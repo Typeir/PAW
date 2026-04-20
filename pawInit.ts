@@ -15,12 +15,12 @@
  */
 
 import * as p from '@clack/prompts';
-import { execSync } from 'node:child_process';
 import {
     appendFileSync,
     copyFileSync,
     existsSync,
     mkdirSync,
+    readdirSync,
     readFileSync,
     writeFileSync,
 } from 'node:fs';
@@ -33,9 +33,6 @@ import {
     HOOKS_DIR,
     PAW_CORE_DIR,
     PAW_DIR,
-    PAW_TSCONFIG,
-    PAW_TSCONFIG_REL,
-    PAW_TSCONFIG_TEMPLATE,
     PAWIGNORE_PATH,
     PROJECT_ROOT,
 } from './paw-paths';
@@ -100,59 +97,6 @@ export const gate: QualityGate = {
 `;
 
 /**
- * Ensure PAW's own dependencies are installed in .github/PAW/node_modules/.
- * PAW is self-contained — it must not rely on the host project's node_modules.
- * Skips install when node_modules already exists.
- */
-function installPawDeps(): void {
-  const nodeModulesPath = path.join(PAW_CORE_DIR, 'node_modules');
-  if (existsSync(nodeModulesPath)) {
-    logger.info('PAW deps — already installed, skipped');
-    return;
-  }
-  logger.info('Installing PAW dependencies in .github/PAW/ ...');
-  execSync('npm install --prefer-offline', {
-    cwd: PAW_CORE_DIR,
-    stdio: 'inherit',
-    timeout: 60000,
-  });
-  logger.success('PAW deps installed');
-}
-
-/**
- * Copy the tsconfig template from .github/PAW/templates/ into .paw/.
- */
-function scaffoldTsconfig(): void {
-  if (existsSync(PAW_TSCONFIG)) {
-    logger.info('tsconfig.json already exists — skipped');
-    return;
-  }
-  if (!existsSync(PAW_TSCONFIG_TEMPLATE)) {
-    logger.warn(
-      'tsconfig template not found at .github/PAW/templates/tsconfig.json',
-    );
-    return;
-  }
-  copyFileSync(PAW_TSCONFIG_TEMPLATE, PAW_TSCONFIG);
-  logger.success('Created .paw/tsconfig.json');
-}
-
-/**
- * Run paw sync to copy default hooks and generate hooks.json.
- */
-function runSync(): void {
-  try {
-    execSync(`npx tsx --tsconfig ${PAW_TSCONFIG_REL} .github/PAW/pawSync.ts`, {
-      cwd: PROJECT_ROOT,
-      stdio: 'inherit',
-      timeout: 30000,
-    });
-  } catch {
-    logger.warn('Hook sync failed — run "npx paw sync" manually');
-  }
-}
-
-/**
  * Ensure .paw/ is listed in .gitignore so the DB and logs aren't committed.
  */
 function ensureGitignore(): void {
@@ -197,6 +141,41 @@ function scaffoldPawignore(): void {
   }
   writeFileSync(PAWIGNORE_PATH, DEFAULT_PAWIGNORE, 'utf-8');
   logger.success('Created .pawignore');
+}
+
+/**
+ * Copy compiled hooks from PAW dist into .paw/hooks/ via sync logic.
+ */
+function runSync(): void {
+  try {
+    const hooksSource = path.join(PAW_CORE_DIR, 'hooks');
+    if (!existsSync(hooksSource)) {
+      logger.warn('No compiled hooks found — run sync manually after build');
+      return;
+    }
+    mkdirSync(HOOKS_DIR, { recursive: true });
+    const files = readdirSync(hooksSource).filter((f: string) =>
+      f.endsWith('.mjs'),
+    );
+    for (const file of files) {
+      copyFileSync(path.join(hooksSource, file), path.join(HOOKS_DIR, file));
+    }
+    // Copy _lib/ chunks
+    const libSrc = path.join(hooksSource, '_lib');
+    if (existsSync(libSrc)) {
+      const libDest = path.join(HOOKS_DIR, '_lib');
+      mkdirSync(libDest, { recursive: true });
+      const libFiles = readdirSync(libSrc).filter((f: string) =>
+        f.endsWith('.mjs'),
+      );
+      for (const file of libFiles) {
+        copyFileSync(path.join(libSrc, file), path.join(libDest, file));
+      }
+    }
+    logger.success(`Hooks synced (${files.length} hooks copied)`);
+  } catch {
+    logger.warn('Hook sync failed — run "paw sync" manually');
+  }
 }
 
 /**
@@ -272,13 +251,8 @@ async function main(): Promise<void> {
 
   const s = logger.spin();
 
-  s.start('Checking PAW dependencies');
-  installPawDeps();
-  s.stop('✅ PAW deps ready');
-
   s.start('Scaffolding .paw/ directory');
   scaffoldDirectories();
-  scaffoldTsconfig();
   s.stop('✅ .paw/ directory ready');
 
   if (options.starterGate) {
@@ -307,15 +281,9 @@ async function main(): Promise<void> {
   if (options.gitHooks) {
     s.start('Installing Git hooks');
     try {
-      execSync(
-        `npx tsx --tsconfig ${PAW_TSCONFIG_REL} .github/PAW/pawHooks.ts install`,
-        {
-          cwd: PROJECT_ROOT,
-          stdio: 'inherit',
-          timeout: 15000,
-        },
-      );
-      s.stop('✅ Git hooks installed');
+      // TODO: Git hooks installation via bundled CLI
+      logger.warn('Git hook installation not yet available in compiled mode');
+      s.stop('⚠️ Git hooks — skipped (run manually)');
     } catch {
       s.stop(
         '⚠️ Git hook installation failed — run "paw hooks:install" manually',

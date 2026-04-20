@@ -1,31 +1,35 @@
 {
-  "name": "paw",
+  "name": "paw-cli",
   "version": "0.1.0",
   "description": "Portable Agentic Workflows — quality gates, hooks, and agent memory for GitHub Copilot",
-  "private": true,
   "type": "module",
+  "license": "MIT",
   "engines": {
     "node": ">=18"
   },
+  "bin": {
+    "paw": "dist/cli.mjs"
+  },
+  "files": [
+    "dist/"
+  ],
   "scripts": {
-    "init": "npx tsx pawInit.ts",
-    "sync": "npx tsx pawSync.ts",
+    "build": "node build.mjs",
+    "init": "node dist/cli.mjs init",
+    "sync": "node dist/cli.mjs sync",
     "gates": "npx tsx pawGates.ts",
     "gates:changed": "npx tsx pawGates.ts --changed-only",
     "gates:staged": "npx tsx pawGates.ts --staged",
-    "hooks:install": "npx tsx pawHooks.ts install",
-    "hooks:uninstall": "npx tsx pawHooks.ts uninstall",
-    "hooks:status": "npx tsx pawHooks.ts status",
     "typecheck": "tsc --noEmit --project ../../.paw/tsconfig.json"
   },
   "dependencies": {
     "@clack/prompts": "^1.1.0",
     "@github/copilot-sdk": "^0.2.2",
-    "better-sqlite3": "^12.8.0"
+    "sql.js": "^1.14.1"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.19.7",
+    "esbuild": "^0.25.0",
     "tsx": "^4.21.0",
     "typescript": "^5"
   }

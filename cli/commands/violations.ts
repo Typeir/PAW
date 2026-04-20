@@ -35,8 +35,8 @@ export const meta: CommandMeta = {
 /**
  * List all unresolved violations in the database.
  */
-export function cmdViolationsList(): void {
-  const db = openDb(DEFAULT_DB_PATH, { readonly: false });
+export async function cmdViolationsList(): Promise<void> {
+  const db = await openDb(DEFAULT_DB_PATH, { readonly: false });
   try {
     const rows = getUnresolvedViolations(db);
 
@@ -83,7 +83,7 @@ async function requirePassword(): Promise<boolean> {
 export async function cmdViolationsPrune(): Promise<void> {
   if (!(await requirePassword())) return;
 
-  const db = openDb();
+  const db = await openDb();
   try {
     const count = resolveAllViolations(db);
     log.success(`Resolved ${count} violation(s) in database.`);
@@ -109,7 +109,7 @@ export async function cmdViolationsResolve(filePath?: string): Promise<void> {
     ? filePath
     : `${process.cwd()}/${filePath}`.replace(/\\/g, '/');
 
-  const db = openDb();
+  const db = await openDb();
   try {
     const count = resolveViolations(db, resolved);
     log.success(`Resolved ${count} violation(s) for ${resolved}`);

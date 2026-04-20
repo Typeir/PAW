@@ -4,68 +4,34 @@
 
 ---
 
-## Quick Start (5-Minute Setup)
+## Quick Start (2-Minute Setup)
 
-For a project that already has Node.js and TypeScript:
+For any project with Node.js 18+:
 
-### 1. Install tsx
+### 1. Install PAW
 
 ```bash
-npm install --save-dev tsx typescript
+npm i -g paw-cli && paw init
 ```
 
-### 2. Create tsconfig.scripts.json
+Three install modes are available:
 
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "noEmit": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "strict": true
-  },
-  "include": ["scripts/**/*.ts", ".github/scripts/**/*.ts"]
-}
-```
+- **Global**: `npm i -g paw-cli` — `paw` command available everywhere
+- **Local devDep**: `npm i -D paw-cli` — scoped to the project
+- **Drop-in**: Copy the `.paw/` directory directly (no npm needed)
 
-### 3. Create the Hook Runtime
+`paw init` bootstraps `.paw/` with compiled hooks, gates, and config. No tsx, no tsconfig needed at runtime.
 
-Copy the `hook-runtime.ts` from [Part 1](./01-portable-hook-system.md) into `.github/PAW/hook-runtime.ts`.
-
-### 4. Create hooks.json
-
-Run `npm run paw:sync` to auto-generate `.github/hooks/hooks.json` from discovered hooks. Or create it manually:
-
-```json
-{
-  "version": 1,
-  "hooks": {
-    "postToolUse": [
-      {
-        "type": "command",
-        "bash": "npx tsx --tsconfig .paw/tsconfig.json .paw/hooks/post-tool-use.ts",
-        "powershell": "npx tsx --tsconfig .paw/tsconfig.json .paw/hooks/post-tool-use.ts",
-        "cwd": ".",
-        "timeoutSec": 15
-      }
-    ]
-  }
-}
-```
-
-### 5. Create Your First Gate
+### 2. Create Your First Gate
 
 Create `.paw/gates/no-console-log.gate.ts` (see [Part 2](./02-quality-gate-architecture.md) for the full pattern).
 
-### 6. Wire npm Scripts
+### 3. Wire npm Scripts
 
 ```json
 {
   "scripts": {
-    "health:check": "npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts"
+    "health:check": "node .paw/hooks/health-check.mjs"
   }
 }
 ```
@@ -85,7 +51,7 @@ You now have a working portable hook + health check system. Expand from here.
     README.md                           ← This guide index
     docs/                               ← Architecture documentation (Parts 1–9)
     hook-runtime.ts                     ← Shared I/O protocol (HookResult, readInput, writeOutput)
-    hooks/                              ← Default hook templates (skeletons)
+    hooks/                              ← Default hook source (compiled to .mjs by build)
       post-tool-use.ts
       pre-tool-use.ts
       session-end-health.ts
@@ -103,13 +69,13 @@ You now have a working portable hook + health check system. Expand from here.
     templates/                          ← Scaffolding templates (tsconfig, etc.)
 
 .paw/                                   ← Project-specific installed content (gitignored)
-  hooks/                                ← Active hooks invoked by VS Code
-    post-tool-use.ts                    ← Quick lint hook (postToolUse)
-    pre-tool-use.ts                     ← Violation enforcement gate (preToolUse)
-    session-end-health.ts               ← Blocking health gate (calls pawGates.ts)
-    session-end-memory-save.ts          ← Writes decisions/patterns/hints to paw.sqlite
-    session-end-missing-tests.ts        ← Test coverage gate (sessionEnd)
-    user-prompt-submitted.ts            ← L1 loader: queries paw.sqlite, injects facts
+  hooks/                                ← Active compiled hooks (*.mjs — invoked by VS Code)
+    post-tool-use.mjs                   ← Quick lint hook (postToolUse)
+    pre-tool-use.mjs                    ← Violation enforcement gate (preToolUse)
+    session-end-health.mjs              ← Blocking health gate (calls pawGates)
+    session-end-memory-save.mjs         ← Writes decisions/patterns/hints to paw.sqlite
+    session-end-missing-tests.mjs       ← Test coverage gate (sessionEnd)
+    user-prompt-submitted.mjs           ← L1 loader: queries paw.sqlite, injects facts
   gates/                                ← Drop gate files here (auto-discovered)
     file-length.gate.ts                 ← TypeScript gate (in-process import)
     duplicate-css.gate.ts
@@ -128,7 +94,6 @@ You now have a working portable hook + health check system. Expand from here.
   paw.sqlite                            ← SQLite memory store (gitignored)
   violations.json                       ← Single-file violation ledger (gitignored)
   paw.log                               ← Runtime log (gitignored)
-  tsconfig.json                         ← Script tsconfig for .paw/ hooks
 
   agents/
     analyzer.agent.md                   ← Phase A: Read-only analysis
@@ -180,7 +145,7 @@ The project config is the single file that adapts PAW to the host project. All k
 ```jsonc
 {
   // Which Copilot surface to generate hook configs for
-  "surface": "extension",           // "cli" | "extension" | "sdk" | "all"
+  "surface": "extension", // "cli" | "extension" | "sdk" | "all"
 
   // Directories PAW scans for source files in gates
   "sourceDirectories": ["src/", "scripts/"],
@@ -193,9 +158,9 @@ The project config is the single file that adapts PAW to the host project. All k
 
   // Gate runner configuration — maps file suffixes to execution strategies
   "runners": {
-    ".gate.ts": "import",           // In-process dynamic import (default)
-    ".gate.js": "node",             // Node.js subprocess
-    ".gate.py": "python3"           // Python subprocess
+    ".gate.ts": "import", // In-process dynamic import (default)
+    ".gate.js": "node", // Node.js subprocess
+    ".gate.py": "python3", // Python subprocess
   },
 
   // Git hook definitions — loaded by pawHooks.ts install
@@ -204,25 +169,25 @@ The project config is the single file that adapts PAW to the host project. All k
       "name": "pre-commit",
       "flags": "--changed-only --staged",
       "description": "Run quality gates on staged files before commit",
-      "appendCommands": ["npx tsx ... .paw/git-hooks/submodule-guard.ts"]
+      "appendCommands": ["node .paw/git-hooks/submodule-guard.mjs"],
     },
     {
       "name": "commit-msg",
-      "command": "npx tsx ... .paw/git-hooks/commit-msg.ts \"$1\"",
-      "description": "Validate commit message format"
-    }
-  ]
+      "command": "node .paw/git-hooks/commit-msg.mjs \"$1\"",
+      "description": "Validate commit message format",
+    },
+  ],
 }
 ```
 
-| Key                  | Type       | Default         | Purpose                                                 |
-| -------------------- | ---------- | --------------- | ------------------------------------------------------- |
-| `surface`            | string     | `"extension"`   | Which Copilot surface adapter to use                    |
-| `sourceDirectories`  | string[]   | `[]`            | Source directories for gate file scanning                |
-| `tasksDir`           | string     | *(none)*        | Project-relative path to agile task artifacts            |
-| `domains`            | string[]   | `[]`            | Domain keywords for automatic decision tagging           |
-| `runners`            | object     | `{".gate.ts":"import"}` | Gate file suffix → execution command mapping    |
-| `gitHooks`           | object[]   | pre-commit only | Git hook definitions with flags, commands, append        |
+| Key                 | Type     | Default                 | Purpose                                           |
+| ------------------- | -------- | ----------------------- | ------------------------------------------------- |
+| `surface`           | string   | `"extension"`           | Which Copilot surface adapter to use              |
+| `sourceDirectories` | string[] | `[]`                    | Source directories for gate file scanning         |
+| `tasksDir`          | string   | _(none)_                | Project-relative path to agile task artifacts     |
+| `domains`           | string[] | `[]`                    | Domain keywords for automatic decision tagging    |
+| `runners`           | object   | `{".gate.ts":"import"}` | Gate file suffix → execution command mapping      |
+| `gitHooks`          | object[] | pre-commit only         | Git hook definitions with flags, commands, append |
 
 ---
 
@@ -478,6 +443,7 @@ interface Remote {
 3. Implement main function: `readHookInput()` → logic → `writeHookOutput()`
 4. Run `npm run paw:sync` — pawSync auto-discovers hooks from `.paw/hooks/` and regenerates hooks.json
 5. Filename conventions: `pre-tool-use-*` → PreToolUse, `post-tool-use-*` → PostToolUse, `session-end-*` → Stop, `user-prompt-*` → UserPromptSubmit
+6. After adding hooks, run `node build.mjs` to compile them to `.mjs`
 
 ### How to Add a New Agent
 
@@ -525,8 +491,8 @@ interface Remote {
 ### How to Set Up Git Hooks (Replace Husky)
 
 1. Configure hooks in `.paw/config.json` under `gitHooks` — set `name`, `flags`, and optional `command`/`appendCommands`
-2. Run `npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawHooks.ts install`
-3. To remove: `pawHooks.ts uninstall` — only removes PAW-generated hooks
+2. Run `paw hooks install`
+3. To remove: `paw hooks uninstall` — only removes PAW-generated hooks
 4. See [Part 8: Huskys Need PAWs](./08-huskys-need-paws.md) for migration guide and full details
 
 ### How to Add a Federation Remote
@@ -534,7 +500,7 @@ interface Remote {
 1. Ensure the remote `paw.sqlite` is accessible (file path, synced folder, or future HTTP endpoint)
 2. Insert into the `remotes` table: `INSERT INTO remotes (name, path, transport) VALUES ('name', '/path/to/remote/paw.sqlite', 'file')`
 3. Optionally set `pull_filter` to limit what gets imported (e.g., `"domain = 'testing'"`)
-4. Run the pull script: `npx tsx --tsconfig tsconfig.scripts.json .github/scripts/paw-pull.ts`
+4. Run the pull script: `paw pull`
 5. Review imports: `SELECT * FROM imported_decisions WHERE accepted = 0`
 6. Accept useful imports: the accept function promotes them to local decisions
 

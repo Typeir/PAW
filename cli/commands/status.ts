@@ -25,7 +25,7 @@ export const meta: CommandMeta = {
  * Show PAW surface config, hook registration, and system state.
  * @param _args - Unused; present for the CliCommand contract.
  */
-export function run(_args: string[]): void {
+export async function run(_args: string[]): Promise<void> {
   log.info('PAW Status');
 
   log.message(
@@ -36,7 +36,7 @@ export function run(_args: string[]): void {
   );
   let violationCount = 0;
   try {
-    const db = openDbReadonly(DEFAULT_DB_PATH);
+    const db = await openDbReadonly(DEFAULT_DB_PATH);
     if (db) {
       try {
         violationCount = getUnresolvedViolations(db).length;

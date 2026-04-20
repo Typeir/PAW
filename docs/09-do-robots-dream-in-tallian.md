@@ -595,16 +595,16 @@ This skill is **conditionally referenced**: only injected into agent context whe
 
 ```bash
 # Decode a Tallian record to English
-npx tsx .github/PAW/tallian.ts decode "①❮∀✦☀✦∈⊕⊗✦∧⊙⊘✦⌘✦⌛❯"
+paw tallian decode "①❮∀✦☀✦∈⊕⊗✦∧⊙⊘✦⌘✦⌛❯"
 
 # Encode from structured input
-npx tsx .github/PAW/tallian.ts encode --type decision --domain scss --subject "color placement" --predicate "vars only" --confidence certain --temporal past
+paw tallian encode --type decision --domain scss --subject "color placement" --predicate "vars only" --confidence certain --temporal past
 
 # Validate all dictionary glyphs against tokenizers
-npx tsx .github/PAW/tallian.ts validate-glyphs
+paw tallian validate-glyphs
 
 # Batch-convert existing English memories to Tallian
-npx tsx .github/PAW/tallian.ts migrate
+paw tallian migrate
 ```
 
 ### Optional Byte Compression
@@ -652,7 +652,7 @@ The `Z1:` prefix (analogous to Tallian's `①` version prefix) allows the decode
 
 ```bash
 # During initial setup
-npx tsx .github/PAW/pawInit.ts
+paw init
 # → "Enable Tallian memory encoding?" → Yes
 
 # Or manually
@@ -687,12 +687,12 @@ Convention: project extensions use glyphs from the **Musical Symbols** or **Geom
 
 ```bash
 # Decode a memory record
-npx tsx .github/PAW/tallian.ts decode "①❮∀✦☀✦∈⊕⊗✦∧⊙⊘✦⌘✦⌛❯"
+paw tallian decode "①❮∀✦☀✦∈⊕⊗✦∧⊙⊘✦⌘✦⌛❯"
 # Output: Decision [scss] color-placement → vars-only (certain, past)
 
 # View paw.sqlite contents with decoded Tallian
 sqlite3 .paw/paw.sqlite "SELECT context, choice FROM decisions WHERE superseded_at IS NULL" | \
-  npx tsx .github/PAW/tallian.ts decode-stream
+  paw tallian decode-stream
 ```
 
 ### Migration
@@ -701,10 +701,10 @@ Existing English memories can be batch-converted:
 
 ```bash
 # Dry run — show what would change
-npx tsx .github/PAW/tallian.ts migrate --dry-run
+paw tallian migrate --dry-run
 
 # Convert all records
-npx tsx .github/PAW/tallian.ts migrate
+paw tallian migrate
 ```
 
 The migration:

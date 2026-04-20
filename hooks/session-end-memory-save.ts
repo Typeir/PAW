@@ -11,21 +11,17 @@
  * @since 3.0.0
  */
 
-import type BetterSqlite3 from 'better-sqlite3';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import {
-  isNestedHookRun,
-  readHookInput,
-  writeHookOutput,
-} from '../../.github/PAW/hook-runtime';
-import { DEFAULT_DB_PATH, openDb } from '../../.github/PAW/paw-db';
-import {
-  PAW_DIR,
-  PROJECT_ROOT as ROOT,
-  getTasksDir,
-} from '../../.github/PAW/paw-paths';
-import { runPlugins } from '../../.github/PAW/plugin-loader';
+    isNestedHookRun,
+    readHookInput,
+    writeHookOutput,
+} from '../hook-runtime';
+import type { PawDatabase } from '../paw-db';
+import { DEFAULT_DB_PATH, openDb } from '../paw-db';
+import { PAW_DIR, PROJECT_ROOT as ROOT, getTasksDir } from '../paw-paths';
+import { runPlugins } from '../plugin-loader';
 
 /**
  * Parsed decision extracted from a task file.
@@ -43,7 +39,7 @@ interface Decision {
  *
  * @param _db - SQLite database instance (schema already applied by openDb)
  */
-function ensureSchema(_db: BetterSqlite3.Database): void {
+function ensureSchema(_db: PawDatabase): void {
   /** Schema is initialized by paw-db.openDb() — nothing to do */
 }
 
@@ -189,7 +185,7 @@ function extractAppliedPatterns(input: Record<string, unknown>): string[] {
  * @param db - SQLite database instance
  * @param filePath - Absolute path to task file
  */
-function indexTaskFile(db: BetterSqlite3.Database, filePath: string): void {
+function indexTaskFile(db: PawDatabase, filePath: string): void {
   const content = readFileSync(filePath, 'utf-8');
   const title = extractTitle(content);
   const status = extractStatus(content);
@@ -227,7 +223,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const db = openDb(DEFAULT_DB_PATH);
+  const db = await openDb(DEFAULT_DB_PATH);
   try {
     ensureSchema(db);
 

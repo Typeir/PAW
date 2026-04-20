@@ -5,12 +5,13 @@
  * by the PAW runtime, gates, hooks, or bootstrapper is derived from here.
  *
  * Layout:
- *   .github/PAW/      — Framework core (runtime, types, commands)
+ *   PAW_CORE_DIR      — Framework package directory (PAW's own code, templates, assets)
+ *   PROJECT_ROOT      — User's project root (process.cwd() — where .paw/ lives)
  *   .paw/             — Project-specific installed content (gates, hooks, db, logs)
  *
  * @module .github/PAW/paw-paths
  * @author PAW
- * @version 1.0.0
+ * @version 2.0.0
  * @since 3.0.0
  */
 
@@ -22,14 +23,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Absolute path to the PAW core directory (.github/PAW/).
+ * Absolute path to the PAW core directory (framework package).
+ * Used to locate templates and assets shipped with PAW.
  */
 export const PAW_CORE_DIR = __dirname;
 
 /**
- * Absolute path to the project root (two levels above .github/PAW/).
+ * Absolute path to the project root. Derived from process.cwd() so PAW
+ * works regardless of install method (global, local devDep, or drop-in).
  */
-export const PROJECT_ROOT = path.resolve(__dirname, '../..');
+export const PROJECT_ROOT = process.cwd();
 
 /**
  * Absolute path to the installed PAW directory (.paw/).

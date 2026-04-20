@@ -12,7 +12,7 @@
  * @since 4.0.0
  */
 
-import type BetterSqlite3 from 'better-sqlite3';
+import type { PawDatabase } from './paw-db';
 
 /**
  * Result returned by a plugin's run() function.
@@ -38,7 +38,7 @@ export interface PawPlugin {
   name: string;
   run(
     hookInput: Record<string, unknown>,
-    db: BetterSqlite3.Database | null,
+    db: PawDatabase | null,
   ): Promise<PluginResult>;
 }
 

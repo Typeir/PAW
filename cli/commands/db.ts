@@ -34,8 +34,8 @@ const TABLES = [
 /**
  * Print row counts for all PAW database tables.
  */
-export function cmdDbStats(): void {
-  const db = openDb(DEFAULT_DB_PATH, { readonly: false });
+export async function cmdDbStats(): Promise<void> {
+  const db = await openDb(DEFAULT_DB_PATH, { readonly: false });
   try {
     log.info('PAW Database Stats:');
     for (const table of TABLES) {
@@ -56,8 +56,8 @@ export function cmdDbStats(): void {
 /**
  * Drop all tables and recreate the schema from scratch.
  */
-export function cmdDbReset(): void {
-  const db = openDb();
+export async function cmdDbReset(): Promise<void> {
+  const db = await openDb();
   try {
     db.pragma('foreign_keys = OFF');
     for (const table of [...TABLES].reverse()) {

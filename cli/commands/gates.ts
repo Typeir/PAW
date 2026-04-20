@@ -7,8 +7,8 @@
 
 import { log } from '@clack/prompts';
 import { execSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
-import { GATES_DIR, PAW_TSCONFIG_REL, PROJECT_ROOT } from '../../paw-paths';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { GATES_DIR, PAW_CONFIG_PATH, PAW_TSCONFIG_REL, PROJECT_ROOT } from '../../paw-paths';
 import type { CommandMeta } from '../cli-loader';
 import { resolveSubcommand } from '../cli-loader';
 
@@ -28,12 +28,36 @@ export const meta: CommandMeta = {
 };
 
 /**
+ * Load runner extension suffixes from .paw/config.json.
+ * Falls back to the default TypeScript-only runner when no config exists.
+ *
+ * @returns Set of recognised gate file suffixes (e.g. {".gate.ts", ".gate.py"})
+ */
+function loadGateSuffixes(): Set<string> {
+  if (!existsSync(PAW_CONFIG_PATH)) return new Set(['.gate.ts']);
+  try {
+    const cfg = JSON.parse(readFileSync(PAW_CONFIG_PATH, 'utf-8')) as {
+      runners?: Record<string, string>;
+    };
+    if (cfg.runners && typeof cfg.runners === 'object') {
+      return new Set(Object.keys(cfg.runners));
+    }
+  } catch {
+    /* parse failure — fall through */
+  }
+  return new Set(['.gate.ts']);
+}
+
+/**
  * List all discovered gate files in .paw/gates/.
  */
 function cmdGatesList(): void {
   let files: string[];
   try {
-    files = readdirSync(GATES_DIR).filter((f) => f.endsWith('.gate.ts'));
+    const suffixes = loadGateSuffixes();
+    files = readdirSync(GATES_DIR).filter((f) =>
+      [...suffixes].some((suf) => f.endsWith(suf)),
+    );
   } catch {
     log.warn(`No gates directory found at ${GATES_DIR}`);
     return;
@@ -46,7 +70,7 @@ function cmdGatesList(): void {
 
   log.info(`${files.length} gate(s) in ${GATES_DIR}:`);
   for (const f of files) {
-    log.message(`  ${f.replace('.gate.ts', '')}`);
+    log.message(`  ${f.replace(/\.gate\.\w+$/, '')}`);
   }
 }
 

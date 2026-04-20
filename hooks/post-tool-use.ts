@@ -29,28 +29,28 @@ import { spawn, type SpawnOptions } from 'node:child_process';
 import path from 'node:path';
 
 import {
-  extractSessionId,
-  readHookInput,
-  resolveEditedFilePath,
-  writeHookOutput,
-} from '../../.github/PAW/hook-runtime';
+    extractSessionId,
+    readHookInput,
+    resolveEditedFilePath,
+    writeHookOutput,
+} from '../hook-runtime';
 import {
-  DEFAULT_DB_PATH,
-  getPawConfig,
-  insertViolation,
-  normalizePath,
-  openDb,
-  openDbReadonly,
-  resolveViolationsForFile,
-} from '../../.github/PAW/paw-db';
+    DEFAULT_DB_PATH,
+    getPawConfig,
+    insertViolation,
+    normalizePath,
+    openDb,
+    openDbReadonly,
+    resolveViolationsForFile,
+} from '../paw-db';
 import {
-  isPathIgnored,
-  PROJECT_ROOT as ROOT,
-  toProjectRelative,
-} from '../../.github/PAW/paw-paths';
-import { runGatesForFiles } from '../../.github/PAW/pawGates';
-import { runPlugins } from '../../.github/PAW/plugin-loader';
-import { resolveStaleIndirectViolations } from '../../.github/PAW/resolve-indirect-violations';
+    isPathIgnored,
+    PROJECT_ROOT as ROOT,
+    toProjectRelative,
+} from '../paw-paths';
+import { runGatesForFiles } from '../pawGates';
+import { runPlugins } from '../plugin-loader';
+import { resolveStaleIndirectViolations } from '../resolve-indirect-violations';
 
 /**
  * Persist gate findings for a file into SQLite, scoped to the current session.
@@ -59,13 +59,13 @@ import { resolveStaleIndirectViolations } from '../../.github/PAW/resolve-indire
  * @param {Array<{ rule: string; message: string }>} findings - Gate findings
  * @param {string | null} sessionId - Current session ID
  */
-function writeViolations(
+async function writeViolations(
   filePath: string,
   findings: Array<{ rule: string; message: string; indirectFix?: boolean }>,
   sessionId: string | null,
-): void {
+): Promise<void> {
   try {
-    const db = openDb(DEFAULT_DB_PATH);
+    const db = await openDb(DEFAULT_DB_PATH);
     try {
       for (const finding of findings) {
         insertViolation(db, {
@@ -86,16 +86,25 @@ function writeViolations(
 }
 
 /**
- * Resolve violations for a file in the current session.
+ * Resolve violations for a file — clears both session-scoped and
+ * project-scoped (NULL session_id) violations.
+ * When a file passes all gates, any stale project-scoped violation
+ * (e.g. from manual test runs without a session_id) is also cleared
+ * so the enforcement loop can complete correctly.
  *
  * @param {string} filePath - File path whose violations are resolved
  * @param {string | null} sessionId - Current session ID
  */
-function clearViolations(filePath: string, sessionId: string | null): void {
+async function clearViolations(filePath: string, sessionId: string | null): Promise<void> {
   try {
-    const db = openDb(DEFAULT_DB_PATH);
+    const db = await openDb(DEFAULT_DB_PATH);
     try {
-      resolveViolationsForFile(db, normalizePath(filePath), sessionId);
+      /** Always clear project-scoped (NULL session) violations for clean files. */
+      resolveViolationsForFile(db, normalizePath(filePath), null);
+      /** Also clear session-scoped violations when a session is known. */
+      if (sessionId) {
+        resolveViolationsForFile(db, normalizePath(filePath), sessionId);
+      }
     } finally {
       db.close();
     }
@@ -127,7 +136,13 @@ function spawnMemoryWorker(
 ): Promise<void> {
   return new Promise((resolve) => {
     try {
-      const workerPath = path.join(ROOT, '.github', 'PAW', 'hooks', 'memory-worker.ts');
+      const workerPath = path.join(
+        ROOT,
+        '.github',
+        'PAW',
+        'hooks',
+        'memory-worker.ts',
+      );
       const tsconfigPath = path.join(ROOT, '.paw', 'tsconfig.json');
       const tsxCli = path.join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs');
       const isWindows = process.platform === 'win32';
@@ -173,7 +188,7 @@ function spawnMemoryWorker(
  */
 async function main(): Promise<void> {
   try {
-    const cfgDb = openDbReadonly(DEFAULT_DB_PATH);
+    const cfgDb = await openDbReadonly(DEFAULT_DB_PATH);
     if (cfgDb) {
       try {
         if (getPawConfig(cfgDb, 'paw_state') === 'disabled') {
@@ -201,7 +216,7 @@ async function main(): Promise<void> {
 
   /** Skip files excluded by .pawignore or PAW's built-in exclusions. */
   if (isPathIgnored(relativePath)) {
-    clearViolations(relativePath, sessionId);
+    await clearViolations(relativePath, sessionId);
     writeHookOutput({ continue: true });
     return;
   }
@@ -213,15 +228,15 @@ async function main(): Promise<void> {
     .flatMap((g) => g.findings);
 
   if (criticalFindings.length === 0) {
-    clearViolations(relativePath, sessionId);
-    resolveStaleIndirectViolations(sessionId);
+    await clearViolations(relativePath, sessionId);
+    await resolveStaleIndirectViolations(sessionId);
     writeHookOutput({ continue: true });
     await spawnMemoryWorker(relativePath, sessionId);
     return;
   }
 
-  clearViolations(relativePath, sessionId);
-  writeViolations(relativePath, criticalFindings, sessionId);
+  await clearViolations(relativePath, sessionId);
+  await writeViolations(relativePath, criticalFindings, sessionId);
 
   const pluginResult = await runPlugins('post-tool-use', hookInput, null);
 

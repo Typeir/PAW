@@ -1,24 +1,26 @@
 # Part 1: Portable Hook System
 
-> Build cross-platform Copilot hooks using TypeScript-via-tsx — no shell scripts, no platform branching.
+> Build cross-platform Copilot hooks using pre-compiled `.mjs` files — no shell scripts, no platform branching, no runtime dependencies beyond Node.
 
 ---
 
-## Why TypeScript-via-tsx
+## Why Pre-Compiled .mjs
 
 Traditional hook systems rely on `.sh` (Unix) and `.ps1` (Windows) scripts, creating two maintenance surfaces and constant divergence. The PAW approach eliminates this entirely:
 
 | Approach                   | Maintenance Surfaces | Path Handling             | Encoding Issues      |
 | -------------------------- | -------------------- | ------------------------- | -------------------- |
 | Shell scripts (.sh + .ps1) | 2 per hook           | OS-specific               | CRLF vs LF           |
-| **TypeScript-via-tsx**     | **1 per hook**       | **Node.js `path` module** | **UTF-8 everywhere** |
+| **Pre-compiled .mjs**      | **1 per hook**       | **Node.js `path` module** | **UTF-8 everywhere** |
 
-**The key insight**: `npx tsx` runs identically on Windows PowerShell, cmd.exe, macOS bash, and Linux — one command string works everywhere. Combined with Node.js built-in `fs` and `path` modules for all I/O, you get truly portable hooks with zero platform-conditional code.
+**The key insight**: `node .paw/hooks/xxx.mjs` runs identically on Windows PowerShell, cmd.exe, macOS bash, and Linux — one command string works everywhere. Hooks are authored in TypeScript but compiled to self-contained `.mjs` files via esbuild at build time. At runtime, only Node.js is needed — no tsx, no tsconfig, no TypeScript dependency.
 
-**Prerequisites**: Node.js 18+, `tsx` as a dev dependency, a `tsconfig` for scripts.
+**Prerequisites**: Node.js 18+.
+
+Install PAW:
 
 ```bash
-npm install --save-dev tsx typescript
+npm i -g paw-cli && paw init
 ```
 
 ---
@@ -48,7 +50,7 @@ VS Code Copilot discovers hooks via `.github/hooks/hooks.json`. This file maps l
 
 ### Portability Trick
 
-Because `npx tsx` is cross-platform, **both fields use the identical command**:
+Because `node` is cross-platform and hooks are pre-compiled `.mjs`, **both fields use the identical command**:
 
 ```json
 {
@@ -57,8 +59,8 @@ Because `npx tsx` is cross-platform, **both fields use the identical command**:
     "postToolUse": [
       {
         "type": "command",
-        "bash": "npx tsx --tsconfig .paw/tsconfig.json .paw/hooks/post-tool-use.ts",
-        "powershell": "npx tsx --tsconfig .paw/tsconfig.json .paw/hooks/post-tool-use.ts",
+        "bash": "node .paw/hooks/post-tool-use.mjs",
+        "powershell": "node .paw/hooks/post-tool-use.mjs",
         "cwd": ".",
         "timeoutSec": 15
       }
@@ -67,16 +69,16 @@ Because `npx tsx` is cross-platform, **both fields use the identical command**:
 }
 ```
 
-No branching. No platform detection. One command.
+No branching. No platform detection. No runtime dependencies. One command.
 
 ### Available Hook Events
 
-| Event                 | Fires When                    | Typical Use                                            |
-| --------------------- | ----------------------------- | ------------------------------------------------------ |
-| `userPromptSubmitted` | User sends a message          | Logging, L1 memory injection via `systemMessage`       |
-| `preToolUse`          | Agent is about to call a tool | Violation enforcement — deny tools until fixes applied |
-| `postToolUse`          | Agent finishes a tool call    | Gate violations recorded in SQLite; PreToolUse enforces on the next call |
-| `sessionEnd`          | Conversation ends             | Full health check, test gap detection, blocking gates  |
+| Event                 | Fires When                    | Typical Use                                                              |
+| --------------------- | ----------------------------- | ------------------------------------------------------------------------ |
+| `userPromptSubmitted` | User sends a message          | Logging, L1 memory injection via `systemMessage`                         |
+| `preToolUse`          | Agent is about to call a tool | Violation enforcement — deny tools until fixes applied                   |
+| `postToolUse`         | Agent finishes a tool call    | Gate violations recorded in SQLite; PreToolUse enforces on the next call |
+| `sessionEnd`          | Conversation ends             | Full health check, test gap detection, blocking gates                    |
 
 Multiple hooks can register for the same event — they execute sequentially in array order.
 
@@ -438,10 +440,11 @@ async function main(): Promise<void> {
   let output = '';
   let exitCode = 0;
   try {
-    output = execSync(
-      'npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts --changed-only',
-      { encoding: 'utf-8', timeout: 90000, stdio: ['pipe', 'pipe', 'pipe'] },
-    );
+    output = execSync('node .paw/hooks/session-end-health.mjs --changed-only', {
+      encoding: 'utf-8',
+      timeout: 90000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
   } catch (err: unknown) {
     const execErr = err as { stdout?: string; status?: number };
     output = execErr.stdout ?? '';
@@ -486,15 +489,17 @@ async function main(): Promise<void> {
 | File operations      | `fs.promises` or `fs` sync variants — both cross-platform                              |
 | Subprocess execution | `execSync(cmd, { stdio: ['pipe', 'pipe', 'pipe'] })` — explicit pipes avoid TTY issues |
 | Git commands         | `execSync('git ...')` — works anywhere git is installed                                |
-| Script compilation   | `npx tsx --tsconfig tsconfig.scripts.json <script>` — identical on all platforms       |
+| Hook execution       | `node .paw/hooks/xxx.mjs` — pre-compiled, identical on all platforms                   |
 | Temp files           | `os.tmpdir()` — though prefer in-memory processing                                     |
 | Timeouts             | Always set `setTimeout` fallbacks on stdin reads                                       |
 
 ---
 
-## tsconfig for Scripts
+## Build: Compiling Hooks
 
-Create a dedicated `tsconfig.scripts.json` at project root:
+Hooks are authored in TypeScript but compiled to `.mjs` via esbuild. Run `node build.mjs` to produce `dist/` with the CLI and compiled hooks. The compiled `.mjs` files are self-contained — no tsconfig or tsx needed at runtime.
+
+For development, you can still use a `tsconfig.scripts.json` at project root:
 
 ```json
 {
@@ -516,7 +521,7 @@ Create a dedicated `tsconfig.scripts.json` at project root:
 
 - `ES2022` target — enables top-level await, import.meta
 - `ESNext` modules — native ESM, no CommonJS translation
-- `noEmit` — tsx runs TypeScript directly, no compilation step
+- `noEmit` — type checking only; esbuild handles compilation
 - `bundler` resolution — handles both bare specifiers and relative paths
 
 ---
@@ -530,7 +535,7 @@ Create a dedicated `tsconfig.scripts.json` at project root:
   PAW/
     hook-runtime.ts         ← Shared I/O protocol (HookResult, writeBlockingOutput)
     paw-paths.ts            ← Central path constants (VIOLATIONS_PATH, etc.)
-    hooks/                  ← Default hook templates (copied to .paw/ by sync)
+    hooks/                  ← Default hook source (compiled to .mjs by build)
       pre-tool-use.ts
       user-prompt-submitted.ts
       post-tool-use.ts
@@ -542,7 +547,7 @@ Create a dedicated `tsconfig.scripts.json` at project root:
     paw.db                  ← SQLite memory store (gitignored)
 
 .paw/                       ← Project-specific overrides (gitignored)
-  hooks/                    ← Active hooks (VS Code executes these)
+  hooks/                    ← Active compiled hooks (*.mjs — VS Code executes these)
   violations.json           ← Violation ledger (postToolUse writes, preToolUse reads)
 ```
 

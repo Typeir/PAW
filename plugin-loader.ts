@@ -14,9 +14,9 @@
  * @since 4.0.0
  */
 
-import type BetterSqlite3 from 'better-sqlite3';
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import type { PawDatabase } from './paw-db';
 import { PLUGINS_DIR } from './paw-paths';
 import type { AggregatePluginResult, PawPlugin } from './plugin-types';
 
@@ -80,7 +80,7 @@ async function importPlugin(filePath: string): Promise<PawPlugin | null> {
 export async function runPlugins(
   hookName: string,
   hookInput: Record<string, unknown>,
-  db: BetterSqlite3.Database | null,
+  db: PawDatabase | null,
 ): Promise<AggregatePluginResult> {
   const files = discoverPlugins(hookName);
 

@@ -59,9 +59,9 @@ async function requirePassword(): Promise<boolean> {
  *
  * @returns Current PAW state string
  */
-function readState(): string {
+async function readState(): Promise<string> {
   try {
-    const db = openDbReadonly(DEFAULT_DB_PATH);
+    const db = await openDbReadonly(DEFAULT_DB_PATH);
     if (!db) return 'enabled';
     try {
       return getPawConfig(db, 'paw_state') ?? 'enabled';
@@ -82,7 +82,7 @@ export async function run(args: string[]): Promise<void> {
   const subcommand = args[0];
 
   if (!subcommand) {
-    const current = readState();
+    const current = await readState();
     const icon = current === 'disabled' ? '🔴' : '🟢';
     log.info(`PAW enforcement is currently: ${icon} ${current.toUpperCase()}`);
     return;
@@ -98,7 +98,7 @@ export async function run(args: string[]): Promise<void> {
   }
 
   try {
-    const db = openDb(DEFAULT_DB_PATH);
+    const db = await openDb(DEFAULT_DB_PATH);
     try {
       setPawConfig(db, 'paw_state', subcommand === 'disable' ? 'disabled' : 'enabled');
     } finally {

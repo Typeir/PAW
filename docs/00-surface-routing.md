@@ -195,7 +195,7 @@ PAW introduces a `PawSurfaceAdapter` interface that abstracts hook/agent/skill c
 
 Valid values: `"cli"` (default, backward-compatible), `"extension"`, `"sdk"`, `"all"`.
 
-Environment variable override: `PAW_SURFACE=extension npx tsx .github/PAW/pawSync.ts`
+Environment variable override: `PAW_SURFACE=extension paw sync`
 
 ---
 
@@ -223,14 +223,14 @@ interface PawSurfaceAdapter {
 
 - Output: `.github/hooks/hooks.json` with `{ version: 1, hooks: { ... } }`
 - Events: camelCase (`preToolUse`, `postToolUse`, `userPromptSubmitted`, `sessionEnd`)
-- Commands: `{ type: "command", bash: "npx tsx ...", powershell: "npx tsx ...", cwd: ".", timeoutSec: N }`
+- Commands: `{ type: "command", bash: "node .paw/hooks/...", powershell: "node .paw/hooks/...", cwd: ".", timeoutSec: N }`
 - This is the **current** `pawSync.ts` behavior, extracted into an adapter
 
 ### ExtensionAdapter (new, Extension-native output)
 
 - Output: `.github/hooks/hooks.json` with PascalCase events (or a separate file if CLI format is also needed)
 - Events: PascalCase (`PreToolUse`, `PostToolUse`, `SessionStart`, `Stop`, `SubagentStart`, `SubagentStop`, `PreCompact`)
-- Commands: `{ type: "command", command: "npx tsx ...", windows: "npx tsx ...", linux: "npx tsx ...", osx: "npx tsx ...", cwd: ".", timeout: N }`
+- Commands: `{ type: "command", command: "node .paw/hooks/...", windows: "node .paw/hooks/...", linux: "node .paw/hooks/...", osx: "node .paw/hooks/...", cwd: ".", timeout: N }`
 - Unlocks: Extension-only events, agent-scoped hooks, OS-specific commands
 
 ### SDKAdapter (new, programmatic output)

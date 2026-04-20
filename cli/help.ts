@@ -48,6 +48,6 @@ ${C.yellow}ALIASES${C.reset}
   paw st                     → status
 
 ${C.dim}Run from project root:
-  npx tsx --tsconfig .paw/tsconfig.json .github/PAW/cli/paw.ts <command>${C.reset}
+  paw <command>${C.reset}
 `);
 }

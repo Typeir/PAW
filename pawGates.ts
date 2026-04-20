@@ -457,10 +457,13 @@ async function main(): Promise<void> {
 
 /**
  * True when this module is the direct entry point (not imported by another module).
+ * Guard is narrowed to only match when the script name contains "pawGates" or "health-check"
+ * to avoid triggering the full-scan main() when bundled into hook .mjs files.
  */
 const isDirectRun =
-  process.argv[1] &&
-  fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+  process.argv[1] !== undefined &&
+  fileURLToPath(import.meta.url) === path.resolve(process.argv[1]) &&
+  /paw.?gates|health.?check/i.test(path.basename(process.argv[1]));
 
 if (isDirectRun) {
   main().catch((err: Error) => {

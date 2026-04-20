@@ -19,18 +19,14 @@ import {
     readHookInput,
     writeBlockingOutput,
     writeHookOutput,
-} from '../../.github/PAW/hook-runtime';
-import {
-    DEFAULT_DB_PATH,
-    getPawConfig,
-    openDbReadonly,
-} from '../../.github/PAW/paw-db';
+} from '../hook-runtime';
+import { DEFAULT_DB_PATH, getPawConfig, openDbReadonly } from '../paw-db';
 import {
     PAW_DIR,
     PAW_GATES_REL,
     PAW_TSCONFIG_REL,
     PROJECT_ROOT as ROOT,
-} from '../../.github/PAW/paw-paths';
+} from '../paw-paths';
 
 /**
  * Load optional sourceDirectories from .paw/config.json.
@@ -185,7 +181,7 @@ function buildActionableContext(report: ParsedReport): string {
  */
 async function main(): Promise<void> {
   try {
-    const cfgDb = openDbReadonly(DEFAULT_DB_PATH);
+    const cfgDb = await openDbReadonly(DEFAULT_DB_PATH);
     if (cfgDb) {
       try {
         if (getPawConfig(cfgDb, 'paw_state') === 'disabled') {

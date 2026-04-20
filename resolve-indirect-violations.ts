@@ -71,7 +71,7 @@ const INDIRECT_RESOLVERS: Record<string, (filePath: string) => boolean> = {
  * @param {string | null} [sessionId] - Optional session scope (unused for now — resolves all indirect)
  * @returns {ResolutionResult} Summary of checked and resolved violations
  */
-export function resolveStaleIndirectViolations(
+export async function resolveStaleIndirectViolations(
   sessionId?: string | null,
 ): ResolutionResult {
   const result: ResolutionResult = {
@@ -82,7 +82,7 @@ export function resolveStaleIndirectViolations(
 
   let violations: ViolationRow[];
   try {
-    const readDb = openDbReadonly(DEFAULT_DB_PATH);
+    const readDb = await openDbReadonly(DEFAULT_DB_PATH);
     if (!readDb) return result;
     try {
       violations = readDb
@@ -111,7 +111,7 @@ export function resolveStaleIndirectViolations(
   if (toResolve.length === 0) return result;
 
   try {
-    const writeDb = openDb(DEFAULT_DB_PATH);
+    const writeDb = await openDb(DEFAULT_DB_PATH);
     if (!writeDb) return result;
     try {
       const stmt = writeDb.prepare(

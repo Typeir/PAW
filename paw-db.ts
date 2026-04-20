@@ -1,21 +1,175 @@
 /**
  * PAW Database
  *
- * @fileoverview Central SQLite access layer for PAW. Provides schema initialization,
- * connection management, and typed query helpers. All PAW modules import from this
- * file instead of directly requiring better-sqlite3.
+ * @fileoverview Central SQLite access layer for PAW using sql.js (pure JS, no native deps).
+ * Provides schema initialization, connection management, and typed query helpers.
+ * All PAW modules import from this file instead of directly requiring sql.js.
+ *
+ * sql.js operates in-memory; this module loads the DB file on open and persists
+ * after every mutation via a lightweight wrapper.
  *
  * @module .github/PAW/paw-db
  * @author PAW
- * @version 2.0.0
+ * @version 3.0.0
  * @since 3.0.0
  */
 
-import type BetterSqlite3 from 'better-sqlite3';
-import Database from 'better-sqlite3';
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import initSqlJs, { type Database as SqlJsDatabase } from 'sql.js';
 import { DB_PATH } from './paw-paths';
+
+/* ------------------------------------------------------------------ */
+/*  sql.js engine — lazily initialized (avoids top-level await which  */
+/*  breaks CJS transforms in tsx/esbuild)                             */
+/* ------------------------------------------------------------------ */
+let SQL: Awaited<ReturnType<typeof initSqlJs>> | null = null;
+
+/**
+ * Get the sql.js engine, initializing on first call.
+ */
+async function getSqlEngine(): Promise<Awaited<ReturnType<typeof initSqlJs>>> {
+  if (!SQL) {
+    SQL = await initSqlJs();
+  }
+  return SQL;
+}
+
+/* ------------------------------------------------------------------ */
+/*  PawDatabase wrapper — backward-compatible with better-sqlite3 API */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Persist a sql.js database to disk.
+ */
+function persistToFile(db: SqlJsDatabase, dbPath: string): void {
+  const data = db.export();
+  const buffer = Buffer.from(data);
+  mkdirSync(dirname(dbPath), { recursive: true });
+  writeFileSync(dbPath, buffer);
+}
+
+/**
+ * Statement-like object returned by PawDatabase.prepare(), matching
+ * the better-sqlite3 Statement surface used by PAW callers.
+ */
+export interface PawStatement {
+  get(...params: unknown[]): Record<string, unknown> | undefined;
+  all(...params: unknown[]): Record<string, unknown>[];
+  run(...params: unknown[]): {
+    changes: number;
+    lastInsertRowid: number | bigint;
+  };
+}
+
+/**
+ * Wrapped database that auto-persists to disk after mutations.
+ * Exposes .prepare(), .pragma(), .exec(), and .close() for backward
+ * compatibility with code originally written for better-sqlite3.
+ */
+export interface PawDatabase {
+  /** Underlying sql.js database (escape hatch). */
+  readonly _db: SqlJsDatabase;
+  /** File path this database persists to. */
+  readonly _path: string;
+  /** Whether this is a read-only connection. */
+  readonly _readonly: boolean;
+
+  /**
+   * Create a statement-like object (better-sqlite3 compat).
+   * The returned object supports .get(), .all(), and .run() with params.
+   */
+  prepare(sql: string): PawStatement;
+
+  /** No-op for sql.js — WAL / foreign_keys pragmas are silently ignored. */
+  pragma(str: string): unknown;
+
+  /** Execute raw SQL (DDL, multi-statement). Auto-persists if not readonly. */
+  exec(sql: string): void;
+
+  /** Close the database and release memory. */
+  close(): void;
+}
+
+/**
+ * Create a PawDatabase wrapper around a sql.js database.
+ */
+function wrapDatabase(
+  db: SqlJsDatabase,
+  dbPath: string,
+  readonly: boolean,
+): PawDatabase {
+  return {
+    _db: db,
+    _path: dbPath,
+    _readonly: readonly,
+
+    prepare(sql: string): PawStatement {
+      return {
+        get(...params: unknown[]): Record<string, unknown> | undefined {
+          const stmt = db.prepare(sql);
+          if (params.length > 0) stmt.bind(params as never[]);
+          if (stmt.step()) {
+            const obj = stmt.getAsObject() as Record<string, unknown>;
+            stmt.free();
+            return obj;
+          }
+          stmt.free();
+          return undefined;
+        },
+
+        all(...params: unknown[]): Record<string, unknown>[] {
+          const results = db.exec(
+            sql,
+            params.length > 0 ? (params as never[]) : undefined,
+          );
+          if (results.length === 0) return [];
+          const { columns, values } = results[0];
+          return values.map((row) => {
+            const obj: Record<string, unknown> = {};
+            columns.forEach((col, i) => {
+              obj[col] = row[i];
+            });
+            return obj;
+          });
+        },
+
+        run(...params: unknown[]): {
+          changes: number;
+          lastInsertRowid: number | bigint;
+        } {
+          if (readonly) throw new Error('Cannot write to readonly database');
+          db.run(sql, params.length > 0 ? (params as never[]) : undefined);
+          const meta = db.exec(
+            'SELECT changes() as c, last_insert_rowid() as r',
+          );
+          const changes =
+            meta.length > 0 ? (meta[0].values[0][0] as number) : 0;
+          const lastInsertRowid =
+            meta.length > 0 ? (meta[0].values[0][1] as number) : 0;
+          persistToFile(db, dbPath);
+          return { changes, lastInsertRowid };
+        },
+      };
+    },
+
+    pragma(_str: string): unknown {
+      /* sql.js runs in-memory — WAL, foreign_keys, etc. are no-ops */
+      return undefined;
+    },
+
+    exec(sql: string): void {
+      db.run(sql);
+      if (!readonly) {
+        persistToFile(db, dbPath);
+      }
+    },
+
+    close(): void {
+      db.close();
+    },
+  };
+}
 
 /**
  * Normalize a file path to forward slashes for consistent storage and lookup.
@@ -37,10 +191,10 @@ export const DEFAULT_DB_PATH = DB_PATH;
 /**
  * Ensure all required tables and indices exist (idempotent).
  *
- * @param db - SQLite database instance
+ * @param db - PawDatabase wrapper
  */
-export function ensureSchema(db: BetterSqlite3.Database): void {
-  db.exec(`
+export function ensureSchema(db: PawDatabase): void {
+  db._db.run(`
     CREATE TABLE IF NOT EXISTS decisions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       context TEXT NOT NULL,
@@ -125,7 +279,7 @@ export function ensureSchema(db: BetterSqlite3.Database): void {
     );
   `);
 
-  db.exec(`
+  db._db.run(`
     CREATE INDEX IF NOT EXISTS idx_decisions_active ON decisions(superseded_at) WHERE superseded_at IS NULL;
     CREATE INDEX IF NOT EXISTS idx_decisions_domain ON decisions(domain);
     CREATE INDEX IF NOT EXISTS idx_patterns_domain ON patterns(domain);
@@ -142,6 +296,7 @@ export function ensureSchema(db: BetterSqlite3.Database): void {
     CREATE INDEX IF NOT EXISTS idx_file_memories_hash ON file_memories(file_path, content_hash);
   `);
 
+  persistToFile(db._db, db._path);
   seedMemoryTypes(db);
 }
 
@@ -171,14 +326,13 @@ const DEFAULT_MEMORY_TYPES = [
 /**
  * Seed the memory_types table with default categories (idempotent).
  *
- * @param db - SQLite database instance
+ * @param db - PawDatabase wrapper
  */
-function seedMemoryTypes(db: BetterSqlite3.Database): void {
-  const insert = db.prepare(
-    'INSERT OR IGNORE INTO memory_types (name, description) VALUES (?, ?)',
-  );
+function seedMemoryTypes(db: PawDatabase): void {
   for (const mt of DEFAULT_MEMORY_TYPES) {
-    insert.run(mt.name, mt.description);
+    db.prepare(
+      'INSERT OR IGNORE INTO memory_types (name, description) VALUES (?, ?)',
+    ).run(mt.name, mt.description);
   }
 }
 
@@ -207,10 +361,7 @@ export interface ViolationRow {
  * @param typeName - Memory type name (e.g. 'violation')
  * @returns The integer id
  */
-export function getMemoryTypeId(
-  db: BetterSqlite3.Database,
-  typeName: string,
-): number {
+export function getMemoryTypeId(db: PawDatabase, typeName: string): number {
   const row = db
     .prepare('SELECT id FROM memory_types WHERE name = ?')
     .get(typeName) as { id: number } | undefined;
@@ -228,7 +379,7 @@ export function getMemoryTypeId(
  * @returns The inserted row id
  */
 export function insertViolation(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   violation: {
     filePath: string;
     rule: string;
@@ -266,10 +417,7 @@ export function insertViolation(
  * @param filePath - Absolute file path to resolve violations for
  * @returns Number of rows updated
  */
-export function resolveViolations(
-  db: BetterSqlite3.Database,
-  filePath: string,
-): number {
+export function resolveViolations(db: PawDatabase, filePath: string): number {
   const normalizedFilePath = normalizePath(filePath);
   const result = db
     .prepare(
@@ -286,7 +434,7 @@ export function resolveViolations(
  * @param db - SQLite database instance
  * @returns Number of rows updated
  */
-export function resolveAllViolations(db: BetterSqlite3.Database): number {
+export function resolveAllViolations(db: PawDatabase): number {
   const result = db
     .prepare(
       `UPDATE violations SET resolved_at = datetime('now')
@@ -304,7 +452,7 @@ export function resolveAllViolations(db: BetterSqlite3.Database): number {
  * @returns Array of unresolved violation rows
  */
 export function getUnresolvedViolations(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   filePath?: string,
 ): ViolationRow[] {
   if (filePath) {
@@ -331,7 +479,7 @@ export function getUnresolvedViolations(
  * @returns Array of unresolved violation rows for this session + project-scoped
  */
 export function getSessionViolations(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   sessionId: string,
 ): ViolationRow[] {
   return db
@@ -351,7 +499,7 @@ export function getSessionViolations(
  * @returns Number of rows updated
  */
 export function resolveSessionViolations(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   sessionId: string,
 ): number {
   const result = db
@@ -372,7 +520,7 @@ export function resolveSessionViolations(
  * @returns Number of rows escalated
  */
 export function escalateSessionViolations(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   sessionId: string,
 ): number {
   const result = db
@@ -394,7 +542,7 @@ export function escalateSessionViolations(
  * @returns Number of rows updated
  */
 export function resolveViolationsForFile(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   filePath: string,
   sessionId: string | null,
 ): number {
@@ -428,7 +576,7 @@ export function resolveViolationsForFile(
  * @returns Number of rows affected (deleted + auto-resolved)
  */
 export function gcOldViolations(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   retentionDays: number = 30,
   staleTtlHours: number = 48,
 ): number {
@@ -460,7 +608,7 @@ export function gcOldViolations(
  * @returns Array of violation rows ordered by creation time
  */
 export function getRecentViolations(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   limit: number = 10,
 ): ViolationRow[] {
   return db
@@ -477,9 +625,7 @@ export function getRecentViolations(
  * @param db - SQLite database instance (must be writable)
  * @returns Number of violations resolved
  */
-export function pruneOrphanedViolations(db: BetterSqlite3.Database): number {
-  const { existsSync } = require('node:fs') as typeof import('node:fs');
-  const { PROJECT_ROOT } = require('./paw-paths') as { PROJECT_ROOT: string };
+export function pruneOrphanedViolations(db: PawDatabase): number {
   const unresolved = db
     .prepare(
       `SELECT DISTINCT file_path FROM violations WHERE resolved_at IS NULL`,
@@ -487,31 +633,22 @@ export function pruneOrphanedViolations(db: BetterSqlite3.Database): number {
     .all() as Array<{ file_path: string }>;
 
   let pruned = 0;
-  const resolveStmt = db.prepare(
-    `UPDATE violations SET resolved_at = datetime('now')
-     WHERE file_path = ? AND resolved_at IS NULL`,
-  );
 
   for (const row of unresolved) {
     const fp = row.file_path;
     const isAbsolute = /^[a-z]:\//i.test(fp) || fp.startsWith('/');
-    const absPath = isAbsolute
-      ? fp
-      : require('node:path').join(PROJECT_ROOT, fp);
+    const absPath = isAbsolute ? fp : join(process.cwd(), fp);
     if (!existsSync(absPath)) {
-      pruned += resolveStmt.run(fp).changes;
+      pruned += db
+        .prepare(
+          `UPDATE violations SET resolved_at = datetime('now')
+         WHERE file_path = ? AND resolved_at IS NULL`,
+        )
+        .run(fp).changes;
     }
   }
   return pruned;
 }
-
-/**
- * Open a PAW database connection with schema initialization.
- *
- * @param dbPath - Path to the SQLite file (defaults to paw.sqlite in PAW directory)
- * @param options - Database open options
- * @returns Initialized database instance
- */
 
 /**
  * Read a value from the paw_config key-value store.
@@ -520,10 +657,7 @@ export function pruneOrphanedViolations(db: BetterSqlite3.Database): number {
  * @param key - Config key to read
  * @returns Stored value string, or null if the key does not exist
  */
-export function getPawConfig(
-  db: BetterSqlite3.Database,
-  key: string,
-): string | null {
+export function getPawConfig(db: PawDatabase, key: string): string | null {
   const row = db
     .prepare('SELECT value FROM paw_config WHERE key = ?')
     .get(key) as { value: string } | undefined;
@@ -538,7 +672,7 @@ export function getPawConfig(
  * @param value - Value to store
  */
 export function setPawConfig(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   key: string,
   value: string,
 ): void {
@@ -572,7 +706,7 @@ export interface FileMemoryRow {
  * @param sessionId - Session that generated this memory
  */
 export function upsertFileMemory(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   filePath: string,
   memory: string,
   contentHash: string | null,
@@ -595,7 +729,7 @@ export function upsertFileMemory(
  * @returns The memory row or undefined
  */
 export function getFileMemory(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   filePath: string,
   contentHash?: string,
 ): FileMemoryRow | undefined {
@@ -621,7 +755,7 @@ export function getFileMemory(
  * @returns Array of memory rows
  */
 export function getFileMemories(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   filePaths: string[],
 ): FileMemoryRow[] {
   if (filePaths.length === 0) return [];
@@ -642,7 +776,7 @@ export function getFileMemories(
  * @returns Number of rows deleted
  */
 export function gcStaleFileMemories(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   retentionDays: number = 30,
 ): number {
   return db
@@ -652,17 +786,28 @@ export function gcStaleFileMemories(
     .run(retentionDays).changes;
 }
 
-export function openDb(
+export async function openDb(
   dbPath: string = DEFAULT_DB_PATH,
   options: { readonly?: boolean } = {},
-): BetterSqlite3.Database {
+): Promise<PawDatabase> {
   mkdirSync(dirname(dbPath), { recursive: true });
-  const db = new Database(dbPath, { readonly: options.readonly ?? false });
-  if (!options.readonly) {
-    db.pragma('journal_mode = WAL');
-    ensureSchema(db);
+  const engine = await getSqlEngine();
+
+  let db: SqlJsDatabase;
+  if (existsSync(dbPath)) {
+    const fileBuffer = readFileSync(dbPath);
+    db = new engine.Database(fileBuffer);
+  } else {
+    db = new engine.Database();
   }
-  return db;
+
+  const wrapped = wrapDatabase(db, dbPath, options.readonly ?? false);
+
+  if (!options.readonly) {
+    ensureSchema(wrapped);
+  }
+
+  return wrapped;
 }
 
 /**
@@ -672,12 +817,11 @@ export function openDb(
  * @param dbPath - Path to the SQLite file
  * @returns Database instance or null if file missing
  */
-export function openDbReadonly(
+export async function openDbReadonly(
   dbPath: string = DEFAULT_DB_PATH,
-): BetterSqlite3.Database | null {
-  const { existsSync } = require('node:fs');
+): Promise<PawDatabase | null> {
   if (!existsSync(dbPath)) return null;
-  return new Database(dbPath, { readonly: true });
+  return openDb(dbPath, { readonly: true });
 }
 
 /**
@@ -690,7 +834,7 @@ export function openDbReadonly(
  * @returns ID of the new decision
  */
 export function supersedeDecision(
-  db: BetterSqlite3.Database,
+  db: PawDatabase,
   oldId: number,
   newDecision: {
     context: string;

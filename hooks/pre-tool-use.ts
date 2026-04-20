@@ -23,30 +23,33 @@
  * @since 3.0.0
  */
 
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
-  extractSessionId,
-  readHookInput,
-  writeDenyOutput,
-  writeHookOutput,
-} from '../../.github/PAW/hook-runtime';
+    extractSessionId,
+    readHookInput,
+    writeDenyOutput,
+    writeHookOutput,
+} from '../hook-runtime';
 import {
-  DEFAULT_DB_PATH,
-  getPawConfig,
-  getSessionViolations,
-  getUnresolvedViolations,
-  normalizePath,
-  openDb,
-  openDbReadonly,
-  pruneOrphanedViolations,
-  type ViolationRow,
-} from '../../.github/PAW/paw-db';
+    DEFAULT_DB_PATH,
+    getPawConfig,
+    getSessionViolations,
+    getUnresolvedViolations,
+    normalizePath,
+    openDb,
+    openDbReadonly,
+    pruneOrphanedViolations,
+    type ViolationRow,
+} from '../paw-db';
 import {
-  isPathIgnored,
-  PROJECT_ROOT as ROOT,
-  toProjectRelative,
-} from '../../.github/PAW/paw-paths';
-import { runPlugins } from '../../.github/PAW/plugin-loader';
-import { resolveStaleIndirectViolations } from '../../.github/PAW/resolve-indirect-violations';
+    isPathIgnored,
+    PROJECT_ROOT as ROOT,
+    toProjectRelative,
+} from '../paw-paths';
+import { runPlugins } from '../plugin-loader';
+import { resolveStaleIndirectViolations } from '../resolve-indirect-violations';
 
 /**
  * Tools that are always allowed, even during violation enforcement.
@@ -249,7 +252,7 @@ function isTargetingIgnoredFiles(hookInput: Record<string, unknown>): boolean {
  */
 async function main(): Promise<void> {
   try {
-    const cfgDb = openDbReadonly(DEFAULT_DB_PATH);
+    const cfgDb = await openDbReadonly(DEFAULT_DB_PATH);
     if (cfgDb) {
       try {
         if (getPawConfig(cfgDb, 'paw_state') === 'disabled') {
@@ -281,7 +284,7 @@ async function main(): Promise<void> {
 
   let violations: ViolationRow[] = [];
   try {
-    const db = openDbReadonly(DEFAULT_DB_PATH);
+    const db = await openDbReadonly(DEFAULT_DB_PATH);
     if (!db) {
       writeHookOutput({ continue: true });
       return;
@@ -299,8 +302,6 @@ async function main(): Promise<void> {
   }
 
   if (violations.length > 0) {
-    const { existsSync } = require('node:fs') as typeof import('node:fs');
-    const { join } = require('node:path') as typeof import('node:path');
     const resolveAbsolute = (fp: string): string => {
       const isAbs = /^[a-z]:\//i.test(fp) || fp.startsWith('/');
       return isAbs ? fp : join(ROOT, fp);
@@ -310,14 +311,14 @@ async function main(): Promise<void> {
     );
     if (hasOrphans) {
       try {
-        const writeDb = openDb(DEFAULT_DB_PATH);
+        const writeDb = await openDb(DEFAULT_DB_PATH);
         try {
           pruneOrphanedViolations(writeDb);
         } finally {
           writeDb.close();
         }
 
-        const readDb = openDbReadonly(DEFAULT_DB_PATH);
+        const readDb = await openDbReadonly(DEFAULT_DB_PATH);
         if (readDb) {
           try {
             violations = sessionId
@@ -337,10 +338,10 @@ async function main(): Promise<void> {
 
   /** Resolve stale indirect-fix violations (e.g. test file now exists). */
   if (violations.some((v) => v.indirect_fix === 1)) {
-    const resolution = resolveStaleIndirectViolations(sessionId);
+    const resolution = await resolveStaleIndirectViolations(sessionId);
     if (resolution.resolved > 0) {
       try {
-        const freshDb = openDbReadonly(DEFAULT_DB_PATH);
+        const freshDb = await openDbReadonly(DEFAULT_DB_PATH);
         if (freshDb) {
           try {
             violations = sessionId

@@ -22,7 +22,6 @@
  * @since 3.0.0
  */
 
-import { execSync } from 'node:child_process';
 import {
     copyFileSync,
     existsSync,
@@ -43,15 +42,7 @@ import type {
 } from './adapters/types';
 import { PawEvent } from './adapters/types';
 import * as logger from './paw-logger';
-import {
-    HOOKS_DIR,
-    PAW_CORE_DIR,
-    PAW_DIR,
-    PAW_TSCONFIG,
-    PAW_TSCONFIG_REL,
-    PAW_TSCONFIG_TEMPLATE,
-    PROJECT_ROOT,
-} from './paw-paths';
+import { HOOKS_DIR, PAW_CORE_DIR, PAW_DIR, PROJECT_ROOT } from './paw-paths';
 
 /**
  * CLI flag: --force overwrites existing user hooks.
@@ -59,30 +50,13 @@ import {
 const forceOverwrite = process.argv.includes('--force');
 
 /**
- * Ensure PAW's own dependencies are installed in .github/PAW/node_modules/.
- * PAW is self-contained — it must not rely on the host project's node_modules.
- * Skips install when node_modules already exists.
+ * Source directory for compiled hook bundles.
+ * After build, compiled .mjs hooks live at dist/hooks/ relative to PAW_CORE_DIR.
+ * During development (unbundled), they're at hooks/ relative to PAW_CORE_DIR.
  */
-function installPawDeps(): void {
-  const nodeModulesPath = path.join(PAW_CORE_DIR, 'node_modules');
-  if (existsSync(nodeModulesPath)) {
-    logger.info('PAW deps — already installed, skipped');
-    return;
-  }
-  logger.info('Installing PAW dependencies in .github/PAW/ ...');
-  execSync('npm install --prefer-offline', {
-    cwd: PAW_CORE_DIR,
-    stdio: 'inherit',
-    timeout: 60000,
-  });
-  logger.success('PAW deps installed');
-}
-
-/**
- * Source directory for default hook implementations.
- * PAW core ships reference hooks; sync copies them into .paw/hooks/.
- */
-const DEFAULT_HOOKS_SRC = path.join(PAW_CORE_DIR, 'hooks');
+const DEFAULT_HOOKS_SRC = existsSync(path.join(PAW_CORE_DIR, 'hooks'))
+  ? path.join(PAW_CORE_DIR, 'hooks')
+  : path.join(PAW_CORE_DIR, 'dist', 'hooks');
 
 /**
  * Source directory for Copilot asset templates (skills, agents, prompts).
@@ -107,9 +81,18 @@ interface AssetMapping {
  * Copilot asset mappings — template subdirectories to .github/ targets.
  */
 const ASSET_MAPPINGS: AssetMapping[] = [
-  { templateSubdir: 'skills', targetDir: path.join(PROJECT_ROOT, '.github', 'skills') },
-  { templateSubdir: 'agents', targetDir: path.join(PROJECT_ROOT, '.github', 'agents') },
-  { templateSubdir: 'prompts', targetDir: path.join(PROJECT_ROOT, '.github', 'prompts') },
+  {
+    templateSubdir: 'skills',
+    targetDir: path.join(PROJECT_ROOT, '.github', 'skills'),
+  },
+  {
+    templateSubdir: 'agents',
+    targetDir: path.join(PROJECT_ROOT, '.github', 'agents'),
+  },
+  {
+    templateSubdir: 'prompts',
+    targetDir: path.join(PROJECT_ROOT, '.github', 'prompts'),
+  },
 ];
 
 /**
@@ -133,49 +116,28 @@ interface HookMapping {
  * When adding a new hook to .github/PAW/hooks/, add a mapping here.
  */
 const HOOK_REGISTRY: HookMapping[] = [
-  { file: 'pre-tool-use.ts', event: PawEvent.ToolPre, timeoutSec: 10 },
+  { file: 'pre-tool-use.mjs', event: PawEvent.ToolPre, timeoutSec: 10 },
   {
-    file: 'user-prompt-submitted.ts',
+    file: 'user-prompt-submitted.mjs',
     event: PawEvent.PromptSubmitted,
     timeoutSec: 10,
   },
-  { file: 'post-tool-use.ts', event: PawEvent.ToolPost, timeoutSec: 15 },
+  { file: 'post-tool-use.mjs', event: PawEvent.ToolPost, timeoutSec: 15 },
   {
-    file: 'session-end-memory-save.ts',
+    file: 'session-end-memory-save.mjs',
     event: PawEvent.SessionEnd,
     timeoutSec: 15,
   },
   {
-    file: 'session-end-health.ts',
+    file: 'session-end-health.mjs',
     event: PawEvent.SessionEnd,
     timeoutSec: 120,
   },
 ];
 
 /**
- * Ensure .paw/tsconfig.json exists by copying the template if missing.
- */
-function syncTsconfig(): void {
-  if (existsSync(PAW_TSCONFIG) && !forceOverwrite) {
-    logger.info(
-      'tsconfig.json — already exists, skipped (use --force to overwrite)',
-    );
-    return;
-  }
-  if (!existsSync(PAW_TSCONFIG_TEMPLATE)) {
-    logger.warn(
-      'tsconfig template not found at .github/PAW/templates/tsconfig.json',
-    );
-    return;
-  }
-  copyFileSync(PAW_TSCONFIG_TEMPLATE, PAW_TSCONFIG);
-  logger.success(
-    `tsconfig.json — ${existsSync(PAW_TSCONFIG) && forceOverwrite ? 'overwritten' : 'copied'}`,
-  );
-}
-
-/**
- * Copy default hooks from .github/PAW/hooks/ into .paw/hooks/.
+ * Copy compiled .mjs hooks from PAW dist/hooks/ into .paw/hooks/.
+ * Also copies _lib/ shared chunks needed by the hooks.
  * Skips files that already exist unless --force is set.
  *
  * @returns Number of files copied
@@ -185,13 +147,14 @@ function syncHooks(): number {
 
   if (!existsSync(DEFAULT_HOOKS_SRC)) {
     logger.warn(
-      'No default hooks found at .github/PAW/hooks/ — skipping hook copy',
+      'No compiled hooks found — run "node build.mjs" first, or check your PAW installation',
     );
     return 0;
   }
 
+  // Copy top-level .mjs hook files
   const sourceFiles = readdirSync(DEFAULT_HOOKS_SRC).filter((f) =>
-    f.endsWith('.ts'),
+    f.endsWith('.mjs'),
   );
   let copied = 0;
 
@@ -211,6 +174,19 @@ function syncHooks(): number {
     logger.success(
       `${file} — ${existsSync(dest) && forceOverwrite ? 'overwritten' : 'copied'}`,
     );
+  }
+
+  // Copy _lib/ shared chunks (always overwritten — content-hashed names)
+  const libSrc = path.join(DEFAULT_HOOKS_SRC, '_lib');
+  if (existsSync(libSrc)) {
+    const libDest = path.join(HOOKS_DIR, '_lib');
+    mkdirSync(libDest, { recursive: true });
+    const libFiles = readdirSync(libSrc).filter((f) => f.endsWith('.mjs'));
+    for (const file of libFiles) {
+      copyFileSync(path.join(libSrc, file), path.join(libDest, file));
+    }
+    logger.success(`_lib/ — ${libFiles.length} shared chunk(s) synced`);
+    copied += libFiles.length;
   }
 
   return copied;
@@ -247,6 +223,53 @@ function copyDirRecursive(srcDir: string, destDir: string): number {
   }
 
   return copied;
+}
+
+/**
+ * Sync runtime dependencies (sql.js) into .paw/node_modules/ so compiled
+ * hooks can resolve external packages. This is the portability mechanism —
+ * hooks don't need a global npm install, they find deps in .paw/node_modules/.
+ */
+function syncRuntimeDeps(): void {
+  // In bundled CLI, PAW_CORE_DIR is dist/ — node_modules is one level up
+  const candidates = [
+    path.join(PAW_CORE_DIR, 'node_modules'),
+    path.join(PAW_CORE_DIR, '..', 'node_modules'),
+  ];
+  const nodeModulesSrc = candidates.find((p) =>
+    existsSync(path.join(p, 'sql.js')),
+  );
+
+  if (!nodeModulesSrc) {
+    logger.warn(
+      'sql.js not found in PAW node_modules — hooks may fail to resolve it',
+    );
+    return;
+  }
+
+  const nodeModulesDest = path.join(PAW_DIR, 'node_modules');
+  const sqlJsSrc = path.join(nodeModulesSrc, 'sql.js');
+  const sqlJsDest = path.join(nodeModulesDest, 'sql.js');
+  mkdirSync(sqlJsDest, { recursive: true });
+
+  // Copy package.json + dist/ (only the files we need)
+  copyFileSync(
+    path.join(sqlJsSrc, 'package.json'),
+    path.join(sqlJsDest, 'package.json'),
+  );
+
+  const distSrc = path.join(sqlJsSrc, 'dist');
+  const distDest = path.join(sqlJsDest, 'dist');
+  mkdirSync(distDest, { recursive: true });
+
+  // Copy the wasm files (default sql.js entry point)
+  for (const file of readdirSync(distSrc)) {
+    if (file.startsWith('sql-wasm')) {
+      copyFileSync(path.join(distSrc, file), path.join(distDest, file));
+    }
+  }
+
+  logger.success('sql.js → .paw/node_modules/sql.js/');
 }
 
 /**
@@ -288,7 +311,7 @@ function syncAssets(): number {
  * @returns PAW canonical event or null if unrecognized
  */
 function inferPawEventFromFilename(filename: string): PawEvent | null {
-  const name = filename.replace(/\.ts$/, '');
+  const name = filename.replace(/\.(mjs|ts)$/, '');
   if (name.startsWith('pre-tool-use')) return PawEvent.ToolPre;
   if (name.startsWith('post-tool-use')) return PawEvent.ToolPost;
   if (
@@ -343,8 +366,8 @@ function readSurfaceConfig(): PawSurface {
  * @returns Array of adapter instances
  */
 function resolveAdapters(surface: PawSurface): PawSurfaceAdapter[] {
-  const cli = new CLIAdapter(PAW_TSCONFIG_REL);
-  const extension = new ExtensionAdapter(PAW_TSCONFIG_REL);
+  const cli = new CLIAdapter();
+  const extension = new ExtensionAdapter();
   const sdk = new SDKAdapter();
 
   switch (surface) {
@@ -368,7 +391,7 @@ function resolveAdapters(surface: PawSurface): PawSurfaceAdapter[] {
  */
 function discoverHookDefs(): PawHookDef[] {
   const installedFiles = existsSync(HOOKS_DIR)
-    ? readdirSync(HOOKS_DIR).filter((f) => f.endsWith('.ts'))
+    ? readdirSync(HOOKS_DIR).filter((f) => f.endsWith('.mjs'))
     : [];
 
   if (installedFiles.length === 0) {
@@ -462,11 +485,7 @@ function mergeHooksJson(
     }
   }
 
-  return JSON.stringify(
-    { version: newJson.version, hooks: merged },
-    null,
-    2,
-  );
+  return JSON.stringify({ version: newJson.version, hooks: merged }, null, 2);
 }
 
 /**
@@ -500,9 +519,9 @@ function generateSurfaceConfigs(surface: PawSurface): void {
 }
 
 /**
- * Main sync entrypoint.
+ * Main sync entrypoint. Exported for use by CLI commands.
  */
-async function main(): Promise<void> {
+export async function runPawSync(): Promise<void> {
   logger.pawIntro('PAW Sync');
 
   if (!existsSync(PAW_DIR)) {
@@ -513,17 +532,13 @@ async function main(): Promise<void> {
   const surface = readSurfaceConfig();
   const s = logger.spin();
 
-  s.start('Checking PAW dependencies');
-  installPawDeps();
-  s.stop('✅ PAW deps ready');
-
-  s.start('Syncing tsconfig');
-  syncTsconfig();
-  s.stop('✅ tsconfig synced');
-
   s.start('Syncing hooks');
   const copied = syncHooks();
   s.stop(`✅ Hooks synced (${copied} copied)`);
+
+  s.start('Syncing runtime dependencies');
+  syncRuntimeDeps();
+  s.stop('✅ Runtime deps synced');
 
   s.start('Syncing Copilot assets (skills, agents, prompts)');
   const assetsCopied = syncAssets();
@@ -536,7 +551,13 @@ async function main(): Promise<void> {
   logger.pawOutro('Sync complete');
 }
 
-main().catch((err: Error) => {
-  logger.error(`Fatal: ${err.message}`);
-  process.exit(1);
-});
+// Auto-run only when executed directly (not when imported as a module)
+const isDirectRun =
+  process.argv[1]?.endsWith('pawSync.ts') ||
+  process.argv[1]?.endsWith('pawSync.mjs');
+if (isDirectRun) {
+  runPawSync().catch((err: Error) => {
+    logger.error(`Fatal: ${err.message}`);
+    process.exit(1);
+  });
+}

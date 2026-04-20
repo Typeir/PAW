@@ -417,15 +417,15 @@ Add to `hooks.json` — the memory save hook runs **first** in the `sessionEnd` 
   "sessionEnd": [
     {
       "type": "command",
-      "bash": "npx tsx --tsconfig tsconfig.scripts.json .github/scripts/hooks/session-end-memory-save.ts",
-      "powershell": "npx tsx --tsconfig tsconfig.scripts.json .github/scripts/hooks/session-end-memory-save.ts",
+      "bash": "node .paw/hooks/session-end-memory-save.mjs",
+      "powershell": "node .paw/hooks/session-end-memory-save.mjs",
       "cwd": ".",
       "timeoutSec": 15
     },
     {
       "type": "command",
-      "bash": "npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts --changed-only",
-      "powershell": "npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts --changed-only",
+      "bash": "paw gates --changed-only",
+      "powershell": "paw gates --changed-only",
       "cwd": ".",
       "timeoutSec": 120
     }
@@ -820,7 +820,7 @@ On first run, the session-end save hook calls `ensureSchema()` which creates all
 
 ```bash
 # Or manually initialize:
-npx tsx --tsconfig tsconfig.scripts.json .github/PAW/paw-init.ts
+paw init
 ```
 
 ### Seeding Initial Knowledge

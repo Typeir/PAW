@@ -8,11 +8,11 @@
 
 The QualityGate system from Part 2 runs identically in three contexts:
 
-| Surface | Trigger | Mode | Blocks |
-|---------|---------|------|--------|
-| **postToolUse hook** | Every file edit | Quick regex (not full gates) | Never (warnings only) |
-| **sessionEnd hook** | Conversation ends | `--changed-only` | Yes, if critical |
-| **CI pipeline** | Push / PR | Full codebase | Yes, if critical |
+| Surface              | Trigger           | Mode                         | Blocks                |
+| -------------------- | ----------------- | ---------------------------- | --------------------- |
+| **postToolUse hook** | Every file edit   | Quick regex (not full gates) | Never (warnings only) |
+| **sessionEnd hook**  | Conversation ends | `--changed-only`             | Yes, if critical      |
+| **CI pipeline**      | Push / PR         | Full codebase                | Yes, if critical      |
 
 The same `pawGates.ts` orchestrator, the same gate files, the same report format. No "CI-only" checks that diverge from local behavior.
 
@@ -36,14 +36,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive  # If using content submodules
+          submodules: recursive # If using content submodules
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
-      - run: npm run pre-init:ci   # Build prerequisites (if applicable)
-      - run: npm test              # Runs pretest → test:enforce → vitest
+      - run: npm run pre-init:ci # Build prerequisites (if applicable)
+      - run: npm test # Runs pretest → test:enforce → vitest
 
   lint:
     runs-on: ubuntu-latest
@@ -60,7 +60,7 @@ jobs:
 
   health-check:
     runs-on: ubuntu-latest
-    needs: [test, lint]            # Run after test + lint (always, even on failure)
+    needs: [test, lint] # Run after test + lint (always, even on failure)
     if: always()
     steps:
       - uses: actions/checkout@v4
@@ -72,7 +72,7 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run pre-init:ci
-      - run: npm run health:check  # Full codebase, not --changed-only
+      - run: npm run health:check # Full codebase, not --changed-only
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -83,6 +83,7 @@ jobs:
 ### Key Design Choices
 
 **Three parallel jobs** (test, lint, health-check):
+
 - `test` and `lint` run in parallel for speed
 - `health-check` runs after both (`needs: [test, lint]`) but `if: always()` ensures it runs even if test/lint fail — you want the full picture
 
@@ -99,12 +100,12 @@ Wire the health check system into your `package.json` scripts:
 ```json
 {
   "scripts": {
-    "health:check": "npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts",
+    "health:check": "node .paw/hooks/health-check.mjs",
     "health:check:changed": "npm run health:check -- --changed-only",
 
     "test": "vitest run",
     "pretest": "npm run test:enforce",
-    "test:enforce": "npx tsx --tsconfig tsconfig.scripts.json tests/scripts/enforce-coverage.ts",
+    "test:enforce": "node .paw/hooks/enforce-coverage.mjs",
     "test:coverage": "vitest run --coverage",
 
     "lint": "next lint",
@@ -130,7 +131,14 @@ import path from 'node:path';
 
 const SRC_DIR = 'src';
 const TEST_DIRS = ['tests/unit', 'tests/integration'];
-const EXCLUDE = ['.d.ts', '.config.ts', '/index.ts', '.module.scss', '.stories.ts', '.test.ts'];
+const EXCLUDE = [
+  '.d.ts',
+  '.config.ts',
+  '/index.ts',
+  '.module.scss',
+  '.stories.ts',
+  '.test.ts',
+];
 
 function findSourceFiles(dir: string): string[] {
   // Recursively find .ts/.tsx files, excluding patterns above
@@ -140,9 +148,10 @@ function findSourceFiles(dir: string): string[] {
 function hasTestFile(sourcePath: string): boolean {
   const relative = path.relative(SRC_DIR, sourcePath);
   const base = relative.replace(/\.(ts|tsx)$/, '');
-  return TEST_DIRS.some((testDir) =>
-    existsSync(path.join(testDir, `${base}.test.ts`)) ||
-    existsSync(path.join(testDir, `${base}.test.tsx`)),
+  return TEST_DIRS.some(
+    (testDir) =>
+      existsSync(path.join(testDir, `${base}.test.ts`)) ||
+      existsSync(path.join(testDir, `${base}.test.tsx`)),
   );
 }
 
@@ -208,12 +217,15 @@ const total = report.numTotalTests;
 const passed = report.numPassedTests;
 const allPassed = passed === total;
 
-writeFileSync('temp/test-badge.json', JSON.stringify({
-  schemaVersion: 1,
-  label: 'tests',
-  message: `${passed}/${total} passing`,
-  color: allPassed ? 'brightgreen' : 'red',
-}));
+writeFileSync(
+  'temp/test-badge.json',
+  JSON.stringify({
+    schemaVersion: 1,
+    label: 'tests',
+    message: `${passed}/${total} passing`,
+    color: allPassed ? 'brightgreen' : 'red',
+  }),
+);
 ```
 
 Serve via a JSON endpoint or commit to repo for Shields badge:

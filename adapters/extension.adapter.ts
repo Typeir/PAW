@@ -63,24 +63,14 @@ export class ExtensionAdapter implements PawSurfaceAdapter {
   readonly name = 'extension' as const;
 
   /**
-   * Relative path to the tsconfig used by hook entrypoints.
-   */
-  private readonly tsconfigRel: string;
-
-  /**
    * Relative path to the hooks directory from project root.
    */
   private readonly hookBase: string;
 
   /**
-   * @param tsconfigRel - Relative path to .paw/tsconfig.json
    * @param hookBase - Relative path to .paw/hooks/ directory
    */
-  constructor(
-    tsconfigRel: string = '.paw/tsconfig.json',
-    hookBase: string = '.paw/hooks',
-  ) {
-    this.tsconfigRel = tsconfigRel;
+  constructor(hookBase: string = '.paw/hooks') {
     this.hookBase = hookBase;
   }
 
@@ -93,7 +83,7 @@ export class ExtensionAdapter implements PawSurfaceAdapter {
       if (!eventName) continue;
 
       const entry = this.getCommandFormat(
-        `npx tsx --tsconfig ${this.tsconfigRel} ${this.hookBase}/${hook.file}`,
+        `node ${this.hookBase}/${hook.file}`,
         hook.timeoutSec,
       ) as unknown as ExtensionHookEntry;
 

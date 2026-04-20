@@ -10,7 +10,7 @@ PAW's quality gate system is entirely filesystem-driven. The orchestrator (`pawG
 
 ```
 .github/PAW/
-  pawGates.ts                    ← Orchestrator script (run via npx tsx)
+  pawGates.ts                    ← Orchestrator script (run via paw gates)
   health-check-types.ts          ← Shared type definitions
 
 .paw/gates/
@@ -29,27 +29,27 @@ No registration, no arrays — if a file matches a configured runner suffix and 
 
 ### How It's Invoked
 
-Hooks and npm scripts call `pawGates.ts` directly via tsx, just like any other hook:
+Hooks and npm scripts call gates via the `paw` CLI:
 
 ```bash
 # Run specific gates by name
-npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts --gates file-length,antipatterns
+paw gates --gates file-length,antipatterns
 
 # Run all gates
-npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts
+paw gates
 
 # Run all gates, scoped to changed files
-npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts --changed-only
+paw gates --changed-only
 
 # Run gates in a port
-npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts --port code-quality
+paw gates --port code-quality
 ```
 
 From hooks, the invocation looks like any other `execSync` call:
 
 ```typescript
 const output = execSync(
-  'npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts --gates file-length,antipatterns --changed-only',
+  'paw gates --gates file-length,antipatterns --changed-only',
   { encoding: 'utf-8', timeout: 90000, stdio: ['pipe', 'pipe', 'pipe'] },
 );
 ```
@@ -59,8 +59,8 @@ From `package.json`:
 ```json
 {
   "scripts": {
-    "health:check": "npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts",
-    "health:check:changed": "npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts --changed-only"
+    "health:check": "paw gates",
+    "health:check:changed": "paw gates --changed-only"
   }
 }
 ```
@@ -365,11 +365,11 @@ Gate discovery matches files in `.paw/gates/` against configured runner suffixes
 // .paw/config.json
 {
   "runners": {
-    ".gate.ts": "import",   // In-process dynamic import (fast, default)
-    ".gate.js": "node",     // Node.js subprocess
-    ".gate.py": "python3",  // Python subprocess
-    ".gate.sh": "bash"      // Shell subprocess
-  }
+    ".gate.ts": "import", // In-process dynamic import (fast, default)
+    ".gate.js": "node", // Node.js subprocess
+    ".gate.py": "python3", // Python subprocess
+    ".gate.sh": "bash", // Shell subprocess
+  },
 }
 ```
 
@@ -662,7 +662,7 @@ That's it. The orchestrator auto-discovers it on the next run. No imports to add
 ### 3. Optional: Run Only Your Port
 
 ```bash
-npx tsx --tsconfig tsconfig.scripts.json .github/PAW/pawGates.ts --port code-quality
+paw gates --port code-quality
 ```
 
 ---

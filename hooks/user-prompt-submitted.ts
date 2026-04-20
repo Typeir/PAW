@@ -17,11 +17,11 @@ import {
     extractSessionId,
     readHookInput,
     writeHookOutput,
-} from '../../.github/PAW/hook-runtime';
-import { openDbReadonly } from '../../.github/PAW/paw-db';
-import { LOG_PATH, PAW_DIR } from '../../.github/PAW/paw-paths';
-import { runPlugins } from '../../.github/PAW/plugin-loader';
-import { resolveStaleIndirectViolations } from '../../.github/PAW/resolve-indirect-violations';
+} from '../hook-runtime';
+import { openDbReadonly } from '../paw-db';
+import { LOG_PATH, PAW_DIR } from '../paw-paths';
+import { runPlugins } from '../plugin-loader';
+import { resolveStaleIndirectViolations } from '../resolve-indirect-violations';
 
 const MAX_L1_CHARS = 800;
 
@@ -47,8 +47,8 @@ function appendLog(event: Record<string, unknown>): void {
  *
  * @returns Compact memory context string
  */
-function loadL1Context(): string {
-  const db = openDbReadonly();
+async function loadL1Context(): Promise<string> {
+  const db = await openDbReadonly();
   if (!db) return '';
 
   const facts: string[] = [];
@@ -138,9 +138,9 @@ async function main(): Promise<void> {
   const hookInput = await readHookInput();
   appendLog(hookInput);
 
-  resolveStaleIndirectViolations();
+  await resolveStaleIndirectViolations();
 
-  const l1Context = loadL1Context();
+  const l1Context = await loadL1Context();
 
   const pluginResult = await runPlugins(
     'user-prompt-submitted',

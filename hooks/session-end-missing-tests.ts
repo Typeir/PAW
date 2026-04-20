@@ -19,9 +19,9 @@ import {
     readHookInput,
     writeBlockingOutput,
     writeHookOutput,
-} from '../../.github/PAW/hook-runtime';
-import { PROJECT_ROOT as ROOT } from '../../.github/PAW/paw-paths';
-import { resolveStaleIndirectViolations } from '../../.github/PAW/resolve-indirect-violations';
+} from '../hook-runtime';
+import { PROJECT_ROOT as ROOT } from '../paw-paths';
+import { resolveStaleIndirectViolations } from '../resolve-indirect-violations';
 
 /**
  * File patterns excluded from the test-gap check.
@@ -139,7 +139,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  resolveStaleIndirectViolations();
+  await resolveStaleIndirectViolations();
 
   const newSourceFiles = getNewSourceFiles();
   if (newSourceFiles.length === 0) {
