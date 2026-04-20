@@ -95,7 +95,10 @@ async function writeViolations(
  * @param {string} filePath - File path whose violations are resolved
  * @param {string | null} sessionId - Current session ID
  */
-async function clearViolations(filePath: string, sessionId: string | null): Promise<void> {
+async function clearViolations(
+  filePath: string,
+  sessionId: string | null,
+): Promise<void> {
   try {
     const db = await openDb(DEFAULT_DB_PATH);
     try {

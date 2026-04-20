@@ -6,11 +6,11 @@
 
 import { log, password } from '@clack/prompts';
 import {
-  DEFAULT_DB_PATH,
-  getUnresolvedViolations,
-  openDb,
-  resolveAllViolations,
-  resolveViolations,
+    DEFAULT_DB_PATH,
+    getUnresolvedViolations,
+    openDb,
+    resolveAllViolations,
+    resolveViolations,
 } from '../../paw-db';
 import type { CommandMeta } from '../cli-loader';
 import { resolveSubcommand } from '../cli-loader';

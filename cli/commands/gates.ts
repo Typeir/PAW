@@ -8,7 +8,12 @@
 import { log } from '@clack/prompts';
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { GATES_DIR, PAW_CONFIG_PATH, PAW_TSCONFIG_REL, PROJECT_ROOT } from '../../paw-paths';
+import {
+    GATES_DIR,
+    PAW_CONFIG_PATH,
+    PAW_TSCONFIG_REL,
+    PROJECT_ROOT,
+} from '../../paw-paths';
 import type { CommandMeta } from '../cli-loader';
 import { resolveSubcommand } from '../cli-loader';
 

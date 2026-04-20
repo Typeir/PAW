@@ -39,7 +39,9 @@ export const meta: CommandMeta = {
  */
 async function requirePassword(): Promise<boolean> {
   if (!hasPassword()) {
-    log.warn('No PAW admin password set. Run `npm run paw:set-password` to lock destructive commands.');
+    log.warn(
+      'No PAW admin password set. Run `npm run paw:set-password` to lock destructive commands.',
+    );
     return true;
   }
   const pw = await password({ message: 'Enter PAW admin password:' });
@@ -100,19 +102,29 @@ export async function run(args: string[]): Promise<void> {
   try {
     const db = await openDb(DEFAULT_DB_PATH);
     try {
-      setPawConfig(db, 'paw_state', subcommand === 'disable' ? 'disabled' : 'enabled');
+      setPawConfig(
+        db,
+        'paw_state',
+        subcommand === 'disable' ? 'disabled' : 'enabled',
+      );
     } finally {
       db.close();
     }
   } catch (err) {
-    log.error(`Failed to update PAW state: ${err instanceof Error ? err.message : String(err)}`);
+    log.error(
+      `Failed to update PAW state: ${err instanceof Error ? err.message : String(err)}`,
+    );
     process.exit(1);
   }
 
   if (subcommand === 'disable') {
-    log.warn('🔴 PAW enforcement DISABLED — hooks will pass through without running gates.');
+    log.warn(
+      '🔴 PAW enforcement DISABLED — hooks will pass through without running gates.',
+    );
     log.message('  Run `npm run paw:enable` to restore enforcement.');
   } else {
-    log.success('🟢 PAW enforcement ENABLED — hooks will enforce quality gates.');
+    log.success(
+      '🟢 PAW enforcement ENABLED — hooks will enforce quality gates.',
+    );
   }
 }
