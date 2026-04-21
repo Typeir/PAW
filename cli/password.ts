@@ -10,7 +10,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PAW_DIR } from '../paw-paths';
+import { PAW_DIR } from '../pawPaths';
 
 /** Path to the secret file storing the salted hash. */
 const SECRET_PATH = join(PAW_DIR, '.pawsecret');

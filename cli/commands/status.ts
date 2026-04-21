@@ -10,9 +10,9 @@ import {
     DEFAULT_DB_PATH,
     getUnresolvedViolations,
     openDbReadonly,
-} from '../../paw-db';
-import { HOOKS_JSON_PATH, PAW_CONFIG_PATH, PAW_DIR } from '../../paw-paths';
-import type { CommandMeta } from '../cli-loader';
+} from '../../pawDb';
+import { HOOKS_JSON_PATH, PAW_CONFIG_PATH, PAW_DIR } from '../../pawPaths';
+import type { CommandMeta } from '../cliLoader';
 
 /** Command metadata for the fs-based loader. */
 export const meta: CommandMeta = {

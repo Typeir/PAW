@@ -25,8 +25,8 @@ import {
     writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
-import { openDb } from './paw-db';
-import * as logger from './paw-logger';
+import { openDb } from './pawDb';
+import * as logger from './pawLogger';
 import {
     DB_PATH,
     GATES_DIR,
@@ -35,7 +35,7 @@ import {
     PAW_DIR,
     PAWIGNORE_PATH,
     PROJECT_ROOT,
-} from './paw-paths';
+} from './pawPaths';
 
 /**
  * Default .pawignore content for new projects.
@@ -65,7 +65,7 @@ const STARTER_GATE = `/**
  * @since 3.0.0
  */
 
-import type { QualityGate, GateContext, GateResult } from '../../.github/PAW/health-check-types';
+import type { QualityGate, GateContext, GateResult } from './healthCheckTypes';
 
 /**
  * Example gate that always passes.

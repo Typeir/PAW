@@ -14,7 +14,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, promises as fs, readFileSync } from 'node:fs';
 import path from 'node:path';
-import type { GateContext } from './health-check-types';
+import type { GateContext } from './healthCheckTypes';
 
 /**
  * Default patterns to exclude when no .pawignore file is present.

@@ -14,7 +14,7 @@
  * @since 4.0.0
  */
 
-import { CLI_EVENT_MAP, resolveEventName } from './event-map';
+import { CLI_EVENT_MAP, resolveEventName } from './eventMap';
 import type { PawHookDef, PawSurfaceAdapter, SurfaceHookOutput } from './types';
 import { PawEvent } from './types';
 

@@ -21,17 +21,17 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { buildGateContext, buildSingleFileContext } from './gate-context';
-import { filterGateFindings } from './gate-ignore';
+import { buildGateContext, buildSingleFileContext } from './gateContext';
+import { filterGateFindings } from './gateIgnore';
 import type {
     GateContext,
     GatePort,
     GateResult,
     HealthReport,
     QualityGate,
-} from './health-check-types';
-import * as logger from './paw-logger';
-import { GATES_DIR, PAW_CONFIG_PATH, PROJECT_ROOT as ROOT } from './paw-paths';
+} from './healthCheckTypes';
+import * as logger from './pawLogger';
+import { GATES_DIR, PAW_CONFIG_PATH, PROJECT_ROOT } from './pawPaths';
 
 /**
  * Parse CLI arguments into structured options.
@@ -141,15 +141,34 @@ function runSubprocessGate(
     changedFiles: context.changedFiles ? [...context.changedFiles] : null,
   });
 
-  const stdout = execFileSync(runner, [gatePath], {
-    cwd: context.rootDir,
-    input: stdinPayload,
-    encoding: 'utf-8',
-    timeout: 120_000,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
+  // Split runner into command and args if it contains spaces
+  const parts = runner.split(' ');
+  const command = parts[0];
+  const runnerArgs = parts.slice(1);
 
-  return JSON.parse(stdout) as GateResult;
+  logger.debug(`Subprocess: command="${command}", args=[${runnerArgs.join(', ')}], gate="${gatePath}"`);
+
+  try {
+    const stdout = execFileSync(command, [...runnerArgs, gatePath], {
+      cwd: context.rootDir,
+      input: stdinPayload,
+      encoding: 'utf-8',
+      timeout: 120_000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    logger.debug(`Subprocess stdout (first 200 chars): ${stdout.substring(0, 200)}`);
+    const result = JSON.parse(stdout) as GateResult;
+    return result;
+  } catch (err: unknown) {
+    const error = err as Error & { code?: string; signal?: string; stderr?: string };
+    logger.error(`Subprocess execution error: code=${error.code}, signal=${error.signal}`);
+    logger.error(`Error message: ${error.message}`);
+    if (error.stderr) {
+      logger.error(`Subprocess stderr: ${error.stderr.substring(0, 500)}`);
+    }
+    throw err;
+  }
 }
 
 /**
@@ -163,11 +182,14 @@ function runSubprocessGate(
  */
 async function discoverGates(gateNames?: string[]): Promise<QualityGate[]> {
   const runners = loadRunnerConfig();
+  logger.info(`Gate runners config: ${JSON.stringify(runners)}`);
+  
   let allFiles: string[];
   try {
     allFiles = readdirSync(GATES_DIR).filter(
       (f) => matchRunner(f, runners) !== null,
     );
+    logger.info(`Discovered ${allFiles.length} gate files: ${allFiles.join(', ')}`);
   } catch {
     logger.warn(`No gates/ directory found at ${GATES_DIR}`);
     return [];
@@ -179,43 +201,78 @@ async function discoverGates(gateNames?: string[]): Promise<QualityGate[]> {
         return gateNames.includes(id);
       })
     : allFiles;
+  
+  logger.info(`Processing ${files.length} gates (filtered by names: ${gateNames ? gateNames.join(', ') : 'none'})`);
 
   const gates: QualityGate[] = [];
 
   for (const file of files) {
     const suffix = matchRunner(file, runners)!;
     const runnerCmd = runners[suffix];
+    const gateId = file.replace(/\.gate\.\w+$/, '');
+    
+    logger.info(`[${gateId}] File: ${file}, suffix: ${suffix}, runner: ${runnerCmd}`);
 
     try {
       if (runnerCmd === 'import') {
+        logger.info(`[${gateId}] Loading via import`);
         const modulePath = pathToFileURL(path.join(GATES_DIR, file)).href;
+        logger.debug(`[${gateId}] Module path: ${modulePath}`);
         const mod = await import(modulePath);
         if (mod.gate && typeof mod.gate.check === 'function') {
           gates.push(mod.gate as QualityGate);
+          logger.info(`[${gateId}] ✓ Loaded successfully`);
         } else {
           logger.warn(
-            `${file} does not export a valid 'gate' constant — skipped`,
+            `[${gateId}] Does not export valid 'gate' constant (exports: ${Object.keys(mod).join(', ')})`,
           );
         }
       } else {
         const gatePath = path.join(GATES_DIR, file);
-        const id = file.replace(/\.gate\.\w+$/, '');
+        logger.info(`[${gateId}] Loading via subprocess runner: "${runnerCmd}"`);
+        logger.debug(`[${gateId}] Gate path: ${gatePath}`);
+        
+        // Resolve only the command part (first word) to absolute path if needed
+        const parts = runnerCmd.split(' ');
+        const cmdPart = parts[0];
+        const restParts = parts.slice(1);
+        logger.debug(`[${gateId}] Runner split: cmd="${cmdPart}", args=[${restParts.join(', ')}]`);
+        
+        const resolvedCmd = cmdPart.includes(path.sep) || cmdPart.includes('/')
+          ? cmdPart.startsWith('/') || (cmdPart[1] === ':')
+            ? cmdPart
+            : path.resolve(PROJECT_ROOT, cmdPart)
+          : cmdPart;
+        logger.debug(`[${gateId}] Resolved cmd: "${resolvedCmd}" (original: "${cmdPart}")`);
+        
+        const resolvedRunner = [resolvedCmd, ...restParts].join(' ');
+        logger.info(`[${gateId}] ✓ Ready for subprocess execution: "${resolvedRunner}"`);
+        
         gates.push({
-          id,
-          name: id,
+          id: gateId,
+          name: gateId,
           port: 'custom',
           severity: 'critical',
           appliesTo: [],
           async check(context: GateContext): Promise<GateResult> {
-            return runSubprocessGate(runnerCmd, gatePath, context);
+            logger.info(`[${gateId}] Executing subprocess gate`);
+            try {
+              const result = await runSubprocessGate(resolvedRunner, gatePath, context);
+              logger.debug(`[${gateId}] Result: ${JSON.stringify(result).substring(0, 100)}...`);
+              return result;
+            } catch (err) {
+              logger.error(`[${gateId}] Subprocess execution failed: ${(err as Error).message}`);
+              throw err;
+            }
           },
         } as QualityGate);
       }
     } catch (err: unknown) {
-      logger.error(`Failed to load ${file}: ${(err as Error).message}`);
+      logger.error(`[${gateId}] Failed to load ${file}: ${(err as Error).message}`);
     }
   }
 
+  logger.info(`Gate discovery complete: ${gates.length}/${files.length} gates loaded successfully`);
   return gates;
 }
 
@@ -324,6 +381,10 @@ async function orchestrateWithContext(
 
     try {
       const result = await gate.check(context);
+      // Ensure stats object exists and has durationMs
+      if (!result.stats) {
+        result.stats = { filesChecked: 0, findingsCount: 0 };
+      }
       result.stats.durationMs = Math.round(performance.now() - start);
       result.findings = await filterGateFindings(
         gate.id,

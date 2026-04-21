@@ -4,7 +4,7 @@
  * @module .github/PAW/cli/commands/help
  */
 
-import type { CommandMeta } from '../cli-loader';
+import type { CommandMeta } from '../cliLoader';
 import { LOGO, printHelp } from '../help';
 
 /** Command metadata for the fs-based loader. */

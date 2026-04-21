@@ -12,7 +12,7 @@
  * @since 4.0.0
  */
 
-import type { PawDatabase } from './paw-db';
+import type { PawDatabase } from './pawDb';
 
 /**
  * Result returned by a plugin's run() function.

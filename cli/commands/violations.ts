@@ -11,9 +11,9 @@ import {
     openDb,
     resolveAllViolations,
     resolveViolations,
-} from '../../paw-db';
-import type { CommandMeta } from '../cli-loader';
-import { resolveSubcommand } from '../cli-loader';
+} from '../../pawDb';
+import type { CommandMeta } from '../cliLoader';
+import { resolveSubcommand } from '../cliLoader';
 import { checkPassword, hasPassword } from '../password';
 
 /** Command metadata for the fs-based loader. */

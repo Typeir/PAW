@@ -6,7 +6,7 @@
  */
 
 import { log, password } from '@clack/prompts';
-import type { CommandMeta } from '../cli-loader';
+import type { CommandMeta } from '../cliLoader';
 import { hasPassword, savePassword } from '../password';
 
 /** Command metadata for the fs-based loader. */

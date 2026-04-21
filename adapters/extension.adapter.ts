@@ -12,7 +12,7 @@
  * @since 4.0.0
  */
 
-import { EXTENSION_EVENT_MAP, resolveEventName } from './event-map';
+import { EXTENSION_EVENT_MAP, resolveEventName } from './eventMap';
 import type { PawHookDef, PawSurfaceAdapter, SurfaceHookOutput } from './types';
 import { PawEvent } from './types';
 

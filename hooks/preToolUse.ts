@@ -31,7 +31,7 @@ import {
     readHookInput,
     writeDenyOutput,
     writeHookOutput,
-} from '../hook-runtime';
+} from '../hookRuntime';
 import {
     DEFAULT_DB_PATH,
     getPawConfig,
@@ -42,14 +42,14 @@ import {
     openDbReadonly,
     pruneOrphanedViolations,
     type ViolationRow,
-} from '../paw-db';
+} from '../pawDb';
 import {
     isPathIgnored,
     PROJECT_ROOT as ROOT,
     toProjectRelative,
-} from '../paw-paths';
-import { runPlugins } from '../plugin-loader';
-import { resolveStaleIndirectViolations } from '../resolve-indirect-violations';
+} from '../pawPaths';
+import { runPlugins } from '../pluginLoader';
+import { resolveStaleIndirectViolations } from '../resolveIndirectViolations';
 
 /**
  * Tools that are always allowed, even during violation enforcement.

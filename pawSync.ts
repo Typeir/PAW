@@ -41,8 +41,8 @@ import type {
     PawSurfaceAdapter,
 } from './adapters/types';
 import { PawEvent } from './adapters/types';
-import * as logger from './paw-logger';
-import { HOOKS_DIR, PAW_CORE_DIR, PAW_DIR, PROJECT_ROOT } from './paw-paths';
+import * as logger from './pawLogger';
+import { HOOKS_DIR, PAW_CORE_DIR, PAW_DIR, PROJECT_ROOT } from './pawPaths';
 
 /**
  * CLI flag: --force overwrites existing user hooks.
@@ -525,6 +525,40 @@ function generateSurfaceConfigs(surface: PawSurface): void {
 }
 
 /**
+ * Sync gate-wrapper.ts from dist/ to .paw/ for TypeScript gate subprocess execution.
+ * When bundled, PAW_CORE_DIR already points to dist/, so gate-wrapper.ts is directly accessible.
+ */
+function syncGateWrapper(): boolean {
+  // When bundled, PAW_CORE_DIR === .github/PAW/dist, so framework files are in the same directory
+  const files = ['gateWrapper.ts', 'gateContext.ts', 'healthCheckTypes.ts'];
+  let success = true;
+
+  for (const file of files) {
+    const src = path.join(PAW_CORE_DIR, file);
+    const dest = path.join(PAW_DIR, file);
+
+    if (!existsSync(src)) {
+      logger.warn(`${file} not found at ${src} — gates may fail`);
+      success = false;
+      continue;
+    }
+
+    if (existsSync(dest) && !forceOverwrite) {
+      // Skip silently for non-wrapper files, or log if first time
+      if (file === 'gateWrapper.ts') {
+        logger.info(`${file} — already exists, skipped (use --force to overwrite)`);
+      }
+      continue;
+    }
+
+    copyFileSync(src, dest);
+    logger.success(`${file} — copied`);
+  }
+
+  return success;
+}
+
+/**
  * Main sync entrypoint. Exported for use by CLI commands.
  */
 export async function runPawSync(): Promise<void> {
@@ -541,6 +575,10 @@ export async function runPawSync(): Promise<void> {
   s.start('Syncing hooks');
   const copied = syncHooks();
   s.stop(`✅ Hooks synced (${copied} copied)`);
+
+  s.start('Syncing gate wrapper');
+  syncGateWrapper();
+  s.stop('✅ Gate wrapper synced');
 
   s.start('Syncing runtime dependencies');
   syncRuntimeDeps();

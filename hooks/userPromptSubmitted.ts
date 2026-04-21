@@ -17,11 +17,11 @@ import {
     extractSessionId,
     readHookInput,
     writeHookOutput,
-} from '../hook-runtime';
-import { openDbReadonly } from '../paw-db';
-import { LOG_PATH, PAW_DIR } from '../paw-paths';
-import { runPlugins } from '../plugin-loader';
-import { resolveStaleIndirectViolations } from '../resolve-indirect-violations';
+} from '../hookRuntime';
+import { openDbReadonly } from '../pawDb';
+import { LOG_PATH, PAW_DIR } from '../pawPaths';
+import { runPlugins } from '../pluginLoader';
+import { resolveStaleIndirectViolations } from '../resolveIndirectViolations';
 
 const MAX_L1_CHARS = 800;
 

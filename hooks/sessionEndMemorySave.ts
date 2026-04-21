@@ -17,11 +17,11 @@ import {
     isNestedHookRun,
     readHookInput,
     writeHookOutput,
-} from '../hook-runtime';
-import type { PawDatabase } from '../paw-db';
-import { DEFAULT_DB_PATH, openDb } from '../paw-db';
-import { PAW_DIR, PROJECT_ROOT as ROOT, getTasksDir } from '../paw-paths';
-import { runPlugins } from '../plugin-loader';
+} from '../hookRuntime';
+import type { PawDatabase } from '../pawDb';
+import { DEFAULT_DB_PATH, openDb } from '../pawDb';
+import { PAW_DIR, PROJECT_ROOT as ROOT, getTasksDir } from '../pawPaths';
+import { runPlugins } from '../pluginLoader';
 
 /**
  * Parsed decision extracted from a task file.

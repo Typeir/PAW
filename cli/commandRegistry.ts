@@ -8,12 +8,12 @@
  * @module .github/PAW/cli/command-registry
  */
 
-import type { CliCommand, CommandRegistry } from './cli-loader';
+import type { CliCommand, CommandRegistry } from './cliLoader';
 
 import * as dbCmd from './commands/db';
 import * as gatesCmd from './commands/gates';
 import * as helpCmd from './commands/help';
-import * as setPasswordCmd from './commands/set-password';
+import * as setPasswordCmd from './commands/setPassword';
 import * as stateCmd from './commands/state';
 import * as statusCmd from './commands/status';
 import * as syncCmd from './commands/sync';

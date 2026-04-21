@@ -13,9 +13,9 @@ import {
     PAW_CONFIG_PATH,
     PAW_TSCONFIG_REL,
     PROJECT_ROOT,
-} from '../../paw-paths';
-import type { CommandMeta } from '../cli-loader';
-import { resolveSubcommand } from '../cli-loader';
+} from '../../pawPaths';
+import type { CommandMeta } from '../cliLoader';
+import { resolveSubcommand } from '../cliLoader';
 
 /** Command metadata for the fs-based loader. */
 export const meta: CommandMeta = {

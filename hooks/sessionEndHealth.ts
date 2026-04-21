@@ -19,14 +19,14 @@ import {
     readHookInput,
     writeBlockingOutput,
     writeHookOutput,
-} from '../hook-runtime';
-import { DEFAULT_DB_PATH, getPawConfig, openDbReadonly } from '../paw-db';
+} from '../hookRuntime';
+import { DEFAULT_DB_PATH, getPawConfig, openDbReadonly } from '../pawDb';
 import {
     PAW_DIR,
     PAW_GATES_REL,
     PAW_TSCONFIG_REL,
     PROJECT_ROOT as ROOT,
-} from '../paw-paths';
+} from '../pawPaths';
 
 /**
  * Load optional sourceDirectories from .paw/config.json.

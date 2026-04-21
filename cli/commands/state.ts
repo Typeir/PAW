@@ -20,8 +20,8 @@ import {
     openDb,
     openDbReadonly,
     setPawConfig,
-} from '../../paw-db';
-import type { CommandMeta } from '../cli-loader';
+} from '../../pawDb';
+import type { CommandMeta } from '../cliLoader';
 import { checkPassword, hasPassword } from '../password';
 
 /** Command metadata for the fs-based loader. */

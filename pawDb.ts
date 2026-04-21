@@ -17,7 +17,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import initSqlJs, { type Database as SqlJsDatabase } from 'sql.js';
-import { DB_PATH } from './paw-paths';
+import { DB_PATH } from './pawPaths';
 
 /* ------------------------------------------------------------------ */
 /*  sql.js engine — lazily initialized (avoids top-level await which  */

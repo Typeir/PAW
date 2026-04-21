@@ -24,7 +24,7 @@
  * @since 3.0.0
  */
 
-import type { GateFinding } from './health-check-types';
+import type { GateFinding } from './healthCheckTypes';
 
 /**
  * Pattern matching any `paw:gate:` ignore directive.

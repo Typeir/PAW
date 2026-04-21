@@ -31,8 +31,8 @@ import {
     normalizePath,
     openDb,
     upsertFileMemory,
-} from '../paw-db';
-import { PROJECT_ROOT } from '../paw-paths';
+} from '../pawDb';
+import { PROJECT_ROOT } from '../pawPaths';
 
 /** CLI args: filePath is required, sessionId is optional. */
 const filePath = process.argv[2];

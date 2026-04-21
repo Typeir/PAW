@@ -18,9 +18,9 @@
 
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import type { ViolationRow } from './paw-db';
-import { DEFAULT_DB_PATH, openDb, openDbReadonly } from './paw-db';
-import { PROJECT_ROOT as ROOT } from './paw-paths';
+import type { ViolationRow } from './pawDb';
+import { DEFAULT_DB_PATH, openDb, openDbReadonly } from './pawDb';
+import { PROJECT_ROOT as ROOT } from './pawPaths';
 
 /**
  * Result of a stale-violation resolution pass.

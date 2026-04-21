@@ -33,7 +33,7 @@ import {
     readHookInput,
     resolveEditedFilePath,
     writeHookOutput,
-} from '../hook-runtime';
+} from '../hookRuntime';
 import {
     DEFAULT_DB_PATH,
     getPawConfig,
@@ -42,15 +42,15 @@ import {
     openDb,
     openDbReadonly,
     resolveViolationsForFile,
-} from '../paw-db';
+} from '../pawDb';
 import {
     isPathIgnored,
     PROJECT_ROOT as ROOT,
     toProjectRelative,
-} from '../paw-paths';
+} from '../pawPaths';
 import { runGatesForFiles } from '../pawGates';
-import { runPlugins } from '../plugin-loader';
-import { resolveStaleIndirectViolations } from '../resolve-indirect-violations';
+import { runPlugins } from '../pluginLoader';
+import { resolveStaleIndirectViolations } from '../resolveIndirectViolations';
 
 /**
  * Persist gate findings for a file into SQLite, scoped to the current session.

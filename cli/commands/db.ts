@@ -5,9 +5,9 @@
  */
 
 import { log } from '@clack/prompts';
-import { DEFAULT_DB_PATH, ensureSchema, openDb } from '../../paw-db';
-import type { CommandMeta } from '../cli-loader';
-import { resolveSubcommand } from '../cli-loader';
+import { DEFAULT_DB_PATH, ensureSchema, openDb } from '../../pawDb';
+import type { CommandMeta } from '../cliLoader';
+import { resolveSubcommand } from '../cliLoader';
 
 /** Command metadata for the fs-based loader. */
 export const meta: CommandMeta = {

@@ -16,9 +16,9 @@
 
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import type { PawDatabase } from './paw-db';
-import { PLUGINS_DIR } from './paw-paths';
-import type { AggregatePluginResult, PawPlugin } from './plugin-types';
+import type { PawDatabase } from './pawDb';
+import { PLUGINS_DIR } from './pawPaths';
+import type { AggregatePluginResult, PawPlugin } from './pluginTypes';
 
 /**
  * Discover plugin files for a given hook name.

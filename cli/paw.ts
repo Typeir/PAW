@@ -18,7 +18,7 @@ import {
     loadCommands,
     resolveCommandsDir,
     type CommandRegistry,
-} from './cli-loader';
+} from './cliLoader';
 import { LOGO, printHelp } from './help';
 
 /**

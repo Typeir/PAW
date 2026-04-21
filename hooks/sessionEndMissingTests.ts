@@ -19,9 +19,9 @@ import {
     readHookInput,
     writeBlockingOutput,
     writeHookOutput,
-} from '../hook-runtime';
-import { PROJECT_ROOT as ROOT } from '../paw-paths';
-import { resolveStaleIndirectViolations } from '../resolve-indirect-violations';
+} from '../hookRuntime';
+import { PROJECT_ROOT as ROOT } from '../pawPaths';
+import { resolveStaleIndirectViolations } from '../resolveIndirectViolations';
 
 /**
  * File patterns excluded from the test-gap check.

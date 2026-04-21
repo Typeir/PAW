@@ -63,7 +63,7 @@ const cliBundleEntry = join(__dirname, '_cli-entry.ts');
 writeFileSync(
   cliBundleEntry,
   `import { log } from '@clack/prompts';
-import { buildStaticRegistry } from './cli/command-registry';
+import { buildStaticRegistry } from './cli/commandRegistry';
 import { LOGO, printHelp } from './cli/help';
 
 async function main(): Promise<void> {
@@ -115,13 +115,13 @@ console.log('  → dist/cli.mjs');
 console.log('Building hooks...');
 
 const hookEntries = [
-  'hooks/memory-worker.ts',
-  'hooks/post-tool-use.ts',
-  'hooks/pre-tool-use.ts',
-  'hooks/session-end-health.ts',
-  'hooks/session-end-memory-save.ts',
-  'hooks/session-end-missing-tests.ts',
-  'hooks/user-prompt-submitted.ts',
+  'hooks/memoryWorker.ts',
+  'hooks/postToolUse.ts',
+  'hooks/preToolUse.ts',
+  'hooks/sessionEndHealth.ts',
+  'hooks/sessionEndMemorySave.ts',
+  'hooks/sessionEndMissingTests.ts',
+  'hooks/userPromptSubmitted.ts',
 ].map((h) => join(__dirname, h));
 
 await build({
@@ -168,6 +168,33 @@ try {
   console.log('  → dist/gates/');
 } catch {
   console.log('  (no gates/ directory — skipped)');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Post-build: copy gate wrapper                                     */
+/* ------------------------------------------------------------------ */
+try {
+  const wrapperSrc = join(__dirname, 'gateWrapper.ts');
+  const wrapperDst = join(DIST, 'gateWrapper.ts');
+  cpSync(wrapperSrc, wrapperDst);
+  console.log('  → dist/gateWrapper.ts');
+} catch {
+  console.log('  (gateWrapper.ts — skipped)');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Post-build: copy gate support files                               */
+/* ------------------------------------------------------------------ */
+const supportFiles = ['gateContext.ts', 'healthCheckTypes.ts'];
+for (const file of supportFiles) {
+  try {
+    const src = join(__dirname, file);
+    const dst = join(DIST, file);
+    cpSync(src, dst);
+    console.log(`  → dist/${file}`);
+  } catch {
+    console.log(`  (${file} — skipped)`);
+  }
 }
 
 console.log('\nBuild complete!');

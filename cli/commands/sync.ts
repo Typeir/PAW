@@ -6,7 +6,7 @@
 
 import { log } from '@clack/prompts';
 import { runPawSync } from '../../pawSync';
-import type { CommandMeta } from '../cli-loader';
+import type { CommandMeta } from '../cliLoader';
 
 /** Command metadata for the fs-based loader. */
 export const meta: CommandMeta = {
