@@ -6,7 +6,7 @@
  * in paw.sqlite whose fix condition is now satisfied.
  *
  * @module .github/PAW/hooks/session-end-missing-tests
- * @author PAW
+ * @author Typeir
  * @version 2.0.0
  * @since 3.0.0
  */

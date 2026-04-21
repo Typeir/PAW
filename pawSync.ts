@@ -17,7 +17,7 @@
  *   PAW_SURFACE=all npx tsx .github/PAW/pawSync.ts  # generate all surfaces
  *
  * @module .github/PAW/pawSync
- * @author PAW
+ * @author Typeir
  * @version 2.0.0
  * @since 3.0.0
  */
@@ -506,12 +506,18 @@ function generateSurfaceConfigs(surface: PawSurface): void {
 
     mkdirSync(path.dirname(outputPath), { recursive: true });
 
-    const existingContent = existsSync(outputPath)
-      ? readFileSync(outputPath, 'utf-8')
-      : null;
-    const mergedContent = mergeHooksJson(existingContent, output.content);
+    const isJsonOutput = output.filePath.endsWith('.json');
+    let finalContent: string;
+    if (isJsonOutput) {
+      const existingContent = existsSync(outputPath)
+        ? readFileSync(outputPath, 'utf-8')
+        : null;
+      finalContent = mergeHooksJson(existingContent, output.content);
+    } else {
+      finalContent = output.content;
+    }
 
-    writeFileSync(outputPath, mergedContent, 'utf-8');
+    writeFileSync(outputPath, finalContent, 'utf-8');
     logger.success(
       `${adapter.name} → ${path.relative(process.cwd(), outputPath)}`,
     );

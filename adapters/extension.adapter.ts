@@ -7,7 +7,7 @@
  * PreCompact hooks that are not available through the CLI format.
  *
  * @module .github/PAW/adapters/extension.adapter
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 4.0.0
  */

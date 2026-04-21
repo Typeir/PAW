@@ -9,7 +9,7 @@
  * after every mutation via a lightweight wrapper.
  *
  * @module .github/PAW/paw-db
- * @author PAW
+ * @author Typeir
  * @version 3.0.0
  * @since 3.0.0
  */

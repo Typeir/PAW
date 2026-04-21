@@ -11,7 +11,7 @@
  * those stale entries.
  *
  * @module .github/PAW/resolve-indirect-violations
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 3.0.0
  */

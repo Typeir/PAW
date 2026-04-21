@@ -20,7 +20,7 @@
  *   - Memory worker is fire-and-forget — failures never block the agent
  *
  * @module .github/PAW/hooks/post-tool-use
- * @author PAW
+ * @author Typeir
  * @version 10.0.0
  * @since 3.0.0
  */

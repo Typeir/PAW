@@ -6,7 +6,7 @@
  * so the health gate reads the freshest data.
  *
  * @module .github/PAW/hooks/session-end-memory-save
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 3.0.0
  */

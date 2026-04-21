@@ -18,7 +18,7 @@
  * Exit code 2 = blocking error per chatHooks spec.
  *
  * @module .paw/hooks/pre-tool-use
- * @author PAW
+ * @author Typeir
  * @version 7.0.0
  * @since 3.0.0
  */

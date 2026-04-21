@@ -6,7 +6,7 @@
  * changed-only mode.
  *
  * @module .github/PAW/hooks/session-end-health
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 3.0.0
  */

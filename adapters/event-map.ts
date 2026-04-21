@@ -5,7 +5,7 @@
  * for the VS Code Extension, Copilot CLI, and Copilot SDK surfaces.
  *
  * @module .github/PAW/adapters/event-map
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 4.0.0
  */

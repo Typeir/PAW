@@ -5,7 +5,7 @@
  * All gates, the orchestrator, hooks, and CI scripts import from this file.
  *
  * @module .github/PAW/health-check-types
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 3.0.0
  */

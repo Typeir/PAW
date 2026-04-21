@@ -13,7 +13,7 @@
  * step appended to the PAW pre-commit shim.
  *
  * @module .github/PAW/git-hooks/submodule-guard
- * @author Ikuisuus
+ * @author Typeir
  * @version 1.0.0
  * @since 3.0.0
  */

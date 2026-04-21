@@ -7,7 +7,7 @@
  * Customize: Add project-specific prompt validation or skill pre-loading.
  *
  * @module .paw/hooks/user-prompt-submitted
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 3.0.0
  */

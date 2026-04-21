@@ -17,7 +17,7 @@
  * remove ALL state from disk immediately. No session artifacts are left behind.
  *
  * @module .github/PAW/hooks/memory-worker
- * @author PAW
+ * @author Typeir
  * @version 2.0.0
  * @since 4.0.0
  */

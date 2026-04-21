@@ -10,7 +10,7 @@
  * - SDK: `customAgents[]` with runtime tool scoping and sub-agent delegation
  *
  * @module .github/PAW/adapters/lifecycle
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 4.0.0
  */

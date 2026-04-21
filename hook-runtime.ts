@@ -16,7 +16,7 @@
  * PostToolUse can only observe and emit informational messages.
  *
  * @module .github/PAW/hook-runtime
- * @author PAW
+ * @author Typeir
  * @version 2.0.0
  * @since 3.0.0
  */

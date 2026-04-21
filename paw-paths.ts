@@ -10,7 +10,7 @@
  *   .paw/             — Project-specific installed content (gates, hooks, db, logs)
  *
  * @module .github/PAW/paw-paths
- * @author PAW
+ * @author Typeir
  * @version 2.0.0
  * @since 3.0.0
  */

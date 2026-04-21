@@ -19,7 +19,7 @@
  * `*` is the wildcard that matches any gate or any rule.
  *
  * @module .github/PAW/gate-ignore
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 3.0.0
  */

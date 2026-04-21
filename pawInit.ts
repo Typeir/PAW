@@ -9,7 +9,7 @@
  *   npx tsx .github/PAW/pawInit.ts
  *
  * @module .github/PAW/pawInit
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 3.0.0
  */
@@ -60,7 +60,7 @@ const STARTER_GATE = `/**
  * @fileoverview Starter gate scaffolded by paw init. Replace with your own checks.
  *
  * @module .paw/gates/example
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 3.0.0
  */

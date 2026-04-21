@@ -12,7 +12,7 @@
  *   --port name      Run only gates in a logical port
  *
  * @module .github/PAW/pawGates
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 3.0.0
  */

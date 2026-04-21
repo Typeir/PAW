@@ -6,7 +6,7 @@
  * vs staged).
  *
  * @module .github/PAW/gate-context
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 3.0.0
  */

@@ -11,19 +11,19 @@
  *   status     Show which hooks are installed
  *
  * @module .github/PAW/pawHooks
- * @author PAW
+ * @author Typeir
  * @version 2.0.0
  * @since 3.0.0
  */
 
 import { execSync } from 'node:child_process';
 import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  unlinkSync,
-  writeFileSync,
+    chmodSync,
+    existsSync,
+    mkdirSync,
+    readFileSync,
+    unlinkSync,
+    writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
 import * as logger from './paw-logger';

@@ -7,12 +7,12 @@
  * entire PAW system.
  *
  * @module .github/PAW/paw-logger
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 3.0.0
  */
 
-import { intro, outro, log, spinner as clackSpinner } from '@clack/prompts';
+import { spinner as clackSpinner, intro, log, outro } from '@clack/prompts';
 
 /**
  * Print a PAW intro banner.

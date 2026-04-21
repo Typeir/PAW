@@ -8,7 +8,7 @@
  * the SDK's typed callback system.
  *
  * @module .github/PAW/adapters/sdk.adapter
- * @author PAW
+ * @author Typeir
  * @version 1.0.0
  * @since 4.0.0
  */
