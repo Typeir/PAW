@@ -171,7 +171,50 @@ and can return additional messages.
 
 ## When Extending PAW
 
-- **New gate**: Create `.paw/gates/my-gate.gate.ts` implementing `QualityGate`
+- **New gate (TypeScript)**: Create `.paw/gates/my-gate.gate.ts` implementing `QualityGate`
+- **New gate (other language)**: Create `.paw/gates/my-gate.gate.{ext}`, add runner to `config.json`
 - **New hook**: Create `.paw/hooks/my-hook.ts`, run `paw sync` to register
 - **New plugin**: Create `.paw/plugins/{hook-name}/my-plugin.ts`
 - **Ignore a path**: Add pattern to `.pawignore`
+- **Suppress a finding inline**: Use `/* paw:gate:{id}:{rule} ignore */` in the source file
+
+## Gate Ignore Directives
+
+To suppress a specific violation in a file, add a `paw:gate:` ignore comment.
+This is processed by the PAW orchestrator (`pawGates.ts`) via `gate-ignore.ts` —
+it is **not** gate-specific code and works for every gate uniformly.
+
+### Syntax
+
+```
+/* paw:gate:{id} ignore */                 suppress all rules for that gate (whole file)
+/* paw:gate:{id}:{rule} ignore */          suppress one rule for that gate (whole file)
+/* paw:gate:{id} ignore-nextline */        suppress next line only
+/* paw:gate:{id}:{rule} ignore-nextline */ suppress one rule on next line only
+/* paw:gate:* ignore */                    suppress ALL gates (whole file)
+```
+
+Also valid in MDX JSX comments `{/* … */}` and HTML comments `<!-- … -->`.
+
+### Examples
+
+```ts
+/* paw:gate:* ignore */
+// Use only on generated files — suppresses every gate for the whole file
+```
+
+```ts
+/* paw:gate:antipatterns:console-log ignore */
+// Suppress only the console-log rule from the antipatterns gate
+```
+
+```mdx
+{/* paw:gate:content-format:missing-h1 ignore */}
+```
+
+### Rules
+
+- **Never use `paw:gate:* ignore`** in hand-authored files. Reserve it for generated output.
+- **Prefer the narrowest scope**: `gate:rule` over `gate:*`, `ignore-nextline` over `ignore`.
+- **Never suppress `missing-test`** — create the test file instead.
+- `health:check-ignore` is **deprecated**. Do not use it in new files.
