@@ -12,12 +12,7 @@
  */
 
 import { build } from 'esbuild';
-import {
-    cpSync,
-    mkdirSync,
-    rmSync,
-    writeFileSync
-} from 'node:fs';
+import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -115,7 +110,6 @@ console.log('  → dist/cli.mjs');
 console.log('Building hooks...');
 
 const hookEntries = [
-  'hooks/memoryWorker.ts',
   'hooks/postToolUse.ts',
   'hooks/preToolUse.ts',
   'hooks/sessionEndHealth.ts',
@@ -134,6 +128,25 @@ await build({
 });
 
 console.log('  → dist/hooks/*.mjs + dist/hooks/_lib/');
+
+/* ------------------------------------------------------------------ */
+/*  Pass 3: Workers — background processes spawned by hooks           */
+/* ------------------------------------------------------------------ */
+console.log('Building workers...');
+
+const workerEntries = ['workers/memoryWorker.ts'].map((w) =>
+  join(__dirname, w),
+);
+
+await build({
+  ...shared,
+  entryPoints: workerEntries,
+  outdir: join(DIST, 'workers'),
+  splitting: false,
+  outExtension: { '.js': '.mjs' },
+});
+
+console.log('  → dist/workers/*.mjs');
 
 /* ------------------------------------------------------------------ */
 /*  Post-build: copy templates and docs                               */

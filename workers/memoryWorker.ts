@@ -1,13 +1,13 @@
 /**
  * PAW Memory Worker
  *
- * @fileoverview Async background worker spawned by post-tool-use.ts.
+ * @fileoverview Async background worker spawned by postToolUse.ts.
  * Uses the GitHub Copilot SDK to call the CLI for LLM-powered file memory
  * generation. Reads the edited file, generates a concise memory summary
  * via a mini-LLM, and stores it in paw.sqlite's file_memories table.
  *
- * Invocation: spawned as a detached child process by post-tool-use.ts
- *   npx tsx --tsconfig .paw/tsconfig.json .github/PAW/hooks/memory-worker.ts <filePath> [sessionId]
+ * Invocation: spawned as a detached child process by postToolUse.ts
+ *   npx tsx --tsconfig .paw/tsconfig.json .github/PAW/workers/memoryWorker.ts <filePath> [sessionId]
  *
  * Non-blocking: PostToolUse returns to the agent immediately after spawning.
  * Failures are logged but never propagate — they don't block the agent.
@@ -16,7 +16,7 @@
  * server generates a random one, then calls disconnect() + deleteSession() to
  * remove ALL state from disk immediately. No session artifacts are left behind.
  *
- * @module .github/PAW/hooks/memory-worker
+ * @module .github/PAW/workers/memoryWorker
  * @author Typeir
  * @version 2.0.0
  * @since 4.0.0
@@ -27,10 +27,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import {
-    DEFAULT_DB_PATH,
-    normalizePath,
-    openDb,
-    upsertFileMemory,
+  DEFAULT_DB_PATH,
+  normalizePath,
+  openDb,
+  upsertFileMemory,
 } from '../pawDb';
 import { PROJECT_ROOT } from '../pawPaths';
 
@@ -144,7 +144,7 @@ async function main(): Promise<void> {
       systemMessage: {
         mode: 'replace' as const,
         content:
-          'You are a concise code memory assistant. Output ONLY the memory note — no headers, no markdown fences, no explanation. 3-5 sentences max.',
+          'You are a concise code memory assistant. Output ONLY the memory note — no markdown fences, no explanation. 3-5 sentences max.',
       },
     });
 

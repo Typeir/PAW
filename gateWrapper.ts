@@ -10,15 +10,10 @@
  * @module .paw/gate-wrapper.ts
  */
 
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type {
-  GateContext,
-  GateResult,
-  QualityGate,
-} from './healthCheckTypes';
-import { buildGateContext } from './gateContext';
+import { buildSingleFileContext } from './gateContext';
+import type { GateResult, QualityGate } from './healthCheckTypes';
 
 /**
  * Main entrypoint.
@@ -40,11 +35,10 @@ async function main(): Promise<void> {
 
     const contextData = JSON.parse(stdinData);
 
-    // Build GateContext from serialized data
-    const context = await buildGateContext(
+    // Build GateContext from serialized data using explicit file list
+    const context = buildSingleFileContext(
       contextData.rootDir,
-      contextData.mode,
-      contextData.changedFiles,
+      contextData.changedFiles ?? [],
     );
 
     // Import the gate module

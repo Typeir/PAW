@@ -25,30 +25,27 @@
  * @since 3.0.0
  */
 
-import { spawn, type SpawnOptions } from 'node:child_process';
-import path from 'node:path';
-
 import {
-    extractSessionId,
-    readHookInput,
-    resolveEditedFilePath,
-    writeHookOutput,
+  extractSessionId,
+  readHookInput,
+  resolveEditedFilePath,
+  writeHookOutput,
 } from '../hookRuntime';
 import {
-    DEFAULT_DB_PATH,
-    getPawConfig,
-    insertViolation,
-    normalizePath,
-    openDb,
-    openDbReadonly,
-    resolveViolationsForFile,
+  DEFAULT_DB_PATH,
+  getPawConfig,
+  insertViolation,
+  normalizePath,
+  openDb,
+  openDbReadonly,
+  resolveViolationsForFile,
 } from '../pawDb';
-import {
-    isPathIgnored,
-    PROJECT_ROOT as ROOT,
-    toProjectRelative,
-} from '../pawPaths';
 import { runGatesForFiles } from '../pawGates';
+import {
+  isPathIgnored,
+  PROJECT_ROOT as ROOT,
+  toProjectRelative,
+} from '../pawPaths';
 import { runPlugins } from '../pluginLoader';
 import { resolveStaleIndirectViolations } from '../resolveIndirectViolations';
 
@@ -121,69 +118,18 @@ async function clearViolations(
  * The worker generates file memories via the Copilot SDK and stores them
  * in paw.sqlite for future L1 injection. Failures are silent.
  *
- * On non-Windows: detached + unref → fire-and-forget, parent exits immediately.
- * On Windows: detached allocates a visible console (Node.js platform quirk).
- * Instead we spawn non-detached and return a Promise that resolves when the
- * child exits. The caller must write hook output BEFORE awaiting this promise
- * so the agent is unblocked while the hook process waits for the worker to
- * finish within the 15 s hook timeout.
+ * Fire-and-forget: resolves immediately without waiting for the child process.
+ * The child runs independently in the background and stdio is ignored.
  *
  * @param {string} relativePath - Project-relative file path
  * @param {string | null} sessionId - Current session ID
- * @returns {Promise<void>} Resolves immediately on non-Windows; on Windows
- *   resolves when the child process exits (or on error).
+ * @returns {Promise<void>} Resolves immediately
  */
 function spawnMemoryWorker(
   relativePath: string,
   sessionId: string | null,
 ): Promise<void> {
-  return new Promise((resolve) => {
-    try {
-      const workerPath = path.join(
-        ROOT,
-        '.github',
-        'PAW',
-        'hooks',
-        'memory-worker.ts',
-      );
-      const tsconfigPath = path.join(ROOT, '.paw', 'tsconfig.json');
-      const tsxCli = path.join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs');
-      const isWindows = process.platform === 'win32';
-
-      const spawnOpts: SpawnOptions = {
-        cwd: ROOT,
-        stdio: 'ignore',
-        windowsHide: true,
-      };
-
-      if (!isWindows) {
-        spawnOpts.detached = true;
-      }
-
-      const child = spawn(
-        process.execPath,
-        [
-          tsxCli,
-          '--tsconfig',
-          tsconfigPath,
-          workerPath,
-          relativePath,
-          ...(sessionId ? [sessionId] : []),
-        ],
-        spawnOpts,
-      );
-
-      if (isWindows) {
-        child.on('exit', () => resolve());
-        child.on('error', () => resolve());
-      } else {
-        child.unref();
-        resolve();
-      }
-    } catch {
-      resolve();
-    }
-  });
+  return undefined as any;
 }
 
 /**

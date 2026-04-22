@@ -11,13 +11,22 @@
  * @since 3.0.0
  */
 
+import { spinner as clackSpinner } from '@clack/prompts';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { spinner as clackSpinner, intro, log, outro } from '@clack/prompts';
 
 const PAW_LOGS_DIR = '.ignore/paw-logs';
-const SESSION_START = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+const SESSION_START = new Date()
+  .toISOString()
+  .replace(/[:.]/g, '-')
+  .slice(0, 19);
 const LOG_FILE = path.join(PAW_LOGS_DIR, `paw-${SESSION_START}.log`);
+
+/**
+ * Detect if running in a hook context (no TTY, stdin is not a terminal).
+ * In hook context, suppress all console output and only log to file.
+ */
+const IN_HOOK_CONTEXT = !process.stdout.isTTY;
 
 /**
  * Initialize log directory.
@@ -55,7 +64,9 @@ function writeLog(level: string, message: string): void {
  */
 export function pawIntro(title: string): void {
   writeLog('info', `[CLI] Intro: ${title}`);
-  intro(title);
+  if (!IN_HOOK_CONTEXT) {
+    process.stderr.write(`\n┌─ ${title}\n│\n`);
+  }
 }
 
 /**
@@ -65,7 +76,9 @@ export function pawIntro(title: string): void {
  */
 export function pawOutro(message: string): void {
   writeLog('info', `[CLI] Outro: ${message}`);
-  outro(message);
+  if (!IN_HOOK_CONTEXT) {
+    process.stderr.write(`│\n└─ ${message}\n\n`);
+  }
 }
 
 /**
@@ -75,7 +88,9 @@ export function pawOutro(message: string): void {
  */
 export function info(message: string): void {
   writeLog('info', message);
-  log.info(message);
+  if (!IN_HOOK_CONTEXT) {
+    process.stderr.write(`ℹ  ${message}\n`);
+  }
 }
 
 /**
@@ -85,7 +100,9 @@ export function info(message: string): void {
  */
 export function success(message: string): void {
   writeLog('info', `✓ ${message}`);
-  log.success(message);
+  if (!IN_HOOK_CONTEXT) {
+    process.stderr.write(`✓ ${message}\n`);
+  }
 }
 
 /**
@@ -95,7 +112,9 @@ export function success(message: string): void {
  */
 export function warn(message: string): void {
   writeLog('warn', message);
-  log.warn(message);
+  if (!IN_HOOK_CONTEXT) {
+    process.stderr.write(`⚠ ${message}\n`);
+  }
 }
 
 /**
@@ -105,7 +124,9 @@ export function warn(message: string): void {
  */
 export function error(message: string): void {
   writeLog('error', message);
-  log.error(message);
+  if (!IN_HOOK_CONTEXT) {
+    process.stderr.write(`✖ ${message}\n`);
+  }
 }
 
 /**
@@ -124,7 +145,9 @@ export function debug(message: string): void {
  */
 export function step(message: string): void {
   writeLog('info', `→ ${message}`);
-  log.step(message);
+  if (!IN_HOOK_CONTEXT) {
+    process.stderr.write(`→ ${message}\n`);
+  }
 }
 
 /**
@@ -134,15 +157,26 @@ export function step(message: string): void {
  */
 export function message(message: string): void {
   writeLog('info', message);
-  log.message(message);
+  if (!IN_HOOK_CONTEXT) {
+    process.stderr.write(`${message}\n`);
+  }
 }
 
 /**
  * Create a spinner for long-running operations.
+ * In hook context (TTY=false), returns a no-op spinner to prevent
+ * ANSI animation codes from polluting stdout/JSON responses.
  *
  * @returns Spinner with start/stop methods
  */
 export function spin(): ReturnType<typeof clackSpinner> {
+  if (IN_HOOK_CONTEXT) {
+    // Return a no-op spinner for hook context
+    return {
+      start: () => {},
+      stop: () => {},
+    } as ReturnType<typeof clackSpinner>;
+  }
   return clackSpinner();
 }
 

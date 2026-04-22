@@ -12,8 +12,7 @@
  *   - Defaults to "extension" when no config is found
  *
  * Usage:
- *   npx tsx .github/PAW/pawSync.ts          # full sync (default surface)
- *   npx tsx .github/PAW/pawSync.ts --force  # overwrite existing hooks
+ *   npx tsx .github/PAW/pawSync.ts          # full sync
  *   PAW_SURFACE=all npx tsx .github/PAW/pawSync.ts  # generate all surfaces
  *
  * @module .github/PAW/pawSync
@@ -23,31 +22,26 @@
  */
 
 import {
-    copyFileSync,
-    existsSync,
-    mkdirSync,
-    readFileSync,
-    readdirSync,
-    writeFileSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
 import { CLIAdapter } from './adapters/cli.adapter';
 import { ExtensionAdapter } from './adapters/extension.adapter';
 import { SDKAdapter } from './adapters/sdk.adapter';
 import type {
-    PawConfig,
-    PawHookDef,
-    PawSurface,
-    PawSurfaceAdapter,
+  PawConfig,
+  PawHookDef,
+  PawSurface,
+  PawSurfaceAdapter,
 } from './adapters/types';
 import { PawEvent } from './adapters/types';
 import * as logger from './pawLogger';
 import { HOOKS_DIR, PAW_CORE_DIR, PAW_DIR, PROJECT_ROOT } from './pawPaths';
-
-/**
- * CLI flag: --force overwrites existing user hooks.
- */
-const forceOverwrite = process.argv.includes('--force');
 
 /**
  * Source directory for compiled hook bundles.
@@ -116,29 +110,34 @@ interface HookMapping {
  * When adding a new hook to .github/PAW/hooks/, add a mapping here.
  */
 const HOOK_REGISTRY: HookMapping[] = [
-  { file: 'pre-tool-use.mjs', event: PawEvent.ToolPre, timeoutSec: 10 },
+  { file: 'preToolUse.mjs', event: PawEvent.ToolPre, timeoutSec: 10 },
   {
-    file: 'user-prompt-submitted.mjs',
+    file: 'userPromptSubmitted.mjs',
     event: PawEvent.PromptSubmitted,
     timeoutSec: 10,
   },
-  { file: 'post-tool-use.mjs', event: PawEvent.ToolPost, timeoutSec: 15 },
+  { file: 'postToolUse.mjs', event: PawEvent.ToolPost, timeoutSec: 15 },
   {
-    file: 'session-end-memory-save.mjs',
+    file: 'sessionEndMemorySave.mjs',
     event: PawEvent.SessionEnd,
     timeoutSec: 15,
   },
   {
-    file: 'session-end-health.mjs',
+    file: 'sessionEndHealth.mjs',
     event: PawEvent.SessionEnd,
     timeoutSec: 120,
+  },
+  {
+    file: 'sessionEndMissingTests.mjs',
+    event: PawEvent.SessionEnd,
+    timeoutSec: 30,
   },
 ];
 
 /**
  * Copy compiled .mjs hooks from PAW dist/hooks/ into .paw/hooks/.
  * Also copies _lib/ shared chunks needed by the hooks.
- * Skips files that already exist unless --force is set.
+ * Always overwrites existing files to keep hooks in sync.
  *
  * @returns Number of files copied
  */
@@ -162,18 +161,9 @@ function syncHooks(): number {
     const src = path.join(DEFAULT_HOOKS_SRC, file);
     const dest = path.join(HOOKS_DIR, file);
 
-    if (existsSync(dest) && !forceOverwrite) {
-      logger.info(
-        `${file} — already exists, skipped (use --force to overwrite)`,
-      );
-      continue;
-    }
-
     copyFileSync(src, dest);
     copied++;
-    logger.success(
-      `${file} — ${existsSync(dest) && forceOverwrite ? 'overwritten' : 'copied'}`,
-    );
+    logger.success(`${file} — synced`);
   }
 
   // Copy _lib/ shared chunks (always overwritten — content-hashed names)
@@ -214,9 +204,6 @@ function copyDirRecursive(srcDir: string, destDir: string): number {
     if (entry.isDirectory()) {
       copied += copyDirRecursive(src, dest);
     } else {
-      if (existsSync(dest) && !forceOverwrite) {
-        continue;
-      }
       copyFileSync(src, dest);
       copied++;
     }
@@ -312,18 +299,31 @@ function syncAssets(): number {
  */
 function inferPawEventFromFilename(filename: string): PawEvent | null {
   const name = filename.replace(/\.(mjs|ts)$/, '');
-  if (name.startsWith('pre-tool-use')) return PawEvent.ToolPre;
-  if (name.startsWith('post-tool-use')) return PawEvent.ToolPost;
+  if (name.startsWith('preToolUse') || name.startsWith('pre-tool-use'))
+    return PawEvent.ToolPre;
+  if (name.startsWith('postToolUse') || name.startsWith('post-tool-use'))
+    return PawEvent.ToolPost;
   if (
+    name.startsWith('userPromptSubmitted') ||
+    name.startsWith('userPrompt') ||
     name.startsWith('user-prompt-submitted') ||
     name.startsWith('user-prompt')
   )
     return PawEvent.PromptSubmitted;
-  if (name.startsWith('session-end')) return PawEvent.SessionEnd;
-  if (name.startsWith('session-start')) return PawEvent.SessionStart;
-  if (name.startsWith('subagent-start')) return PawEvent.SubagentStart;
-  if (name.startsWith('subagent-stop')) return PawEvent.SubagentStop;
-  if (name.startsWith('pre-compact') || name.startsWith('context-compact'))
+  if (name.startsWith('sessionEnd') || name.startsWith('session-end'))
+    return PawEvent.SessionEnd;
+  if (name.startsWith('sessionStart') || name.startsWith('session-start'))
+    return PawEvent.SessionStart;
+  if (name.startsWith('subagentStart') || name.startsWith('subagent-start'))
+    return PawEvent.SubagentStart;
+  if (name.startsWith('subagentStop') || name.startsWith('subagent-stop'))
+    return PawEvent.SubagentStop;
+  if (
+    name.startsWith('preCompact') ||
+    name.startsWith('contextCompact') ||
+    name.startsWith('pre-compact') ||
+    name.startsWith('context-compact')
+  )
     return PawEvent.ContextCompact;
   return null;
 }
@@ -540,14 +540,6 @@ function syncGateWrapper(): boolean {
     if (!existsSync(src)) {
       logger.warn(`${file} not found at ${src} — gates may fail`);
       success = false;
-      continue;
-    }
-
-    if (existsSync(dest) && !forceOverwrite) {
-      // Skip silently for non-wrapper files, or log if first time
-      if (file === 'gateWrapper.ts') {
-        logger.info(`${file} — already exists, skipped (use --force to overwrite)`);
-      }
       continue;
     }
 
