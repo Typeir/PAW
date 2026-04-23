@@ -27,26 +27,26 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-    extractSessionId,
-    readHookInput,
-    writeDenyOutput,
-    writeHookOutput,
+  extractSessionId,
+  readHookInput,
+  writeDenyOutput,
+  writeHookOutput,
 } from '../hookRuntime';
 import {
-    DEFAULT_DB_PATH,
-    getPawConfig,
-    getSessionViolations,
-    getUnresolvedViolations,
-    normalizePath,
-    openDb,
-    openDbReadonly,
-    pruneOrphanedViolations,
-    type ViolationRow,
+  DEFAULT_DB_PATH,
+  getPawConfig,
+  getSessionViolations,
+  getUnresolvedViolations,
+  normalizePath,
+  openDb,
+  openDbReadonly,
+  pruneOrphanedViolations,
+  type ViolationRow,
 } from '../pawDb';
 import {
-    isPathIgnored,
-    PROJECT_ROOT as ROOT,
-    toProjectRelative,
+  isPathIgnored,
+  PROJECT_ROOT as ROOT,
+  toProjectRelative,
 } from '../pawPaths';
 import { runPlugins } from '../pluginLoader';
 import { resolveStaleIndirectViolations } from '../resolveIndirectViolations';
@@ -118,6 +118,27 @@ function extractToolFilePaths(hookInput: Record<string, unknown>): string[] {
       for (const key of ['filePath', 'file_path', 'path']) {
         if (typeof nested[key] === 'string') {
           paths.push(normalizePath(nested[key] as string));
+        }
+      }
+    }
+
+    // Some tools (apply_patch) embed a patch string in `input` instead of an object.
+    // Detect the patch header lines like "*** Update File: <path>" and harvest those paths.
+    if (typeof parsed.input === 'string') {
+      const patchText = parsed.input as string;
+      const patchFileRegex =
+        /^\*\*\*\s*(?:Update File|Add File|Delete File):\s*(.+)$/gim;
+      let m: RegExpExecArray | null = null;
+      while ((m = patchFileRegex.exec(patchText)) !== null) {
+        paths.push(normalizePath(m[1].trim()));
+      }
+
+      // As a fallback, also pick up any absolute paths that appear inside the patch body.
+      const absPathPattern = /(?:[a-zA-Z]:[\\\/]|\/)[^\s"'`;|&<>]+/g;
+      const absMatches = patchText.match(absPathPattern);
+      if (absMatches) {
+        for (const a of absMatches) {
+          paths.push(normalizePath(a));
         }
       }
     }
