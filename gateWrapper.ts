@@ -8,6 +8,9 @@
  * Usage: node tsx dist/cli.mjs gate-path.gate.ts < stdin
  *
  * @module .paw/gate-wrapper.ts
+ * @author Typeir
+ * @version 1.0.0
+ * @since 3.0.0
  */
 
 import path from 'node:path';
@@ -16,32 +19,55 @@ import { buildSingleFileContext } from './gateContext';
 import type { GateResult, QualityGate } from './healthCheckTypes';
 
 /**
+ * Read all data from stdin as a UTF-8 string.
+ *
+ * @returns Full stdin contents as a string
+ */
+async function readStdinText(): Promise<string> {
+  let data = '';
+  for await (const chunk of process.stdin) {
+    data += chunk.toString();
+  }
+  return data;
+}
+
+/**
+ * Serialize a gate-level error as a failed GateResult JSON and exit with code 0.
+ * Exit code 0 is used deliberately — VS Code reads the JSON output, not the exit code.
+ *
+ * @param err - Error to serialize into the result
+ */
+function outputErrorResult(err: unknown): void {
+  const errorMessage = err instanceof Error ? err.message : String(err);
+  console.log(
+    JSON.stringify({
+      passed: false,
+      severity: 'critical',
+      findings: [{ rule: 'gate-error', message: errorMessage }],
+    } as GateResult),
+  );
+  process.exit(0);
+}
+
+/**
  * Main entrypoint.
  */
 async function main(): Promise<void> {
   try {
-    // Get gate path from CLI argument
     const gatePath = process.argv[2];
     if (!gatePath) {
       process.stderr.write('ERROR: Gate path required as first argument\n');
       process.exit(1);
     }
 
-    // Read GateContext from stdin
-    let stdinData = '';
-    for await (const chunk of process.stdin) {
-      stdinData += chunk.toString();
-    }
-
+    const stdinData = await readStdinText();
     const contextData = JSON.parse(stdinData);
 
-    // Build GateContext from serialized data using explicit file list
     const context = buildSingleFileContext(
       contextData.rootDir,
       contextData.changedFiles ?? [],
     );
 
-    // Import the gate module
     const moduleUrl = pathToFileURL(path.resolve(gatePath)).href;
     const mod = await import(moduleUrl);
 
@@ -52,27 +78,10 @@ async function main(): Promise<void> {
       );
     }
 
-    // Execute the gate
     const result: GateResult = await gate.check(context);
-
-    // Output JSON result
     console.log(JSON.stringify(result));
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    // Output error as a proper GateResult
-    console.log(
-      JSON.stringify({
-        passed: false,
-        severity: 'critical',
-        findings: [
-          {
-            rule: 'gate-error',
-            message,
-          },
-        ],
-      } as GateResult),
-    );
-    process.exit(0); // Don't exit with error — output JSON instead
+    outputErrorResult(err);
   }
 }
 

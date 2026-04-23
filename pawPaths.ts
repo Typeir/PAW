@@ -96,8 +96,8 @@ export const PAW_CONFIG_PATH = path.join(PAW_DIR, 'config.json');
  * Read an optional path from .paw/config.json relative to project root.
  * Returns the resolved absolute path, or null when the key is absent.
  *
- * @param key - JSON key in config (e.g. `"tasksDir"`)
- * @returns Absolute path or null
+ * @param {string} key - JSON key in config (e.g. `"tasksDir"`)
+ * @returns {string | null} Absolute path or null
  */
 export function getConfigPath(key: string): string | null {
   if (!existsSync(PAW_CONFIG_PATH)) return null;
@@ -108,7 +108,7 @@ export function getConfigPath(key: string): string | null {
       return path.join(PROJECT_ROOT, config[key]);
     }
   } catch {
-    /* parse failure — return null */
+    return null;
   }
   return null;
 }
@@ -117,7 +117,7 @@ export function getConfigPath(key: string): string | null {
  * Resolve the tasks directory from `.paw/config.json` `tasksDir` key.
  * Returns null when the project has not configured a tasks directory.
  *
- * @returns Absolute path to the tasks directory, or null
+ * @returns {string | null} Absolute path to the tasks directory, or null
  */
 export function getTasksDir(): string | null {
   return getConfigPath('tasksDir');
@@ -157,7 +157,7 @@ let _ignorePatterns: RegExp[] | null = null;
  * Load and cache .pawignore exclude patterns.
  * Falls back to a minimal default set if the file doesn't exist.
  *
- * @returns Array of compiled RegExp patterns
+ * @returns {RegExp[]} Array of compiled RegExp patterns
  */
 function loadIgnorePatterns(): RegExp[] {
   if (_ignorePatterns) return _ignorePatterns;
@@ -187,7 +187,7 @@ function loadIgnorePatterns(): RegExp[] {
  * built-in exclusions (.github/PAW/ and .paw/).
  *
  * @param {string} relativePath - Forward-slash path relative to project root
- * @returns True if the path should be skipped by PAW hooks and gates
+ * @returns {boolean} True if the path should be skipped by PAW hooks and gates
  */
 export function isPathIgnored(relativePath: string): boolean {
   if (

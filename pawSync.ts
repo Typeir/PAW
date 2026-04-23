@@ -139,7 +139,7 @@ const HOOK_REGISTRY: HookMapping[] = [
  * Also copies _lib/ shared chunks needed by the hooks.
  * Always overwrites existing files to keep hooks in sync.
  *
- * @returns Number of files copied
+ * @returns {number} Number of files copied
  */
 function syncHooks(): number {
   mkdirSync(HOOKS_DIR, { recursive: true });
@@ -151,7 +151,6 @@ function syncHooks(): number {
     return 0;
   }
 
-  // Copy top-level .mjs hook files
   const sourceFiles = readdirSync(DEFAULT_HOOKS_SRC).filter((f) =>
     f.endsWith('.mjs'),
   );
@@ -166,20 +165,30 @@ function syncHooks(): number {
     logger.success(`${file} — synced`);
   }
 
-  // Copy _lib/ shared chunks (always overwritten — content-hashed names)
-  const libSrc = path.join(DEFAULT_HOOKS_SRC, '_lib');
-  if (existsSync(libSrc)) {
-    const libDest = path.join(HOOKS_DIR, '_lib');
-    mkdirSync(libDest, { recursive: true });
-    const libFiles = readdirSync(libSrc).filter((f) => f.endsWith('.mjs'));
-    for (const file of libFiles) {
-      copyFileSync(path.join(libSrc, file), path.join(libDest, file));
-    }
-    logger.success(`_lib/ — ${libFiles.length} shared chunk(s) synced`);
-    copied += libFiles.length;
-  }
+  copied += syncLibChunks();
 
   return copied;
+}
+
+/**
+ * Copy the `_lib/` shared chunk directory from `DEFAULT_HOOKS_SRC` into
+ * `.paw/hooks/_lib/`. Content-hashed filenames are overwritten unconditionally
+ * so consumers always resolve to the freshest chunks.
+ *
+ * @returns {number} Count of chunk files copied (0 when no _lib/ source)
+ */
+function syncLibChunks(): number {
+  const libSrc = path.join(DEFAULT_HOOKS_SRC, '_lib');
+  if (!existsSync(libSrc)) return 0;
+
+  const libDest = path.join(HOOKS_DIR, '_lib');
+  mkdirSync(libDest, { recursive: true });
+  const libFiles = readdirSync(libSrc).filter((f) => f.endsWith('.mjs'));
+  for (const file of libFiles) {
+    copyFileSync(path.join(libSrc, file), path.join(libDest, file));
+  }
+  logger.success(`_lib/ — ${libFiles.length} shared chunk(s) synced`);
+  return libFiles.length;
 }
 
 /**
@@ -218,7 +227,6 @@ function copyDirRecursive(srcDir: string, destDir: string): number {
  * hooks don't need a global npm install, they find deps in .paw/node_modules/.
  */
 function syncRuntimeDeps(): void {
-  // In bundled CLI, PAW_CORE_DIR is dist/ — node_modules is one level up
   const candidates = [
     path.join(PAW_CORE_DIR, 'node_modules'),
     path.join(PAW_CORE_DIR, '..', 'node_modules'),
@@ -239,7 +247,21 @@ function syncRuntimeDeps(): void {
   const sqlJsDest = path.join(nodeModulesDest, 'sql.js');
   mkdirSync(sqlJsDest, { recursive: true });
 
-  // Copy package.json + dist/ (only the files we need)
+  copySqlJsPackage(sqlJsSrc, sqlJsDest);
+
+  logger.success('sql.js → .paw/node_modules/sql.js/');
+}
+
+/**
+ * Copy the minimum subset of a sql.js package (its `package.json` and the
+ * `sql-wasm*` build artifacts) from source into destination. This is the
+ * runtime portability surface — consumers need only these files to boot
+ * sql.js from `.paw/node_modules/`.
+ *
+ * @param {string} sqlJsSrc - Source sql.js directory (inside a node_modules tree)
+ * @param {string} sqlJsDest - Destination sql.js directory inside `.paw/node_modules/`
+ */
+function copySqlJsPackage(sqlJsSrc: string, sqlJsDest: string): void {
   copyFileSync(
     path.join(sqlJsSrc, 'package.json'),
     path.join(sqlJsDest, 'package.json'),
@@ -249,14 +271,11 @@ function syncRuntimeDeps(): void {
   const distDest = path.join(sqlJsDest, 'dist');
   mkdirSync(distDest, { recursive: true });
 
-  // Copy the wasm files (default sql.js entry point)
   for (const file of readdirSync(distSrc)) {
     if (file.startsWith('sql-wasm')) {
       copyFileSync(path.join(distSrc, file), path.join(distDest, file));
     }
   }
-
-  logger.success('sql.js → .paw/node_modules/sql.js/');
 }
 
 /**
@@ -264,7 +283,7 @@ function syncRuntimeDeps(): void {
  * into .github/ so VS Code discovers them natively.
  * Skips files that already exist unless --force is set.
  *
- * @returns Number of files copied
+ * @returns {number} Number of files copied
  */
 function syncAssets(): number {
   let totalCopied = 0;
@@ -294,8 +313,8 @@ function syncAssets(): number {
  * Infer the PAW canonical event from a filename convention.
  * Filenames starting with the event prefix map to that event.
  *
- * @param filename - Hook filename (e.g. 'session-end-missing-tests.ts')
- * @returns PAW canonical event or null if unrecognized
+ * @param {string} filename - Hook filename (e.g. 'session-end-missing-tests.ts')
+ * @returns {PawEvent | null} PAW canonical event or null if unrecognized
  */
 function inferPawEventFromFilename(filename: string): PawEvent | null {
   const name = filename.replace(/\.(mjs|ts)$/, '');
@@ -332,7 +351,7 @@ function inferPawEventFromFilename(filename: string): PawEvent | null {
  * Read the target surface from PAW_SURFACE env var or .paw/config.json.
  * Defaults to "extension" (VS Code is the primary surface).
  *
- * @returns Selected surface identifier
+ * @returns {PawSurface} Selected surface identifier
  */
 function readSurfaceConfig(): PawSurface {
   const envSurface = process.env.PAW_SURFACE?.toLowerCase();
@@ -362,8 +381,8 @@ function readSurfaceConfig(): PawSurface {
 /**
  * Resolve the set of adapters for the selected surface.
  *
- * @param surface - Target surface identifier
- * @returns Array of adapter instances
+ * @param {PawSurface} surface - Target surface identifier
+ * @returns {PawSurfaceAdapter[]} Array of adapter instances
  */
 function resolveAdapters(surface: PawSurface): PawSurfaceAdapter[] {
   const cli = new CLIAdapter();
@@ -387,7 +406,7 @@ function resolveAdapters(surface: PawSurface): PawSurfaceAdapter[] {
  * Uses HOOK_REGISTRY for known files; infers event from filename for
  * project-specific hooks not in the registry.
  *
- * @returns Array of PAW canonical hook definitions
+ * @returns {PawHookDef[]} Array of PAW canonical hook definitions
  */
 function discoverHookDefs(): PawHookDef[] {
   const installedFiles = existsSync(HOOKS_DIR)
@@ -424,8 +443,8 @@ function discoverHookDefs(): PawHookDef[] {
  * Detect whether a hook entry was generated by PAW.
  * PAW-managed entries have commands pointing into .paw/hooks/.
  *
- * @param entry - A hook entry object from hooks.json
- * @returns True if PAW generated this entry
+ * @param {Record<string, unknown>} entry - A hook entry object from hooks.json
+ * @returns {boolean} True if PAW generated this entry
  */
 function isPawManagedEntry(entry: Record<string, unknown>): boolean {
   const cmd =
@@ -441,9 +460,9 @@ function isPawManagedEntry(entry: Record<string, unknown>): boolean {
  * entries. PAW-managed entries (commands targeting .paw/hooks/) are replaced;
  * all other entries are preserved in their original position.
  *
- * @param existingContent - Current hooks.json content (JSON string), or null
- * @param newContent - PAW-generated hooks.json content (JSON string)
- * @returns Merged JSON string
+ * @param {string | null} existingContent - Current hooks.json content (JSON string), or null
+ * @param {string} newContent - PAW-generated hooks.json content (JSON string)
+ * @returns {string} Merged JSON string
  */
 function mergeHooksJson(
   existingContent: string | null,
@@ -494,7 +513,7 @@ function mergeHooksJson(
  * configuration files. Merges with existing non-PAW hooks instead of
  * overwriting.
  *
- * @param surface - Target surface identifier
+ * @param {PawSurface} surface - Target surface identifier
  */
 function generateSurfaceConfigs(surface: PawSurface): void {
   const hookDefs = discoverHookDefs();
@@ -527,9 +546,10 @@ function generateSurfaceConfigs(surface: PawSurface): void {
 /**
  * Sync gate-wrapper.ts from dist/ to .paw/ for TypeScript gate subprocess execution.
  * When bundled, PAW_CORE_DIR already points to dist/, so gate-wrapper.ts is directly accessible.
+ *
+ * @returns {boolean} True when all gate-wrapper files were found and copied
  */
 function syncGateWrapper(): boolean {
-  // When bundled, PAW_CORE_DIR === .github/PAW/dist, so framework files are in the same directory
   const files = ['gateWrapper.ts', 'gateContext.ts', 'healthCheckTypes.ts'];
   let success = true;
 
@@ -587,7 +607,11 @@ export async function runPawSync(): Promise<void> {
   logger.pawOutro('Sync complete');
 }
 
-// Auto-run only when executed directly (not when imported as a module)
+/**
+ * True when this module is the direct entry point (invoked via `tsx pawSync.ts`
+ * or the compiled `.mjs` form), false when imported by another module. Used
+ * to guard the auto-run `runPawSync()` call below.
+ */
 const isDirectRun =
   process.argv[1]?.endsWith('pawSync.ts') ||
   process.argv[1]?.endsWith('pawSync.mjs');

@@ -73,7 +73,7 @@ const INDIRECT_RESOLVERS: Record<string, (filePath: string) => boolean> = {
  */
 export async function resolveStaleIndirectViolations(
   sessionId?: string | null,
-): ResolutionResult {
+): Promise<ResolutionResult> {
   const result: ResolutionResult = {
     checked: 0,
     resolved: 0,
@@ -89,7 +89,7 @@ export async function resolveStaleIndirectViolations(
         .prepare(
           `SELECT * FROM violations WHERE resolved_at IS NULL AND indirect_fix = 1`,
         )
-        .all() as ViolationRow[];
+        .all() as unknown as ViolationRow[];
     } finally {
       readDb.close();
     }
@@ -129,9 +129,7 @@ export async function resolveStaleIndirectViolations(
     } finally {
       writeDb.close();
     }
-  } catch {
-    /* DB write failure — fail open */
-  }
+  } catch {}
 
   return result;
 }

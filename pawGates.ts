@@ -36,7 +36,7 @@ import { GATES_DIR, PAW_CONFIG_PATH, PROJECT_ROOT } from './pawPaths';
 /**
  * Parse CLI arguments into structured options.
  *
- * @returns Parsed flags
+ * @returns {{ mode: 'full' | 'changed-only'; staged: boolean; gateNames: string[] | undefined; port: GatePort | undefined }} Parsed flags
  */
 function parseArgs(): {
   mode: 'full' | 'changed-only';
@@ -72,6 +72,35 @@ function parseArgs(): {
 }
 
 /**
+ * Split a runner command string (e.g. `"node --no-warnings"`) into its
+ * executable and argument components. Handy for both dynamic runner lookup
+ * and passing to `execFile`-style APIs that require the binary separately.
+ *
+ * @param {string} runner - Runner command, potentially space-separated
+ * @returns {{ command: string; args: string[] }} Executable + trailing args
+ */
+function splitRunnerCommand(runner: string): {
+  command: string;
+  args: string[];
+} {
+  const parts = runner.split(' ');
+  return { command: parts[0], args: parts.slice(1) };
+}
+
+/**
+ * Ensure a {@link GateResult} has a `stats` object, mutating in place.
+ * Used to guard against gates that forget to initialise stats before we
+ * decorate the result with `durationMs`.
+ *
+ * @param {GateResult} result - Gate result returned by a gate implementation
+ */
+function ensureGateStats(result: GateResult): void {
+  if (!result.stats) {
+    result.stats = { filesChecked: 0, findingsCount: 0, durationMs: 0 };
+  }
+}
+
+/**
  * Gate runner configuration mapping file extensions to execution strategies.
  * `"import"` means in-process dynamic import (fast, TypeScript only).
  * Any other string is treated as a subprocess command (e.g. `"node"`, `"python3"`).
@@ -90,7 +119,7 @@ const DEFAULT_RUNNERS: RunnerMap = { '.gate.ts': 'import' };
  * Load gate runner configuration from .paw/config.json.
  * Falls back to DEFAULT_RUNNERS when no config exists or runners key is absent.
  *
- * @returns Runner extension-to-command mapping
+ * @returns {RunnerMap} Runner extension-to-command mapping
  */
 function loadRunnerConfig(): RunnerMap {
   if (!existsSync(PAW_CONFIG_PATH)) return DEFAULT_RUNNERS;
@@ -110,9 +139,9 @@ function loadRunnerConfig(): RunnerMap {
  * Get the runner suffix that matches a gate filename.
  * E.g. `"my-check.gate.py"` matches `".gate.py"`.
  *
- * @param filename - Gate filename
- * @param runners - Runner map
- * @returns Matching suffix key or null
+ * @param {string} filename - Gate filename
+ * @param {RunnerMap} runners - Runner map
+ * @returns {string | null} Matching suffix key or null
  */
 function matchRunner(filename: string, runners: RunnerMap): string | null {
   for (const suffix of Object.keys(runners)) {
@@ -125,10 +154,10 @@ function matchRunner(filename: string, runners: RunnerMap): string | null {
  * Execute a gate as a subprocess. Passes a serialised context object on
  * stdin and expects a JSON {@link GateResult} on stdout.
  *
- * @param runner - Executable command (e.g. `"python3"`, `"node"`)
- * @param gatePath - Absolute path to the gate script
- * @param context - Gate context to serialise for the subprocess
- * @returns Parsed GateResult from subprocess stdout
+ * @param {string} runner - Executable command (e.g. `"python3"`, `"node"`)
+ * @param {string} gatePath - Absolute path to the gate script
+ * @param {GateContext} context - Gate context to serialise for the subprocess
+ * @returns {GateResult} Parsed GateResult from subprocess stdout
  */
 function runSubprocessGate(
   runner: string,
@@ -141,10 +170,7 @@ function runSubprocessGate(
     changedFiles: context.changedFiles ? [...context.changedFiles] : null,
   });
 
-  // Split runner into command and args if it contains spaces
-  const parts = runner.split(' ');
-  const command = parts[0];
-  const runnerArgs = parts.slice(1);
+  const { command, args: runnerArgs } = splitRunnerCommand(runner);
 
   logger.debug(
     `Subprocess: command="${command}", args=[${runnerArgs.join(', ')}], gate="${gatePath}"`,
@@ -187,8 +213,8 @@ function runSubprocessGate(
  * `.gate.py`, `.gate.js`). TypeScript gates are loaded via in-process
  * `import()`; all others are executed as subprocesses.
  *
- * @param gateNames - Optional filter: only load gates whose id matches
- * @returns Array of discovered QualityGate instances
+ * @param {string[]} [gateNames] - Optional filter: only load gates whose id matches
+ * @returns {Promise<QualityGate[]>} Array of discovered QualityGate instances
  */
 async function discoverGates(gateNames?: string[]): Promise<QualityGate[]> {
   const runners = loadRunnerConfig();
@@ -250,10 +276,8 @@ async function discoverGates(gateNames?: string[]): Promise<QualityGate[]> {
         );
         logger.debug(`[${gateId}] Gate path: ${gatePath}`);
 
-        // Resolve only the command part (first word) to absolute path if needed
-        const parts = runnerCmd.split(' ');
-        const cmdPart = parts[0];
-        const restParts = parts.slice(1);
+        const { command: cmdPart, args: restParts } =
+          splitRunnerCommand(runnerCmd);
         logger.debug(
           `[${gateId}] Runner split: cmd="${cmdPart}", args=[${restParts.join(', ')}]`,
         );
@@ -317,8 +341,8 @@ async function discoverGates(gateNames?: string[]): Promise<QualityGate[]> {
  * Topological sort of gates by dependsOn declarations.
  * Throws if a cycle is detected.
  *
- * @param gates - Gates to sort
- * @returns Sorted gates in execution order
+ * @param {QualityGate[]} gates - Gates to sort
+ * @returns {QualityGate[]} Sorted gates in execution order
  */
 function resolveExecutionOrder(gates: QualityGate[]): QualityGate[] {
   const byId = new Map(gates.map((g) => [g.id, g]));
@@ -348,12 +372,12 @@ function resolveExecutionOrder(gates: QualityGate[]): QualityGate[] {
 /**
  * Run all discovered gates and produce a HealthReport.
  *
- * @param rootDir - Project root
- * @param mode - Execution scope
- * @param staged - Whether to scope to staged files
- * @param gateNames - Optional gate name filter
- * @param port - Optional port filter
- * @returns Aggregated HealthReport
+ * @param {string} rootDir - Project root
+ * @param {'full' | 'changed-only'} mode - Execution scope
+ * @param {boolean} staged - Whether to scope to staged files
+ * @param {string[]} [gateNames] - Optional gate name filter
+ * @param {GatePort} [port] - Optional port filter
+ * @returns {Promise<HealthReport>} Aggregated HealthReport
  */
 async function orchestrate(
   rootDir: string,
@@ -370,10 +394,10 @@ async function orchestrate(
  * Run gates against a pre-built GateContext.
  * Shared implementation used by both the CLI entrypoint and the exported API.
  *
- * @param context - Pre-built gate context
- * @param gateNames - Optional gate name filter
- * @param port - Optional port filter
- * @returns Aggregated HealthReport
+ * @param {GateContext} context - Pre-built gate context
+ * @param {string[]} [gateNames] - Optional gate name filter
+ * @param {GatePort} [port] - Optional port filter
+ * @returns {Promise<HealthReport>} Aggregated HealthReport
  */
 async function orchestrateWithContext(
   context: GateContext,
@@ -416,11 +440,8 @@ async function orchestrateWithContext(
 
     try {
       const result = await gate.check(context);
-      // Ensure stats object exists and has durationMs
-      if (!result.stats) {
-        result.stats = { filesChecked: 0, findingsCount: 0 };
-      }
-      result.stats.durationMs = Math.round(performance.now() - start);
+      ensureGateStats(result);
+      result.stats!.durationMs = Math.round(performance.now() - start);
       result.findings = await filterGateFindings(
         gate.id,
         result.findings,
@@ -431,8 +452,6 @@ async function orchestrateWithContext(
 
       if (!result.passed && result.severity === 'critical') {
         hasCritical = true;
-      } else if (!result.passed) {
-        // warn but continue
       }
     } catch (err: unknown) {
       const durationMs = Math.round(performance.now() - start);
@@ -509,7 +528,7 @@ async function main(): Promise<void> {
 
   logger.pawIntro(`PAW Health Check ${modeLabel}${filterLabel}`);
 
-  const report = await orchestrate(ROOT, mode, staged, gateNames, port);
+  const report = await orchestrate(PROJECT_ROOT, mode, staged, gateNames, port);
 
   logger.step(`Overall: ${report.overall}`);
   logger.info(

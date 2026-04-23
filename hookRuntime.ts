@@ -44,31 +44,30 @@ type HookRecord = Record<string, unknown>;
  * @property {boolean} continue - Must be true to allow the agent to continue
  * @property {string} [stopReason] - Reason string when stopping the agent
  * @property {string} [systemMessage] - Non-blocking informational message shown to the agent
- * @property {string} [decision] - PostToolUse/SubagentStop: 'block' to halt processing
- * @property {string} [reason] - Reason for blocking decision
+ * @property {'block'} [decision] - PostToolUse/SubagentStop: block further processing
+ * @property {string} [reason] - Reason shown to agent when decision is 'block'
  * @property {object} [hookSpecificOutput] - Event-specific payload
+ * @property {string} hookSpecificOutput.hookEventName - Hook event name
+ * @property {'allow' | 'ask' | 'deny'} [hookSpecificOutput.permissionDecision] - PreToolUse: deny, allow, or ask for user confirmation
+ * @property {string} [hookSpecificOutput.permissionDecisionReason] - PreToolUse: reason shown to agent when denying
+ * @property {Record<string, unknown>} [hookSpecificOutput.updatedInput] - PreToolUse: modified tool input
+ * @property {string} [hookSpecificOutput.additionalContext] - Extra context injected into the conversation
+ * @property {'block'} [hookSpecificOutput.decision] - Stop/SubagentStop: block the agent from stopping
+ * @property {string} [hookSpecificOutput.reason] - Stop/SubagentStop: reason for blocking stop
  */
 export interface HookResult {
   continue: boolean;
   stopReason?: string;
   systemMessage?: string;
-  /** PostToolUse / SubagentStop: block further processing */
   decision?: 'block';
-  /** Reason shown to agent when decision is 'block' */
   reason?: string;
   hookSpecificOutput?: {
     hookEventName: string;
-    /** PreToolUse: deny, allow, or ask for user confirmation */
     permissionDecision?: 'allow' | 'ask' | 'deny';
-    /** PreToolUse: reason shown to agent when denying */
     permissionDecisionReason?: string;
-    /** PreToolUse: modified tool input (optional) */
     updatedInput?: Record<string, unknown>;
-    /** Extra context injected into the conversation */
     additionalContext?: string;
-    /** Stop/SubagentStop: block the agent from stopping */
     decision?: 'block';
-    /** Stop/SubagentStop: reason for blocking stop */
     reason?: string;
   };
 }
@@ -132,6 +131,29 @@ export function writeDenyOutput(reason: string): void {
 }
 
 /**
+ * Extract the first file path from a files-array payload entry.
+ * Handles entries that are plain strings or objects with path/filePath/file_path.
+ * Returns undefined after the first object entry even when no key matches,
+ * replicating the single-entry scan semantics of the original tool payload handlers.
+ *
+ * @param files - Array from a tool payload files field
+ * @returns First resolved path, or undefined if none found
+ */
+function extractFirstFileArrayPath(files: unknown[]): string | undefined {
+  for (const f of files) {
+    if (typeof f === 'string') return f;
+    if (typeof f === 'object' && f !== null) {
+      const rec = f as Record<string, unknown>;
+      for (const key of ['filePath', 'file_path', 'path']) {
+        if (typeof rec[key] === 'string') return rec[key] as string;
+      }
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Extract the edited file path from hook input.
  * Handles multiple payload structures from different tool sources.
  *
@@ -161,28 +183,13 @@ export function resolveEditedFilePath(
     if (typeof input.toolInput.file_path === 'string')
       candidates.push(input.toolInput.file_path);
 
-    /** editFiles (GPT5.3codex / Codex): files[] — string[] or {path/filePath}[] */
-    const tiFiles = (input.toolInput as Record<string, unknown>).files;
-    if (Array.isArray(tiFiles)) {
-      for (const f of tiFiles) {
-        if (typeof f === 'string') {
-          candidates.push(f);
-          break;
-        } else if (typeof f === 'object' && f !== null) {
-          const rec = f as Record<string, unknown>;
-          for (const key of ['filePath', 'file_path', 'path']) {
-            if (typeof rec[key] === 'string') {
-              candidates.push(rec[key] as string);
-              break;
-            }
-          }
-          break;
-        }
-      }
+    const toolInputFiles = (input.toolInput as Record<string, unknown>).files;
+    if (Array.isArray(toolInputFiles)) {
+      const first = extractFirstFileArrayPath(toolInputFiles);
+      if (first !== undefined) candidates.push(first);
     }
   }
 
-  /** VS Code chatHooks v6 sends tool_input (snake_case) as a JSON string. */
   let parsedToolInput: HookRecord = {};
   if (typeof input.tool_input === 'string') {
     try {
@@ -203,23 +210,9 @@ export function resolveEditedFilePath(
   if (typeof parsedToolInput.path === 'string')
     candidates.push(parsedToolInput.path);
 
-  /** editFiles via tool_input (snake_case payload): files[] */
   if (Array.isArray(parsedToolInput.files)) {
-    for (const f of parsedToolInput.files) {
-      if (typeof f === 'string') {
-        candidates.push(f);
-        break;
-      } else if (typeof f === 'object' && f !== null) {
-        const rec = f as Record<string, unknown>;
-        for (const key of ['filePath', 'file_path', 'path']) {
-          if (typeof rec[key] === 'string') {
-            candidates.push(rec[key] as string);
-            break;
-          }
-        }
-        break;
-      }
-    }
+    const first = extractFirstFileArrayPath(parsedToolInput.files as unknown[]);
+    if (first !== undefined) candidates.push(first);
   }
 
   let parsedArgs: HookRecord = {};
@@ -238,23 +231,9 @@ export function resolveEditedFilePath(
   if (typeof parsedArgs.file_path === 'string')
     candidates.push(parsedArgs.file_path);
 
-  /** editFiles via toolArgs: files[] */
   if (Array.isArray(parsedArgs.files)) {
-    for (const f of parsedArgs.files as unknown[]) {
-      if (typeof f === 'string') {
-        candidates.push(f);
-        break;
-      } else if (typeof f === 'object' && f !== null) {
-        const rec = f as Record<string, unknown>;
-        for (const key of ['filePath', 'file_path', 'path']) {
-          if (typeof rec[key] === 'string') {
-            candidates.push(rec[key] as string);
-            break;
-          }
-        }
-        break;
-      }
-    }
+    const first = extractFirstFileArrayPath(parsedArgs.files as unknown[]);
+    if (first !== undefined) candidates.push(first);
   }
 
   const nestedInput = parsedArgs.input as HookRecord | undefined;

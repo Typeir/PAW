@@ -117,7 +117,6 @@ function getChangedFiles(rootDir: string): Set<string> {
     .filter(Boolean)
     .map((f) => f.replace(/\\/g, '/'));
 
-  /** Auto-discover git submodules and collect their changed files */
   const submodulePaths = discoverSubmodules(rootDir, run);
   for (const subPath of submodulePaths) {
     const absSubPath = path.join(rootDir, subPath);
@@ -134,9 +133,7 @@ function getChangedFiles(rootDir: string): Set<string> {
         .map((f) => `${subPath}/${f.replace(/\\/g, '/')}`);
 
       for (const line of subLines) lines.push(line);
-    } catch {
-      /** Submodule may not be initialized */
-    }
+    } catch {}
   }
 
   return new Set(lines);

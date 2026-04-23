@@ -19,14 +19,17 @@ import { dirname, join } from 'node:path';
 import initSqlJs, { type Database as SqlJsDatabase } from 'sql.js';
 import { DB_PATH } from './pawPaths';
 
-/* ------------------------------------------------------------------ */
-/*  sql.js engine — lazily initialized (avoids top-level await which  */
-/*  breaks CJS transforms in tsx/esbuild)                             */
-/* ------------------------------------------------------------------ */
+/**
+ * sql.js engine handle. Lazily initialized by `getSqlEngine()` to avoid a
+ * top-level `await`, which would otherwise break the CJS transforms used
+ * by `tsx` and `esbuild` when this module is consumed synchronously.
+ */
 let SQL: Awaited<ReturnType<typeof initSqlJs>> | null = null;
 
 /**
  * Get the sql.js engine, initializing on first call.
+ *
+ * @returns {Promise<Awaited<ReturnType<typeof initSqlJs>>>} Initialized sql.js engine handle
  */
 async function getSqlEngine(): Promise<Awaited<ReturnType<typeof initSqlJs>>> {
   if (!SQL) {
@@ -35,12 +38,11 @@ async function getSqlEngine(): Promise<Awaited<ReturnType<typeof initSqlJs>>> {
   return SQL;
 }
 
-/* ------------------------------------------------------------------ */
-/*  PawDatabase wrapper — backward-compatible with better-sqlite3 API */
-/* ------------------------------------------------------------------ */
-
 /**
  * Persist a sql.js database to disk.
+ *
+ * @param {SqlJsDatabase} db - sql.js database instance to export
+ * @param {string} dbPath - Absolute file path to write to
  */
 function persistToFile(db: SqlJsDatabase, dbPath: string): void {
   const data = db.export();
@@ -50,8 +52,13 @@ function persistToFile(db: SqlJsDatabase, dbPath: string): void {
 }
 
 /**
- * Statement-like object returned by PawDatabase.prepare(), matching
- * the better-sqlite3 Statement surface used by PAW callers.
+ * Statement-like object returned by `PawDatabase.prepare()`, matching the
+ * better-sqlite3 Statement surface used by PAW callers.
+ *
+ * @interface PawStatement
+ * @property {(...params: unknown[]) => Record<string, unknown> | undefined} get - Execute and return the first row, or undefined if empty
+ * @property {(...params: unknown[]) => Record<string, unknown>[]} all - Execute and return every matching row
+ * @property {(...params: unknown[]) => { changes: number; lastInsertRowid: number | bigint }} run - Execute a mutation and return row-count metadata
  */
 export interface PawStatement {
   get(...params: unknown[]): Record<string, unknown> | undefined;
@@ -64,35 +71,35 @@ export interface PawStatement {
 
 /**
  * Wrapped database that auto-persists to disk after mutations.
- * Exposes .prepare(), .pragma(), .exec(), and .close() for backward
+ * Exposes `.prepare()`, `.pragma()`, `.exec()`, and `.close()` for backward
  * compatibility with code originally written for better-sqlite3.
+ *
+ * @interface PawDatabase
+ * @property {SqlJsDatabase} _db - Underlying sql.js database (escape hatch)
+ * @property {string} _path - File path this database persists to
+ * @property {boolean} _readonly - Whether this is a read-only connection
+ * @property {(sql: string) => PawStatement} prepare - Create a statement-like object (better-sqlite3 compat). Supports `.get()`, `.all()`, and `.run()` with bound parameters.
+ * @property {(str: string) => unknown} pragma - No-op for sql.js — WAL / foreign_keys pragmas are silently ignored.
+ * @property {(sql: string) => void} exec - Execute raw SQL (DDL, multi-statement). Auto-persists if not readonly.
+ * @property {() => void} close - Close the database and release memory.
  */
 export interface PawDatabase {
-  /** Underlying sql.js database (escape hatch). */
   readonly _db: SqlJsDatabase;
-  /** File path this database persists to. */
   readonly _path: string;
-  /** Whether this is a read-only connection. */
   readonly _readonly: boolean;
-
-  /**
-   * Create a statement-like object (better-sqlite3 compat).
-   * The returned object supports .get(), .all(), and .run() with params.
-   */
   prepare(sql: string): PawStatement;
-
-  /** No-op for sql.js — WAL / foreign_keys pragmas are silently ignored. */
   pragma(str: string): unknown;
-
-  /** Execute raw SQL (DDL, multi-statement). Auto-persists if not readonly. */
   exec(sql: string): void;
-
-  /** Close the database and release memory. */
   close(): void;
 }
 
 /**
  * Create a PawDatabase wrapper around a sql.js database.
+ *
+ * @param {SqlJsDatabase} db - Underlying sql.js database instance
+ * @param {string} dbPath - File path this wrapper persists mutations to
+ * @param {boolean} readonly - When true, mutation operations throw instead of persisting
+ * @returns {PawDatabase} Wrapped database with auto-persist and better-sqlite3-compat API
  */
 function wrapDatabase(
   db: SqlJsDatabase,
@@ -154,7 +161,6 @@ function wrapDatabase(
     },
 
     pragma(_str: string): unknown {
-      /* sql.js runs in-memory — WAL, foreign_keys, etc. are no-ops */
       return undefined;
     },
 
@@ -176,8 +182,8 @@ function wrapDatabase(
  * Preserves original casing to avoid false mismatches on case-sensitive
  * filesystems and incorrect paths in violation messages.
  *
- * @param p - Raw file path
- * @returns Normalized path string
+ * @param {string} p - Raw file path
+ * @returns {string} Normalized path string
  */
 export function normalizePath(p: string): string {
   return p.replace(/\\/g, '/');
@@ -191,7 +197,7 @@ export const DEFAULT_DB_PATH = DB_PATH;
 /**
  * Ensure all required tables and indices exist (idempotent).
  *
- * @param db - PawDatabase wrapper
+ * @param {PawDatabase} db - PawDatabase wrapper
  */
 export function ensureSchema(db: PawDatabase): void {
   db._db.run(`
@@ -326,7 +332,7 @@ const DEFAULT_MEMORY_TYPES = [
 /**
  * Seed the memory_types table with default categories (idempotent).
  *
- * @param db - PawDatabase wrapper
+ * @param {PawDatabase} db - PawDatabase wrapper
  */
 function seedMemoryTypes(db: PawDatabase): void {
   for (const mt of DEFAULT_MEMORY_TYPES) {
@@ -338,6 +344,19 @@ function seedMemoryTypes(db: PawDatabase): void {
 
 /**
  * Row shape returned from the violations table.
+ *
+ * @interface ViolationRow
+ * @property {number} id - Primary key (autoincrement)
+ * @property {string} file_path - Normalised forward-slash path relative to project root
+ * @property {string} rule - Gate or hook rule identifier that produced this violation
+ * @property {string} message - Human-readable violation description
+ * @property {string} severity - Severity level (critical | warning | info)
+ * @property {string} hook_event - PAW canonical event that created the row (e.g. ToolPost)
+ * @property {string | null} session_id - Originating session id, or null for project-scoped entries
+ * @property {string | null} resolved_at - ISO timestamp when resolved, or null if still open
+ * @property {number} indirect_fix - 1 if this row was closed via cascading resolution, else 0
+ * @property {number} memory_type_id - FK into `memory_types` (always the `violation` type for this table)
+ * @property {string} created_at - ISO timestamp when the violation was inserted
  */
 export interface ViolationRow {
   id: number;
@@ -357,9 +376,9 @@ export interface ViolationRow {
  * Look up the memory_type_id for a given type name.
  * Returns the cached 'violation' type id for the common case.
  *
- * @param db - SQLite database instance
- * @param typeName - Memory type name (e.g. 'violation')
- * @returns The integer id
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {string} typeName - Memory type name (e.g. 'violation')
+ * @returns {number} The integer id
  */
 export function getMemoryTypeId(db: PawDatabase, typeName: string): number {
   const row = db
@@ -374,9 +393,9 @@ export function getMemoryTypeId(db: PawDatabase, typeName: string): number {
 /**
  * Insert a violation record into the violations table.
  *
- * @param db - SQLite database instance
- * @param violation - Violation data to persist
- * @returns The inserted row id
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {object} violation - Violation data to persist
+ * @returns {number} The inserted row id
  */
 export function insertViolation(
   db: PawDatabase,
@@ -413,9 +432,9 @@ export function insertViolation(
 /**
  * Mark all unresolved violations for a file as resolved.
  *
- * @param db - SQLite database instance
- * @param filePath - Absolute file path to resolve violations for
- * @returns Number of rows updated
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {string} filePath - Absolute file path to resolve violations for
+ * @returns {number} Number of rows updated
  */
 export function resolveViolations(db: PawDatabase, filePath: string): number {
   const normalizedFilePath = normalizePath(filePath);
@@ -431,8 +450,8 @@ export function resolveViolations(db: PawDatabase, filePath: string): number {
 /**
  * Mark all unresolved violations as resolved (bulk clear).
  *
- * @param db - SQLite database instance
- * @returns Number of rows updated
+ * @param {PawDatabase} db - SQLite database instance
+ * @returns {number} Number of rows updated
  */
 export function resolveAllViolations(db: PawDatabase): number {
   const result = db
@@ -447,9 +466,9 @@ export function resolveAllViolations(db: PawDatabase): number {
 /**
  * Query all unresolved violations, optionally filtered by file path.
  *
- * @param db - SQLite database instance
- * @param filePath - Optional file path filter
- * @returns Array of unresolved violation rows
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {string} [filePath] - Optional file path filter
+ * @returns {ViolationRow[]} Array of unresolved violation rows
  */
 export function getUnresolvedViolations(
   db: PawDatabase,
@@ -460,13 +479,13 @@ export function getUnresolvedViolations(
       .prepare(
         `SELECT * FROM violations WHERE resolved_at IS NULL AND file_path = ? ORDER BY created_at DESC`,
       )
-      .all(normalizePath(filePath)) as ViolationRow[];
+      .all(normalizePath(filePath)) as any as ViolationRow[];
   }
   return db
     .prepare(
       `SELECT * FROM violations WHERE resolved_at IS NULL ORDER BY created_at DESC`,
     )
-    .all() as ViolationRow[];
+    .all() as any as ViolationRow[];
 }
 
 /**
@@ -474,9 +493,9 @@ export function getUnresolvedViolations(
  * This is the primary query for pre-tool-use blocking — it only returns violations
  * that should block THIS session.
  *
- * @param db - SQLite database instance
- * @param sessionId - Current session ID
- * @returns Array of unresolved violation rows for this session + project-scoped
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {string} sessionId - Current session ID
+ * @returns {ViolationRow[]} Array of unresolved violation rows for this session + project-scoped
  */
 export function getSessionViolations(
   db: PawDatabase,
@@ -488,15 +507,15 @@ export function getSessionViolations(
        WHERE resolved_at IS NULL AND (session_id = ? OR session_id IS NULL)
        ORDER BY created_at DESC`,
     )
-    .all(sessionId) as ViolationRow[];
+    .all(sessionId) as any as ViolationRow[];
 }
 
 /**
  * Mark all unresolved violations for a specific session as resolved.
  *
- * @param db - SQLite database instance
- * @param sessionId - Session ID whose violations should be resolved
- * @returns Number of rows updated
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {string} sessionId - Session ID whose violations should be resolved
+ * @returns {number} Number of rows updated
  */
 export function resolveSessionViolations(
   db: PawDatabase,
@@ -515,9 +534,9 @@ export function resolveSessionViolations(
  * Escalate unresolved session violations to project scope by clearing session_id.
  * Called at session end — makes violations visible to ALL future sessions.
  *
- * @param db - SQLite database instance
- * @param sessionId - Session ID whose violations should be escalated
- * @returns Number of rows escalated
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {string} sessionId - Session ID whose violations should be escalated
+ * @returns {number} Number of rows escalated
  */
 export function escalateSessionViolations(
   db: PawDatabase,
@@ -536,10 +555,10 @@ export function escalateSessionViolations(
  * Resolve violations for a specific file within a specific session.
  * More precise than resolveViolations() which clears across all sessions.
  *
- * @param db - SQLite database instance
- * @param filePath - File path to resolve
- * @param sessionId - Session ID scope (null resolves project-scoped only)
- * @returns Number of rows updated
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {string} filePath - File path to resolve
+ * @param {string | null} sessionId - Session ID scope (null resolves project-scoped only)
+ * @returns {number} Number of rows updated
  */
 export function resolveViolationsForFile(
   db: PawDatabase,
@@ -570,10 +589,10 @@ export function resolveViolationsForFile(
  * unresolved violations that exceed a staleness TTL to prevent permanent blocks
  * from orphaned sessions.
  *
- * @param db - SQLite database instance
- * @param retentionDays - Number of days to retain resolved violations
- * @param staleTtlHours - Hours after which unresolved violations are auto-resolved
- * @returns Number of rows affected (deleted + auto-resolved)
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {number} [retentionDays] - Number of days to retain resolved violations
+ * @param {number} [staleTtlHours] - Hours after which unresolved violations are auto-resolved
+ * @returns {number} Number of rows affected (deleted + auto-resolved)
  */
 export function gcOldViolations(
   db: PawDatabase,
@@ -603,9 +622,9 @@ export function gcOldViolations(
 /**
  * Get recent violation history (resolved and unresolved) for L1 context injection.
  *
- * @param db - SQLite database instance
- * @param limit - Maximum number of records to return
- * @returns Array of violation rows ordered by creation time
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {number} [limit] - Maximum number of records to return
+ * @returns {ViolationRow[]} Array of violation rows ordered by creation time
  */
 export function getRecentViolations(
   db: PawDatabase,
@@ -613,7 +632,7 @@ export function getRecentViolations(
 ): ViolationRow[] {
   return db
     .prepare(`SELECT * FROM violations ORDER BY created_at DESC LIMIT ?`)
-    .all(limit) as ViolationRow[];
+    .all(limit) as any as ViolationRow[];
 }
 
 /**
@@ -622,8 +641,8 @@ export function getRecentViolations(
  * after a file is deleted. Handles both absolute and project-relative
  * paths stored in the DB.
  *
- * @param db - SQLite database instance (must be writable)
- * @returns Number of violations resolved
+ * @param {PawDatabase} db - SQLite database instance (must be writable)
+ * @returns {number} Number of violations resolved
  */
 export function pruneOrphanedViolations(db: PawDatabase): number {
   const unresolved = db
@@ -653,9 +672,9 @@ export function pruneOrphanedViolations(db: PawDatabase): number {
 /**
  * Read a value from the paw_config key-value store.
  *
- * @param db - SQLite database instance
- * @param key - Config key to read
- * @returns Stored value string, or null if the key does not exist
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {string} key - Config key to read
+ * @returns {string | null} Stored value string, or null if the key does not exist
  */
 export function getPawConfig(db: PawDatabase, key: string): string | null {
   const row = db
@@ -667,9 +686,9 @@ export function getPawConfig(db: PawDatabase, key: string): string | null {
 /**
  * Write a value to the paw_config key-value store (upsert).
  *
- * @param db - SQLite database instance
- * @param key - Config key to set
- * @param value - Value to store
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {string} key - Config key to set
+ * @param {string} value - Value to store
  */
 export function setPawConfig(
   db: PawDatabase,
@@ -684,6 +703,15 @@ export function setPawConfig(
 
 /**
  * Row shape returned from the file_memories table.
+ *
+ * @interface FileMemoryRow
+ * @property {number} id - Primary key (autoincrement)
+ * @property {string} file_path - Normalised forward-slash path relative to project root
+ * @property {string} memory - Serialised memory text associated with the file
+ * @property {string | null} content_hash - Content hash at the time the memory was captured, or null
+ * @property {string | null} session_id - Originating session id, or null for project-scoped entries
+ * @property {string} created_at - ISO timestamp when the memory row was inserted
+ * @property {string | null} updated_at - ISO timestamp of the most recent update, or null if never updated
  */
 export interface FileMemoryRow {
   id: number;
@@ -699,11 +727,11 @@ export interface FileMemoryRow {
  * Upsert a file memory. If a row with the same file_path + content_hash
  * already exists, update the memory text and timestamp.
  *
- * @param db - SQLite database instance
- * @param filePath - Normalized file path
- * @param memory - Generated memory text
- * @param contentHash - Hash of the file content at draft time
- * @param sessionId - Session that generated this memory
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {string} filePath - Normalized file path
+ * @param {string} memory - Generated memory text
+ * @param {string | null} contentHash - Hash of the file content at draft time
+ * @param {string | null} sessionId - Session that generated this memory
  */
 export function upsertFileMemory(
   db: PawDatabase,
@@ -723,10 +751,10 @@ export function upsertFileMemory(
 /**
  * Get the most recent file memory for a path, optionally matching a content hash.
  *
- * @param db - SQLite database instance
- * @param filePath - Normalized file path to query
- * @param contentHash - Optional hash to match current content
- * @returns The memory row or undefined
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {string} filePath - Normalized file path to query
+ * @param {string} [contentHash] - Optional hash to match current content
+ * @returns {FileMemoryRow | undefined} The memory row or undefined
  */
 export function getFileMemory(
   db: PawDatabase,
@@ -750,9 +778,9 @@ export function getFileMemory(
 /**
  * Get file memories for multiple paths (batch L1 query).
  *
- * @param db - SQLite database instance
- * @param filePaths - Array of normalized file paths
- * @returns Array of memory rows
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {string[]} filePaths - Array of normalized file paths
+ * @returns {FileMemoryRow[]} Array of memory rows
  */
 export function getFileMemories(
   db: PawDatabase,
@@ -765,15 +793,15 @@ export function getFileMemories(
     .prepare(
       `SELECT * FROM file_memories WHERE file_path IN (${placeholders}) ORDER BY updated_at DESC`,
     )
-    .all(...normalized) as FileMemoryRow[];
+    .all(...normalized) as any as FileMemoryRow[];
 }
 
 /**
  * Delete stale file memories older than the retention period.
  *
- * @param db - SQLite database instance
- * @param retentionDays - Days to retain memories
- * @returns Number of rows deleted
+ * @param {PawDatabase} db - SQLite database instance
+ * @param {number} [retentionDays] - Days to retain memories
+ * @returns {number} Number of rows deleted
  */
 export function gcStaleFileMemories(
   db: PawDatabase,
@@ -786,6 +814,14 @@ export function gcStaleFileMemories(
     .run(retentionDays).changes;
 }
 
+/**
+ * Open a PAW database connection, creating the file if it does not exist.
+ * Runs schema initialization on first open (idempotent).
+ *
+ * @param {string} [dbPath] - Path to the SQLite file; defaults to {@link DEFAULT_DB_PATH}
+ * @param {{ readonly?: boolean }} [options] - Connection options
+ * @returns {Promise<PawDatabase>} Opened and schema-initialized database wrapper
+ */
 export async function openDb(
   dbPath: string = DEFAULT_DB_PATH,
   options: { readonly?: boolean } = {},
@@ -814,8 +850,8 @@ export async function openDb(
  * Open a read-only PAW database connection. Returns null if the database
  * file does not exist yet (first run before any writes).
  *
- * @param dbPath - Path to the SQLite file
- * @returns Database instance or null if file missing
+ * @param {string} [dbPath] - Path to the SQLite file; defaults to {@link DEFAULT_DB_PATH}
+ * @returns {Promise<PawDatabase | null>} Database instance or null if file missing
  */
 export async function openDbReadonly(
   dbPath: string = DEFAULT_DB_PATH,
@@ -828,10 +864,10 @@ export async function openDbReadonly(
  * Supersede an existing decision with a new one. The old decision gets a
  * superseded_at timestamp and a reference to its replacement.
  *
- * @param db - Database connection
- * @param oldId - ID of the decision to supersede
- * @param newDecision - The replacement decision
- * @returns ID of the new decision
+ * @param {PawDatabase} db - Database connection
+ * @param {number} oldId - ID of the decision to supersede
+ * @param {object} newDecision - The replacement decision
+ * @returns {number} ID of the new decision
  */
 export function supersedeDecision(
   db: PawDatabase,

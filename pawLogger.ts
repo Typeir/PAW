@@ -15,11 +15,16 @@ import { spinner as clackSpinner } from '@clack/prompts';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 
+/** Directory where PAW session log files are stored. */
 const PAW_LOGS_DIR = '.ignore/paw-logs';
+
+/** ISO timestamp for the current process start, used as the log file name suffix. */
 const SESSION_START = new Date()
   .toISOString()
   .replace(/[:.]/g, '-')
   .slice(0, 19);
+
+/** Absolute path to the current session's log file. */
 const LOG_FILE = path.join(PAW_LOGS_DIR, `paw-${SESSION_START}.log`);
 
 /**
@@ -34,9 +39,7 @@ const IN_HOOK_CONTEXT = !process.stdout.isTTY;
 function initLogsDir(): void {
   try {
     mkdirSync(PAW_LOGS_DIR, { recursive: true });
-  } catch {
-    // Ignore errors
-  }
+  } catch {}
 }
 
 /**
@@ -52,9 +55,7 @@ function writeLog(level: string, message: string): void {
     const processId = process.pid;
     const line = `${timestamp} [${level}] [#${processId}] ${message}\n`;
     appendFileSync(LOG_FILE, line, 'utf-8');
-  } catch {
-    // Silently fail if logging fails
-  }
+  } catch {}
 }
 
 /**
@@ -171,7 +172,6 @@ export function message(message: string): void {
  */
 export function spin(): ReturnType<typeof clackSpinner> {
   if (IN_HOOK_CONTEXT) {
-    // Return a no-op spinner for hook context
     return {
       start: () => {},
       stop: () => {},

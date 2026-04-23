@@ -16,25 +16,25 @@
 
 import * as p from '@clack/prompts';
 import {
-    appendFileSync,
-    copyFileSync,
-    existsSync,
-    mkdirSync,
-    readdirSync,
-    readFileSync,
-    writeFileSync,
+  appendFileSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
 import { openDb } from './pawDb';
 import * as logger from './pawLogger';
 import {
-    DB_PATH,
-    GATES_DIR,
-    HOOKS_DIR,
-    PAW_CORE_DIR,
-    PAW_DIR,
-    PAWIGNORE_PATH,
-    PROJECT_ROOT,
+  DB_PATH,
+  GATES_DIR,
+  HOOKS_DIR,
+  PAW_CORE_DIR,
+  PAW_DIR,
+  PAWIGNORE_PATH,
+  PROJECT_ROOT,
 } from './pawPaths';
 
 /**
@@ -144,6 +144,43 @@ function scaffoldPawignore(): void {
 }
 
 /**
+ * Copy all compiled `.mjs` hook files from a source directory into the
+ * installed `.paw/hooks/` directory.
+ *
+ * @param {string} hooksSource - Absolute path to the source `hooks/` directory
+ * @returns {number} Number of files copied
+ */
+function copyTopLevelHookFiles(hooksSource: string): number {
+  const files = readdirSync(hooksSource).filter((f: string) =>
+    f.endsWith('.mjs'),
+  );
+  for (const file of files) {
+    copyFileSync(path.join(hooksSource, file), path.join(HOOKS_DIR, file));
+  }
+  return files.length;
+}
+
+/**
+ * Copy the `_lib/` shared chunk directory (emitted by the hook bundler)
+ * into `.paw/hooks/_lib/` when present. No-op when the source is missing.
+ *
+ * @param {string} hooksSource - Absolute path to the source `hooks/` directory
+ */
+function copyLibChunks(hooksSource: string): void {
+  const libSrc = path.join(hooksSource, '_lib');
+  if (!existsSync(libSrc)) return;
+
+  const libDest = path.join(HOOKS_DIR, '_lib');
+  mkdirSync(libDest, { recursive: true });
+  const libFiles = readdirSync(libSrc).filter((f: string) =>
+    f.endsWith('.mjs'),
+  );
+  for (const file of libFiles) {
+    copyFileSync(path.join(libSrc, file), path.join(libDest, file));
+  }
+}
+
+/**
  * Copy compiled hooks from PAW dist into .paw/hooks/ via sync logic.
  */
 function runSync(): void {
@@ -154,25 +191,9 @@ function runSync(): void {
       return;
     }
     mkdirSync(HOOKS_DIR, { recursive: true });
-    const files = readdirSync(hooksSource).filter((f: string) =>
-      f.endsWith('.mjs'),
-    );
-    for (const file of files) {
-      copyFileSync(path.join(hooksSource, file), path.join(HOOKS_DIR, file));
-    }
-    // Copy _lib/ chunks
-    const libSrc = path.join(hooksSource, '_lib');
-    if (existsSync(libSrc)) {
-      const libDest = path.join(HOOKS_DIR, '_lib');
-      mkdirSync(libDest, { recursive: true });
-      const libFiles = readdirSync(libSrc).filter((f: string) =>
-        f.endsWith('.mjs'),
-      );
-      for (const file of libFiles) {
-        copyFileSync(path.join(libSrc, file), path.join(libDest, file));
-      }
-    }
-    logger.success(`Hooks synced (${files.length} hooks copied)`);
+    const copied = copyTopLevelHookFiles(hooksSource);
+    copyLibChunks(hooksSource);
+    logger.success(`Hooks synced (${copied} hooks copied)`);
   } catch {
     logger.warn('Hook sync failed — run "paw sync" manually');
   }
@@ -189,11 +210,20 @@ function scaffoldHooksDir(): void {
 /**
  * Initialize paw.sqlite with schema.
  */
-function initializeDatabase(): void {
+async function initializeDatabase(): Promise<void> {
   mkdirSync(PAW_DIR, { recursive: true });
-  const db = openDb(DB_PATH);
+  const db = await openDb(DB_PATH);
   db.close();
   logger.success('Initialized paw.sqlite');
+}
+
+/**
+ * Emit a warning that Git hooks installation is not yet wired up in the
+ * bundled CLI. Planned follow-up: invoke pawHooks.install() from the
+ * compiled entry so users get the same experience as in dev.
+ */
+function warnGitHooksUnsupported(): void {
+  logger.warn('Git hook installation not yet available in compiled mode');
 }
 
 /**
@@ -271,7 +301,7 @@ async function main(): Promise<void> {
   }
 
   s.start('Initializing database');
-  initializeDatabase();
+  await initializeDatabase();
   s.stop('✅ Database ready');
 
   if (options.gitignore) {
@@ -281,8 +311,7 @@ async function main(): Promise<void> {
   if (options.gitHooks) {
     s.start('Installing Git hooks');
     try {
-      // TODO: Git hooks installation via bundled CLI
-      logger.warn('Git hook installation not yet available in compiled mode');
+      warnGitHooksUnsupported();
       s.stop('⚠️ Git hooks — skipped (run manually)');
     } catch {
       s.stop(

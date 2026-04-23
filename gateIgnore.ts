@@ -41,13 +41,11 @@ const DIRECTIVE_PATTERN =
  * Parsed ignore directives for a single file.
  *
  * @interface FileIgnoreDirectives
- * @property {Map<string, Set<string>>} fileLevel - Gate ID → suppressed rule IDs (`*` = all)
- * @property {Map<number, Map<string, Set<string>>>} nextLine - 1-based target line → gate ID → rule IDs
+ * @property {Map<string, Set<string>>} fileLevel - Gate ID → suppressed rule IDs ('*' = all rules suppressed for that gate)
+ * @property {Map<number, Map<string, Set<string>>>} nextLine - 1-based target line number → gate ID → suppressed rule IDs
  */
 interface FileIgnoreDirectives {
-  /** Gate ID → suppressed rule IDs (`'*'` = all rules suppressed for that gate) */
   fileLevel: Map<string, Set<string>>;
-  /** 1-based target line number → gate ID → suppressed rule IDs */
   nextLine: Map<number, Map<string, Set<string>>>;
 }
 
