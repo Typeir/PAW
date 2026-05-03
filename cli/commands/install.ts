@@ -18,9 +18,9 @@ import { log, spinner } from '@clack/prompts';
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import {
-  buildPawCli,
-  installPawDependencies,
-  PAW_CLI_PATH,
+    buildPawCli,
+    installPawDependencies,
+    PAW_CLI_PATH,
 } from '../../pawBootstrap';
 import type { CommandMeta } from '../cliLoader';
 

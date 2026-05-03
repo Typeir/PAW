@@ -16,10 +16,10 @@
  * @since 3.0.0
  */
 
+import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { platform } from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { PAW_CORE_DIR } from './pawPaths';
 
 /**
