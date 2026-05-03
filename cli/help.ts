@@ -40,12 +40,14 @@ ${C.yellow}DATABASE${C.reset}
   paw db reset               Drop and recreate all tables
 
 ${C.yellow}SYSTEM${C.reset}
+  paw install                Bootstrap PAW: install deps, build CLI, and sync hooks
   paw sync                   Regenerate hooks.json via adapter layer
   paw status                 Show surface config and hook registration
 
 ${C.yellow}ALIASES${C.reset}
   paw v                      → violations ls
   paw st                     → status
+  paw i                      → install
 
 ${C.dim}Run from project root:
   paw <command>${C.reset}

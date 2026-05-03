@@ -13,6 +13,7 @@ import type { CliCommand, CommandRegistry } from './cliLoader';
 import * as dbCmd from './commands/db';
 import * as gatesCmd from './commands/gates';
 import * as helpCmd from './commands/help';
+import * as installCmd from './commands/install';
 import * as setPasswordCmd from './commands/setPassword';
 import * as stateCmd from './commands/state';
 import * as statusCmd from './commands/status';
@@ -23,6 +24,7 @@ const ALL_COMMANDS: CliCommand[] = [
   dbCmd as CliCommand,
   gatesCmd as CliCommand,
   helpCmd as CliCommand,
+  installCmd as CliCommand,
   setPasswordCmd as CliCommand,
   stateCmd as CliCommand,
   statusCmd as CliCommand,
