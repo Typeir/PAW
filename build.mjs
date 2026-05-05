@@ -198,7 +198,7 @@ try {
 /* ------------------------------------------------------------------ */
 /*  Post-build: copy gate support files                               */
 /* ------------------------------------------------------------------ */
-const supportFiles = ['gateContext.ts', 'healthCheckTypes.ts'];
+const supportFiles = ['gateContext.ts', 'healthCheckTypes.ts', 'tsconfig.json'];
 for (const file of supportFiles) {
   try {
     const src = join(__dirname, file);
