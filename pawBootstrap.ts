@@ -18,7 +18,6 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { platform } from 'node:os';
 import path from 'node:path';
 import { PAW_CORE_DIR } from './pawPaths';
 
@@ -33,13 +32,13 @@ export const PAW_CLI_PATH = path.join(PAW_CORE_DIR, 'dist', 'cli.mjs');
  * @returns {string | null} Error message if installation failed, null on success.
  */
 export function installPawDependencies(): string | null {
-  const npmCmd = platform() === 'win32' ? 'npm.cmd' : 'npm';
-  const result = spawnSync(npmCmd, ['install'], {
+  const result = spawnSync('npm', ['install'], {
     cwd: PAW_CORE_DIR,
     stdio: 'pipe',
+    shell: true,
   });
-  if (result.status !== 0) {
-    const stderr = result.stderr?.toString().trim() ?? 'unknown error';
+  if (result.status !== 0 || result.error) {
+    const stderr = result.stderr?.toString().trim() ?? result.error?.message ?? 'unknown error';
     return `PAW npm install failed: ${stderr}`;
   }
   return null;
@@ -57,8 +56,8 @@ export function buildPawCli(): string | null {
     cwd: PAW_CORE_DIR,
     stdio: 'pipe',
   });
-  if (result.status !== 0) {
-    const stderr = result.stderr?.toString().trim() ?? 'unknown error';
+  if (result.status !== 0 || result.error) {
+    const stderr = result.stderr?.toString().trim() ?? result.error?.message ?? 'unknown error';
     return `PAW build failed: ${stderr}`;
   }
   return null;
