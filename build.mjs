@@ -40,8 +40,6 @@ const shared = {
     'node:*',
     // sql.js uses CJS internals (__dirname, require) — must remain external
     'sql.js',
-    // @clack/prompts is a runtime dep (ships in node_modules)
-    '@clack/prompts',
     // copilot-sdk is optional runtime dep
     '@github/copilot-sdk',
   ],
