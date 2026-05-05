@@ -550,7 +550,7 @@ function generateSurfaceConfigs(surface: PawSurface): void {
  * @returns {boolean} True when all gate-wrapper files were found and copied
  */
 function syncGateWrapper(): boolean {
-  const files = ['gateWrapper.ts', 'gateContext.ts', 'healthCheckTypes.ts'];
+  const files = ['gateWrapper.ts', 'gateContext.ts', 'healthCheckTypes.ts', 'tsconfig.json'];
   let success = true;
 
   for (const file of files) {
