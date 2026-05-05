@@ -126,6 +126,17 @@ export async function run(_args: string[]): Promise<void> {
   }
   s.stop('Hooks synced');
 
+  /** Initialize SQLite database if not already present. */
+  const dbPath = path.join(PAW_DIR, 'paw.sqlite');
+  if (!existsSync(dbPath)) {
+    s.start('Initializing PAW database');
+    const dbResult = spawnSync('node', [PAW_CLI_PATH, 'db', 'reset'], {
+      stdio: 'pipe',
+      timeout: 10_000,
+    });
+    s.stop(dbResult.status === 0 ? 'Database initialized' : 'Database init skipped (will auto-create on first use)');
+  }
+
   log.success('PAW installed — hooks are active. Run `paw status` to verify.');
 }
 
