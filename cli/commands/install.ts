@@ -8,13 +8,12 @@
  *
  * Design note: sync is invoked as a child process rather than a direct import
  * so this command can run safely via tsx before PAW's own node_modules exist.
- * All imports here resolve through Node's parent-directory walk to the root
- * node_modules, with no dependency on `.github/PAW/node_modules`.
+ * Uses only Node.js built-ins — no external package imports — so it runs on
+ * a fresh clone with no node_modules at all.
  *
  * @module .github/PAW/cli/commands/install
  */
 
-import { log, spinner } from '@clack/prompts';
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import {
@@ -23,6 +22,36 @@ import {
     PAW_CLI_PATH,
 } from '../../pawBootstrap';
 import type { CommandMeta } from '../cliLoader';
+
+/**
+ * Minimal console-based logger used during bootstrap before @clack/prompts
+ * is available (i.e. before PAW's own node_modules are installed).
+ */
+const log = {
+  /** @param {string} msg - Success message */
+  success: (msg: string) => console.log(`✓ ${msg}`),
+  /** @param {string} msg - Error message */
+  error: (msg: string) => console.error(`✗ ${msg}`),
+};
+
+/**
+ * Return a minimal spinner-like object backed by console output.
+ *
+ * @returns {{ start: (msg: string) => void; stop: (msg: string) => void }}
+ */
+function spinner(): { start: (msg: string) => void; stop: (msg: string) => void } {
+  let _active = '';
+  return {
+    start(msg: string) {
+      _active = msg;
+      process.stdout.write(`  ${msg}...\n`);
+    },
+    stop(msg: string) {
+      _active = '';
+      process.stdout.write(`  ✓ ${msg}\n`);
+    },
+  };
+}
 
 /** Command metadata for the fs-based loader. */
 export const meta: CommandMeta = {
