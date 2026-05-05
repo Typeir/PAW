@@ -107,3 +107,12 @@ export async function run(_args: string[]): Promise<void> {
 
   log.success('PAW installed — hooks are active. Run `paw status` to verify.');
 }
+
+/** Auto-invoke when run directly via tsx (e.g. `npx tsx ... install.ts`). */
+run(process.argv.slice(3)).catch((err: unknown) => {
+  console.error(
+    '✗ Install failed:',
+    err instanceof Error ? err.message : String(err),
+  );
+  process.exit(1);
+});
