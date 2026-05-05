@@ -17,11 +17,14 @@ Traditional hook systems rely on `.sh` (Unix) and `.ps1` (Windows) scripts, crea
 
 **Prerequisites**: Node.js 18+.
 
-Install PAW:
+Install PAW (clone once, then run the one-shot installer):
 
 ```bash
-npm i -g paw-cli && paw init
+git clone https://github.com/Typeir/PAW.git .github/PAW
+npm run paw:install
 ```
+
+See [Part 6 — Quick Start](./06-reference-architecture.md#quick-start-2-minute-setup) for the full setup including npm script definitions.
 
 ---
 
@@ -38,13 +41,15 @@ VS Code Copilot discovers hooks via `.github/hooks/hooks.json`. This file maps l
     "<eventName>": [
       {
         "type": "command",
-        "bash": "<command>", // Unix shells
-        "powershell": "<command>", // Windows PowerShell
-        "cwd": ".", // Working directory (project root)
-        "timeoutSec": 15, // Kill after N seconds
-      },
-    ],
-  },
+        "command": "<command>",   // Default (all platforms)
+        "windows": "<command>",   // Windows override (optional)
+        "linux": "<command>",     // Linux override (optional)
+        "osx": "<command>",       // macOS override (optional)
+        "cwd": ".",               // Working directory (project root)
+        "timeout": 15             // Kill after N seconds
+      }
+    ]
+  }
 }
 ```
 
@@ -56,13 +61,15 @@ Because `node` is cross-platform and hooks are pre-compiled `.mjs`, **both field
 {
   "version": 1,
   "hooks": {
-    "postToolUse": [
+    "PostToolUse": [
       {
         "type": "command",
-        "bash": "node .paw/hooks/post-tool-use.mjs",
-        "powershell": "node .paw/hooks/post-tool-use.mjs",
+        "command": "node .paw/hooks/postToolUse.mjs",
+        "windows": "node .paw/hooks/postToolUse.mjs",
+        "linux": "node .paw/hooks/postToolUse.mjs",
+        "osx": "node .paw/hooks/postToolUse.mjs",
         "cwd": ".",
-        "timeoutSec": 15
+        "timeout": 15
       }
     ]
   }

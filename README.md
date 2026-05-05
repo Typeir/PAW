@@ -30,8 +30,8 @@ The patterns are extracted from a production workflow system and generalized for
 | 3    | [Agent Ecosystem](./docs/03-agent-ecosystem.md)                    | A→B→C lifecycle, agent contracts (Analyzer, Implementer, HealthReviewer, Auditor), task files as inter-agent communication                                         |
 | 4    | [Skills & Instructions](./docs/04-skills-and-instructions.md)      | Three knowledge layers (auto instructions, explicit skills, user prompts), skill composition with dependency resolution, `applyTo` glob matching                   |
 | 5    | [CI/CD Integration](./docs/05-ci-cd-integration.md)                | GitHub Actions pipeline, same pawGates.ts in CI, test enforcement, badge generation, PR comments                                                                   |
-| 6    | [Reference Architecture](./docs/06-reference-architecture.md)      | Quick Start (5-min setup), full directory layout, all interface definitions, "How to add a new X" checklists                                                       |
-| 7    | [Agent Memory Model](./docs/07-agent-memory-model.md)              | SQLite memory store (paw.db), L0→L1→L2 tiered agent loading, session-end save hook, decision supersession, pull-only federation                                    |
+| 6    | [Reference Architecture](./docs/06-reference-architecture.md)      | Quick Start (2-min setup), full directory layout, all interface definitions, "How to add a new X" checklists                                                       |
+| 7    | [Agent Memory Model](./docs/07-agent-memory-model.md)              | SQLite memory store (paw.sqlite), L0→L1→L2 tiered agent loading, session-end save hook, decision supersession, pull-only federation                                 |
 | 8    | [Huskys Need PAWs](./docs/08-huskys-need-paws.md)                  | Built-in Git hook configurator, replaces Husky + lint-staged, same gates for humans and agents, `--staged` scoping, migration guide                                |
 | 10   | [Copilot SDK Integration](./docs/10-copilot-sdk-integration.md)    | GitHub Copilot SDK (`@github/copilot-sdk`) enhancement analysis — typed hooks, programmatic agents, session persistence, steering, skill loading, MAF interop      |
 
@@ -39,7 +39,7 @@ The patterns are extracted from a production workflow system and generalized for
 
 ## Quick Start
 
-If you want to get running fast, go directly to the [Quick Start in Part 6](./docs/06-reference-architecture.md#quick-start-5-minute-setup).
+If you want to get running fast, go directly to the [Quick Start in Part 6](./docs/06-reference-architecture.md#quick-start-2-minute-setup).
 
 ## Deep Dive
 
