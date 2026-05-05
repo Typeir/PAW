@@ -161,6 +161,20 @@ async function main(): Promise<void> {
     return;
   }
 
+  /** Skip files outside the project root — avoids gate crashes on cross-workspace edits. */
+  const fileForward = filePath.replace(/\\/g, '/');
+  const rootForward = ROOT.replace(/\\/g, '/');
+  const isAbsolutePath =
+    /^[a-zA-Z]:\//.test(fileForward) || fileForward.startsWith('/');
+  if (
+    isAbsolutePath &&
+    !fileForward.toLowerCase().startsWith(rootForward.toLowerCase() + '/') &&
+    fileForward.toLowerCase() !== rootForward.toLowerCase()
+  ) {
+    writeHookOutput({ continue: true });
+    return;
+  }
+
   const relativePath = toProjectRelative(filePath);
 
   /** Skip files excluded by .pawignore or PAW's built-in exclusions. */
