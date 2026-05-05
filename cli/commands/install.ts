@@ -15,12 +15,14 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import {
     buildPawCli,
     installPawDependencies,
     PAW_CLI_PATH,
 } from '../../pawBootstrap';
+import { PAW_DIR } from '../../pawPaths';
 import type { CommandMeta } from '../cliLoader';
 
 /**
@@ -94,6 +96,25 @@ export async function run(_args: string[]): Promise<void> {
   }
 
   s.start('Syncing hooks into .paw/');
+
+  /** Bootstrap .paw/ with a default config if it doesn't exist yet.
+   *  paw sync requires the directory; paw init is interactive so we can't
+   *  call it here — create the minimal structure instead. */
+  if (!existsSync(PAW_DIR)) {
+    mkdirSync(PAW_DIR, { recursive: true });
+    const defaultConfig = {
+      surface: 'all',
+      sourceDirectories: ['src/'],
+      tasksDir: '.ignore/tasks',
+      domains: [],
+      gitHooks: [],
+    };
+    writeFileSync(
+      path.join(PAW_DIR, 'config.json'),
+      JSON.stringify(defaultConfig, null, 2) + '\n',
+    );
+  }
+
   const syncResult = spawnSync('node', [PAW_CLI_PATH, 'sync'], {
     stdio: 'pipe',
     timeout: 30_000,
