@@ -25,6 +25,8 @@
  * @since 3.0.0
  */
 
+import { spawn, SpawnOptions } from 'node:child_process';
+import path from 'node:path';
 import {
   extractSessionId,
   readHookInput,
@@ -129,7 +131,53 @@ function spawnMemoryWorker(
   relativePath: string,
   sessionId: string | null,
 ): Promise<void> {
-  return undefined as any;
+  return new Promise((resolve) => {
+    try {
+      const workerPath = path.join(
+        ROOT,
+        '.github',
+        'PAW',
+        'hooks',
+        'memory-worker.ts',
+      );
+      const tsconfigPath = path.join(ROOT, '.paw', 'tsconfig.json');
+      const tsxCli = path.join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs');
+      const isWindows = process.platform === 'win32';
+
+      const spawnOpts: SpawnOptions = {
+        cwd: ROOT,
+        stdio: 'ignore',
+        windowsHide: true,
+      };
+
+      if (!isWindows) {
+        spawnOpts.detached = true;
+      }
+
+      const child = spawn(
+        process.execPath,
+        [
+          tsxCli,
+          '--tsconfig',
+          tsconfigPath,
+          workerPath,
+          relativePath,
+          ...(sessionId ? [sessionId] : []),
+        ],
+        spawnOpts,
+      );
+
+      if (isWindows) {
+        child.on('exit', () => resolve());
+        child.on('error', () => resolve());
+      } else {
+        child.unref();
+        resolve();
+      }
+    } catch {
+      resolve();
+    }
+  });
 }
 
 /**

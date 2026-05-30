@@ -83,7 +83,7 @@ export class ExtensionAdapter implements PawSurfaceAdapter {
       if (!eventName) continue;
 
       const entry = this.getCommandFormat(
-        `node ${this.hookBase}/${hook.file}`,
+        `node --import tsx/esm ${this.hookBase}/${hook.file}`,
         hook.timeoutSec,
       ) as unknown as ExtensionHookEntry;
 

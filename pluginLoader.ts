@@ -2,8 +2,10 @@
  * PAW Plugin Loader
  *
  * @fileoverview Discovers and executes plugins from `.paw/plugins/{hookName}/`.
- * Each `.ts` file in the folder must export a `plugin` constant (or default export)
- * satisfying the {@link PawPlugin} interface.
+ * Each plugin file must export a `plugin` constant (or default export) satisfying
+ * the {@link PawPlugin} interface. Compiled `.mjs` plugins are preferred over
+ * `.ts` source files — `.ts` files require the `--import tsx/esm` loader flag
+ * to be importable under plain `node`, while `.mjs` files work with no flags.
  *
  * Decision compound: if ANY plugin returns `block: true`, the aggregate blocks.
  * Errors in individual plugins are caught and logged — they never crash the host hook.
@@ -22,24 +24,43 @@ import type { AggregatePluginResult, PawPlugin } from './pluginTypes';
 
 /**
  * Discover plugin files for a given hook name.
+ * Prefers compiled `.mjs` over `.ts` source files when both exist for the
+ * same basename — compiled plugins run under plain `node` without a TypeScript
+ * loader, while `.ts` files require the `--import tsx/esm` flag.
  *
  * @param hookName - Hook name matching a subfolder in .paw/plugins/ (e.g. 'session-end')
- * @returns Array of absolute paths to plugin .ts files
+ * @returns Array of absolute paths to plugin files (.mjs preferred over .ts)
  */
 function discoverPlugins(hookName: string): string[] {
   const dir = path.join(PLUGINS_DIR, hookName);
   if (!existsSync(dir)) return [];
 
-  return readdirSync(dir)
-    .filter((f) => f.endsWith('.ts') && !f.endsWith('.d.ts'))
+  const allFiles = readdirSync(dir);
+
+  /** Build a set of basenames that have a compiled .mjs counterpart. */
+  const compiledBasenames = new Set(
+    allFiles.filter((f) => f.endsWith('.mjs')).map((f) => f.slice(0, -4)),
+  );
+
+  return allFiles
+    .filter((f) => {
+      if (f.endsWith('.mjs')) return true;
+      if (f.endsWith('.ts') && !f.endsWith('.d.ts')) {
+        /** Skip .ts when a compiled .mjs with the same basename exists. */
+        return !compiledBasenames.has(f.slice(0, -3));
+      }
+      return false;
+    })
     .sort()
     .map((f) => path.join(dir, f));
 }
 
 /**
  * Import a single plugin file and extract the PawPlugin export.
+ * Supports both `.mjs` (compiled, no loader needed) and `.ts`
+ * (requires `--import tsx/esm` at hook invocation time).
  *
- * @param filePath - Absolute path to the plugin .ts file
+ * @param filePath - Absolute path to the plugin file
  * @returns The plugin instance or null if the file doesn't export a valid plugin
  */
 async function importPlugin(filePath: string): Promise<PawPlugin | null> {

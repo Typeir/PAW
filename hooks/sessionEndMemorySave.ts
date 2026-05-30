@@ -14,12 +14,18 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import {
+    extractSessionId,
     isNestedHookRun,
     readHookInput,
     writeHookOutput,
 } from '../hookRuntime';
 import type { PawDatabase } from '../pawDb';
-import { DEFAULT_DB_PATH, openDb } from '../pawDb';
+import {
+    DEFAULT_DB_PATH,
+    escalateSessionViolations,
+    gcOldViolations,
+    openDb,
+} from '../pawDb';
 import { PAW_DIR, PROJECT_ROOT as ROOT, getTasksDir } from '../pawPaths';
 import { runPlugins } from '../pluginLoader';
 
@@ -261,6 +267,20 @@ async function main(): Promise<void> {
     }
 
     await runPlugins('session-end', input, db);
+
+    /** Direct escalation — belt-and-suspenders in case the plugin failed to load.
+     *  Runs after runPlugins so the plugin's attempt goes first; this call is
+     *  idempotent (escalateSessionViolations only touches rows still session-scoped). */
+    const sessionId = extractSessionId(input);
+    if (sessionId) {
+      const escalated = escalateSessionViolations(db, sessionId);
+      if (escalated > 0) {
+        process.stderr.write(
+          `\u26A0\uFE0F [sessionEndMemorySave] ${escalated} violation(s) escalated to project scope\n`,
+        );
+      }
+    }
+    gcOldViolations(db, 30);
   } finally {
     db.close();
   }

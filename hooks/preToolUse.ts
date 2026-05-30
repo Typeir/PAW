@@ -27,26 +27,26 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-  extractSessionId,
-  readHookInput,
-  writeDenyOutput,
-  writeHookOutput,
+    extractSessionId,
+    readHookInput,
+    writeDenyOutput,
+    writeHookOutput,
 } from '../hookRuntime';
 import {
-  DEFAULT_DB_PATH,
-  getPawConfig,
-  getSessionViolations,
-  getUnresolvedViolations,
-  normalizePath,
-  openDb,
-  openDbReadonly,
-  pruneOrphanedViolations,
-  type ViolationRow,
+    DEFAULT_DB_PATH,
+    getPawConfig,
+    getSessionViolations,
+    getUnresolvedViolations,
+    normalizePath,
+    openDb,
+    openDbReadonly,
+    pruneOrphanedViolations,
+    type ViolationRow,
 } from '../pawDb';
 import {
-  isPathIgnored,
-  PROJECT_ROOT as ROOT,
-  toProjectRelative,
+    isPathIgnored,
+    PROJECT_ROOT as ROOT,
+    toProjectRelative,
 } from '../pawPaths';
 import { runPlugins } from '../pluginLoader';
 import { resolveStaleIndirectViolations } from '../resolveIndirectViolations';
@@ -71,6 +71,87 @@ const EXEMPT_TOOLS = new Set([
   'fetch_webpage',
   'task_complete',
 ]);
+
+/**
+ * Matches any path whose basename is `.env` or starts with `.env.`
+ * (e.g. `.env`, `.env.local`, `.env.production`, `.env.development.local`).
+ * Used to deny all tool access to environment-variable files regardless of
+ * read/write intent — credentials must never enter the model context.
+ */
+const ENV_FILE_BASENAME_REGEX = /(?:^|[\\/])\.env(?:\.[A-Za-z0-9_.-]+)?$/;
+
+/**
+ * Detect `.env` references inside terminal command strings (cat .env, rm .env.local,
+ * source .env, etc.) including bare relative invocations that wouldn't match the
+ * absolute-path harvester in `extractToolFilePaths`.
+ */
+const ENV_FILE_COMMAND_REGEX =
+  /(?:^|[\s"'`(=/\\])\.env(?:\.[A-Za-z0-9_.-]+)?(?=$|[\s"'`)|&;><])/;
+
+/**
+ * Pull any inline command strings out of a tool payload so we can scan them
+ * for `.env` references that bypass the file-path harvester.
+ *
+ * @param {Record<string, unknown>} hookInput - Hook payload
+ * @returns {string[]} Raw command strings
+ */
+function extractCommandStrings(hookInput: Record<string, unknown>): string[] {
+  const commands: string[] = [];
+
+  const visit = (source: unknown): void => {
+    let parsed: Record<string, unknown> = {};
+    if (typeof source === 'string') {
+      try {
+        parsed = JSON.parse(source) as Record<string, unknown>;
+      } catch {
+        return;
+      }
+    } else if (typeof source === 'object' && source !== null) {
+      parsed = source as Record<string, unknown>;
+    } else {
+      return;
+    }
+    if (typeof parsed.command === 'string') {
+      commands.push(parsed.command);
+    }
+    if (typeof parsed.input === 'object' && parsed.input !== null) {
+      const nested = parsed.input as Record<string, unknown>;
+      if (typeof nested.command === 'string') {
+        commands.push(nested.command);
+      }
+    }
+  };
+
+  visit(hookInput.toolInput);
+  visit(hookInput.tool_input);
+  visit(hookInput.toolArgs);
+
+  return commands;
+}
+
+/**
+ * Check whether the tool would read, write, or otherwise touch any `.env*`
+ * file. Covers direct file-path arguments AND terminal commands that name
+ * the file inline (e.g. `cat .env.local`). When triggered, the agent is
+ * denied regardless of EXEMPT_TOOLS membership — secrets must not enter
+ * the model context under any circumstance.
+ *
+ * @param {Record<string, unknown>} hookInput - Hook payload
+ * @returns {string | null} Matched path/command snippet, or null if clean
+ */
+function detectEnvFileAccess(
+  hookInput: Record<string, unknown>,
+): string | null {
+  const paths = extractToolFilePaths(hookInput);
+  for (const p of paths) {
+    if (ENV_FILE_BASENAME_REGEX.test(p)) return p;
+  }
+  const commands = extractCommandStrings(hookInput);
+  for (const cmd of commands) {
+    if (ENV_FILE_COMMAND_REGEX.test(cmd)) return cmd;
+  }
+  return null;
+}
 
 /**
  * Extract all file paths mentioned in tool arguments.
@@ -295,6 +376,22 @@ async function main(): Promise<void> {
       : typeof hookInput.toolName === 'string'
         ? hookInput.toolName
         : '';
+
+  const envMatch = detectEnvFileAccess(hookInput);
+  if (envMatch) {
+    writeDenyOutput(
+      [
+        `🔒 Access to .env files is blocked by PAW.`,
+        ``,
+        `Tool: ${toolName || '(unknown)'}`,
+        `Match: ${envMatch}`,
+        ``,
+        `Environment files contain credentials and must never enter the model context.`,
+        `If you need to change an env var, ask the user to edit the file directly.`,
+      ].join('\n'),
+    );
+    return;
+  }
 
   if (EXEMPT_TOOLS.has(toolName)) {
     writeHookOutput({ continue: true });
