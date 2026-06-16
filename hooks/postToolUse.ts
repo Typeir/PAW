@@ -53,14 +53,22 @@ import { resolveStaleIndirectViolations } from '../resolveIndirectViolations';
 
 /**
  * Persist gate findings for a file into SQLite, scoped to the current session.
+ * Each finding carries its own file path from the gate; that is the authoritative
+ * source. The `filePath` parameter is a fallback for findings that lack a `file`
+ * property.
  *
- * @param {string} filePath - Normalized file path
- * @param {Array<{ rule: string; message: string }>} findings - Gate findings
+ * @param {string} filePath - Fallback file path (the edited file)
+ * @param {Array<{ file?: string; rule: string; message: string; indirectFix?: boolean }>} findings - Gate findings
  * @param {string | null} sessionId - Current session ID
  */
 async function writeViolations(
   filePath: string,
-  findings: Array<{ rule: string; message: string; indirectFix?: boolean }>,
+  findings: Array<{
+    file?: string;
+    rule: string;
+    message: string;
+    indirectFix?: boolean;
+  }>,
   sessionId: string | null,
 ): Promise<void> {
   try {
@@ -68,7 +76,7 @@ async function writeViolations(
     try {
       for (const finding of findings) {
         insertViolation(db, {
-          filePath: normalizePath(filePath),
+          filePath: normalizePath(finding.file ?? filePath),
           rule: finding.rule,
           message: finding.message,
           hookEvent: 'postToolUse',
@@ -254,8 +262,9 @@ async function main(): Promise<void> {
   const message = [
     `⚠️ Gate violations in ${relativePath}:`,
     ...criticalFindings.slice(0, 10).map((f: any) => {
+      const fileLabel = f.file && f.file !== relativePath ? ` (${f.file})` : '';
       const loc = f.line ? `:${f.line}` : '';
-      return `  - [${f.rule}] ${f.message}${loc}`;
+      return `  - [${f.rule}] ${f.message}${fileLabel}${loc}`;
     }),
     criticalFindings.length > 10
       ? `  ... and ${criticalFindings.length - 10} more`
