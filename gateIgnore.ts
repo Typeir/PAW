@@ -108,7 +108,12 @@ function isSuppressed(
   rule: string,
   line: number | undefined,
 ): boolean {
-  const matchesGate = (id: string): boolean => id === '*' || id === gateId;
+  const normalizeId = (s: string): string =>
+    s.replace(/-/g, '').toLowerCase();
+
+  const matchesGate = (id: string): boolean =>
+    id === '*' || id === gateId || normalizeId(id) === normalizeId(gateId);
+
   const matchesRule = (rules: Set<string>): boolean =>
     rules.has('*') || rules.has(rule);
 
