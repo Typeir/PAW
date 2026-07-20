@@ -27,26 +27,26 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-    extractSessionId,
-    readHookInput,
-    writeDenyOutput,
-    writeHookOutput,
+  extractSessionId,
+  readHookInput,
+  writeDenyOutput,
+  writeHookOutput,
 } from '../hookRuntime';
 import {
-    DEFAULT_DB_PATH,
-    getPawConfig,
-    getSessionViolations,
-    getUnresolvedViolations,
-    normalizePath,
-    openDb,
-    openDbReadonly,
-    pruneOrphanedViolations,
-    type ViolationRow,
+  DEFAULT_DB_PATH,
+  getPawConfig,
+  getSessionViolations,
+  getUnresolvedViolations,
+  normalizePath,
+  openDb,
+  openDbReadonly,
+  pruneOrphanedViolations,
+  type ViolationRow,
 } from '../pawDb';
 import {
-    isPathIgnored,
-    PROJECT_ROOT as ROOT,
-    toProjectRelative,
+  isPathIgnored,
+  PROJECT_ROOT as ROOT,
+  toProjectRelative,
 } from '../pawPaths';
 import { runPlugins } from '../pluginLoader';
 import { resolveStaleIndirectViolations } from '../resolveIndirectViolations';
@@ -408,9 +408,15 @@ async function main(): Promise<void> {
       return;
     }
     try {
-      violations = sessionId
-        ? getSessionViolations(db, sessionId)
-        : getUnresolvedViolations(db);
+      if (sessionId) {
+        violations = getSessionViolations(db, sessionId);
+      } else {
+        process.stderr.write(
+          `\u26A0\uFE0F PAW preToolUse: no session_id in hook input — ` +
+            `falling back to all unresolved violations (session isolation unavailable).\n`,
+        );
+        violations = getUnresolvedViolations(db);
+      }
     } finally {
       db.close();
     }

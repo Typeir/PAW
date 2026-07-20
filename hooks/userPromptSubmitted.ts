@@ -14,9 +14,9 @@
 
 import { appendFileSync, mkdirSync } from 'node:fs';
 import {
-    extractSessionId,
-    readHookInput,
-    writeHookOutput,
+  extractSessionId,
+  readHookInput,
+  writeHookOutput,
 } from '../hookRuntime';
 import { openDbReadonly } from '../pawDb';
 import { LOG_PATH, PAW_DIR } from '../pawPaths';
@@ -47,7 +47,7 @@ function appendLog(event: Record<string, unknown>): void {
  *
  * @returns Compact memory context string
  */
-async function loadL1Context(): Promise<string> {
+async function loadL1Context(sessionId: string | null): Promise<string> {
   const db = await openDbReadonly();
   if (!db) return '';
 
@@ -104,11 +104,12 @@ async function loadL1Context(): Promise<string> {
       SELECT file_path, rule, message, created_at
       FROM violations
       WHERE resolved_at IS NULL
+        AND (session_id = ? OR session_id IS NULL)
       ORDER BY created_at DESC
       LIMIT 5
     `,
       )
-      .all() as Array<{
+      .all(sessionId ?? null) as Array<{
       file_path: string;
       rule: string;
       message: string;
@@ -140,7 +141,8 @@ async function main(): Promise<void> {
 
   await resolveStaleIndirectViolations();
 
-  const l1Context = await loadL1Context();
+  const sessionId = extractSessionId(hookInput);
+  const l1Context = await loadL1Context(sessionId);
 
   const pluginResult = await runPlugins(
     'user-prompt-submitted',

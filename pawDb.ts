@@ -393,6 +393,10 @@ export function getMemoryTypeId(db: PawDatabase, typeName: string): number {
 /**
  * Insert a violation record into the violations table.
  *
+ * When no valid sessionId is provided, the violation is stored with
+ * session_id = NULL (project-scoped) and a warning is emitted to stderr.
+ * This ensures violations are always visible rather than silently hidden.
+ *
  * @param {PawDatabase} db - SQLite database instance
  * @param {object} violation - Violation data to persist
  * @returns {number} The inserted row id
@@ -411,6 +415,15 @@ export function insertViolation(
 ): number {
   const memoryTypeId = getMemoryTypeId(db, 'violation');
   const normalizedFilePath = normalizePath(violation.filePath);
+
+  if (!violation.sessionId) {
+    process.stderr.write(
+      `\u26A0\uFE0F PAW: insertViolation called without sessionId — ` +
+        `violation stored as project-scoped (NULL). ` +
+        `file=${normalizedFilePath} rule=${violation.rule}\n`,
+    );
+  }
+
   const result = db
     .prepare(
       `INSERT INTO violations (file_path, rule, message, severity, hook_event, session_id, indirect_fix, memory_type_id)
