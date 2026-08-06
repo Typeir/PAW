@@ -1,0 +1,19 @@
+{
+  "root": ".paw",
+  "gatesDir": ".paw/gates",
+  "connector": "ghost-host",
+  "models": {
+    "ds-flash": {
+      "contextTokens": 128000,
+      "maxOutputTokens": 16384,
+      "tools": true,
+      "structuredOutput": true,
+      "reasoning": true,
+      "vision": false,
+      "costClass": "cheap"
+    }
+  },
+  "roles": {
+    "edit.apply": "ds-flash"
+  }
+}

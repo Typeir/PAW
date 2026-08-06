@@ -1,0 +1,21 @@
+{
+  "root": ".paw",
+  "gatesDir": ".paw/gates",
+  "connector": "copilot-hooks",
+  "models": {
+    "ds-flash": {
+      "contextTokens": 128000,
+      "maxOutputTokens": 16384,
+      "tools": true,
+      "structuredOutput": true,
+      "reasoning": true,
+      "vision": false,
+      "costClass": "cheap"
+    }
+  },
+  "roles": {
+    "edit.apply": "ds-flash",
+    "review.graze": "ds-flash",
+    "review.judge": "ds-flash"
+  }
+}

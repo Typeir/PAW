@@ -1,0 +1,25 @@
+{
+  "name": "@paw/tui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PAW TUI — a driving adapter that consumes @paw/core. A pure renderer and reducer behind a thin process shell.",
+  "type": "module",
+  "bin": {
+    "paw-tui": "./src/main.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@paw/adapters": "file:../adapters",
+    "@paw/core": "file:../core"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  }
+}

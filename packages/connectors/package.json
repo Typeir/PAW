@@ -1,0 +1,26 @@
+{
+  "name": "@paw/connectors",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PAW host connectors — implementations of @paw/core's HostConnector that translate a host surface (Copilot hooks, SDK, VS Code, future runtimes) to and from the canonical event stream.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@paw/core": "file:../core"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  }
+}

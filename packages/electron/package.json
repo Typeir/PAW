@@ -1,0 +1,25 @@
+{
+  "name": "@paw/electron",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PAW Electron — a desktop shell that runs pawd in-process and shows the live @paw/gui console. Owns no domain logic.",
+  "type": "module",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build:gui": "npm --prefix ../gui run build",
+    "build": "node build.mjs",
+    "start": "npm run build:gui && npm run build && electron dist/main.cjs --root=../cli/test/fixtures --config=ready.config.json",
+    "capture": "npm run build:gui && npm run build && electron dist/main.cjs --root=../cli/test/fixtures --config=ready.config.json demo.swarm.mjs --capture",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@paw/daemon": "file:../daemon",
+    "@paw/gui": "file:../gui"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.39",
+    "electron": "^33.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.6.3"
+  }
+}

@@ -20,7 +20,12 @@
     "gates": "npx tsx pawGates.ts",
     "gates:changed": "npx tsx pawGates.ts --changed-only",
     "gates:staged": "npx tsx pawGates.ts --staged",
-    "typecheck": "tsc --noEmit --project ../../.paw/tsconfig.json"
+    "typecheck": "tsc --noEmit --project ../../.paw/tsconfig.json",
+    "paw": "node bin/paw.mjs",
+    "pawd": "node bin/pawd.mjs",
+    "paw-tui": "node bin/paw-tui.mjs",
+    "build:console": "npm --prefix packages/gui run build",
+    "demo": "npm run build:console && node bin/paw.mjs ui packages/cli/test/fixtures/ready.config.json packages/cli/test/fixtures/demo.swarm.mjs"
   },
   "dependencies": {
     "@clack/prompts": "^1.1.0",

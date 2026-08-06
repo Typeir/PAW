@@ -1,0 +1,93 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`render > frames a ready doctor 1`] = `
+[
+  "┌─ PAW ────────────────────────────────────────────────────────────────┐",
+  "│ ▸1 doctor◂   2 plan    3 herd                                        │",
+  "│                                                                      │",
+  "│ PAW is ready.                                                        │",
+  "│                                                                      │",
+  "│ ✓ edit.apply → ds-flash                                              │",
+  "│ ✓ memory.draft → (unbound)                                           │",
+  "├──────────────────────────────────────────────────────────────────────┤",
+  "│ 1/2/3 view · j/k select member · q quit                              │",
+  "└──────────────────────────────────────────────────────────────────────┘",
+]
+`;
+
+exports[`render > frames a refused herd 1`] = `
+[
+  "┌─ PAW ────────────────────────────────────────────────────────────────┐",
+  "│  1 doctor    2 plan   ▸3 herd◂                                       │",
+  "│                                                                      │",
+  "│ Release REFUSED.                                                     │",
+  "│                                                                      │",
+  "│ ✓ count                                                              │",
+  "│ ✗ file-conflict — two members target x                               │",
+  "├──────────────────────────────────────────────────────────────────────┤",
+  "│ 1/2/3 view · j/k select member · q quit                              │",
+  "└──────────────────────────────────────────────────────────────────────┘",
+]
+`;
+
+exports[`render > frames a released herd 1`] = `
+[
+  "┌─ PAW ────────────────────────────────────────────────────────────────┐",
+  "│  1 doctor    2 plan   ▸3 herd◂                                       │",
+  "│                                                                      │",
+  "│ 1 done · 1 skipped                                                   │",
+  "│                                                                      │",
+  "│ ✓ member 0 (alpha)                                                   │",
+  "│ · member 1 (beta)                                                    │",
+  "├──────────────────────────────────────────────────────────────────────┤",
+  "│ 1/2/3 view · j/k select member · q quit                              │",
+  "└──────────────────────────────────────────────────────────────────────┘",
+]
+`;
+
+exports[`render > frames an unready doctor with config and role problems 1`] = `
+[
+  "┌─ PAW ────────────────────────────────────────────────────────────────┐",
+  "│ ▸1 doctor◂   2 plan    3 herd                                        │",
+  "│                                                                      │",
+  "│ PAW is NOT ready.                                                    │",
+  "│                                                                      │",
+  "│ ✗ config.connector — unknown connector "x"                           │",
+  "│ ✗ review.judge → weak (requires reasoning)                           │",
+  "├──────────────────────────────────────────────────────────────────────┤",
+  "│ 1/2/3 view · j/k select member · q quit                              │",
+  "└──────────────────────────────────────────────────────────────────────┘",
+]
+`;
+
+exports[`render > frames an unreleased herd 1`] = `
+[
+  "┌─ PAW ────────────────────────────────────────────────────────────────┐",
+  "│  1 doctor    2 plan   ▸3 herd◂                                       │",
+  "│                                                                      │",
+  "│ No herd released yet.                                                │",
+  "├──────────────────────────────────────────────────────────────────────┤",
+  "│ 1/2/3 view · j/k select member · q quit                              │",
+  "└──────────────────────────────────────────────────────────────────────┘",
+]
+`;
+
+exports[`render > frames the plan view with the selected member brief 1`] = `
+[
+  "┌─ PAW ────────────────────────────────────────────────────────────────┐",
+  "│  1 doctor   ▸2 plan◂   3 herd                                        │",
+  "│                                                                      │",
+  "│ plan: demo · role edit.apply · 2 members                             │",
+  "│                                                                      │",
+  "│   member 0 — alpha                                                   │",
+  "│ ▸ member 1 — beta                                                    │",
+  "│                                                                      │",
+  "│ ── brief · member 1 ──                                               │",
+  "│ short                                                                │",
+  "│ EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE │",
+  "│ LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL… │",
+  "├──────────────────────────────────────────────────────────────────────┤",
+  "│ 1/2/3 view · j/k select member · q quit                              │",
+  "└──────────────────────────────────────────────────────────────────────┘",
+]
+`;

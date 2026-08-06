@@ -1,0 +1,37 @@
+{
+  "name": "@paw/daemon",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PAW daemon (pawd) — reads real host/process and plan state and serves it as a PawSnapshot over 127.0.0.1. The producer the web UI and Electron shell consume.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "bin": {
+    "pawd": "./src/main.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@paw/adapters": "file:../adapters",
+    "@paw/core": "file:../core",
+    "@peculiar/asn1-schema": "^2.8.0",
+    "@peculiar/asn1-x509": "^2.8.0",
+    "@peculiar/x509": "^1.12.3",
+    "ps-list": "8.1.1",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "^2.1.9",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  }
+}
