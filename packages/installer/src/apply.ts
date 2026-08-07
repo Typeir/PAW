@@ -1,12 +1,16 @@
 /**
  * PAW Installer Apply
  *
- * @fileoverview The application layer: it gathers the current state through the
- * ports, calls the pure planners to decide, and performs the decided edit — PATH
- * activation and per-repo init. It reads and writes only through {@link
- * FileSystemPort} / {@link EnvironmentPort}, so it is unit-tested against fakes and
- * `main.ts` supplies the real adapters. It returns the plan it executed so a caller
- * (or a `--dry-run`) can report exactly what changed.
+ * @fileoverview The application layer for what is genuinely the installer's:
+ * putting PAW's bin directory on PATH. It gathers the current state through the
+ * ports, calls the pure planner to decide, and performs the decided edit,
+ * returning the plan so a caller (or a `--dry-run`) can report exactly what
+ * changed.
+ *
+ * Attaching a repository is deliberately not here. It moved to
+ * `@paw/core`'s {@link applyInit}, because a terminal, a console and a desktop
+ * dialog all attach repositories and three copies of that sequence would be
+ * three chances to drift.
  *
  * @module @paw/installer/apply
  * @version 0.0.0
@@ -14,9 +18,7 @@
  * @since 5.0.0
  */
 
-import { dirname } from 'node:path';
 import { planPathEdit, type PathEdit } from './path.js';
-import { planInit, type InitPlan } from './scaffold.js';
 import { detectShell, profileTarget } from './shell.js';
 import type { EnvironmentPort, FileSystemPort } from './ports.js';
 
@@ -77,21 +79,3 @@ export async function activatePath(
   return edit;
 }
 
-/**
- * Attach PAW to a repo root by writing the scaffold, returning the plan executed.
- *
- * @param {string} root - The repo root (from `findRepoRoot`).
- * @param {FileSystemPort} fs - Filesystem port.
- * @returns {Promise<InitPlan>} The plan that was written.
- */
-export async function applyInit(root: string, fs: FileSystemPort): Promise<InitPlan> {
-  const plan = planInit(root);
-  for (const write of plan.writes) {
-    await fs.ensureDir(dirname(write.path));
-    await fs.writeText(write.path, write.content);
-    if (write.executable) {
-      await fs.setExecutable(write.path);
-    }
-  }
-  return plan;
-}

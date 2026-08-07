@@ -102,6 +102,7 @@ describe('doctorPlan', () => {
       'total-brief',
       'purity',
       'file-conflict',
+      'key-collision',
       'context-paths',
     ]);
   });
@@ -187,5 +188,55 @@ describe('doctorPlan', () => {
       plan({ contextFiles: () => [undefined as unknown as string] }),
     );
     expect(findings.find((f) => f.check === 'context-paths')).toMatchObject({ ok: false });
+  });
+});
+
+describe('doctorPlan key-collision', () => {
+  /**
+   * A plan whose members derive their key from a name, so a repeated name
+   * collides exactly as a repeated filename does in a real plan.
+   *
+   * @param {readonly string[]} names - One name per member.
+   * @returns {SwarmPlan<{ names: readonly string[] }>} The plan.
+   */
+  const keyedBy = (names: readonly string[]): SwarmPlan<{ names: readonly string[] }> => ({
+    name: 'keyed',
+    role: 'edit.apply',
+    args: { names },
+    members: (a) => a.names.length,
+    brief: (_a, m) => `brief-${m}`,
+    key: (a, m) => `tale:${a.names[m]}`,
+  });
+
+  it('passes when every member has its own key', () => {
+    const finding = doctorPlan(keyedBy(['alpha', 'beta', 'gamma'])).find(
+      (f) => f.check === 'key-collision',
+    );
+    expect(finding).toEqual({ check: 'key-collision', ok: true });
+  });
+
+  it('refuses two members that share a key, naming both', () => {
+    // The real shape of this bug: two source files called `main.mdx` in
+    // different directories, reduced to the same key by a basename-derived
+    // naming rule.
+    const findings = doctorPlan(keyedBy(['bard/main', 'druid/main'].map((p) => p.split('/')[1])));
+    const finding = findings.find((f) => f.check === 'key-collision');
+
+    expect(finding?.ok).toBe(false);
+    expect(finding?.detail).toContain('members 0 and 1');
+    expect(finding?.detail).toContain('tale:main');
+  });
+
+  it('names the first colliding pair when several collide', () => {
+    const finding = doctorPlan(keyedBy(['a', 'b', 'b', 'c', 'c'])).find(
+      (f) => f.check === 'key-collision',
+    );
+    expect(finding?.detail).toContain('members 1 and 2');
+  });
+
+  it('refuses the release, because a collision silently skips real work', () => {
+    // Every later member sharing a key is reported `skipped`, which reads
+    // exactly like a legitimate resume — so the release must not proceed.
+    expect(doctorPlan(keyedBy(['same', 'same'])).every((f) => f.ok)).toBe(false);
   });
 });

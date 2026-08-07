@@ -144,11 +144,42 @@ describe('CommandBar', () => {
 describe('HerdTab', () => {
   it('lists every dispatched member with its state and level', () => {
     renderInConsole(<HerdTab />);
-    const table = screen.getByRole('table');
-    expect(within(table).getAllByRole('button')).toHaveLength(4);
-    expect(within(table).getByText('lvl 9')).toBeInTheDocument();
-    expect(within(table).getByText('—')).toBeInTheDocument();
+    const tables = screen.getAllByRole('table');
+    const buttons = tables.flatMap((t) => within(t).queryAllByRole('button'));
+    expect(buttons).toHaveLength(4);
+    expect(screen.getByText('lvl 9')).toBeInTheDocument();
     expect(screen.getByText('1 done · 1 run · 1 fail')).toBeInTheDocument();
+  });
+
+  it('groups members with what needs attention first and settled last', () => {
+    renderInConsole(<HerdTab />);
+    const groups = screen
+      .getAllByRole('region')
+      .map((g) => g.getAttribute('aria-label') ?? '');
+    expect(groups).toEqual([
+      'In progress, 1 member(s)',
+      'Failed, 1 member(s)',
+      'Settled, 2 member(s)',
+    ]);
+  });
+
+  it('renders no table for a group with nothing in it', () => {
+    const base = makeSnapshot();
+    renderInConsole(
+      <HerdTab />,
+      makeSnapshot({
+        run: {
+          ...base.run,
+          members: base.run.members.filter((m) => m.state === 'done'),
+        },
+      }),
+    );
+    const groups = screen
+      .getAllByRole('region')
+      .map((g) => g.getAttribute('aria-label') ?? '');
+    expect(groups).toEqual(['Settled, 1 member(s)']);
+    expect(screen.queryByText('Failed')).not.toBeInTheDocument();
+    expect(screen.queryByText('In progress')).not.toBeInTheDocument();
   });
 
   it('shows the run spend', () => {

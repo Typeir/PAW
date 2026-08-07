@@ -8,7 +8,8 @@
     "node": ">=18"
   },
   "bin": {
-    "paw": "dist/cli.mjs"
+    "paw": "dist/cli.mjs",
+    "paw-setup": "dist/paw-setup.mjs"
   },
   "files": [
     "dist/"
@@ -29,11 +30,11 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.1.0",
-    "@github/copilot-sdk": "^0.2.2",
+    "@github/copilot-sdk": "1.0.8",
     "sql.js": "^1.14.1"
   },
   "devDependencies": {
-    "@types/node": "^20.19.39",
+    "@types/node": "^22.20.1",
     "esbuild": "^0.25.0",
     "tsx": "^4.21.0",
     "typescript": "^5"

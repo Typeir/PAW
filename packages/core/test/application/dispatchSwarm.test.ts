@@ -227,12 +227,15 @@ describe('dispatchSwarm', () => {
 });
 
 describe('dispatchSwarm progress', () => {
-  it('announces every member starting and settling, in order', async () => {
+  it('announces every member starting and settling, in order, when sequential', async () => {
     const events: DispatchEvent[] = [];
     await dispatchSwarm(plan({ args: { n: 2 } }), {
       registry: registry(),
       files: reader(),
-      onProgress: (event) => events.push(event),
+      concurrency: 1,
+      onProgress: (event) => {
+        events.push(event);
+      },
     });
 
     expect(events.map((e) => `${e.phase}:${e.member}`)).toEqual([
@@ -245,12 +248,35 @@ describe('dispatchSwarm progress', () => {
     expect(events.map((e) => e.key)).toEqual(['k0', 'k0', 'k1', 'k1']);
   });
 
+  it('announces every member once each way under batching, its own start first', async () => {
+    const events: DispatchEvent[] = [];
+    await dispatchSwarm(plan({ args: { n: 4 } }), {
+      registry: registry(),
+      files: reader(),
+      onProgress: (event) => {
+        events.push(event);
+      },
+    });
+
+    const seq = events.map((e) => `${e.phase}:${e.member}`);
+    for (let member = 0; member < 4; member += 1) {
+      expect(seq.indexOf(`started:${member}`)).toBeGreaterThanOrEqual(0);
+      expect(seq.indexOf(`settled:${member}`)).toBeGreaterThan(
+        seq.indexOf(`started:${member}`),
+      );
+    }
+    expect(seq).toHaveLength(8);
+    expect(events.every((e) => e.total === 4)).toBe(true);
+  });
+
   it('carries the same outcome it puts in the result', async () => {
     const events: DispatchEvent[] = [];
     const res = await dispatchSwarm(plan({ args: { n: 2 } }), {
       registry: registry(),
       files: reader(),
-      onProgress: (event) => events.push(event),
+      onProgress: (event) => {
+        events.push(event);
+      },
     });
 
     // The live view and the returned result come from one place, so a console
@@ -263,8 +289,11 @@ describe('dispatchSwarm progress', () => {
     const res = await dispatchSwarm(plan({ args: { n: 2 } }), {
       registry: registry(),
       files: reader(),
+      concurrency: 1,
       skip: (_p, member) => member === 0,
-      onProgress: (event) => events.push(event),
+      onProgress: (event) => {
+        events.push(event);
+      },
     });
 
     expect(events[0]).toMatchObject({ phase: 'started', member: 0 });
@@ -279,7 +308,9 @@ describe('dispatchSwarm progress', () => {
       registry: registry(),
       files: reader(),
       alreadyDone: () => true,
-      onProgress: (event) => events.push(event),
+      onProgress: (event) => {
+        events.push(event);
+      },
     });
 
     expect(events.map((e) => e.phase)).toEqual(['started', 'settled']);
@@ -291,7 +322,9 @@ describe('dispatchSwarm progress', () => {
     const res = await dispatchSwarm(plan({ members: 0 }), {
       registry: registry(),
       files: reader(),
-      onProgress: (event) => events.push(event),
+      onProgress: (event) => {
+        events.push(event);
+      },
     });
 
     expect(res.released).toBe(false);
@@ -321,5 +354,25 @@ describe('dispatchSwarm progress', () => {
         },
       }),
     ).rejects.toThrow('the console exploded');
+  });
+});
+
+describe('dispatchSwarm output budget', () => {
+  it('spends the bound model’s output ceiling, so long answers are not cut off', async () => {
+    const seen: (number | undefined)[] = [];
+    const capturing: ModelPort = {
+      complete: async (req) => {
+        seen.push(req.maxOutputTokens);
+        return { content: 'x', inputTokens: 1, outputTokens: 1 };
+      },
+    };
+
+    await dispatchSwarm(plan({ args: { n: 2 } }), {
+      registry: registry({ port: capturing }),
+      files: reader(),
+    });
+
+    expect(seen).toEqual([CAP.maxOutputTokens, CAP.maxOutputTokens]);
+    expect(CAP.maxOutputTokens).toBeGreaterThan(512);
   });
 });

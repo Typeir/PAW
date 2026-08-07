@@ -260,6 +260,22 @@ dl, dd { margin: 0; }
 .budget .cost .big { font-size: 16px; color: var(--good); }
 .budget .cost .cap { letter-spacing: .1em; }
 
+.herd-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.herd-group { min-width: 0; }
+.herd-group-title {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  margin: 0 0 6px; padding: 0 0 4px;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .12em; color: var(--ink-faint);
+}
+.herd-group-count { font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+
 .role-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); font-family: var(--mono); font-size: 11.5px; }
 .role-row:last-child { border-bottom: 0; }
 .role-row .rid { color: var(--ink); width: 122px; }

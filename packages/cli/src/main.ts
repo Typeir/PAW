@@ -16,6 +16,7 @@
  *                                 --root=DIR serve another repo · --config=PATH override
  *                                 --run release the named plan · --live use the provider
  *                                 --context a,b attach files to every brief
+ *                                 --sequential one member at a time · --concurrency=N
  *   paw trust [--dry-run]         install this machine's PAW CA so the console
  *                                 loads without a certificate warning
  *
@@ -30,17 +31,21 @@
  */
 
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
+import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import {
+  applyInit,
   buildRegistry,
   composeBrief,
   decidePreToolUse,
   dispatchSwarm,
   doctorPlan,
   runDoctor,
+  type InitMode,
   type ModelCapabilities,
   type ModelPort,
   type PreToolInput,
@@ -48,8 +53,15 @@ import {
   type SwarmPlan,
   type Violation,
 } from '@paw/core';
-import { createNodeFileReader } from '@paw/adapters';
+import { createNodeFileReader, createNodeFs } from '@paw/adapters';
+import { createHerdWriter } from './herdWriter.js';
 import {
+  attachOutcomeLine,
+  attachPromptLines,
+  readAttachAnswer,
+} from './attachPrompt.js';
+import {
+  consolePage,
   identityNotice,
   identityPaths,
   markTrusted,
@@ -57,20 +69,22 @@ import {
   nodeIdentityIo,
   nodeRuntime,
   nodeServerIdentity,
+  openLiveHerd,
   pawHome,
   planTrust,
   runDaemon,
   trustCommandLine,
   walkFiles,
+  type DaemonHandle,
   type Dispatcher,
 } from '@paw/daemon';
 import {
+  concurrencyFrom,
   parseArgs,
   resolveContext,
   splitPatterns,
   withContext,
 } from './context.js';
-import { loadEnvLocal, liveRegistryFor } from './deepseekRuntime.js';
 import { decisionToOutput } from './render.js';
 import {
   formatBrief,
@@ -208,7 +222,7 @@ async function runSwarm(
   rest: string[],
   print: (lines: string[]) => void,
 ): Promise<number> {
-  const args = parseArgs(rest, ['context']);
+  const args = parseArgs(rest, ['context', 'concurrency']);
   const live = args.flags.has('live');
   const [sub, planPath, memberArg] = args.positional;
   const plan = await loadPlan(planPath);
@@ -229,20 +243,32 @@ async function runSwarm(
     return 0;
   }
   if (sub === 'run') {
-    if (live) {
-      await loadEnvLocal(process.cwd());
-    }
     const attached = await resolveContextArg(args.values.get('context'));
     if (attached.length > 0) {
       print([`attaching ${attached.length} file(s) to every brief: ${attached.join(', ')}`]);
     }
-    const registry = live ? liveRegistryFor(plan) : fakeRegistryFor(plan);
-    const result = await dispatchSwarm(withContext(plan, attached), {
-      registry,
-      files: createNodeFileReader(process.cwd()),
-    });
-    print(formatHerd(result));
-    return result.released ? 0 : 1;
+    const { registry, close } = live
+      ? await openLiveHerd(plan)
+      : { registry: fakeRegistryFor(plan), close: async () => {} };
+    try {
+      const writer = createHerdWriter(plan, createNodeFs(), existsSync);
+      const result = await dispatchSwarm(withContext(plan, attached), {
+        registry,
+        files: createNodeFileReader(process.cwd()),
+        concurrency: concurrencyFrom(args),
+        onProgress: (event) => writer.onProgress(event),
+      });
+      print(formatHerd(result));
+      const wrote = writer.written();
+      print([
+        wrote.length === 0
+          ? 'wrote nothing — the plan declares no expectFiles'
+          : `wrote ${wrote.length} file(s), first ${wrote[0]}`,
+      ]);
+      return result.released ? 0 : 1;
+    } finally {
+      await close();
+    }
   }
   throw new Error(`unknown swarm subcommand "${sub ?? '(none)'}"`);
 }
@@ -256,25 +282,112 @@ async function runSwarm(
  * @param {boolean} live - Whether to dispatch against the live provider.
  * @returns {Dispatcher} The dispatcher.
  */
-function uiDispatcher(live: boolean, attached: readonly string[]): Dispatcher {
+function uiDispatcher(
+  live: boolean,
+  attached: readonly string[],
+  concurrency: number | undefined,
+): Dispatcher {
   return async (plan, onProgress) => {
-    const base = live ? liveRegistryFor(plan) : fakeRegistryFor(plan);
-    const binding = base.bindings.get(plan.role);
-    if (!binding) {
-      throw new Error(`cannot run "${plan.name}": role "${plan.role}" is bound to no model`);
+    const { registry: base, close } = live
+      ? await openLiveHerd(plan)
+      : { registry: fakeRegistryFor(plan), close: async () => {} };
+    try {
+      const binding = base.bindings.get(plan.role);
+      if (!binding) {
+        throw new Error(`cannot run "${plan.name}": role "${plan.role}" is bound to no model`);
+      }
+      const metered = meterPort(binding.port);
+      const bindings = new Map(base.bindings);
+      bindings.set(plan.role, { ...binding, port: metered.port });
+      const writer = createHerdWriter(plan, createNodeFs(), existsSync);
+      const result = await dispatchSwarm(withContext(plan, attached), {
+        registry: { declarations: base.declarations, bindings },
+        files: createNodeFileReader(process.cwd()),
+        concurrency,
+        onProgress: async (event) => {
+          onProgress(event);
+          await writer.onProgress(event);
+        },
+      });
+      const wrote = writer.written();
+      if (wrote.length > 0) {
+        process.stdout.write(`herd wrote ${wrote.length} file(s)
+`);
+      }
+      return { result, usage: metered.usage() };
+    } finally {
+      await close();
     }
-    const metered = meterPort(binding.port);
-    const bindings = new Map(base.bindings);
-    bindings.set(plan.role, { ...binding, port: metered.port });
-    const result = await dispatchSwarm(withContext(plan, attached), {
-      registry: { declarations: base.declarations, bindings },
-      files: createNodeFileReader(process.cwd()),
-      // Straight through to the daemon's bus: the console fills in member by
-      // member instead of staying blank until the whole herd has landed.
-      onProgress,
-    });
-    return { result, usage: metered.usage() };
   };
+}
+
+/**
+ * Ask the operator's terminal to approve a console's attach request, and act on
+ * the answer.
+ *
+ * This is the out-of-band half of the request pattern. The request arrived over
+ * the socket; the answer arrives from the keyboard of whoever started the
+ * daemon, and the write is performed here — in the process that already holds
+ * filesystem authority — rather than by the daemon, which holds none.
+ *
+ * The outcome is published on the daemon's own bus so the console that asked
+ * stops waiting, and an approved attach re-scopes the daemon onto the repository
+ * it just configured, so the console sees plans rather than the empty state it
+ * asked about.
+ *
+ * @param {string} path - The repository the console named.
+ * @param {InitMode} mode - How it asked for an existing config to be resolved.
+ * @param {() => DaemonHandle | null} daemonOf - The running daemon, once it exists.
+ * @returns {Promise<void>} Settles when the request has been resolved either way.
+ */
+async function approveAttach(
+  path: string,
+  mode: InitMode,
+  daemonOf: () => DaemonHandle | null,
+): Promise<void> {
+  const daemon = daemonOf();
+  if (daemon === null) {
+    return;
+  }
+  process.stdout.write(`${attachPromptLines(path, mode).join('\n')}`);
+
+  const answer = await new Promise<string>((resolve) => {
+    const rl = createInterface({ input: process.stdin });
+    rl.once('line', (line) => {
+      resolve(line);
+      rl.close();
+    });
+    rl.once('close', () => resolve(''));
+  });
+
+  if (readAttachAnswer(answer) === 'refuse') {
+    process.stdout.write(`${attachOutcomeLine(path, [])}\n`);
+    daemon.bus.publish('attach', { status: 'refused', path, mode });
+    return;
+  }
+
+  try {
+    const plan = await applyInit(path, createNodeFs(), mode);
+    const written = plan.refusal === undefined ? plan.writes.map((w) => w.path) : [];
+    process.stdout.write(
+      `${attachOutcomeLine(path, written, plan.refusal?.reason)}\n`,
+    );
+    if (plan.refusal !== undefined) {
+      daemon.bus.publish('attach', {
+        status: 'refused',
+        path,
+        mode,
+        reason: plan.refusal.reason,
+      });
+      return;
+    }
+    await daemon.rescope(path);
+    daemon.bus.publish('attach', { status: 'approved', path, mode });
+  } catch (err: unknown) {
+    const reason = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`attach ${path} failed: ${reason}\n`);
+    daemon.bus.publish('attach', { status: 'failed', path, mode, reason });
+  }
 }
 
 /**
@@ -294,29 +407,34 @@ async function runUi(
   rest: string[],
   print: (lines: string[]) => void,
 ): Promise<never> {
-  const args = parseArgs(rest, ['context', 'port', 'root', 'config']);
+  const args = parseArgs(rest, ['context', 'port', 'root', 'config', 'concurrency']);
   const [planPath] = args.positional;
   const live = args.flags.has('live');
   const shouldRun = args.flags.has('run');
   if (shouldRun && planPath === undefined) {
     throw new Error('paw ui --run needs the plan to release: paw ui <plan.swarm.mjs> --run');
   }
-  if (live) {
-    await loadEnvLocal(process.cwd());
-  }
   const attached = await resolveContextArg(args.values.get('context'));
   const portValue = args.values.get('port');
   const root = args.values.get('root') ?? '.';
+  let handle: DaemonHandle | null = null;
   const daemon = await runDaemon(
     {
       root,
       configPath: args.values.get('config'),
       planPath,
       port: portValue === undefined ? 0 : Number(portValue),
-      ...(shouldRun ? { dispatch: uiDispatcher(live, attached) } : {}),
+      scopeCeiling: homedir(),
+      onAttach: (path, mode) => {
+        void approveAttach(path, mode, () => handle);
+      },
+      ...(shouldRun
+        ? { dispatch: uiDispatcher(live, attached, concurrencyFrom(args)) }
+        : {}),
     },
-    nodeRuntime(),
+    nodeRuntime(consolePage()),
   );
+  handle = daemon;
   print([
     `pawd listening on ${daemon.url}#t=${daemon.token}`,
     'that URL carries this session’s credential — treat it like a password',

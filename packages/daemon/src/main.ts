@@ -19,6 +19,7 @@
  * @since 5.0.0
  */
 
+import { consolePage } from './consolePage.js';
 import { identityNotice } from './identityStore.js';
 import { nodeRuntime } from './nodeRuntime.js';
 import { runDaemon } from './serve.js';
@@ -42,7 +43,7 @@ async function main(): Promise<void> {
       planPath,
       port: portArg === undefined ? 0 : Number(portArg),
     },
-    nodeRuntime(),
+    nodeRuntime(consolePage()),
   );
   const notice = identityNotice(daemon.identity, new Date());
   process.stdout.write(

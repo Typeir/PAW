@@ -114,19 +114,6 @@ fetch('/api/state').then(function(r){return r.json()}).then(function(s){
 </script></body></html>`;
 
 /**
- * Where the built React console lives, resolved from this module so it holds
- * wherever the monorepo is checked out.
- */
-export const GUI_LIVE_PAGE = join(
-  dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  'gui',
-  'dist',
-  'live.html',
-);
-
-/**
  * The method and path of an incoming request, with Node's optional fields
  * resolved. A request line is pure data, so deciding what it means lives here
  * rather than inside the socket callback where no test can reach it.
@@ -516,10 +503,17 @@ export async function bindLoopbackV6(server: TlsServer, port: number): Promise<b
 /**
  * Build the real runtime.
  *
- * @param {string} [pagePath] - Path to the console page; defaults to the GUI build.
+ * The console page is required rather than defaulted. A default would have to
+ * encode one on-disk layout, and PAW runs in two — a source checkout and a
+ * built artifact — so any constant is wrong in one of them, silently, until
+ * someone opens the console. Requiring it makes the omission a compile error
+ * and leaves the choice with the shell, which is the only thing that knows how
+ * it was started. See {@link consolePage}.
+ *
+ * @param {string} pagePath - Path to the console page.
  * @returns {DaemonRuntime} The node-backed runtime.
  */
-export function nodeRuntime(pagePath: string = GUI_LIVE_PAGE): DaemonRuntime {
+export function nodeRuntime(pagePath: string): DaemonRuntime {
   return {
     readFile: (path: string) => readFile(resolve(path), 'utf8'),
 

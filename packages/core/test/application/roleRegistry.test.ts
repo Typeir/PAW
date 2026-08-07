@@ -97,9 +97,14 @@ const binding = (over: Partial<ModelBinding> = {}): ModelBinding => ({
 });
 
 describe('resolveModel', () => {
-  it('returns a handle for a satisfied binding', () => {
+  it('returns a handle for a satisfied binding, carrying the output ceiling', () => {
     const reg = registry([decl('edit.apply', false)], [['edit.apply', binding()]]);
-    expect(resolveModel(reg, 'edit.apply')).toEqual({ port: fakePort, modelId: 'ds-flash' });
+    const handle = resolveModel(reg, 'edit.apply');
+    expect(handle).toEqual({
+      port: fakePort,
+      modelId: 'ds-flash',
+      maxOutputTokens: CAP.maxOutputTokens,
+    });
   });
 
   it('throws on an unknown role', () => {

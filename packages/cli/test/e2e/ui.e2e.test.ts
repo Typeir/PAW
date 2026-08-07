@@ -202,7 +202,11 @@ describe('paw ui (e2e)', () => {
     expect(banner).toContain('releasing the herd (fake model)');
 
     let state = await readState(url, token, 'demo.swarm.mjs');
-    for (let attempt = 0; attempt < 40 && state.run.done === 0; attempt += 1) {
+    for (
+      let attempt = 0;
+      attempt < 40 && (state.run.done === 0 || state.budget.tokensIn === 0);
+      attempt += 1
+    ) {
       await new Promise((resolve) => setTimeout(resolve, 100));
       state = await readState(url, token, 'demo.swarm.mjs');
     }

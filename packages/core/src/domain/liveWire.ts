@@ -33,6 +33,7 @@
  */
 
 import type { ClientMessage, LiveEnvelope, LiveTopic, LiveTopicMap } from '../contracts.js';
+import type { InitMode } from './initConfig.js';
 
 /**
  * The WebSocket subprotocol the daemon requires. A client that does not offer it
@@ -63,6 +64,7 @@ export const TOPIC_CODES: Readonly<Record<LiveTopic, string>> = {
   tree: 'tr',
   log: 'lg',
   error: 'er',
+  attach: 'at',
 };
 
 /**
@@ -86,6 +88,34 @@ export const AUTH_CODE = 'a';
  * The wire code for a `watch` message.
  */
 export const WATCH_CODE = 'w';
+
+/**
+ * The message code an attach request travels as.
+ */
+export const ATTACH_CODE = 't';
+
+/**
+ * The message code a scope request travels as. Scoping is a read — see
+ * {@link withinRoot} for the ceiling it is held to.
+ */
+export const SCOPE_CODE = 'r';
+
+/**
+ * The init modes an attach request may name. Listed here so the wire refuses a
+ * mode the domain does not have, rather than passing an unknown string inward
+ * for something further in to reject — or not.
+ */
+const ATTACH_MODES: readonly InitMode[] = ['create', 'merge', 'override'];
+
+/**
+ * Whether a value is one of the init modes.
+ *
+ * @param {unknown} value - The candidate.
+ * @returns {boolean} True when it names a mode.
+ */
+function isInitMode(value: unknown): value is InitMode {
+  return ATTACH_MODES.some((mode) => mode === value);
+}
 
 /**
  * Close codes. The 4000–4999 range is reserved for applications, so these are
@@ -285,6 +315,22 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     }
     return typeof plan === 'string' ? { v: LIVE_VERSION, type: 'watch', plan } : null;
   }
+  if (message.m === SCOPE_CODE) {
+    const path = message.p;
+    return typeof path === 'string' && path.length > 0
+      ? { v: LIVE_VERSION, type: 'scope', path }
+      : null;
+  }
+  if (message.m === ATTACH_CODE) {
+    const path = message.p;
+    const mode = message.d;
+    if (typeof path !== 'string' || path.length === 0) {
+      return null;
+    }
+    return isInitMode(mode)
+      ? { v: LIVE_VERSION, type: 'attach', path, mode }
+      : null;
+  }
   return null;
 }
 
@@ -350,4 +396,28 @@ export function authFrame(token: string): string {
  */
 export function watchFrame(plan: string | null): string {
   return JSON.stringify({ v: LIVE_VERSION, m: WATCH_CODE, p: plan });
+}
+
+/**
+ * The `attach` frame a console sends to ask that PAW be attached to a
+ * repository. Asking is all it does — see {@link ClientMessage}.
+ *
+ * @param {string} path - Absolute path to the repository root.
+ * @param {InitMode} mode - How to resolve an existing config.
+ * @returns {string} The frame's text.
+ */
+export function encodeAttach(path: string, mode: InitMode): string {
+  return JSON.stringify({ v: LIVE_VERSION, m: ATTACH_CODE, p: path, d: mode });
+}
+
+/**
+ * The `scope` frame a console sends to point an unscoped daemon at a
+ * repository. A read, like {@link watchFrame} — nothing is written and no
+ * approval is sought.
+ *
+ * @param {string} path - Absolute path to the repository root.
+ * @returns {string} The frame's text.
+ */
+export function encodeScope(path: string): string {
+  return JSON.stringify({ v: LIVE_VERSION, m: SCOPE_CODE, p: path });
 }

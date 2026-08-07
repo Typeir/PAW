@@ -19,10 +19,7 @@ export type { PathEdit, PathEditKind, PathPlanInput } from './path.js';
 
 export { findRepoRoot } from './repo.js';
 
-export { planInit } from './scaffold.js';
-export type { FileWrite, InitPlan } from './scaffold.js';
-
-export { activatePath, applyInit } from './apply.js';
+export { activatePath } from './apply.js';
 export type { ActivateInput } from './apply.js';
 
 export type { EnvironmentPort, FileSystemPort } from './ports.js';

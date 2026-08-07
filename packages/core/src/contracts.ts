@@ -18,6 +18,7 @@
 
 import type { DoctorReport } from './application/doctor.js';
 import type { MemberOutcome } from './application/dispatchSwarm.js';
+import type { InitMode } from './domain/initConfig.js';
 import type { DoctorFinding } from './domain/swarm.js';
 import type { Violation } from './domain/violation.js';
 
@@ -318,8 +319,37 @@ export interface LiveError {
  * @property {LogEntry[]} log - Newly appended log lines.
  * @property {LiveError} error - A recoverable problem.
  */
+/**
+ * Where an attach request has got to.
+ *
+ * `unconfigured` is the daemon reporting that a directory the console scoped to
+ * holds no PAW config — a fact, not a request. The rest track a request the
+ * console made: `pending` while an operator is being asked out-of-band, then one
+ * of the three endings. The socket carries this so a console is never left
+ * guessing, and carries no authority to change it.
+ *
+ * @interface AttachState
+ * @property {'idle' | 'unconfigured' | 'pending' | 'approved' | 'refused' | 'failed'} status - Where the request stands.
+ * @property {string | null} path - The repository in question, or null when idle.
+ * @property {InitMode} [mode] - The resolution requested, once one has been.
+ * @property {string} [reason] - Why, for `refused` and `failed`.
+ */
+export interface AttachState {
+  readonly status:
+    | 'idle'
+    | 'unconfigured'
+    | 'pending'
+    | 'approved'
+    | 'refused'
+    | 'failed';
+  readonly path: string | null;
+  readonly mode?: InitMode;
+  readonly reason?: string;
+}
+
 export interface LiveTopicMap {
   readonly hello: PawSnapshot;
+  readonly attach: AttachState;
   readonly host: HostInfo;
   readonly processes: readonly HostProcess[];
   readonly plans: PlansSlice;
@@ -360,9 +390,24 @@ export interface LiveEnvelope<T extends LiveTopic = LiveTopic> {
 }
 
 /**
- * The only two things a client may say, decoded. Anything else is a protocol
+ * The only three things a client may say, decoded. Anything else is a protocol
  * violation and closes the connection — a control socket does not negotiate.
+ *
+ * `auth` and `watch` manage a subscription. `attach` is different in kind and
+ * deliberately narrow: it *requests* that PAW be attached to a repository, and
+ * the daemon's whole part in it is to remember that someone asked. It performs
+ * no write and gains no filesystem authority — an operator approves the request
+ * out-of-band, in the terminal that started the daemon, and the process that
+ * already had that authority does the work. Kill the daemon mid-flow and nothing
+ * has happened, which is the property a POST route would have cost.
  */
 export type ClientMessage =
   | { readonly v: 1; readonly type: 'auth'; readonly token: string }
-  | { readonly v: 1; readonly type: 'watch'; readonly plan: string | null };
+  | { readonly v: 1; readonly type: 'watch'; readonly plan: string | null }
+  | { readonly v: 1; readonly type: 'scope'; readonly path: string }
+  | {
+      readonly v: 1;
+      readonly type: 'attach';
+      readonly path: string;
+      readonly mode: InitMode;
+    };

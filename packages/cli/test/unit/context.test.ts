@@ -15,6 +15,7 @@
 import type { SwarmPlan } from '@paw/core';
 import { describe, expect, it } from 'vitest';
 import {
+  concurrencyFrom,
   globToRegExp,
   isGlob,
   parseArgs,
@@ -140,5 +141,34 @@ describe('withContext', () => {
 
   it('leaves the plan alone when no files were named', () => {
     expect(withContext(plan, [])).toBe(plan);
+  });
+});
+
+describe('concurrencyFrom', () => {
+  it('takes the dispatcher default when nothing is asked for', () => {
+    expect(concurrencyFrom(parseArgs([], ['concurrency']))).toBeUndefined();
+  });
+
+  it('forces one at a time on --sequential', () => {
+    expect(concurrencyFrom(parseArgs(['--sequential'], ['concurrency']))).toBe(1);
+  });
+
+  it('takes an explicit bound, in either spelling', () => {
+    expect(concurrencyFrom(parseArgs(['--concurrency=4'], ['concurrency']))).toBe(4);
+    expect(concurrencyFrom(parseArgs(['--concurrency', '12'], ['concurrency']))).toBe(12);
+  });
+
+  it('lets an explicit bound win over the habit flag', () => {
+    expect(
+      concurrencyFrom(parseArgs(['--sequential', '--concurrency=6'], ['concurrency'])),
+    ).toBe(6);
+  });
+
+  it('refuses a bound that is not a positive whole number', () => {
+    for (const bad of ['0', '-2', '2.5', 'lots']) {
+      expect(() =>
+        concurrencyFrom(parseArgs([`--concurrency=${bad}`], ['concurrency'])),
+      ).toThrow(/whole number/);
+    }
   });
 });

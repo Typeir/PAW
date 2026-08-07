@@ -28,11 +28,13 @@ import {
   LIVE_TOPICS,
   buildRegistry,
   runDoctor,
+  type AttachState,
   type BudgetSummary,
   type DispatchEvent,
   type DispatchResult,
   type HostInfo,
   type HostProcess,
+  type InitMode,
   type LogEntry,
   type ModelPort,
   type PawSnapshot,
@@ -273,6 +275,8 @@ export type Dispatcher = (
  * @property {number} [hostMs] - How often to re-read and publish the host facts.
  * @property {readonly string[]} [allowOrigins] - Extra origins permitted to call the API, e.g. a GUI development server.
  * @property {Dispatcher} [dispatch] - Release the opening plan's herd once, and report the run live.
+ * @property {string} [scopeCeiling] - Permit consoles to re-scope the daemon, within this directory. Omit to refuse every scope request.
+ * @property {(path: string, mode: InitMode) => void} [onAttach] - Receive attach requests. The daemon never writes; whoever supplies this decides.
  */
 export interface DaemonOptions {
   readonly root?: string;
@@ -283,6 +287,8 @@ export interface DaemonOptions {
   readonly hostMs?: number;
   readonly allowOrigins?: readonly string[];
   readonly dispatch?: Dispatcher;
+  readonly scopeCeiling?: string;
+  onAttach?(path: string, mode: InitMode): void;
 }
 
 /**
@@ -299,6 +305,7 @@ export interface DaemonOptions {
  * @property {string | null} openedOn - The plan the daemon opened on, if any.
  * @property {Promise<void> | null} dispatched - Settles when a released herd finishes; null when no run was asked for. Rejects loudly if the run failed.
  * @property {(plan?: string | null) => Promise<PawSnapshot>} snapshot - The current snapshot for a plan, read live.
+ * @property {(path: string) => Promise<void>} rescope - Point the daemon at another repository and republish. Unbounded, unlike the console's scope request: the caller already holds the process.
  * @property {() => Promise<void>} close - Stop polling and stop listening.
  */
 export interface DaemonHandle {
@@ -312,6 +319,7 @@ export interface DaemonHandle {
   readonly openedOn: string | null;
   readonly dispatched: Promise<void> | null;
   snapshot(plan?: string | null): Promise<PawSnapshot>;
+  rescope(path: string): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -380,8 +388,20 @@ export async function runDaemon(
   options: DaemonOptions,
   runtime: DaemonRuntime,
 ): Promise<DaemonHandle> {
-  const root = options.root ?? '.';
+  let root = options.root ?? '.';
   const log = createLogRing(() => runtime.now());
+
+  /**
+   * How the current root stands: a repository with no PAW config is the state a
+   * console turns into "pick a project", so it is reported rather than inferred
+   * from an empty plan list.
+   *
+   * @returns {AttachState} The current attach state.
+   */
+  const attachState = (): AttachState => ({
+    status: configPath === '' ? 'unconfigured' : 'idle',
+    path: root,
+  });
 
   const bus = createBus((topic, error) => {
     // Reported straight to the terminal rather than through `report`: a listener
@@ -404,7 +424,7 @@ export async function runDaemon(
   };
 
   let entries = await runtime.listFiles(root);
-  const configPath = findConfig(options.configPath, entries);
+  let configPath = findConfig(options.configPath, entries);
   let plansSlice: PlansSlice = { plans: discoverPlans(entries), configPath };
   let tree = buildFileTree(entries);
 
@@ -585,6 +605,40 @@ export async function runDaemon(
     }
   };
 
+  /**
+   * Point the daemon at another repository and republish everything derived
+   * from it.
+   *
+   * A read: it changes what is looked at and writes nothing. Every slice below
+   * is already re-derived when files change, so re-rooting reuses that rather
+   * than restarting — open consoles keep their sockets and are told the new
+   * state, instead of being dropped and made to reconnect.
+   *
+   * @param {string} next - The repository to serve.
+   */
+  const rescope = async (next: string): Promise<void> => {
+    root = next;
+    entries = await runtime.listFiles(root);
+    configPath = findConfig(options.configPath, entries);
+    config =
+      configPath === ''
+        ? {}
+        : (JSON.parse(await runtime.readFile(underRoot(root, configPath))) as Record<
+            string,
+            unknown
+          >);
+    configVersion =
+      configPath === '' ? 0 : await runtime.modifiedAt(underRoot(root, configPath));
+    registry = buildRegistry(config, () => REFUSING_MODEL);
+    doctor = runDoctor(config, registry, KNOWN_CONNECTORS);
+    plansSlice = { plans: discoverPlans(entries), configPath };
+    tree = buildFileTree(entries);
+    bus.publish('plans', plansSlice);
+    bus.publish('tree', tree);
+    bus.publish('doctor', doctor);
+    bus.publish('attach', attachState());
+  };
+
   const token = runtime.randomToken();
   const sessions = createSessionRegistry({
     token,
@@ -592,6 +646,22 @@ export async function runDaemon(
     snapshot: (plan) => snapshot(plan),
     plans: () => plansSlice.plans,
     warn: (message) => report(message, 'error'),
+    ...(options.scopeCeiling === undefined
+      ? {}
+      : {
+          scopeCeiling: options.scopeCeiling,
+          onScope: (path: string): void => {
+            void rescope(path).catch((error: unknown) => {
+              report(`could not scope to ${path}: ${reason(error)}`, 'error');
+              bus.publish('attach', {
+                status: 'failed',
+                path,
+                reason: reason(error),
+              });
+            });
+          },
+        }),
+    ...(options.onAttach === undefined ? {} : { onAttach: options.onAttach }),
   });
 
   // One subscription per topic, forwarding to every live session. The sources
@@ -746,7 +816,9 @@ export async function runDaemon(
   return {
     url: `https://${socket}/`,
     port: server.port,
-    root,
+    get root(): string {
+      return root;
+    },
     token,
     identity,
     bus,
@@ -754,6 +826,7 @@ export async function runDaemon(
     openedOn,
     dispatched,
     snapshot,
+    rescope,
     close: async () => {
       stopHostTicker();
       stopPolling();

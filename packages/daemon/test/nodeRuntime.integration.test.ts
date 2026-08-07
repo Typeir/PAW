@@ -32,10 +32,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { consolePage } from '../src/consolePage.js';
 import { issueCa } from '../src/nodeIdentity.js';
 import {
   BOOTSTRAP,
-  GUI_LIVE_PAGE,
   LOOPBACK_V6,
   bindLoopbackV6,
   bindServer,
@@ -390,8 +390,8 @@ describe('the daemon on the real runtime', () => {
     await Promise.resolve();
   });
 
-  it('points at the built console by default', () => {
-    expect(GUI_LIVE_PAGE.replace(/\\/g, '/')).toContain('gui/dist/live.html');
+  it('serves the console the shell resolved, not one it guessed', () => {
+    expect(consolePage().replace(/\\/g, '/')).toContain('gui/dist/live.html');
   });
 
   it('fails loud on a module that exports no plan', async () => {
@@ -416,8 +416,8 @@ describe('the daemon on the real runtime', () => {
     await expect(running.close()).rejects.toThrow();
   });
 
-  it('builds with the default page path', () => {
-    expect(typeof nodeRuntime().readPage).toBe('function');
+  it('builds against the resolved console page', () => {
+    expect(typeof nodeRuntime(consolePage()).readPage).toBe('function');
   });
 });
 

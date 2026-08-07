@@ -95,10 +95,14 @@ export type { TrustPlan, TrustStep } from './trustStore.js';
 export { meterPort, toRunProgress, trackRun } from './run.js';
 export type { MeteredPort, RunTracker } from './run.js';
 
+export { openLiveHerd } from './model/openLiveHerd.js';
+export type { LiveSdkRegistry } from './model/liveSdkRegistry.js';
+
 export { createSessionRegistry } from './sessions.js';
 export type { LiveSession, SessionRegistry, WsSessionPort } from './sessions.js';
 
 export { decideUpgrade } from './security.js';
 export type { UpgradeRefusal, UpgradeRequest } from './security.js';
 
-export { BOOTSTRAP, GUI_LIVE_PAGE, nodeRuntime, walkFiles } from './nodeRuntime.js';
+export { BOOTSTRAP, nodeRuntime, walkFiles } from './nodeRuntime.js';
+export { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from './consolePage.js';

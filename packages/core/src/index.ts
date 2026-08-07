@@ -81,8 +81,12 @@ export {
   PING_MS,
   PONG_TIMEOUT_MS,
   TOPIC_CODES,
+  ATTACH_CODE,
+  SCOPE_CODE,
   authFrame,
+  encodeAttach,
   encodeEnvelope,
+  encodeScope,
   isLiveTopic,
   parseClientMessage,
   parseEnvelope,
@@ -132,9 +136,35 @@ export type {
   MemberOutcome,
 } from './application/dispatchSwarm.js';
 
+export { withinRoot } from './domain/scope.js';
+export { binDir, pawHome } from './domain/pawHome.js';
+export type { HomeEnv } from './domain/pawHome.js';
+
+export { applyInit } from './application/applyInit.js';
+export { configPathFor, planInit } from './domain/initScaffold.js';
+export type { FileWrite, InitPlan } from './domain/initScaffold.js';
+
+export {
+  PAW_CONFIG_VERSION,
+  PAW_STAMP_KEY,
+  hashConfig,
+  inspectConfig,
+  mergeConfig,
+  resolveInit,
+  stampConfig,
+} from './domain/initConfig.js';
+export type {
+  InitConflict,
+  InitMode,
+  InitOutcome,
+  PawStamp,
+} from './domain/initConfig.js';
+
 export type {
   ClockPort,
+  ConfigPort,
   FileReaderPort,
+  FileSystemPort,
   HostConnector,
   ModelPort,
   ModelRequest,
@@ -148,6 +178,7 @@ export type {
 } from './ports/index.js';
 
 export type {
+  AttachState,
   BudgetSummary,
   ClientMessage,
   DaemonStatus,

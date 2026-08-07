@@ -47,10 +47,12 @@ export interface ModelBinding {
  * @interface ModelHandle
  * @property {ModelPort} port - The port to call.
  * @property {string} modelId - The model id to pass.
+ * @property {number} maxOutputTokens - The bound model's output ceiling, carried so a caller can spend it. Dropping it here meant every request fell back to whatever default the provider adapter guessed, and long answers were silently cut off mid-sentence.
  */
 export interface ModelHandle {
   readonly port: ModelPort;
   readonly modelId: string;
+  readonly maxOutputTokens: number;
 }
 
 /**
@@ -147,5 +149,9 @@ export function resolveModel(
       `role "${roleId}" binding ${binding.modelId} does not satisfy: ${satisfaction.reasons.join('; ')}`,
     );
   }
-  return { port: binding.port, modelId: binding.modelId };
+  return {
+    port: binding.port,
+    modelId: binding.modelId,
+    maxOutputTokens: binding.capabilities.maxOutputTokens,
+  };
 }

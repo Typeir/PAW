@@ -1,17 +1,17 @@
 /**
- * PAW Installer Scaffold Tests
+ * PAW Init Scaffold Tests
  *
  * @fileoverview Covers `planInit` — the host-agnostic config and the delegating
- * git hook, with their executable flags — so `scaffold.ts` reaches 100%.
+ * git hook, with their executable flags — so the bytes an attach writes are pinned wherever it is driven from.
  *
- * @module @paw/installer/test/scaffold
+ * @module @paw/core/test/domain/initScaffold
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
  */
 
 import { describe, expect, it } from 'vitest';
-import { planInit } from '../src/scaffold.js';
+import { planInit } from '../../src/domain/initScaffold.js';
 
 describe('planInit', () => {
   const plan = planInit('/work/repo');

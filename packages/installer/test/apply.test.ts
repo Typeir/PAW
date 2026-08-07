@@ -3,8 +3,8 @@
  *
  * @fileoverview Covers the application layer against fake ports: PATH activation on
  * Windows (persist) and when already present (no-op), on POSIX (append) and when
- * already present, and `applyInit` writing the scaffold with the executable bit
- * only on the hook — so `apply.ts` reaches 100%.
+ * already present — so `apply.ts` reaches 100%. Attaching a repository moved to
+ * `@paw/core`; its tests moved with it.
  *
  * @module @paw/installer/test/apply
  * @version 0.0.0
@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { activatePath, applyInit } from '../src/apply.js';
+import { activatePath } from '../src/apply.js';
 import { MARK_BEGIN } from '../src/path.js';
 import type { EnvironmentPort, FileSystemPort } from '../src/ports.js';
 
@@ -92,16 +92,5 @@ describe('activatePath (posix)', () => {
     const edit = await activatePath({ platform: 'linux', shellEnv: '/bin/bash', home, binDir }, fs, env);
     expect(edit.kind).toBe('already-present');
     expect(appendText).not.toHaveBeenCalled();
-  });
-});
-
-describe('applyInit', () => {
-  it('writes each scaffold file and sets the executable bit only on the hook', async () => {
-    const { fs, writeText, ensureDir, setExecutable } = fakeFs();
-    const plan = await applyInit('/work/repo', fs);
-    expect(plan.writes).toHaveLength(2);
-    expect(writeText).toHaveBeenCalledTimes(2);
-    expect(ensureDir).toHaveBeenCalledTimes(2);
-    expect(setExecutable).toHaveBeenCalledTimes(1);
   });
 });

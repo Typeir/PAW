@@ -182,37 +182,6 @@ describe('trustAdvice', () => {
   });
 });
 
-describe('pawHome', () => {
-  it('honours an explicit override above all', () => {
-    expect(pawHome('linux', { PAW_HOME: '/tmp/paw-home' })).toBe('/tmp/paw-home');
-    expect(pawHome('win32', { PAW_HOME: 'C:\\paw\\', LOCALAPPDATA: 'C:\\Users\\x\\AppData\\Local' })).toBe(
-      'C:/paw',
-    );
-  });
-
-  it('follows each platform’s convention', () => {
-    expect(pawHome('win32', { LOCALAPPDATA: 'C:\\Users\\x\\AppData\\Local' })).toBe(
-      'C:/Users/x/AppData/Local/paw',
-    );
-    expect(pawHome('darwin', { HOME: '/Users/x' })).toBe(
-      '/Users/x/Library/Application Support/paw',
-    );
-    expect(pawHome('linux', { XDG_DATA_HOME: '/home/x/.data' })).toBe('/home/x/.data/paw');
-    expect(pawHome('linux', { HOME: '/home/x' })).toBe('/home/x/.local/share/paw');
-  });
-
-  it('falls back to the Windows profile when LOCALAPPDATA is missing', () => {
-    expect(pawHome('win32', { USERPROFILE: 'C:\\Users\\x' })).toBe('C:/Users/x/paw');
-  });
-
-  it('fails loud rather than writing keys somewhere arbitrary', () => {
-    expect(() => pawHome('win32', {})).toThrow('neither LOCALAPPDATA nor USERPROFILE');
-    expect(() => pawHome('darwin', {})).toThrow('HOME is not set');
-    expect(() => pawHome('linux', {})).toThrow('neither XDG_DATA_HOME nor HOME');
-    expect(() => pawHome('linux', { PAW_HOME: '' })).toThrow();
-  });
-});
-
 describe('identityPaths', () => {
   it('keeps the identity out of any repository, under one directory', () => {
     const paths = identityPaths('/home/x/.local/share/paw');

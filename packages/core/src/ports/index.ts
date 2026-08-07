@@ -38,9 +38,14 @@ export interface HostConnector {
 }
 
 /**
- * Persistence for violations, decisions, memories, and the config KV. The one
- * writer in the daemon owns a single instance; readers get a read-only view.
- * Implementations: sql.js today, a real binding later — swapping is one adapter.
+ * Persistence for violations. Implementations: a native SQLite binding, a WASM
+ * one where that binding is blocked, and an in-memory fake for tests — swapping
+ * is one adapter.
+ *
+ * Deliberately narrow. The enforcement use-cases need violations and nothing
+ * else, so widening this to every table PAW stores would make every consumer
+ * and every fake carry methods they never call. Other persisted concerns get
+ * their own port; see {@link ConfigPort}.
  *
  * @interface StorePort
  * @property {(sessionId: string | null) => Promise<Violation[]>} unresolvedFor - Unresolved violations in scope for a session, plus project-scoped ones.
@@ -54,6 +59,23 @@ export interface StorePort {
     sessionId: string | null,
   ): Promise<void>;
   resolveForFile(filePath: string, sessionId: string | null): Promise<number>;
+}
+
+/**
+ * The persisted key-value settings that outlive a process and belong to the
+ * project rather than the machine — the enforcement kill switch above all, which
+ * has to survive between two unrelated hook invocations to mean anything.
+ *
+ * Separate from the engine choice, which cannot live here: a setting that says
+ * how to open the store is unreadable until the store is already open.
+ *
+ * @interface ConfigPort
+ * @property {(key: string) => Promise<string | null>} getConfig - Read a setting, or null when unset.
+ * @property {(key: string, value: string) => Promise<void>} setConfig - Write a setting, replacing any current value.
+ */
+export interface ConfigPort {
+  getConfig(key: string): Promise<string | null>;
+  setConfig(key: string, value: string): Promise<void>;
 }
 
 /**
@@ -118,6 +140,33 @@ export interface ProcessResult {
  */
 export interface FileReaderPort {
   read(path: string): Promise<string>;
+}
+
+/**
+ * Reading and writing the filesystem, for the one flow that changes it: attaching
+ * PAW to a repository.
+ *
+ * Kept apart from {@link FileReaderPort} rather than replacing it. Most of PAW
+ * only ever reads, and handing those callers a port that can also write and
+ * chmod would widen what a fake has to stand in for and what a bug could reach.
+ *
+ * `readText` answers `''` for a missing file rather than rejecting, because the
+ * planners treat absence and emptiness the same and a caller that had to catch
+ * would only turn it back into `''`.
+ *
+ * @interface FileSystemPort
+ * @property {(path: string) => Promise<string>} readText - Read a file, or `''` when it does not exist.
+ * @property {(path: string, content: string) => Promise<void>} writeText - Write a file, creating or overwriting it.
+ * @property {(path: string, content: string) => Promise<void>} appendText - Append to a file, creating it if absent.
+ * @property {(dir: string) => Promise<void>} ensureDir - Create a directory and its parents if needed.
+ * @property {(path: string) => Promise<void>} setExecutable - Set the executable bit; a no-op where the platform has none.
+ */
+export interface FileSystemPort {
+  readText(path: string): Promise<string>;
+  writeText(path: string, content: string): Promise<void>;
+  appendText(path: string, content: string): Promise<void>;
+  ensureDir(dir: string): Promise<void>;
+  setExecutable(path: string): Promise<void>;
 }
 
 /**

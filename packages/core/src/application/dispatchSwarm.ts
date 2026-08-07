@@ -65,15 +65,32 @@ export interface DispatchResult {
  * @property {FileReaderPort} files - Reads the files a member attaches as context. Required, so the caller always decides how files are read rather than the use-case guessing.
  * @property {(plan: SwarmPlan<A>, member: number) => (boolean | Promise<boolean>)} [skip] - Pre-dispatch filter; true skips the member with no model call. May read files.
  * @property {(key: string) => boolean} [alreadyDone] - Resume predicate; true skips a member whose key already completed.
- * @property {(event: DispatchEvent) => void} [onProgress] - Told as each member starts and settles, so a watcher can show a run filling in.
+ * @property {(event: DispatchEvent) => void | Promise<void>} [onProgress] - Told as each member starts and settles, so a watcher can show a run filling in, or persist it. Awaited when it returns a promise.
+ * @property {number} [concurrency] - How many members may be in flight at once; defaults to {@link DEFAULT_CONCURRENCY}. Values below one are treated as one.
  */
 export interface DispatchDeps<A> {
   readonly registry: RoleRegistry;
   readonly files: FileReaderPort;
   readonly skip?: (plan: SwarmPlan<A>, member: number) => boolean | Promise<boolean>;
   readonly alreadyDone?: (key: string) => boolean;
-  readonly onProgress?: (event: DispatchEvent) => void;
+  readonly onProgress?: (event: DispatchEvent) => void | Promise<void>;
+  readonly concurrency?: number;
 }
+
+/**
+ * How many members run at once when the caller does not say.
+ *
+ * A herd is a batch of independent requests to a provider that is happy to take
+ * them together, so dispatching one at a time spends the whole run waiting on a
+ * network round trip that nothing depends on. Bounded rather than unlimited
+ * because a plan of four hundred members would otherwise open four hundred
+ * connections and earn a rate limit instead of an answer.
+ *
+ * Concurrency belongs to the caller, not the plan: a plan declares what to ask,
+ * and how hard to push a particular provider on a particular machine is not
+ * something a plan file can know.
+ */
+export const DEFAULT_CONCURRENCY = 8;
 
 /**
  * What a member is doing, as it happens.
@@ -86,6 +103,11 @@ export interface DispatchDeps<A> {
  *
  * A listener that throws is not caught here: a use-case cannot decide what a
  * broken observer means, and swallowing it would hide the break.
+ *
+ * It may return a promise, and the dispatcher awaits it before that member's
+ * worker takes another. That is what lets a caller persist each result as it
+ * lands: a long run that dies at member sixty keeps the fifty-nine already paid
+ * for, which a listener that could only fire-and-forget could not promise.
  *
  * @interface DispatchEvent
  * @property {'started' | 'settled'} phase - Whether the member is beginning or has finished.
@@ -127,18 +149,24 @@ export async function dispatchSwarm<A>(
     );
   }
 
-  const outcomes: MemberOutcome[] = [];
   const total = memberCount(plan);
+  const slots = Math.max(1, Math.min(deps.concurrency ?? DEFAULT_CONCURRENCY, total));
+  const settled = new Array<MemberOutcome | undefined>(total);
 
   /**
    * Record a member's outcome and tell the watcher, so the two can never
    * disagree about what happened.
    *
+   * Written at the member's index rather than appended: members finish out of
+   * order once more than one is in flight, and a caller comparing outcomes to
+   * its own list of inputs would silently pair the wrong tale with the wrong
+   * file.
+   *
    * @param {MemberOutcome} outcome - How the member finished.
    */
-  const settle = (outcome: MemberOutcome): void => {
-    outcomes.push(outcome);
-    deps.onProgress?.({
+  const settle = async (outcome: MemberOutcome): Promise<void> => {
+    settled[outcome.member] = outcome;
+    await deps.onProgress?.({
       phase: 'settled',
       member: outcome.member,
       key: outcome.key,
@@ -147,24 +175,67 @@ export async function dispatchSwarm<A>(
     });
   };
 
-  for (let member = 0; member < total; member += 1) {
+  /**
+   * Run one member to its outcome.
+   *
+   * @param {number} member - Zero-based member index.
+   * @returns {Promise<void>} Settles when the member has.
+   */
+  const runMember = async (member: number): Promise<void> => {
     const key = planKey(plan, member);
-    deps.onProgress?.({ phase: 'started', member, key, total });
+    await deps.onProgress?.({ phase: 'started', member, key, total });
 
     if (deps.alreadyDone?.(key) === true) {
-      settle({ member, key, state: 'skipped' });
-      continue;
+      await settle({ member, key, state: 'skipped' });
+      return;
     }
     if (deps.skip && (await deps.skip(plan, member))) {
-      settle({ member, key, state: 'skipped' });
-      continue;
+      await settle({ member, key, state: 'skipped' });
+      return;
     }
     const res = await handle.port.complete({
       model: handle.modelId,
       prompt: await composeBrief(plan, member, deps.files),
+      maxOutputTokens: handle.maxOutputTokens,
     });
-    settle({ member, key, state: 'done', content: res.content });
+    await settle({ member, key, state: 'done', content: res.content });
+  };
+
+  let next = 0;
+  let failure: unknown = null;
+
+  /**
+   * Take members off the queue until they run out or one fails.
+   *
+   * The first failure stops new members being taken but does not abandon those
+   * already in flight: they have been paid for, and a watcher writing from
+   * `settled` events keeps them. The error is rethrown once the last worker is
+   * done, so the run still fails loud per CONSTRAINTS.md Constraint 3 — it just
+   * does not throw away work on the way out.
+   *
+   * @returns {Promise<void>} Settles when this worker stops.
+   */
+  const worker = async (): Promise<void> => {
+    while (failure === null && next < total) {
+      const member = next;
+      next += 1;
+      try {
+        await runMember(member);
+      } catch (err: unknown) {
+        failure ??= err;
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: slots }, () => worker()));
+
+  if (failure !== null) {
+    throw failure;
   }
 
-  return { released: true, findings, outcomes };
+  return {
+    released: true,
+    findings,
+    outcomes: settled.filter((o): o is MemberOutcome => o !== undefined),
+  };
 }

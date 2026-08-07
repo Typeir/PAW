@@ -16,9 +16,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@paw/core": "file:../core"
+    "@paw/core": "file:../core",
+    "sql.js": "^1.14.1"
   },
   "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/sql.js": "^1.4.11",
     "@vitest/coverage-v8": "^2.1.9",
     "typescript": "^5.6.3",
     "vitest": "^2.1.9"

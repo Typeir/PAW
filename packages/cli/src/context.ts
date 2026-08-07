@@ -33,6 +33,36 @@ export interface ParsedArgs {
 }
 
 /**
+ * How many swarm members a run may have in flight, from an operator's flags.
+ *
+ * A herd is dispatched in batches by default, because its members are
+ * independent requests and running them one at a time spends the whole run
+ * waiting on a network. `--sequential` forces one at a time — the honest answer
+ * when a provider is rate-limiting, when a run must be reproducible in order, or
+ * when watching the log land in order matters more than finishing quickly.
+ *
+ * `--concurrency=N` names a bound directly and wins over `--sequential`, so an
+ * explicit number is never silently overridden by a habit flag.
+ *
+ * @param {ParsedArgs} args - The parsed subcommand arguments.
+ * @returns {number | undefined} The bound, or undefined to take the dispatcher's default.
+ * @throws {Error} When `--concurrency` is not a positive whole number.
+ */
+export function concurrencyFrom(args: ParsedArgs): number | undefined {
+  const raw = args.values.get('concurrency');
+  if (raw !== undefined) {
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      throw new Error(
+        `--concurrency must be a whole number of one or more, got "${raw}"`,
+      );
+    }
+    return parsed;
+  }
+  return args.flags.has('sequential') ? 1 : undefined;
+}
+
+/**
  * Split an argv, given the flags that take a value. Both `--flag value` and
  * `--flag=value` are accepted, because both are what people type.
  *

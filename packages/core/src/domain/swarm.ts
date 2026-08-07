@@ -225,6 +225,45 @@ function checkFileConflict<A>(
 }
 
 /**
+ * Check that no two members share a resume key.
+ *
+ * A key is a member's identity across runs: `alreadyDone(key)` is the whole
+ * resume mechanism, and a duplicate makes it answer for the wrong member. The
+ * failure is silent and asymmetric — the first member with a given key runs, and
+ * every later member sharing it is reported `skipped`, which reads exactly like
+ * a legitimate resume. A plan that derives keys from a filename will collide the
+ * moment two of its inputs are named alike in different directories, and nothing
+ * downstream can tell that apart from work already done.
+ *
+ * This is the resume-dimension twin of {@link checkFileConflict}: that one
+ * refuses two members writing one file, this one refuses two members *being* the
+ * same member.
+ *
+ * @param {SwarmPlan<A>} plan - The plan.
+ * @param {number[]} members - The member indices.
+ * @returns {DoctorFinding} The key-collision finding.
+ */
+function checkKeyCollision<A>(
+  plan: SwarmPlan<A>,
+  members: number[],
+): DoctorFinding {
+  const seen = new Map<string, number>();
+  for (const m of members) {
+    const key = planKey(plan, m);
+    const first = seen.get(key);
+    if (first !== undefined) {
+      return {
+        check: 'key-collision',
+        ok: false,
+        detail: `members ${first} and ${m} share the resume key "${key}"`,
+      };
+    }
+    seen.set(key, m);
+  }
+  return { check: 'key-collision', ok: true };
+}
+
+/**
  * Check that every path a member attaches as context is a real path — a
  * non-empty string. Existence cannot be checked here (the domain reads no
  * filesystem), but a plan that computes a blank or missing path is a defect
@@ -278,6 +317,7 @@ export function doctorPlan<A>(plan: SwarmPlan<A>): DoctorFinding[] {
     totalBrief,
     checkPurity(plan, members),
     checkFileConflict(plan, members),
+    checkKeyCollision(plan, members),
     checkContextPaths(plan, members),
   ];
 }

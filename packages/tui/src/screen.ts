@@ -21,8 +21,10 @@ import {
   renderBrief,
   type DispatchResult,
   type DoctorReport,
+  type InitConflict,
 } from '@paw/core';
 import type { TuiState, View } from './app.js';
+import { INIT_OPTIONS, type InitPromptState } from './initPrompt.js';
 
 /**
  * A rendered screen: a rectangular block of text lines.
@@ -72,6 +74,52 @@ function frame(title: string, body: string[], footer: string[]): string[] {
     ...footer.map(row),
     `└${'─'.repeat(WIDTH - 2)}┘`,
   ];
+}
+
+/**
+ * Describe what was found at the config path, in the words an operator needs to
+ * choose between keeping it and replacing it.
+ *
+ * @param {InitConflict} conflict - What was found.
+ * @returns {string[]} Body lines.
+ */
+function conflictBody(conflict: InitConflict): string[] {
+  if (conflict.kind === 'absent') {
+    return ['No config at .paw/config.json — nothing to resolve.'];
+  }
+  if (conflict.kind === 'unstamped') {
+    return [
+      '.paw/config.json exists and was not written by PAW.',
+      'Merging keeps everything already declared in it.',
+    ];
+  }
+  const edited = conflict.edited
+    ? 'It has been edited since PAW wrote it.'
+    : 'It is unchanged since PAW wrote it.';
+  return [
+    `.paw/config.json was written by PAW, version ${conflict.stamp.version}.`,
+    edited,
+  ];
+}
+
+/**
+ * Render the init conflict prompt: what was found, and the resolutions offered.
+ *
+ * @param {InitPromptState} state - The prompt state.
+ * @returns {Screen} The framed screen.
+ */
+export function renderInitPrompt(state: InitPromptState): Screen {
+  const options = INIT_OPTIONS.map((option, index) => {
+    const mark = index === state.cursor ? '›' : ' ';
+    return `${mark} ${option.label.padEnd(9)} ${option.detail}`;
+  });
+  return {
+    lines: frame(
+      'paw init',
+      [...conflictBody(state.conflict), '', ...options],
+      ['↑/↓ or j/k  move    ⏎ choose    esc cancel'],
+    ),
+  };
 }
 
 /**

@@ -56,6 +56,8 @@ import {
   MESSAGE_WINDOW_MS,
   encodeEnvelope,
   parseClientMessage,
+  withinRoot,
+  type InitMode,
   type LiveTopic,
   type LiveTopicMap,
   type PawSnapshot,
@@ -86,6 +88,9 @@ export interface WsSessionPort {
  * @property {(plan: string | null) => Promise<PawSnapshot>} snapshot - The full state for a plan.
  * @property {() => readonly string[]} plans - The plans the repository holds.
  * @property {(message: string) => void} warn - Report something without dying of it.
+ * @property {(path: string, mode: InitMode) => void} [onAttach] - Hand an attach request to whoever started the daemon; omit to refuse the request outright.
+ * @property {(path: string) => void} [onScope] - Point the daemon at a repository; omit when it is already scoped.
+ * @property {string} [scopeCeiling] - The directory a scope request may not escape; a missing ceiling refuses every request.
  */
 export interface SessionDeps {
   readonly token: string;
@@ -93,6 +98,9 @@ export interface SessionDeps {
   snapshot(plan: string | null): Promise<PawSnapshot>;
   plans(): readonly string[];
   warn(message: string): void;
+  onAttach?(path: string, mode: InitMode): void;
+  onScope?(path: string): void;
+  readonly scopeCeiling?: string;
 }
 
 /**
@@ -135,6 +143,79 @@ export interface SessionWatcher {
   onAuthenticated(): void;
   onAuthFailed(): void;
   onClosed(): void;
+}
+
+/**
+ * Point the daemon at a repository, or say why not.
+ *
+ * Scoping is a read: it changes what the daemon looks at and writes nothing, so
+ * no operator is asked and nothing is queued. What it is held to instead is a
+ * ceiling — a console able to name any directory could read any directory
+ * through the daemon, and that reach is the part needing bounds. A daemon that
+ * was started against a fixed repository supplies no `onScope` and refuses
+ * every request; one with no ceiling configured refuses too, rather than
+ * treating an absent bound as an open one.
+ *
+ * @param {string} path - The directory the console named.
+ * @param {SessionDeps} deps - What the session was built with.
+ * @returns {LiveTopicMap['error'] | null} The problem to report, or null once dispatched.
+ */
+function dispatchScope(
+  path: string,
+  deps: SessionDeps,
+): LiveTopicMap['error'] | null {
+  const { onScope, scopeCeiling } = deps;
+  if (onScope === undefined) {
+    return {
+      code: 'scope-unavailable',
+      message: 'this daemon is already scoped to a repository',
+    };
+  }
+  if (!withinRoot(path, scopeCeiling ?? '')) {
+    return {
+      code: 'scope-refused',
+      message: 'that directory is outside the operator’s home',
+    };
+  }
+  onScope(path);
+  return null;
+}
+
+/**
+ * Record that a console asked for PAW to be attached to a repository.
+ *
+ * The daemon's entire part in an attach is remembering that someone asked: it
+ * writes nothing, resolves nothing, and gains no filesystem authority. An
+ * operator approves out-of-band, in the terminal that started it, and the
+ * process which already holds that authority performs the write — so killing
+ * the daemon mid-flow leaves nothing half-done. A daemon nobody is listening to
+ * says so, rather than accepting a request that would never be seen.
+ *
+ * Always answers, because a console told nothing cannot distinguish a request
+ * in progress from one that was dropped.
+ *
+ * @param {string} path - The repository the console named.
+ * @param {InitMode} mode - How it asked for an existing config to be resolved.
+ * @param {SessionDeps} deps - What the session was built with.
+ * @returns {LiveTopicMap['error']} What to tell the console.
+ */
+function dispatchAttach(
+  path: string,
+  mode: InitMode,
+  deps: SessionDeps,
+): LiveTopicMap['error'] {
+  const { onAttach } = deps;
+  if (onAttach === undefined) {
+    return {
+      code: 'attach-unavailable',
+      message: 'this daemon cannot take attach requests',
+    };
+  }
+  onAttach(path, mode);
+  return {
+    code: 'attach-pending',
+    message: 'approve this in the terminal running pawd',
+  };
 }
 
 /**
@@ -186,7 +267,10 @@ export function createSession(
    * @param {LiveTopic} topic - The slice.
    * @param {unknown} data - Its value.
    */
-  const write = <T extends LiveTopic>(topic: T, data: LiveTopicMap[T]): void => {
+  const write = <T extends LiveTopic>(
+    topic: T,
+    data: LiveTopicMap[T],
+  ): void => {
     port.send(encodeEnvelope(topic, data, deps.clock()));
   };
 
@@ -333,10 +417,26 @@ export function createSession(
         return;
       }
 
+      if (message.type === 'scope') {
+        const problem = dispatchScope(message.path, deps);
+        if (problem !== null) {
+          write('error', problem);
+        }
+        return;
+      }
+
+      if (message.type === 'attach') {
+        write('error', dispatchAttach(message.path, message.mode, deps));
+        return;
+      }
+
       if (message.plan !== null && !deps.plans().includes(message.plan)) {
         // A plan outside the repository is refused without being opened, and the
         // session keeps whatever it was already watching.
-        write('error', { code: 'unknown-plan', message: 'no such plan in this repository' });
+        write('error', {
+          code: 'unknown-plan',
+          message: 'no such plan in this repository',
+        });
         return;
       }
       watched = message.plan;
@@ -369,7 +469,10 @@ export function createSession(
         void sendHello();
         return;
       }
-      if (topic === 'planDetail' && (data as PlanSlice).selectedPlan !== watched) {
+      if (
+        topic === 'planDetail' &&
+        (data as PlanSlice).selectedPlan !== watched
+      ) {
         // The bus carries one plan's detail to every session, and sessions watch
         // different plans. Sending this on would show a console the briefs of a
         // plan it did not select — wrong data, rendered as though it were right.
@@ -387,7 +490,11 @@ export function createSession(
         shut(CLOSE_MALFORMED, 'no credential offered in time');
         return;
       }
-      if (state === 'live' && stale && nowMs - staleSince >= BACKPRESSURE_STALE_MS) {
+      if (
+        state === 'live' &&
+        stale &&
+        nowMs - staleSince >= BACKPRESSURE_STALE_MS
+      ) {
         shut(CLOSE_BACKPRESSURE, 'client stopped reading');
       }
     },
@@ -456,9 +563,11 @@ export function createSessionRegistry(deps: SessionDeps): SessionRegistry {
       return session;
     },
 
-    live: () => [...sessions].filter((session) => session.state() === 'live').length,
+    live: () =>
+      [...sessions].filter((session) => session.state() === 'live').length,
 
-    preAuth: () => [...sessions].filter((session) => session.state() === 'pre-auth').length,
+    preAuth: () =>
+      [...sessions].filter((session) => session.state() === 'pre-auth').length,
 
     failedAuths: () => failures,
 

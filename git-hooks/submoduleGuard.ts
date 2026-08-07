@@ -12,6 +12,13 @@
  * Extracted from the former pre-commit.ts to run as a standalone hook
  * step appended to the PAW pre-commit shim.
  *
+ * @todo Wrong repository. This guards `src/content`, which is Ikuisuus's
+ * content submodule — a fact about one consuming project, not about PAW. PAW
+ * ships the hook mechanism; the repo supplies the policy it runs, exactly as
+ * `.paw/gates/` and `.paw/git-hooks/` already do for everything else. This file
+ * belongs in the consuming repo alongside those, and `git-hooks/` here should
+ * not exist once it moves: it is the only file in the directory.
+ *
  * @module .github/PAW/git-hooks/submodule-guard
  * @author Typeir
  * @version 1.0.0

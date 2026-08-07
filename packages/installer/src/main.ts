@@ -21,19 +21,39 @@
  * @since 5.0.0
  */
 
+import { createNodeFs } from '@paw/adapters';
+import {
+  applyInit,
+  binDir,
+  configPathFor,
+  pawHome,
+  planInit,
+  type InitMode,
+} from '@paw/core';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { activatePath, applyInit } from './apply.js';
+import { activatePath } from './apply.js';
 import { findRepoRoot } from './repo.js';
-import { planInit } from './scaffold.js';
-import { createNodeFs } from './adapters/nodeFs.js';
 import { createWindowsEnv } from './adapters/windowsEnv.js';
 
 /**
  * The default bin directory PAW installs its binary into.
+ *
+ * One global root for the whole install: the same `PAW_HOME` the TLS identity
+ * already lives under, resolved by the same rules. `~/.paw` would be wrong on
+ * Windows and would ignore XDG on Linux, and a second location would mean an
+ * operator moving `PAW_HOME` moved half their installation.
+ *
+ * Resolved on call rather than at module load so an environment that offers no
+ * home directory fails inside the command that needed one, with that command's
+ * error, instead of at import time.
+ *
+ * @returns {string} The bin directory PAW installs into.
+ * @throws {Error} When the platform offers no home directory.
  */
-const DEFAULT_BIN = join(homedir(), '.paw', 'bin');
+function defaultBinDir(): string {
+  return binDir(pawHome(process.platform, process.env));
+}
 
 /**
  * Read a `--flag=value` option from argv.
@@ -55,15 +75,21 @@ function opt(argv: string[], name: string): string | undefined {
  */
 async function runPath(argv: string[], print: (s: string) => void): Promise<void> {
   const dryRun = argv.includes('--dry-run');
-  const binDir = opt(argv, 'bin') ?? DEFAULT_BIN;
+  const targetBin = opt(argv, 'bin') ?? defaultBinDir();
   const edit = await activatePath(
-    { platform: process.platform, shellEnv: process.env.SHELL, home: homedir(), binDir, dryRun },
+    {
+      platform: process.platform,
+      shellEnv: process.env.SHELL,
+      home: homedir(),
+      binDir: targetBin,
+      dryRun,
+    },
     createNodeFs(),
     createWindowsEnv(),
   );
   const verb = dryRun ? 'would' : 'did';
   if (edit.kind === 'already-present') {
-    print(`PATH: ${binDir} already active (${edit.target}).`);
+    print(`PATH: ${targetBin} already active (${edit.target}).`);
   } else if (edit.kind === 'windows-registry') {
     print(`PATH: ${verb} set user Path in ${edit.target} → ${edit.newPath}`);
   } else {
@@ -79,19 +105,30 @@ async function runPath(argv: string[], print: (s: string) => void): Promise<void
  */
 async function runInit(argv: string[], print: (s: string) => void): Promise<void> {
   const dryRun = argv.includes('--dry-run');
+  const merge = argv.includes('--merge');
+  const override = argv.includes('--override');
+  if (merge && override) {
+    throw new Error('paw init: --merge and --override are mutually exclusive');
+  }
+  const mode: InitMode = merge ? 'merge' : override ? 'override' : 'create';
+
   const root = findRepoRoot(process.cwd(), existsSync);
   if (root === null) {
     throw new Error('paw init: not inside a git repository');
   }
-  if (dryRun) {
-    for (const write of planInit(root).writes) {
-      print(`init: would write ${write.path}`);
-    }
-    return;
-  }
-  const plan = await applyInit(root, createNodeFs());
+
+  const fs = createNodeFs();
+  const existing = await fs.readText(configPathFor(root));
+  const plan = dryRun
+    ? planInit(root, existing === '' ? null : existing, mode)
+    : await applyInit(root, fs, mode);
+
+  const verb = dryRun ? 'would write' : 'wrote';
   for (const write of plan.writes) {
-    print(`init: wrote ${write.path}`);
+    print(`init: ${verb} ${write.path}`);
+  }
+  if (plan.refusal !== undefined) {
+    throw new Error(`paw init: ${plan.refusal.reason}`);
   }
 }
 
