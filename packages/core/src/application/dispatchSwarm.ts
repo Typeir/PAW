@@ -65,12 +65,41 @@ export interface DispatchResult {
  * @property {FileReaderPort} files - Reads the files a member attaches as context. Required, so the caller always decides how files are read rather than the use-case guessing.
  * @property {(plan: SwarmPlan<A>, member: number) => (boolean | Promise<boolean>)} [skip] - Pre-dispatch filter; true skips the member with no model call. May read files.
  * @property {(key: string) => boolean} [alreadyDone] - Resume predicate; true skips a member whose key already completed.
+ * @property {(event: DispatchEvent) => void} [onProgress] - Told as each member starts and settles, so a watcher can show a run filling in.
  */
 export interface DispatchDeps<A> {
   readonly registry: RoleRegistry;
   readonly files: FileReaderPort;
   readonly skip?: (plan: SwarmPlan<A>, member: number) => boolean | Promise<boolean>;
   readonly alreadyDone?: (key: string) => boolean;
+  readonly onProgress?: (event: DispatchEvent) => void;
+}
+
+/**
+ * What a member is doing, as it happens.
+ *
+ * Emitted rather than returned because a run of four hundred members against a
+ * real provider takes minutes, and a console that shows nothing until the last
+ * one lands is indistinguishable from a console that has hung. The use-case
+ * stays synchronous in spirit — it tells, it does not ask — so a caller that
+ * wants nothing still gets the same {@link DispatchResult}.
+ *
+ * A listener that throws is not caught here: a use-case cannot decide what a
+ * broken observer means, and swallowing it would hide the break.
+ *
+ * @interface DispatchEvent
+ * @property {'started' | 'settled'} phase - Whether the member is beginning or has finished.
+ * @property {number} member - Zero-based member index.
+ * @property {string} key - The member's resume key.
+ * @property {number} total - How many members the plan has.
+ * @property {MemberOutcome} [outcome] - How it finished; present only on `settled`.
+ */
+export interface DispatchEvent {
+  readonly phase: 'started' | 'settled';
+  readonly member: number;
+  readonly key: string;
+  readonly total: number;
+  readonly outcome?: MemberOutcome;
 }
 
 
@@ -99,22 +128,42 @@ export async function dispatchSwarm<A>(
   }
 
   const outcomes: MemberOutcome[] = [];
-  const count = memberCount(plan);
-  for (let member = 0; member < count; member += 1) {
+  const total = memberCount(plan);
+
+  /**
+   * Record a member's outcome and tell the watcher, so the two can never
+   * disagree about what happened.
+   *
+   * @param {MemberOutcome} outcome - How the member finished.
+   */
+  const settle = (outcome: MemberOutcome): void => {
+    outcomes.push(outcome);
+    deps.onProgress?.({
+      phase: 'settled',
+      member: outcome.member,
+      key: outcome.key,
+      total,
+      outcome,
+    });
+  };
+
+  for (let member = 0; member < total; member += 1) {
     const key = planKey(plan, member);
+    deps.onProgress?.({ phase: 'started', member, key, total });
+
     if (deps.alreadyDone?.(key) === true) {
-      outcomes.push({ member, key, state: 'skipped' });
+      settle({ member, key, state: 'skipped' });
       continue;
     }
     if (deps.skip && (await deps.skip(plan, member))) {
-      outcomes.push({ member, key, state: 'skipped' });
+      settle({ member, key, state: 'skipped' });
       continue;
     }
     const res = await handle.port.complete({
       model: handle.modelId,
       prompt: await composeBrief(plan, member, deps.files),
     });
-    outcomes.push({ member, key, state: 'done', content: res.content });
+    settle({ member, key, state: 'done', content: res.content });
   }
 
   return { released: true, findings, outcomes };

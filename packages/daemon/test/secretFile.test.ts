@@ -21,6 +21,7 @@ import {
   SECRET_MODE,
   aclIsPrivate,
   aclPrincipals,
+  assertPrivate,
   hardenSecret,
   hardenSecretDir,
   modeIsPrivate,
@@ -134,6 +135,43 @@ describe('hardening a secret on POSIX', () => {
     await expect(hardenSecret('/mnt/share/ca.key', 'linux', io)).rejects.toThrow(
       'landed as mode 644',
     );
+  });
+});
+
+describe('checking a secret that was not written this boot', () => {
+  it('inspects without touching, on either platform', async () => {
+    const posix = ops();
+    await assertPrivate('/home/x/paw/identity/ca.key', 'linux', posix);
+    // The distinction from hardening is the whole point: repairing a key the
+    // daemon did not just write would erase the evidence it is looking for.
+    expect(posix.chmod).not.toHaveBeenCalled();
+
+    const windows = ops();
+    await assertPrivate(KEY, 'win32', windows);
+    expect(windows.calls).toEqual([['icacls', KEY]]);
+  });
+
+  it('refuses a key someone widened, and says it was not written this boot', async () => {
+    await expect(
+      assertPrivate('/home/x/ca.key', 'linux', ops({ statMode: async () => 0o100644 })),
+    ).rejects.toThrow('someone changed it');
+
+    await expect(
+      assertPrivate(
+        KEY,
+        'win32',
+        ops({ run: async () => listing(['LAPTOP\\dtira:(F)', 'BUILTIN\\Users:(RX)']) }),
+      ),
+    ).rejects.toThrow('someone changed it');
+  });
+
+  it('leaves the widened key exactly as it found it', async () => {
+    const posix = ops({ statMode: async () => 0o100644 });
+    await expect(assertPrivate('/home/x/ca.key', 'linux', posix)).rejects.toThrow();
+
+    // A silent chmod back to 0600 would make the one boot where another account
+    // could read the key indistinguishable from every other boot.
+    expect(posix.chmod).not.toHaveBeenCalled();
   });
 });
 

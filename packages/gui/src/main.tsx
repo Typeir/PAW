@@ -17,6 +17,7 @@
 
 import { createRoot } from 'react-dom/client';
 import type { AuthWindow } from './infrastructure/auth.js';
+import type { SocketWindow } from './infrastructure/liveSocket.js';
 import { boot, type PawWindow } from './infrastructure/snapshotSource.js';
 import { windowControls, type ShellWindow } from './infrastructure/shell.js';
 import { ConsoleApp } from './presentation/consoleApp.js';
@@ -29,14 +30,17 @@ async function mount(): Promise<void> {
   if (!host) {
     throw new Error('PAW console: #app mount point is missing');
   }
-  const { snapshot, source, treeSource } = await boot(
-    window as unknown as PawWindow & AuthWindow,
+  const { snapshot, source, connect, treeSource, token } = await boot(
+    window as unknown as PawWindow & AuthWindow & SocketWindow,
     (url, init) => fetch(url, init),
+    window.WebSocket,
   );
   createRoot(host).render(
     <ConsoleApp
       snapshot={snapshot}
       source={source}
+      connect={connect}
+      token={token}
       treeSource={treeSource}
       controls={windowControls(window as ShellWindow)}
     />,

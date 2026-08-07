@@ -28,7 +28,7 @@ shells — a CLI, a TUI, a React web console, an Electron desktop shell — and 
 | **@paw/cli** | `paw` | The command surface: `check`, `doctor`, `swarm`, `ui`. Holds no rules — routes to core. |
 | **@paw/tui** | `paw-tui` | A terminal console: a pure renderer + reducer behind a thin stdin shell. |
 | **@paw/gui** | — | The **React** web console (DDD-layered), rendering a live `PawSnapshot`. No design system — its own instrument-panel CSS. |
-| **@paw/daemon** | `pawd` | Reads **real** host facts, the owned process subtree, and a real config + plan from disk; runs the real doctor; serves the console at `/` and the live snapshot at `GET /api/state` on `127.0.0.1`. A library (`runDaemon`) + a thin argv shell. |
+| **@paw/daemon** | `pawd` | Reads **real** host facts, the owned process subtree, and a real config + plan from disk; runs the real doctor; serves the console over **TLS** at `/` on `127.0.0.1`, streams state over one authenticated `wss` socket, and answers `GET /api/state` for the boot read and for `curl`. A library (`runDaemon`) + a thin argv shell. |
 | **@paw/electron** | — | A hardened desktop shell that runs `pawd` in-process and loads its loopback URL in a **frameless** window whose titlebar the console draws (drag, minimise, maximise, close over one narrow IPC channel). In a browser the same console draws no window chrome at all. Context isolation on, node integration off, sandbox on, strict CSP. |
 | **@paw/installer** | `paw-setup` | Pure planners for OS/shell detection, PATH activation, repo-root discovery, and per-repo attach (`init`), behind injected ports. Packaged as a native binary via Node SEA. |
 
@@ -53,7 +53,7 @@ npm run demo                                      # builds the console, then ser
 
 # Live console — serves THIS REPOSITORY: host facts, PAW's own process subtree, its config,
 # every *.swarm.mjs in it, and the doctor. One console per repo, not one per plan.
-node bin/paw.mjs ui                                # opens http://127.0.0.1:<port>/ — pick a plan in it
+node bin/paw.mjs ui                                # prints https://127.0.0.1:<port>/#t=<credential>
 node bin/paw.mjs ui --root=../other-repo           # serve a different repository
 node bin/paw.mjs ui --config=custom/paw.json       # override the config (path is relative to --root)
 node bin/paw.mjs ui --port=8971                    # pick the port
@@ -62,6 +62,12 @@ node bin/paw.mjs ui plans/lore.swarm.mjs --run     # also releases that plan's h
 node bin/paw.mjs ui plans/lore.swarm.mjs --run --live          # release through a real (BYOK) model instead
 node bin/paw.mjs ui --context docs/style.md        # attach files to every member's brief
 
+# The URL carries this boot's credential in its fragment — treat it like a password.
+# The daemon serves TLS from a local CA it issues per machine; trust it once and the
+# browser stops warning. Nothing here is ever elevated.
+node bin/paw.mjs trust --dry-run                   # print the exact commands and the fingerprint
+node bin/paw.mjs trust                             # install into your own user store
+
 # Enforcement + validation
 node bin/paw.mjs check                                        # stdin: an allow/deny decision (exit 0/2)
 node bin/paw.mjs doctor <config.json>                         # validate config + role/capability bindings
@@ -69,7 +75,7 @@ node bin/paw.mjs swarm doctor|show|run <plan.swarm.mjs>       # validate · prev
 node bin/paw.mjs swarm show <plan> 0 --context docs/style.md  # the dry-run, exactly as dispatch sends it
 
 # Desktop + terminal
-node bin/pawd.mjs [--root=DIR] [plan]                         # the daemon alone (console + /api/state)
+node bin/pawd.mjs [--root=DIR] [plan]                         # the daemon alone (console + live wire)
 node bin/paw-tui.mjs <config> <plan>                          # the terminal console
 npm --prefix packages/electron start                          # the desktop shell (runs pawd in-process)
 ```
@@ -126,7 +132,7 @@ registry checks the model satisfies the role's requirements — so the provider 
 
 `pawd` binds loopback only, on an ephemeral port, and serves a `PawSnapshot` that is **real, not mocked**:
 real `process`/`os` facts, PAW's **owned process subtree** (never the whole host table — unrelated software
-is not disclosed), the real config doctor, and the plan's pre-rendered briefs. A dead poll paints a loud
+is not disclosed), the real config doctor, and the plan's pre-rendered briefs. A dead wire paints a loud
 `daemon unreachable` banner rather than showing stale data as fresh. Electron loads the same URL; its CSP
 grants `connect-src` to that origin alone.
 
@@ -135,7 +141,7 @@ grants `connect-src` to that origin alone.
 ## Status — built vs planned (honest)
 
 **Built + verified (100% coverage):** core, adapters, connectors, cli, tui, the React console, daemon,
-electron, installer. Live host data over `/api/state`. Real BYOK dispatch (`--live`, DeepSeek). Native
+electron, installer. Live host data over an authenticated `wss` wire, TLS from a name-constrained local CA. Real BYOK dispatch (`--live`, DeepSeek). Native
 installer binary via Node SEA; PATH activation + repo hoist. **Swarm file-context** — attach file contents
 to every member's brief via `--context a.ts,src/**` or a multi-select file tree in the console fed by
 `/api/tree`; the rooted reader refuses `..` escapes and `.env*`, and the dry-run is byte-identical to dispatch.
@@ -153,6 +159,9 @@ to every member's brief via `--context a.ts,src/**` or a multi-select file tree 
 
 - **[CONSTRAINTS.md](./CONSTRAINTS.md)** — the enforced rules (read first).
 - **[docs/12-the-console-and-the-daemon.md](./docs/12-the-console-and-the-daemon.md)** — the current console/daemon design.
+- **[docs/13-the-secure-live-wire.md](./docs/13-the-secure-live-wire.md)** — the transport: the local
+  CA and why it is safe to trust, the three gates and what each stops, the `paw.live.v1` frames, the
+  session machine, and the threat model with its accepted residuals.
 - **[.ignore/tasks/](../../.ignore/tasks/)** — active plans and handoffs (distribution/installer, 5b context selector).
 - **[.ignore/research/byoksdk/](../../.ignore/research/byoksdk/)** — the BYOK + PAW decision record (docs 01–21).
 

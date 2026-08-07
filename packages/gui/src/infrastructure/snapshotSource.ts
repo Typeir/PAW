@@ -18,6 +18,13 @@
 import type { PawSnapshot, TreeNode } from '@paw/core';
 import type { SnapshotSource } from '../application/hooks/useLiveRefresh.js';
 import { adoptToken, type AuthWindow } from './auth.js';
+import {
+  createSocketFactory,
+  liveUrl,
+  type SocketFactory,
+  type SocketWindow,
+  type WebSocketConstructor,
+} from './liveSocket.js';
 
 /**
  * The slice of `Response` the source needs.
@@ -141,13 +148,15 @@ export function createTreeSource(fetchFn: FetchLike, root = ''): TreeSource {
  *
  * @interface Boot
  * @property {PawSnapshot} snapshot - The initial snapshot.
- * @property {SnapshotSource | null} source - The live source, or null when static.
+ * @property {SnapshotSource | null} source - The polling source used while the socket is down, or null when static.
+ * @property {SocketFactory | null} connect - Opens the live socket, or null when static or not on https.
  * @property {TreeSource | null} treeSource - The tree source, or null when static.
  * @property {string | null} token - The credential this tab adopted, or null.
  */
 export interface Boot {
   readonly snapshot: PawSnapshot;
   readonly source: SnapshotSource | null;
+  readonly connect: SocketFactory | null;
   readonly treeSource: TreeSource | null;
   readonly token: string | null;
 }
@@ -161,17 +170,26 @@ export interface Boot {
  * @param {FetchLike} fetchFn - The transport for the live case.
  * @returns {Promise<Boot>} The snapshot, its sources, and the adopted token.
  */
-export async function boot(win: PawWindow & AuthWindow, fetchFn: FetchLike): Promise<Boot> {
+export async function boot(
+  win: PawWindow & AuthWindow & SocketWindow,
+  fetchFn: FetchLike,
+  ctor: WebSocketConstructor | undefined,
+): Promise<Boot> {
   const injected = win.__PAW_DATA__;
   if (injected) {
-    return { snapshot: injected, source: null, treeSource: null, token: null };
+    return { snapshot: injected, source: null, connect: null, treeSource: null, token: null };
   }
   const token = adoptToken(win);
   const authed = authedFetch(fetchFn, token);
   const source = createHttpSource(authed);
+  const url = liveUrl(win);
   return {
     snapshot: await source(null),
     source,
+    // No socket when the page is not on https or the environment has none: the
+    // console then polls, which is slower and correct, rather than downgrading
+    // the wire to something a credential should never travel over.
+    connect: url === null || ctor === undefined ? null : createSocketFactory(url, ctor),
     treeSource: createTreeSource(authed),
     token,
   };

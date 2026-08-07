@@ -227,3 +227,142 @@ export interface PawSnapshot {
   readonly daemon: DaemonStatus;
   readonly chrome: RailChrome;
 }
+
+/**
+ * Everything the console shows about one selected plan, as a single value.
+ *
+ * The snapshot carries these fields flat, which is right for a consumer, and
+ * wrong for a producer: they are the expensive ones — a brief and a resume key
+ * are rendered per member, and a 400-member plan re-rendered on every poll is
+ * the whole cost of the console. Grouping them is what lets a producer compute
+ * them once per version of the plan file and lets the live wire send them alone
+ * when that file changes.
+ *
+ * @interface PlanSlice
+ * @property {string | null} selectedPlan - The plan in view, or null when none is.
+ * @property {string} planName - Its name; empty when none is selected.
+ * @property {string} planRole - The role its model must satisfy.
+ * @property {number} memberTotal - Its member count.
+ * @property {string} planSource - The module's source text.
+ * @property {number} highlightLine - 1-based editor line to accent.
+ * @property {string[]} briefs - The rendered brief per member.
+ * @property {string[]} slugs - The resume key per member.
+ * @property {DoctorFinding[]} planFindings - The plan's own doctor findings.
+ */
+export interface PlanSlice {
+  readonly selectedPlan: string | null;
+  readonly planName: string;
+  readonly planRole: string;
+  readonly memberTotal: number;
+  readonly planSource: string;
+  readonly highlightLine: number;
+  readonly briefs: readonly string[];
+  readonly slugs: readonly string[];
+  readonly planFindings: readonly DoctorFinding[];
+}
+
+/**
+ * What the repository holds, as the plan picker needs it.
+ *
+ * @interface PlansSlice
+ * @property {string[]} plans - Every `*.swarm.mjs` in the repository, repo-relative.
+ * @property {string} configPath - Where the config was found, or empty.
+ */
+export interface PlansSlice {
+  readonly plans: readonly string[];
+  readonly configPath: string;
+}
+
+/**
+ * One line in the daemon's log ring.
+ *
+ * @interface LogEntry
+ * @property {string} at - When it was written, ISO-8601.
+ * @property {'info' | 'warn' | 'error'} level - How loud it is.
+ * @property {string} message - What happened.
+ */
+export interface LogEntry {
+  readonly at: string;
+  readonly level: 'info' | 'warn' | 'error';
+  readonly message: string;
+}
+
+/**
+ * A recoverable problem the daemon wants the console to show without closing the
+ * connection over it — an unknown plan, a plan module that will not load.
+ *
+ * @interface LiveError
+ * @property {string} code - A stable machine-readable code, e.g. `unknown-plan`.
+ * @property {string} message - What to tell the operator.
+ */
+export interface LiveError {
+  readonly code: string;
+  readonly message: string;
+}
+
+/**
+ * Every slice of console state that can change on its own, and the payload each
+ * one carries. One map so a producer, the socket, and a consumer's reducer are
+ * all typed from the same place and cannot drift apart.
+ *
+ * @interface LiveTopicMap
+ * @property {PawSnapshot} hello - The whole state, sent after auth and after any resync.
+ * @property {HostInfo} host - Host facts; also the liveness ticker.
+ * @property {HostProcess[]} processes - The owned process subtree.
+ * @property {PlansSlice} plans - What the repository holds.
+ * @property {PlanSlice} planDetail - The watched plan, rendered.
+ * @property {DoctorReport} doctor - The config and role doctor.
+ * @property {RunProgress} run - A dispatched run's progress.
+ * @property {BudgetSummary} budget - What that run has spent.
+ * @property {TreeNode[]} tree - The repository tree.
+ * @property {LogEntry[]} log - Newly appended log lines.
+ * @property {LiveError} error - A recoverable problem.
+ */
+export interface LiveTopicMap {
+  readonly hello: PawSnapshot;
+  readonly host: HostInfo;
+  readonly processes: readonly HostProcess[];
+  readonly plans: PlansSlice;
+  readonly planDetail: PlanSlice;
+  readonly doctor: DoctorReport;
+  readonly run: RunProgress;
+  readonly budget: BudgetSummary;
+  readonly tree: readonly TreeNode[];
+  readonly log: readonly LogEntry[];
+  readonly error: LiveError;
+}
+
+/**
+ * The name of one slice.
+ */
+export type LiveTopic = keyof LiveTopicMap;
+
+/**
+ * One server-to-client frame, **decoded**. Every payload is the full new value
+ * of its slice: there is no delta and no replay buffer, so a consumer that
+ * applies an envelope cannot end up holding a partially-updated slice, and any
+ * doubt is answered by asking for `hello` again.
+ *
+ * This is the shape the code reads. What crosses the wire is smaller — see
+ * `domain/liveWire.ts`, which is the only place the two forms meet.
+ *
+ * @interface LiveEnvelope
+ * @property {1} v - The protocol version.
+ * @property {LiveTopic} topic - Which slice this is.
+ * @property {number} at - When the daemon sent it, epoch milliseconds.
+ * @property {unknown} data - The slice's new value, typed by `topic`.
+ */
+export interface LiveEnvelope<T extends LiveTopic = LiveTopic> {
+  readonly v: 1;
+  readonly topic: T;
+  readonly at: number;
+  readonly data: LiveTopicMap[T];
+}
+
+/**
+ * The only two things a client may say, decoded. Anything else is a protocol
+ * violation and closes the connection — a control socket does not negotiate.
+ */
+export type ClientMessage =
+  | { readonly v: 1; readonly type: 'auth'; readonly token: string }
+  | { readonly v: 1; readonly type: 'watch'; readonly plan: string | null };

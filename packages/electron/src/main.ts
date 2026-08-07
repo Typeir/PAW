@@ -288,12 +288,17 @@ async function start(): Promise<void> {
   installCsp(`https://127.0.0.1:${daemon.port}`);
   installWindowControls();
 
+  // The console reads its credential from the URL fragment and immediately
+  // replaces it out of history — the same path a browser takes from the printed
+  // URL. Giving the desktop shell a private channel instead would mean a second
+  // authentication path to keep correct, and this one is already tested.
+  const url = `${daemon.url}#t=${daemon.token}`;
+
   if (IS_CAPTURE) {
-    await capture(daemon.url);
+    await capture(url);
     app.quit();
     return;
   }
-  const url = daemon.url;
   createWindow(url);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

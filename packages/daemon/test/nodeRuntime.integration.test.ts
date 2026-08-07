@@ -12,7 +12,19 @@
  * @module @paw/daemon/test/nodeRuntime.integration
  */
 
-import type { PawSnapshot, TreeNode } from '@paw/core';
+import {
+  CLOSE_AUTH,
+  CLOSE_MALFORMED,
+  CLOSE_SHUTDOWN,
+  LIVE_SUBPROTOCOL,
+  authFrame,
+  parseEnvelope,
+  watchFrame,
+  type LiveEnvelope,
+  type PawSnapshot,
+  type TreeNode,
+} from '@paw/core';
+import WebSocket from 'ws';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { request as httpsRequest } from 'node:https';
 import { createServer as createPlainServer } from 'node:net';
@@ -26,7 +38,9 @@ import {
   GUI_LIVE_PAGE,
   LOOPBACK_V6,
   bindLoopbackV6,
+  bindServer,
   boundPort,
+  closeServer,
   createConsoleServer,
   firstHeader,
   nodeRuntime,
@@ -34,7 +48,12 @@ import {
   toHostProcess,
   walkFiles,
 } from '../src/nodeRuntime.js';
-import { REFUSING_MODEL, runDaemon, type DaemonHandle } from '../src/serve.js';
+import {
+  REFUSING_MODEL,
+  runDaemon,
+  type DaemonHandle,
+  type SocketHooks,
+} from '../src/serve.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, 'fixtures');
@@ -44,6 +63,15 @@ const PAGE = join(ROOT, 'page.html');
 
 let daemon: DaemonHandle | null = null;
 let previousHome: string | undefined;
+
+/**
+ * Socket hooks that accept nothing, for the tests that only exercise the HTTP
+ * half of a bound server.
+ */
+const REFUSING_HOOKS: SocketHooks = {
+  check: () => ({ status: 403, message: 'no live wire here' }),
+  accept: () => ({ message: async () => undefined, closed: () => undefined }),
+};
 
 beforeAll(async () => {
   // The identity belongs to the machine, so the runtime writes it into PAW's
@@ -344,6 +372,24 @@ describe('the daemon on the real runtime', () => {
     await expect(nodeRuntime(ROOT).readPage()).rejects.toThrow();
   });
 
+  it('reports a source failure to the operator’s terminal, not to a swallowed promise', async () => {
+    const written: string[] = [];
+    const real = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: string): boolean => {
+      written.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      nodeRuntime(PAGE).warn('listing source failed: EACCES');
+    } finally {
+      process.stderr.write = real;
+    }
+
+    expect(written.join('')).toBe('pawd: listing source failed: EACCES\n');
+    await Promise.resolve();
+  });
+
   it('points at the built console by default', () => {
     expect(GUI_LIVE_PAGE.replace(/\\/g, '/')).toContain('gui/dist/live.html');
   });
@@ -373,6 +419,217 @@ describe('the daemon on the real runtime', () => {
   it('builds with the default page path', () => {
     expect(typeof nodeRuntime().readPage).toBe('function');
   });
+});
+
+describe('the live wire, over a real socket', () => {
+  /**
+   * Open a real `wss` connection to the daemon, verifying its certificate
+   * against the CA it issued. Nothing here is faked: real TLS, real `ws`, real
+   * upgrade gate.
+   *
+   * @param {DaemonHandle} running - The daemon.
+   * @param {{ protocols?: string[]; origin?: string; host?: string }} [over] - What to send instead of the defaults.
+   * @returns {Promise<Wire>} The socket, its frames, and its close code.
+   */
+  const dial = (
+    running: DaemonHandle,
+    over: { protocols?: string[]; origin?: string; host?: string } = {},
+  ): {
+    socket: WebSocket;
+    frames: LiveEnvelope[];
+    opened: Promise<void>;
+    ended: Promise<{ code: number; reason: string }>;
+    settle: () => Promise<void>;
+  } => {
+    const socket = new WebSocket(
+      `wss://127.0.0.1:${running.port}/live`,
+      over.protocols ?? [LIVE_SUBPROTOCOL],
+      {
+        ca: running.identity.caCert,
+        headers: {
+          ...(over.origin === undefined ? {} : { origin: over.origin }),
+          ...(over.host === undefined ? {} : { host: over.host }),
+        },
+        ...(over.host === undefined ? {} : { servername: '127.0.0.1' }),
+      },
+    );
+    const frames: LiveEnvelope[] = [];
+    socket.on('message', (data: Buffer) => {
+      const envelope = parseEnvelope(data.toString());
+      if (envelope !== null) {
+        frames.push(envelope);
+      }
+    });
+    const opened = new Promise<void>((done, fail) => {
+      socket.once('open', () => done());
+      socket.once('error', fail);
+    });
+    const ended = new Promise<{ code: number; reason: string }>((done) => {
+      socket.once('close', (code: number, reason: Buffer) =>
+        done({ code, reason: reason.toString() }),
+      );
+    });
+    return {
+      socket,
+      frames,
+      opened,
+      ended,
+      settle: () => new Promise<void>((done) => setTimeout(done, 120)),
+    };
+  };
+
+  it('upgrades, authenticates, and answers with the whole state', async () => {
+    const running = await serveFixtures(PLAN);
+    const wire = dial(running);
+    await wire.opened;
+
+    expect(wire.socket.protocol).toBe(LIVE_SUBPROTOCOL);
+    wire.socket.send(authFrame(running.token));
+    await wire.settle();
+
+    expect(wire.frames.map((frame) => frame.topic)).toContain('hello');
+    const hello = wire.frames.find((frame) => frame.topic === 'hello');
+    expect((hello?.data as PawSnapshot).planName).toBe('demo');
+    expect((hello?.data as PawSnapshot).host.pid).toBe(process.pid);
+    wire.socket.close();
+  }, 30000);
+
+  it('sends a client with the wrong credential nothing at all, and closes 4401', async () => {
+    const running = await serveFixtures();
+    const wire = dial(running);
+    await wire.opened;
+
+    wire.socket.send(authFrame('not-the-token'));
+    const { code } = await wire.ended;
+
+    expect(code).toBe(CLOSE_AUTH);
+    // Not one frame crossed the wire. Anything on this machine can open this
+    // socket; until it proves it read the printed URL it learns nothing.
+    expect(wire.frames).toEqual([]);
+  }, 30000);
+
+  it('refuses a client that did not offer the subprotocol, before upgrading', async () => {
+    const running = await serveFixtures();
+    const wire = dial(running, { protocols: ['chat'] });
+
+    await expect(wire.opened).rejects.toThrow(/400|Unexpected server response/);
+  }, 30000);
+
+  it('refuses a stranger’s Origin at the handshake, where CORS does not reach', async () => {
+    const running = await serveFixtures();
+    const wire = dial(running, { origin: 'https://evil.example' });
+
+    await expect(wire.opened).rejects.toThrow(/403|Unexpected server response/);
+  }, 30000);
+
+  it('refuses a rebinding Host at the handshake too', async () => {
+    const running = await serveFixtures();
+    const wire = dial(running, { host: 'evil.example' });
+
+    await expect(wire.opened).rejects.toThrow(/400|Unexpected server response/);
+  }, 30000);
+
+  it('streams the host slice as a liveness tick', async () => {
+    daemon = await runDaemon(
+      { root: ROOT, configPath: CONFIG, hostMs: 60 },
+      nodeRuntime(PAGE),
+    );
+    const wire = dial(daemon);
+    await wire.opened;
+    wire.socket.send(authFrame(daemon.token));
+    await wire.settle();
+
+    const ticks = wire.frames.filter((frame) => frame.topic === 'host');
+    expect(ticks.length).toBeGreaterThan(0);
+    expect(typeof ticks[0].at).toBe('number');
+    wire.socket.close();
+  }, 30000);
+
+  it('switches plans on the same socket rather than reconnecting', async () => {
+    const running = await serveFixtures();
+    const wire = dial(running);
+    await wire.opened;
+    wire.socket.send(authFrame(running.token));
+    await wire.settle();
+
+    wire.socket.send(watchFrame(PLAN));
+    await wire.settle();
+
+    const hellos = wire.frames.filter((frame) => frame.topic === 'hello');
+    expect(hellos).toHaveLength(2);
+    expect((hellos[0].data as PawSnapshot).selectedPlan).toBeNull();
+    expect((hellos[1].data as PawSnapshot).selectedPlan).toBe(PLAN);
+    wire.socket.close();
+  }, 30000);
+
+  it('answers a plan the repository does not hold with an error, not a disconnect', async () => {
+    const running = await serveFixtures();
+    const wire = dial(running);
+    await wire.opened;
+    wire.socket.send(authFrame(running.token));
+    await wire.settle();
+
+    wire.socket.send(watchFrame('../../../etc/passwd'));
+    await wire.settle();
+
+    expect(wire.frames.at(-1)?.topic).toBe('error');
+    expect(wire.socket.readyState).toBe(WebSocket.OPEN);
+    wire.socket.close();
+  }, 30000);
+
+  it('closes a client that sends a malformed frame', async () => {
+    const running = await serveFixtures();
+    const wire = dial(running);
+    await wire.opened;
+    wire.socket.send(authFrame(running.token));
+    await wire.settle();
+
+    wire.socket.send('{"v":1,"m":"eval","c":"process.exit()"}');
+    const { code } = await wire.ended;
+
+    expect(code).toBe(CLOSE_MALFORMED);
+  }, 30000);
+
+  it('refuses a binary frame rather than growing a second decode path', async () => {
+    const running = await serveFixtures();
+    const wire = dial(running);
+    await wire.opened;
+    wire.socket.send(authFrame(running.token));
+    await wire.settle();
+
+    wire.socket.send(Buffer.from([0x00, 0x01, 0x02]));
+    const { code } = await wire.ended;
+
+    expect(code).toBe(CLOSE_MALFORMED);
+  }, 30000);
+
+  it('closes a socket that never authenticates, with a code it can retry on', async () => {
+    const running = await serveFixtures();
+    const wire = dial(running);
+    await wire.opened;
+
+    const { code } = await wire.ended;
+
+    // Not 4401: a slow socket is not a rejected credential, and a console told
+    // 4401 stops retrying for the life of the page.
+    expect(code).toBe(CLOSE_MALFORMED);
+    expect(wire.frames).toEqual([]);
+  }, 30000);
+
+  it('tells its sessions why when the daemon goes away', async () => {
+    const running = await serveFixtures();
+    const wire = dial(running);
+    await wire.opened;
+    wire.socket.send(authFrame(running.token));
+    await wire.settle();
+
+    await running.close();
+    daemon = null;
+    const { code } = await wire.ended;
+
+    // A console told 1001 stops retrying; an abrupt drop reconnects forever.
+    expect(code).toBe(CLOSE_SHUTDOWN);
+  }, 30000);
 });
 
 describe('request plumbing', () => {
@@ -424,7 +681,13 @@ describe('request plumbing', () => {
     detail,
   ) => {
     const identity = await nodeRuntime(PAGE).identity();
-    const server = await nodeRuntime(PAGE).listen(async () => fail(), 0, '127.0.0.1', identity);
+    const server = await nodeRuntime(PAGE).listen(
+      async () => fail(),
+      REFUSING_HOOKS,
+      0,
+      '127.0.0.1',
+      identity,
+    );
     const res = await call(`https://127.0.0.1:${server.port}/`, identity.caCert);
 
     expect(res.status).toBe(500);

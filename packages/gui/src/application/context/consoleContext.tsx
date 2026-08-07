@@ -17,21 +17,26 @@
  * @since 5.0.0
  */
 
-import type { PawSnapshot } from '@paw/core';
+import type { LiveEnvelope, PawSnapshot } from '@paw/core';
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
+  useRef,
   type ActionDispatch,
   type Context,
   type ReactNode,
 } from 'react';
 import type { ConsoleAction, ConsoleData, ConsoleState } from '../../domain/console.types.js';
 import { initialState, reduce } from '../../domain/consoleState.js';
+import { applyLiveEvent } from '../applyLiveEvent.js';
 import { hydrate } from '../hydrateSnapshot.js';
 import { useLiveRefresh, type SnapshotSource } from '../hooks/useLiveRefresh.js';
+import { useLiveWire, type LiveMode } from '../hooks/useLiveWire.js';
+import type { SocketFactory } from '../../infrastructure/liveSocket.js';
 import type { TreeSource } from '../../infrastructure/snapshotSource.js';
 import type { Shell, WindowControls } from '../../infrastructure/shell.js';
 
@@ -49,6 +54,20 @@ export type ConsoleDispatch = ActionDispatch<[action: ConsoleAction]>;
  */
 export interface LiveError {
   readonly message: string | null;
+}
+
+/**
+ * How the console is connected, and what it can do about it.
+ *
+ * @interface LiveStatus
+ * @property {LiveMode} mode - Where the connection is.
+ * @property {string | null} message - The last polling failure, or null.
+ * @property {() => void} retryNow - Reconnect immediately.
+ */
+export interface LiveStatus {
+  readonly mode: LiveMode;
+  readonly message: string | null;
+  retryNow(): void;
 }
 
 /**
@@ -77,6 +96,7 @@ export interface ShellAccess {
 const StateContext = createContext<ConsoleState | null>(null);
 const DispatchContext = createContext<ConsoleDispatch | null>(null);
 const ErrorContext = createContext<LiveError | null>(null);
+const LiveContext = createContext<LiveStatus | null>(null);
 const TreeContext = createContext<TreeAccess | null>(null);
 const ShellContext = createContext<ShellAccess | null>(null);
 
@@ -101,15 +121,19 @@ function useRequired<T>(context: Context<T | null>, hook: string): T {
  *
  * @interface ConsoleProviderProps
  * @property {PawSnapshot} snapshot - The snapshot to boot from.
- * @property {SnapshotSource | null} [source] - A live source to poll; omit for a static page.
+ * @property {SnapshotSource | null} [source] - The polling source, used only while the socket is down; omit for a static page.
+ * @property {SocketFactory | null} [connect] - Opens the live socket; omit for a static page.
+ * @property {string | null} [token] - The credential this tab adopted.
  * @property {TreeSource | null} [treeSource] - The repository tree source; omit for a static page.
  * @property {WindowControls | null} [controls] - The desktop window's controls; omit in a browser.
- * @property {number} [intervalMs] - Poll period in milliseconds.
+ * @property {number} [intervalMs] - Poll period in milliseconds, for degraded mode.
  * @property {ReactNode} children - The console tree.
  */
 export interface ConsoleProviderProps {
   readonly snapshot: PawSnapshot;
   readonly source?: SnapshotSource | null;
+  readonly connect?: SocketFactory | null;
+  readonly token?: string | null;
   readonly treeSource?: TreeSource | null;
   readonly controls?: WindowControls | null;
   readonly intervalMs?: number;
@@ -131,6 +155,8 @@ export const DEFAULT_POLL_MS = 3000;
 export function ConsoleProvider({
   snapshot,
   source = null,
+  connect = null,
+  token = null,
   treeSource = null,
   controls = null,
   intervalMs = DEFAULT_POLL_MS,
@@ -141,7 +167,44 @@ export function ConsoleProvider({
     (data: ConsoleData) => dispatch({ type: 'refresh', data }),
     [dispatch],
   );
-  const message = useLiveRefresh(source, intervalMs, state.plan, onSnapshot);
+
+  // The live wire delivers one slice at a time, so folding needs the data as it
+  // is *now*, not as it was when React last rendered: two frames can arrive in a
+  // single tick, and reading state there would silently drop the first.
+  const dataRef = useRef(state.data);
+  useEffect(() => {
+    dataRef.current = state.data;
+  }, [state.data]);
+
+  const onEvent = useCallback(
+    (event: LiveEnvelope) => {
+      const next = applyLiveEvent(dataRef.current, event);
+      dataRef.current = next;
+      dispatch({ type: 'refresh', data: next });
+    },
+    [dispatch],
+  );
+
+  const wire = useLiveWire({ connect, token, plan: state.plan, onEvent });
+
+  // `static` means no daemon behind the page at all. A page that has a daemon
+  // but no socket to it — an environment without WebSocket — is degraded, not
+  // static, or it would sit there showing its boot snapshot forever.
+  const mode = connect === null && source !== null ? 'degraded' : wire.mode;
+
+  // Polling is the degraded mode and nothing else: while the socket is live the
+  // console makes no requests at all, which is the whole point of the exercise.
+  const message = useLiveRefresh(
+    mode === 'degraded' ? source : null,
+    intervalMs,
+    state.plan,
+    onSnapshot,
+  );
+
+  const live = useMemo<LiveStatus>(
+    () => ({ mode, message, retryNow: wire.retryNow }),
+    [mode, wire.retryNow, message],
+  );
   const tree = useMemo<TreeAccess>(() => ({ source: treeSource }), [treeSource]);
   const shell = useMemo<ShellAccess>(
     () => ({ shell: controls === null ? 'web' : 'desktop', controls }),
@@ -152,9 +215,11 @@ export function ConsoleProvider({
     <StateContext.Provider value={state}>
       <DispatchContext.Provider value={dispatch}>
         <ErrorContext.Provider value={{ message }}>
-          <TreeContext.Provider value={tree}>
-            <ShellContext.Provider value={shell}>{children}</ShellContext.Provider>
-          </TreeContext.Provider>
+          <LiveContext.Provider value={live}>
+            <TreeContext.Provider value={tree}>
+              <ShellContext.Provider value={shell}>{children}</ShellContext.Provider>
+            </TreeContext.Provider>
+          </LiveContext.Provider>
         </ErrorContext.Provider>
       </DispatchContext.Provider>
     </StateContext.Provider>
@@ -186,6 +251,15 @@ export function useConsoleDispatch(): ConsoleDispatch {
  */
 export function useLiveError(): string | null {
   return useRequired(ErrorContext, 'useLiveError').message;
+}
+
+/**
+ * How the console is connected, and how to reconnect it.
+ *
+ * @returns {LiveStatus} The connection status.
+ */
+export function useLiveStatus(): LiveStatus {
+  return useRequired(LiveContext, 'useLiveStatus');
 }
 
 /**

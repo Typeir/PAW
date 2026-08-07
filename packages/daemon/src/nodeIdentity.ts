@@ -20,6 +20,11 @@
  * shared machine a readable key is another user's licence to impersonate the
  * operator's console.
  *
+ * This is the one file in the package whose types come from `lib.dom` rather
+ * than from `@types/node`: WebCrypto's `CryptoKey`, `EcKeyGenParams` and friends
+ * are declared there, and `@peculiar/x509`'s public API is written against them.
+ * Every tsconfig that compiles this package's sources therefore lists `DOM`.
+ *
  * @module @paw/daemon/nodeIdentity
  * @version 0.0.0
  * @author Typeir
@@ -37,9 +42,9 @@ import {
 import {
   AuthorityKeyIdentifierExtension,
   BasicConstraintsExtension,
-  Extension,
   ExtendedKeyUsage,
   ExtendedKeyUsageExtension,
+  Extension,
   KeyUsageFlags,
   KeyUsagesExtension,
   SubjectAlternativeNameExtension,
@@ -74,6 +79,7 @@ import { identityPaths, pawHome, type HomeEnv } from './pawHome.js';
 import {
   SECRET_DIR_MODE,
   SECRET_MODE,
+  assertPrivate,
   hardenSecret,
   hardenSecretDir,
   type SecretOps,
@@ -148,6 +154,19 @@ export function loopbackNameConstraints(): Extension {
         new GeneralSubtree({ base: new AsnGeneralName({ iPAddress: LOOPBACK_V4_SUBTREE }) }),
         new GeneralSubtree({ base: new AsnGeneralName({ iPAddress: LOOPBACK_V6_SUBTREE }) }),
       ]),
+      // Permitted subtrees alone are not enough, and this is the subtle part of
+      // RFC 5280 §4.2.1.10: a subtree constrains only the name forms that are
+      // actually *present* in a certificate — "if no name of the type is in the
+      // certificate, the certificate is acceptable". A leaf carrying only an
+      // email address, a URI, or a directory name therefore satisfies the DNS
+      // and IP subtrees above by having none of them, and a stolen CA key could
+      // mint an S/MIME or code-signing certificate that escapes the constraint
+      // entirely. Excluding those forms with an empty base — which matches every
+      // name of that type — is what closes it.
+      excludedSubtrees: new GeneralSubtrees([
+        new GeneralSubtree({ base: new AsnGeneralName({ rfc822Name: '' }) }),
+        new GeneralSubtree({ base: new AsnGeneralName({ uniformResourceIdentifier: '' }) }),
+      ]),
     }),
   );
   return new Extension(id_ce_nameConstraints, true, value);
@@ -178,6 +197,13 @@ export async function issueCa(user: string, host: string, now: Date): Promise<Ke
       new BasicConstraintsExtension(true, 0, true),
       new KeyUsagesExtension(KeyUsageFlags.keyCertSign | KeyUsageFlags.cRLSign, true),
       loopbackNameConstraints(),
+      // Name constraints bind only the name forms a certificate actually
+      // carries: RFC 5280 says a subtree is satisfied when no name of that type
+      // is present. A certificate with no SAN at all — a code-signing or S/MIME
+      // certificate — is therefore *unconstrained* by the subtrees above. This
+      // EKU is what closes that: every certificate under this CA is for TLS
+      // server authentication or it is nothing.
+      new ExtendedKeyUsageExtension([ExtendedKeyUsage.serverAuth], true),
       await SubjectKeyIdentifierExtension.create(keys.publicKey),
     ],
   });
@@ -329,6 +355,8 @@ export function nodeIdentityIo(platform: string): IdentityIo {
     },
 
     writePublic: (path: string, text: string): Promise<void> => writeFile(path, text, 'utf8'),
+
+    assertPrivate: (path: string): Promise<void> => assertPrivate(path, platform, ops),
   };
 }
 

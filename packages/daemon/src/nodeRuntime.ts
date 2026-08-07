@@ -22,19 +22,35 @@
 
 import { randomBytes } from 'node:crypto';
 import { readdir, readFile, stat } from 'node:fs/promises';
-import type { IncomingMessage } from 'node:http';
+import { STATUS_CODES, type IncomingMessage } from 'node:http';
 import { createServer, type Server as TlsServer } from 'node:https';
+import type { Duplex } from 'node:stream';
 import os from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import psList from 'ps-list';
-import type { HostProcess } from '@paw/core';
+import { WebSocketServer, type WebSocket } from 'ws';
+import {
+  CLOSE_MALFORMED,
+  LIVE_SUBPROTOCOL,
+  MAX_FRAME_BYTES,
+  PING_MS,
+  PONG_TIMEOUT_MS,
+  type HostProcess,
+} from '@paw/core';
 import { readHostInfo } from './host.js';
 import { nodeServerIdentity } from './nodeIdentity.js';
 import { collectSubtree } from './process.js';
 import type { HttpRequest, HttpResponse } from './router.js';
-import { TOKEN_BYTES } from './security.js';
-import type { DaemonRuntime, ServerHandle, TlsMaterial } from './serve.js';
+import { TOKEN_BYTES, type UpgradeRefusal } from './security.js';
+import type {
+  AcceptedSocket,
+  DaemonRuntime,
+  ServerHandle,
+  SocketHooks,
+  TlsMaterial,
+} from './serve.js';
+import type { WsSessionPort } from './sessions.js';
 import { IGNORED_DIRS, type FileEntry } from './tree.js';
 
 /**
@@ -62,6 +78,17 @@ const MIN_TLS = 'TLSv1.2';
  * a v4-only daemon is a daemon half the URLs cannot reach.
  */
 export const LOOPBACK_V6 = '::1';
+
+/**
+ * Tell the operator something that must not stop the daemon. The one place this
+ * package writes to stderr, so a socket failure and a source failure are
+ * reported identically and there is no second reporter to drift from this one.
+ *
+ * @param {string} message - What happened.
+ */
+export function report(message: string): void {
+  process.stderr.write(`pawd: ${message}\n`);
+}
 
 /**
  * A no-framework page that fetches `/api/state` and shows the real host, the
@@ -114,6 +141,9 @@ export function requestTarget(
   url: string | undefined,
   host: string,
 ): { method: string; path: string; query: URLSearchParams } {
+  // A parse base for a relative request line, never a scheme this daemon speaks:
+  // `new URL` needs an absolute base and the result is read for path and query
+  // only. The daemon serves https and wss exclusively.
   const parsed = new URL(url ?? '/', `http://${host}`);
   return {
     method: method ?? 'GET',
@@ -246,6 +276,174 @@ export function createConsoleServer(
 }
 
 /**
+ * The subprotocols a client offered, from the raw header. A comma-separated
+ * list is the wire format; an absent header means it offered none, which the
+ * upgrade gate refuses.
+ *
+ * @param {string | undefined} header - `Sec-WebSocket-Protocol`.
+ * @returns {string[]} The offered subprotocols.
+ */
+export function offeredProtocols(header: string | undefined): string[] {
+  if (header === undefined) {
+    return [];
+  }
+  return header
+    .split(',')
+    .map((protocol) => protocol.trim())
+    .filter((protocol) => protocol !== '');
+}
+
+/**
+ * Refuse an upgrade while it is still plain HTTP.
+ *
+ * The response is written by hand because there is no `ServerResponse` for an
+ * upgrade — Node hands over the raw socket. `Connection: close` and an explicit
+ * `Content-Length` are both required: without them a client waits for a body
+ * that never comes, and "the daemon hung" is a much worse diagnosis than "403".
+ *
+ * @param {Duplex} socket - The raw socket.
+ * @param {UpgradeRefusal} refusal - Why.
+ */
+export function refuseUpgrade(socket: Duplex, refusal: UpgradeRefusal): void {
+  const body = refusal.message;
+  socket.write(
+    `HTTP/1.1 ${refusal.status} ${STATUS_CODES[refusal.status] ?? 'Error'}\r\n` +
+      'content-type: text/plain; charset=utf-8\r\n' +
+      `content-length: ${Buffer.byteLength(body)}\r\n` +
+      'connection: close\r\n' +
+      '\r\n' +
+      body,
+  );
+  socket.destroy();
+}
+
+/**
+ * Wire an upgraded socket to the daemon's session machine, and keep it honest
+ * with a heartbeat.
+ *
+ * The heartbeat is a ping every {@link PING_MS} with a hard
+ * {@link PONG_TIMEOUT_MS} deadline, and a missed deadline **terminates** rather
+ * than closes: a client that has stopped answering is not going to complete a
+ * closing handshake either, and waiting for one leaks the session.
+ *
+ * Binary frames are refused outright. This protocol is JSON text; accepting
+ * binary would mean a second decode path, and a second decode path on a security
+ * boundary is a second place to get it wrong.
+ *
+ * @param {WebSocket} ws - The upgraded socket.
+ * @param {SocketHooks} hooks - The daemon's half.
+ * @param {(message: string) => void} warn - Report a failure without dying of it.
+ */
+export function adoptSocket(
+  ws: WebSocket,
+  hooks: SocketHooks,
+  warn: (message: string) => void,
+): void {
+  const port: WsSessionPort = {
+    send: (text: string) => ws.send(text),
+    close: (code: number, reason: string) => ws.close(code, reason),
+    bufferedAmount: () => ws.bufferedAmount,
+  };
+  const session: AcceptedSocket = hooks.accept(port);
+
+  let awaitingPong: NodeJS.Timeout | null = null;
+  const heartbeat = setInterval(() => {
+    if (awaitingPong !== null) {
+      return;
+    }
+    ws.ping();
+    awaitingPong = setTimeout(() => ws.terminate(), PONG_TIMEOUT_MS);
+    awaitingPong.unref();
+  }, PING_MS);
+  heartbeat.unref();
+
+  /**
+   * Stop the timers, whichever way the socket ended.
+   */
+  const stopTimers = (): void => {
+    clearInterval(heartbeat);
+    if (awaitingPong !== null) {
+      clearTimeout(awaitingPong);
+      awaitingPong = null;
+    }
+  };
+
+  ws.on('pong', () => {
+    if (awaitingPong !== null) {
+      clearTimeout(awaitingPong);
+      awaitingPong = null;
+    }
+  });
+
+  ws.on('message', (data: unknown, isBinary: boolean) => {
+    if (isBinary) {
+      ws.close(CLOSE_MALFORMED, 'this protocol is text');
+      return;
+    }
+    void session.message(String(data)).catch((err: unknown) => {
+      warn(`live session failed: ${err instanceof Error ? err.message : String(err)}`);
+      ws.close(CLOSE_MALFORMED, 'session error');
+    });
+  });
+
+  ws.on('error', (err: Error) => {
+    warn(`live socket error: ${err.message}`);
+  });
+
+  ws.on('close', () => {
+    stopTimers();
+    session.closed();
+  });
+}
+
+/**
+ * Attach the live wire to a bound server.
+ *
+ * The server is created with `noServer`, so nothing is upgraded until
+ * {@link SocketHooks.check} has said yes. `handleProtocols` cannot be relied on
+ * to refuse — returning false from it does not reject the handshake — so the
+ * subprotocol is checked in the gate alongside `Host` and `Origin`, and this
+ * only echoes the one the daemon speaks.
+ *
+ * Compression stays off: `permessage-deflate` on a control socket buys nothing
+ * on loopback and costs memory per session and a compression oracle.
+ *
+ * @param {TlsServer} server - The bound server.
+ * @param {SocketHooks} hooks - The daemon's half.
+ * @param {(message: string) => void} warn - Report a failure without dying of it.
+ * @returns {WebSocketServer} The attached server, for shutdown.
+ */
+export function attachLiveWire(
+  server: TlsServer,
+  hooks: SocketHooks,
+  warn: (message: string) => void,
+): WebSocketServer {
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: MAX_FRAME_BYTES,
+    perMessageDeflate: false,
+    handleProtocols: () => LIVE_SUBPROTOCOL,
+  });
+
+  server.on('upgrade', (req, socket, head) => {
+    const refusal = hooks.check({
+      host: firstHeader(req.headers.host),
+      origin: firstHeader(req.headers.origin),
+      protocols: offeredProtocols(firstHeader(req.headers['sec-websocket-protocol'])),
+    });
+    if (refusal !== null) {
+      refuseUpgrade(socket, refusal);
+      return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      adoptSocket(ws, hooks, warn);
+    });
+  });
+
+  return wss;
+}
+
+/**
  * Bind a server, rejecting if it cannot take the address.
  *
  * @param {TlsServer} server - The server to bind.
@@ -339,6 +537,10 @@ export function nodeRuntime(pagePath: string = GUI_LIVE_PAGE): DaemonRuntime {
 
     now: () => new Date().toISOString(),
 
+    clock: () => Date.now(),
+
+    warn: report,
+
     randomToken: () => randomBytes(TOKEN_BYTES).toString('base64url'),
 
     identity: () => nodeServerIdentity(process.env, process.platform, new Date()),
@@ -357,17 +559,21 @@ export function nodeRuntime(pagePath: string = GUI_LIVE_PAGE): DaemonRuntime {
       }
     },
 
-    listen: async (handler, port, host, tls): Promise<ServerHandle> => {
+    listen: async (handler, hooks, port, host, tls): Promise<ServerHandle> => {
       const v4 = createConsoleServer(tls, handler, host);
+      const v4Wire = attachLiveWire(v4, hooks, report);
       await bindServer(v4, port, host, false);
       const bound = boundPort(v4.address(), port);
 
       const v6 = createConsoleServer(tls, handler, host);
+      const v6Wire = attachLiveWire(v6, hooks, report);
       const v6Listening = await bindLoopbackV6(v6, bound);
 
       return {
         port: bound,
         close: async (): Promise<void> => {
+          v4Wire.close();
+          v6Wire.close();
           await closeServer(v4);
           if (v6Listening) {
             await closeServer(v6);

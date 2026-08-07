@@ -12,6 +12,7 @@
  * @module @paw/daemon/test/security
  */
 
+import { LIVE_SUBPROTOCOL, MAX_PREAUTH_SESSIONS, MAX_SESSIONS } from '@paw/core';
 import { describe, expect, it } from 'vitest';
 import {
   LOOPBACK_HOSTS,
@@ -20,7 +21,9 @@ import {
   bearerFrom,
   corsHeadersFor,
   cspFor,
+  decideUpgrade,
   hostAllowed,
+  inlineScriptHashes,
   normaliseOrigin,
   originAllowed,
   securityHeaders,
@@ -164,6 +167,90 @@ describe('hostAllowed', () => {
   });
 });
 
+describe('decideUpgrade', () => {
+  const base = {
+    host: '127.0.0.1:8971',
+    origin: 'https://127.0.0.1:8971',
+    protocols: [LIVE_SUBPROTOCOL],
+    port: 8971,
+    origins: allowedOrigins(8971),
+    liveSessions: 0,
+    preAuthSessions: 0,
+  };
+
+  it('lets the console’s own page through', () => {
+    expect(decideUpgrade(base)).toBeNull();
+  });
+
+  it('lets a non-browser client through to face the token instead', () => {
+    // No Origin means no browser, so there is no origin to judge — the first
+    // frame still has to carry the credential.
+    expect(decideUpgrade({ ...base, origin: undefined })).toBeNull();
+  });
+
+  it('refuses a rebinding Host before any WebSocket state exists', () => {
+    expect(decideUpgrade({ ...base, host: 'evil.example' })).toEqual({
+      status: 400,
+      message: 'bad host',
+    });
+    expect(decideUpgrade({ ...base, host: undefined })?.status).toBe(400);
+  });
+
+  it('refuses a stranger’s Origin — the handshake is exempt from CORS, so this is the only gate', () => {
+    expect(decideUpgrade({ ...base, origin: 'https://evil.example' })).toEqual({
+      status: 403,
+      message: 'origin not allowed',
+    });
+    expect(decideUpgrade({ ...base, origin: 'null' })?.status).toBe(403);
+  });
+
+  it('refuses a client that did not offer the versioned subprotocol', () => {
+    expect(decideUpgrade({ ...base, protocols: [] })?.status).toBe(400);
+    expect(decideUpgrade({ ...base, protocols: ['chat'] })?.status).toBe(400);
+    expect(decideUpgrade({ ...base, protocols: ['paw.live.v2'] })?.status).toBe(400);
+    expect(decideUpgrade({ ...base, protocols: ['chat', LIVE_SUBPROTOCOL] })).toBeNull();
+  });
+
+  it('refuses once it is full, counting authenticated and unauthenticated separately', () => {
+    expect(decideUpgrade({ ...base, liveSessions: MAX_SESSIONS })).toEqual({
+      status: 429,
+      message: 'too many sessions',
+    });
+    expect(decideUpgrade({ ...base, preAuthSessions: MAX_PREAUTH_SESSIONS })?.status).toBe(429);
+    expect(decideUpgrade({ ...base, liveSessions: MAX_SESSIONS - 1 })).toBeNull();
+    expect(decideUpgrade({ ...base, preAuthSessions: MAX_PREAUTH_SESSIONS - 1 })).toBeNull();
+  });
+
+  it('never locks the operator out over someone else’s failed guesses', () => {
+    // A global cooldown here would be a denial of service any local process can
+    // trigger against the operator's own console — the daemon cannot tell one
+    // loopback peer from another, so it must not try to punish by peer.
+    expect(decideUpgrade(base)).toBeNull();
+    expect(Object.keys(base)).not.toContain('cooldownActive');
+  });
+
+  it('judges the request before the daemon’s own capacity', () => {
+    // A rebinding page must be told 400 whether or not the daemon happens to be
+    // busy: the answer must not depend on load, or it becomes a probe.
+    const busy = { ...base, liveSessions: MAX_SESSIONS };
+    expect(decideUpgrade({ ...busy, host: 'evil.example' })?.status).toBe(400);
+    expect(decideUpgrade({ ...busy, origin: 'https://evil.example' })?.status).toBe(403);
+  });
+
+  it('never says anything about the token in a refusal', () => {
+    const refusals = [
+      decideUpgrade({ ...base, host: 'evil.example' }),
+      decideUpgrade({ ...base, origin: 'null' }),
+      decideUpgrade({ ...base, protocols: [] }),
+      decideUpgrade({ ...base, liveSessions: MAX_SESSIONS }),
+    ];
+    for (const refusal of refusals) {
+      expect(refusal?.message.toLowerCase()).not.toContain('token');
+      expect(refusal?.message.toLowerCase()).not.toContain('credential');
+    }
+  });
+});
+
 describe('corsHeadersFor', () => {
   const allowed = allowedOrigins(8971, ['http://localhost:5173']);
 
@@ -226,5 +313,54 @@ describe('cspFor', () => {
 
   it('does not grant a bare self, which would not cover the socket scheme', () => {
     expect(csp).not.toContain("connect-src 'self'");
+  });
+});
+
+describe('inlineScriptHashes', () => {
+  it('names each inline script by digest', () => {
+    const hashes = inlineScriptHashes('<html><script>alert(1)</script></html>');
+    expect(hashes).toHaveLength(1);
+    expect(hashes[0]).toMatch(/^'sha256-[A-Za-z0-9+/]+=*'$/);
+  });
+
+  it('changes completely for a single changed byte, which is the point', () => {
+    const [before] = inlineScriptHashes('<script>alert(1)</script>');
+    const [after] = inlineScriptHashes('<script>alert(2)</script>');
+    expect(before).not.toBe(after);
+  });
+
+  it('covers the body exactly as the browser sees it, trimming nothing', () => {
+    const [padded] = inlineScriptHashes('<script>  alert(1)  </script>');
+    const [tight] = inlineScriptHashes('<script>alert(1)</script>');
+    expect(padded).not.toBe(tight);
+  });
+
+  it('reads every inline script, attributes and all, and deduplicates', () => {
+    const hashes = inlineScriptHashes(
+      '<script type="module">a()</script><script defer>b()</script><script>a()</script>',
+    );
+    expect(hashes).toHaveLength(2);
+  });
+
+  it('skips a script with a src, which has no inline body to hash', () => {
+    expect(inlineScriptHashes('<script src="/bundle.js"></script>')).toEqual([]);
+    expect(inlineScriptHashes('<script src="/b.js" defer></script>')).toEqual([]);
+  });
+
+  it('skips an empty script and a page with none', () => {
+    expect(inlineScriptHashes('<script></script>')).toEqual([]);
+    expect(inlineScriptHashes('<html><body>nothing</body></html>')).toEqual([]);
+  });
+
+  it('is what turns the CSP from a general permission into a named one', () => {
+    const page = '<html><script>boot()</script></html>';
+    const named = cspFor(8971, inlineScriptHashes(page));
+    expect(named).toContain("script-src 'sha256-");
+    expect(named).not.toContain("script-src 'unsafe-inline'");
+
+    // With nothing to hash there is nothing to name, and the fallback is the
+    // honest one — a browser ignores 'unsafe-inline' the moment a hash appears,
+    // so emitting both would be a policy that silently means only the hashes.
+    expect(cspFor(8971, [])).toContain("script-src 'unsafe-inline'");
   });
 });

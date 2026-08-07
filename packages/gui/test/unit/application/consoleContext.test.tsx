@@ -8,16 +8,19 @@
  * @module @paw/gui/test/unit/application/consoleContext
  */
 
-import { render, screen } from '@testing-library/react';
+import { encodeEnvelope } from '@paw/core';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   ConsoleProvider,
   DEFAULT_POLL_MS,
   useConsoleDispatch,
   useConsoleState,
   useLiveError,
+  useLiveStatus,
 } from '../../../src/application/context/consoleContext.js';
+import type { SocketHandlers, SocketLike } from '../../../src/infrastructure/liveSocket.js';
 import { makeSnapshot, renderInConsole } from '../../fixtures.js';
 
 /**
@@ -29,10 +32,14 @@ function Probe() {
   const state = useConsoleState();
   const dispatch = useConsoleDispatch();
   const error = useLiveError();
+  const { mode } = useLiveStatus();
   return (
     <div>
       <span data-testid='section'>{state.section}</span>
       <span data-testid='error'>{error ?? 'none'}</span>
+      <span data-testid='mode'>{mode}</span>
+      <span data-testid='pid'>{state.data.host.pid}</span>
+      <span data-testid='procs'>{state.data.processes.length}</span>
       <button type='button' onClick={() => dispatch({ type: 'section', section: 'roles' })}>
         go
       </button>
@@ -81,5 +88,51 @@ describe('ConsoleProvider', () => {
       </ConsoleProvider>,
     );
     expect(container.querySelector('[data-testid="section"]')).toHaveTextContent('swarm');
+  });
+
+  it('folds live slices into the console and stops polling while the wire is up', () => {
+    let handlers: SocketHandlers | null = null;
+    const socket: SocketLike = {
+      send: () => undefined,
+      close: () => undefined,
+      listen: (registered) => {
+        handlers = registered;
+      },
+    };
+    const poll = vi.fn(async () => makeSnapshot());
+
+    render(
+      <ConsoleProvider
+        snapshot={makeSnapshot()}
+        source={poll}
+        connect={() => socket}
+        token='a-credential'>
+        <Probe />
+      </ConsoleProvider>,
+    );
+
+    act(() => handlers?.open());
+    act(() => handlers?.message(encodeEnvelope('hello', makeSnapshot(), 1)));
+    expect(screen.getByTestId('mode')).toHaveTextContent('live');
+
+    // Two frames in one tick. Reading React state in the fold would apply the
+    // second to the data as it was before the first, and silently lose one.
+    act(() => {
+      handlers?.message(encodeEnvelope('host', { ...makeSnapshot().host, pid: 111 }, 2));
+      handlers?.message(encodeEnvelope('processes', [{ pid: 9, ppid: 1, name: 'w' }], 3));
+    });
+
+    expect(screen.getByTestId('pid')).toHaveTextContent('111');
+    expect(screen.getByTestId('procs')).toHaveTextContent('1');
+    // While the socket is live the console makes no requests at all.
+    expect(poll).not.toHaveBeenCalled();
+  });
+
+  it('fails loud when connection status is read outside the provider', () => {
+    const Status = (): null => {
+      useLiveStatus();
+      return null;
+    };
+    expect(() => render(<Status />)).toThrow('useLiveStatus() used outside');
   });
 });

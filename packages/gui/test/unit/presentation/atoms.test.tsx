@@ -29,7 +29,18 @@ import { PawMark } from '../../../src/presentation/atoms/pawMark.js';
 import { Placeholder } from '../../../src/presentation/atoms/placeholder.js';
 import { Stat } from '../../../src/presentation/atoms/stat.js';
 import { StateChip } from '../../../src/presentation/atoms/stateChip.js';
-import { renderInConsole } from '../../fixtures.js';
+import { ConsoleProvider } from '../../../src/application/context/consoleContext.js';
+import type { SocketLike } from '../../../src/infrastructure/liveSocket.js';
+import { makeSnapshot, renderInConsole } from '../../fixtures.js';
+
+/**
+ * A socket that connects to nothing, for the banner states that never get one.
+ */
+const neverSocket: SocketLike = {
+  send: () => undefined,
+  close: () => undefined,
+  listen: () => undefined,
+};
 
 describe('Card', () => {
   it('renders a header with a title and a meta note', () => {
@@ -234,5 +245,33 @@ describe('LiveBanner', () => {
   it('says nothing while the wire is healthy', () => {
     const { container } = renderInConsole(<LiveBanner />);
     expect(container.querySelector('.banner')).toBeNull();
+  });
+
+  it('says the wire is down, and offers to reconnect, while polling', () => {
+    // A daemon behind the page but no socket: degraded, and the console says so
+    // rather than looking healthy while showing data of unknown age.
+    render(
+      <ConsoleProvider snapshot={makeSnapshot()} source={async () => makeSnapshot()}>
+        <LiveBanner />
+      </ConsoleProvider>,
+    );
+
+    const banner = screen.getByRole('status');
+    expect(banner).toHaveTextContent('live wire down — polling');
+    expect(screen.getByRole('button', { name: 'reconnect' })).toBeInTheDocument();
+  });
+
+  it('names the dead end when the daemon refused the credential', () => {
+    // No token to present: polling would be refused too, so the banner tells the
+    // operator the one thing that fixes it instead of spinning.
+    render(
+      <ConsoleProvider snapshot={makeSnapshot()} connect={() => neverSocket} token={null}>
+        <LiveBanner />
+      </ConsoleProvider>,
+    );
+
+    const banner = screen.getByRole('alert');
+    expect(banner).toHaveTextContent('credential refused');
+    expect(banner).toHaveTextContent('re-open the console from the URL');
   });
 });

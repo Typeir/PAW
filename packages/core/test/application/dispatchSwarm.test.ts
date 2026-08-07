@@ -21,6 +21,7 @@ import type {
   RoleRegistry,
 } from '../../src/application/roleRegistry.js';
 import { dispatchSwarm } from '../../src/application/dispatchSwarm.js';
+import type { DispatchEvent } from '../../src/application/dispatchSwarm.js';
 
 /**
  * A model that echoes the prompt, so outcomes are inspectable.
@@ -222,5 +223,103 @@ describe('dispatchSwarm', () => {
     await expect(dispatchSwarm(plan(), { registry: reg, files: reader() })).rejects.toThrow(
       /resolved to no model/,
     );
+  });
+});
+
+describe('dispatchSwarm progress', () => {
+  it('announces every member starting and settling, in order', async () => {
+    const events: DispatchEvent[] = [];
+    await dispatchSwarm(plan({ args: { n: 2 } }), {
+      registry: registry(),
+      files: reader(),
+      onProgress: (event) => events.push(event),
+    });
+
+    expect(events.map((e) => `${e.phase}:${e.member}`)).toEqual([
+      'started:0',
+      'settled:0',
+      'started:1',
+      'settled:1',
+    ]);
+    expect(events.every((e) => e.total === 2)).toBe(true);
+    expect(events.map((e) => e.key)).toEqual(['k0', 'k0', 'k1', 'k1']);
+  });
+
+  it('carries the same outcome it puts in the result', async () => {
+    const events: DispatchEvent[] = [];
+    const res = await dispatchSwarm(plan({ args: { n: 2 } }), {
+      registry: registry(),
+      files: reader(),
+      onProgress: (event) => events.push(event),
+    });
+
+    // The live view and the returned result come from one place, so a console
+    // watching a run cannot end up disagreeing with the run's own answer.
+    expect(events.filter((e) => e.phase === 'settled').map((e) => e.outcome)).toEqual(res.outcomes);
+  });
+
+  it('announces a skipped member as settled, without calling the model', async () => {
+    const events: DispatchEvent[] = [];
+    const res = await dispatchSwarm(plan({ args: { n: 2 } }), {
+      registry: registry(),
+      files: reader(),
+      skip: (_p, member) => member === 0,
+      onProgress: (event) => events.push(event),
+    });
+
+    expect(events[0]).toMatchObject({ phase: 'started', member: 0 });
+    expect(events[1]).toMatchObject({ phase: 'settled', member: 0 });
+    expect(events[1].outcome?.state).toBe('skipped');
+    expect(res.outcomes[0].state).toBe('skipped');
+  });
+
+  it('announces a resumed member as settled too', async () => {
+    const events: DispatchEvent[] = [];
+    await dispatchSwarm(plan({ args: { n: 1 } }), {
+      registry: registry(),
+      files: reader(),
+      alreadyDone: () => true,
+      onProgress: (event) => events.push(event),
+    });
+
+    expect(events.map((e) => e.phase)).toEqual(['started', 'settled']);
+    expect(events[1].outcome?.state).toBe('skipped');
+  });
+
+  it('says nothing about a plan the doctor refused, because nothing ran', async () => {
+    const events: DispatchEvent[] = [];
+    const res = await dispatchSwarm(plan({ members: 0 }), {
+      registry: registry(),
+      files: reader(),
+      onProgress: (event) => events.push(event),
+    });
+
+    expect(res.released).toBe(false);
+    expect(events).toEqual([]);
+  });
+
+  it('runs identically for a caller that wants no progress at all', async () => {
+    const watched = await dispatchSwarm(plan({ args: { n: 2 } }), {
+      registry: registry(),
+      files: reader(),
+      onProgress: () => undefined,
+    });
+    const silent = await dispatchSwarm(plan({ args: { n: 2 } }), {
+      registry: registry(),
+      files: reader(),
+    });
+    expect(silent).toEqual(watched);
+  });
+
+  it('does not swallow a broken watcher, because a use-case cannot judge what that means', async () => {
+    await expect(
+      dispatchSwarm(plan({ args: { n: 1 } }), {
+        registry: registry(),
+        files: reader(),
+        onProgress: () => {
+          throw new Error('the console exploded');
+        },
+      }),
+    ).rejects.toThrow('the console exploded');
   });
 });

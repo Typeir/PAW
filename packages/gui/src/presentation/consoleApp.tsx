@@ -15,6 +15,7 @@
 import type { PawSnapshot } from '@paw/core';
 import { ConsoleProvider } from '../application/context/consoleContext.js';
 import type { SnapshotSource } from '../application/hooks/useLiveRefresh.js';
+import type { SocketFactory } from '../infrastructure/liveSocket.js';
 import type { TreeSource } from '../infrastructure/snapshotSource.js';
 import type { WindowControls } from '../infrastructure/shell.js';
 import { GlobalStyles } from './atoms/globalStyles.js';
@@ -25,14 +26,18 @@ import { ConsoleWindow } from './chrome/consoleWindow.js';
  *
  * @interface ConsoleAppProps
  * @property {PawSnapshot} snapshot - The snapshot to boot from.
- * @property {SnapshotSource | null} [source] - A live source to poll; omit for a static page.
+ * @property {SnapshotSource | null} [source] - The polling source used while the socket is down; omit for a static page.
+ * @property {SocketFactory | null} [connect] - Opens the live socket; omit for a static page.
+ * @property {string | null} [token] - The credential this tab adopted.
  * @property {TreeSource | null} [treeSource] - The repository tree source; omit for a static page.
  * @property {WindowControls | null} [controls] - The desktop window's controls; omit in a browser.
- * @property {number} [intervalMs] - Poll period in milliseconds.
+ * @property {number} [intervalMs] - Poll period in milliseconds, for degraded mode.
  */
 export interface ConsoleAppProps {
   readonly snapshot: PawSnapshot;
   readonly source?: SnapshotSource | null;
+  readonly connect?: SocketFactory | null;
+  readonly token?: string | null;
   readonly treeSource?: TreeSource | null;
   readonly controls?: WindowControls | null;
   readonly intervalMs?: number;
@@ -47,6 +52,8 @@ export interface ConsoleAppProps {
 export function ConsoleApp({
   snapshot,
   source,
+  connect,
+  token,
   treeSource,
   controls,
   intervalMs,
@@ -55,6 +62,8 @@ export function ConsoleApp({
     <ConsoleProvider
       snapshot={snapshot}
       source={source}
+      connect={connect}
+      token={token}
       treeSource={treeSource}
       controls={controls}
       intervalMs={intervalMs}>

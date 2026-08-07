@@ -179,6 +179,50 @@ export function hardenSecret(path: string, platform: string, ops: SecretOps): Pr
 }
 
 /**
+ * Check that an existing key is still readable by its owner alone, **without
+ * changing it**.
+ *
+ * The distinction from {@link hardenSecret} is the whole point of this function.
+ * Hardening is correct at the moment a key is written: the daemon owns the file,
+ * knows what it should be, and sets it. Repairing a key it did *not* just write
+ * would erase the evidence it is looking for — a key another local account could
+ * read is a compromise indicator, and silently chmod-ing it back to private on
+ * every boot means the one boot where somebody had read access looks identical
+ * to every other. So a key that was found wrong is reported and refused, never
+ * quietly corrected.
+ *
+ * @param {string} path - The key file.
+ * @param {string} platform - The platform, as `os.platform()` reports it.
+ * @param {SecretOps} ops - The effects.
+ * @returns {Promise<void>} Resolves when the key is provably private.
+ * @throws {Error} When anyone but this account can read it.
+ */
+export async function assertPrivate(
+  path: string,
+  platform: string,
+  ops: SecretOps,
+): Promise<void> {
+  const user = ops.user();
+  if (platform === 'win32') {
+    const listing = await ops.run('icacls', [path]);
+    if (!aclIsPrivate(listing, path, user)) {
+      throw new Error(
+        `refusing to serve: ${path} is readable by more than ${user}, and was not written ` +
+          `this boot — someone changed it. icacls reports:\n${listing}`,
+      );
+    }
+    return;
+  }
+  const mode = await ops.statMode(path);
+  if (!modeIsPrivate(mode)) {
+    throw new Error(
+      `refusing to serve: ${path} is mode ${(mode & 0o777).toString(8)}, and was not written ` +
+        `this boot — someone changed it`,
+    );
+  }
+}
+
+/**
  * Make the identity directory enterable by its owner alone, so a key written
  * into it later inherits the same restriction.
  *

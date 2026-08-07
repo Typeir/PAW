@@ -257,7 +257,7 @@ async function runSwarm(
  * @returns {Dispatcher} The dispatcher.
  */
 function uiDispatcher(live: boolean, attached: readonly string[]): Dispatcher {
-  return async (plan) => {
+  return async (plan, onProgress) => {
     const base = live ? liveRegistryFor(plan) : fakeRegistryFor(plan);
     const binding = base.bindings.get(plan.role);
     if (!binding) {
@@ -269,6 +269,9 @@ function uiDispatcher(live: boolean, attached: readonly string[]): Dispatcher {
     const result = await dispatchSwarm(withContext(plan, attached), {
       registry: { declarations: base.declarations, bindings },
       files: createNodeFileReader(process.cwd()),
+      // Straight through to the daemon's bus: the console fills in member by
+      // member instead of staying blank until the whole herd has landed.
+      onProgress,
     });
     return { result, usage: metered.usage() };
   };

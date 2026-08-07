@@ -144,11 +144,16 @@ async function readState(url: string, token: string, plan?: string): Promise<Wir
  *
  * @param args - The argv after the script path.
  */
-function runCli(...args: string[]): Promise<{ stderr: string; code: number }> {
+function runCli(...args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve) => {
-    execFile(process.execPath, [TSX, MAIN, ...args], { cwd: PKG }, (err, _stdout, stderr) => {
-      resolve({ stderr, code: err && typeof err.code === 'number' ? err.code : 0 });
-    });
+    execFile(
+      process.execPath,
+      [TSX, MAIN, ...args],
+      { cwd: PKG, env: { ...process.env, PAW_HOME: home } },
+      (err, stdout, stderr) => {
+        resolve({ stdout, stderr, code: err && typeof err.code === 'number' ? err.code : 0 });
+      },
+    );
   });
 }
 
@@ -222,7 +227,7 @@ describe('paw ui (e2e)', () => {
     // The first boot into a fresh PAW home mints the CA, so the banner must
     // carry the fingerprint the OS dialog will show and the file to point at.
     expect(banner).toContain('issued this machine a local CA · SHA256:');
-    expect(banner).toContain('paw-setup trust');
+    expect(banner).toContain('paw trust');
     expect(banner).toContain(join(home, 'identity', 'ca.crt').replace(/\\/g, '/'));
     expect((await call(url)).status).toBe(200);
   }, 30000);
@@ -237,4 +242,34 @@ describe('paw ui (e2e)', () => {
     expect(code).toBe(1);
     expect(stderr).toContain('paw ui --run needs the plan to release');
   });
+});
+
+describe('paw trust (e2e)', () => {
+  it('shows the fingerprint and the exact commands, and changes nothing on a dry run', async () => {
+    const { stdout, code } = await runCli('trust', '--dry-run');
+
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/PAW local CA · SHA256(:[0-9A-F]{2}){32}/);
+    expect(stdout).toContain(join(home, 'identity', 'ca.crt').replace(/\\/g, '/'));
+    // The operator must be able to compare the fingerprint against the OS dialog
+    // — telling them to click through is how a local CA becomes a habit.
+    expect(stdout).toContain('the OS dialog must show that exact fingerprint');
+    expect(stdout).toContain('dry run · nothing was changed');
+
+    const meta = JSON.parse(await readFile(join(home, 'identity', 'meta.json'), 'utf8')) as {
+      trusted: boolean;
+    };
+    expect(meta.trusted).toBe(false);
+  }, 30000);
+
+  it('names a real command for this platform rather than describing one', async () => {
+    const { stdout } = await runCli('trust', '--dry-run');
+    const expected =
+      process.platform === 'win32'
+        ? 'certutil -user -addstore Root'
+        : process.platform === 'darwin'
+          ? 'security add-trusted-cert'
+          : 'certutil -d sql:';
+    expect(stdout).toContain(expected);
+  }, 30000);
 });

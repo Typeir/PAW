@@ -19,7 +19,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PawSnapshot, TreeNode } from '@paw/core';
 import { UnknownPlanError } from '../src/plans.js';
 import { route, type HttpRequest, type RouterDeps } from '../src/router.js';
-import { allowedOrigins } from '../src/security.js';
+import { allowedOrigins, inlineScriptHashes } from '../src/security.js';
 
 const PORT = 8971;
 const TOKEN = 'router-token-value-0123456789abcdef';
@@ -37,11 +37,12 @@ const tree: TreeNode[] = [
 ];
 
 const deps: RouterDeps = {
-  page: '<html>pawd</html>',
+  page: '<html>pawd<script>console.log(1)</script></html>',
   snapshot: async () => snapshot,
   tree: () => tree,
   token: TOKEN,
   port: PORT,
+  scriptHashes: inlineScriptHashes('<html>pawd<script>console.log(1)</script></html>'),
   origins: allowedOrigins(PORT, ['http://localhost:5173']),
 };
 
@@ -71,7 +72,12 @@ describe('the page', () => {
       expect(res.status).toBe(200);
       expect(res.headers['content-type']).toContain('text/html');
       expect(res.headers['content-security-policy']).toContain(`wss://127.0.0.1:${PORT}`);
-      expect(res.body).toBe('<html>pawd</html>');
+      expect(res.body).toBe(deps.page);
+      // The grant names the bundle by digest rather than permitting inline
+      // scripts in general, so a script injected through a rendering bug is
+      // refused by the browser rather than run.
+      expect(res.headers['content-security-policy']).toContain("script-src 'sha256-");
+      expect(res.headers['content-security-policy']).not.toContain("script-src 'unsafe-inline'");
     }
   });
 

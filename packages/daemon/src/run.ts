@@ -17,6 +17,7 @@
 
 import type {
   BudgetSummary,
+  DispatchEvent,
   DispatchResult,
   MemberView,
   ModelPort,
@@ -56,6 +57,89 @@ export function meterPort(inner: ModelPort): MeteredPort {
       },
     },
     usage: () => ({ spendUsd: 0, tokensIn, tokensOut }),
+  };
+}
+
+/**
+ * A run being watched while it happens.
+ *
+ * The finished-dispatch mapping below is the truth at the end; this is the truth
+ * in between, and the two must agree. So the live tracker reports the same
+ * fields from the same events the dispatcher emits — a member is `running` from
+ * the moment it starts until it settles, and the totals are counted, never
+ * estimated. A console watching a four-hundred-member run against a real
+ * provider would otherwise show nothing for several minutes and be
+ * indistinguishable from one that has hung.
+ *
+ * @interface RunTracker
+ * @property {(event: DispatchEvent) => RunProgress} apply - Fold one dispatch event and return the run as it now stands.
+ * @property {() => RunProgress} progress - The run as it now stands.
+ */
+export interface RunTracker {
+  apply(event: DispatchEvent): RunProgress;
+  progress(): RunProgress;
+}
+
+/**
+ * Track a run as its members land.
+ *
+ * @param {string} id - The run id.
+ * @param {string} startedAt - The run's start timestamp.
+ * @returns {RunTracker} The tracker.
+ */
+export function trackRun(id: string, startedAt: string): RunTracker {
+  const settled = new Map<number, MemberView>();
+  const running = new Map<number, MemberView>();
+  let confirmed = 0;
+
+  /**
+   * The run as it now stands, members in plan order.
+   *
+   * @returns {RunProgress} The progress.
+   */
+  const progress = (): RunProgress => {
+    const members = [...settled.values(), ...running.values()].sort(
+      (a, b) => a.member - b.member,
+    );
+    const done = [...settled.values()].filter((m) => m.state === 'done').length;
+    return {
+      id,
+      startedAt,
+      skipped: settled.size - done,
+      done,
+      running: running.size,
+      failed: 0,
+      confirmed,
+      members,
+    };
+  };
+
+  return {
+    progress,
+    apply: (event: DispatchEvent): RunProgress => {
+      if (event.phase === 'started') {
+        running.set(event.member, {
+          member: event.member,
+          key: event.key,
+          state: 'running',
+          level: null,
+        });
+        return progress();
+      }
+      running.delete(event.member);
+      if (event.outcome !== undefined) {
+        settled.set(event.member, {
+          member: event.member,
+          key: event.key,
+          state: event.outcome.state,
+          level: null,
+        });
+        if (event.outcome.content !== undefined) {
+          confirmed += 1;
+        }
+      }
+      return progress();
+    },
   };
 }
 

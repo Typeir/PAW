@@ -9,25 +9,34 @@
 ## Overview
 
 ```
-  packages/daemon (pawd)                         packages/gui (the console)
-  ┌──────────────────────────────┐               ┌────────────────────────────────┐
-  │ nodeRuntime  fs · import ·   │               │ main.tsx  boot + createRoot    │
-  │              ps-list · http  │               │   ↓                            │
-  │      ↓ injected              │  GET /        │ infrastructure/snapshotSource  │
-  │ serve.ts     runDaemon()     │ ───────────▶  │   __PAW_DATA__ ?? fetch(/api)  │
-  │              route()         │               │   ↓                            │
-  │              buildSnapshot() │  GET /api/    │ application/hydrateSnapshot    │
-  │              run.ts (meter)  │ ◀─── state ── │   ↓ ConsoleData                │
-  └──────────────────────────────┘   every 3s    │ domain/consoleState (reducer)  │
-              ▲                                  │   ↓ context                    │
-              │ PawSnapshot (plain JSON)         │ presentation/ atoms · views    │
-              └──────────────────────────────────┘                                │
-                                                 └────────────────────────────────┘
+  packages/daemon (pawd)                          packages/gui (the console)
+  ┌───────────────────────────────┐               ┌────────────────────────────────┐
+  │ nodeRuntime  fs · import ·    │               │ main.tsx  boot + createRoot    │
+  │              ps-list · https  │               │   ↓                            │
+  │              ws (upgrade)     │   GET /       │ infrastructure/snapshotSource  │
+  │      ↓ injected               │ ───────────▶  │   __PAW_DATA__ ?? fetch(/api)  │
+  │ serve.ts     runDaemon()      │               │ infrastructure/liveSocket      │
+  │   ├─ identity  CA · leaf      │  GET /api/    │   ↓ the only `new WebSocket`   │
+  │   ├─ bus       typed pub/sub  │ ◀─── state ── │ application/hydrateSnapshot    │
+  │   ├─ cache     slice + compose│   (boot,      │ application/applyLiveEvent     │
+  │   ├─ sources   diff & publish │    degraded)  │   ↓ ConsoleData                │
+  │   ├─ sessions  auth machine   │  wss /live    │ hooks/useLiveWire (state m/c)  │
+  │   └─ router    token gate     │ ◀══ frames ══ │ domain/consoleState (reducer)  │
+  └───────────────────────────────┘   on change   │   ↓ context                    │
+              ▲                                   │ presentation/ atoms · views    │
+              │ PawSnapshot + LiveEnvelope        └────────────────────────────────┘
+              └───────────────────────────────────┘
 ```
 
 `PawSnapshot` lives in `core/src/contracts.ts` and is types-only. It is deliberately plain data: a
 plan's `brief(args, member)` is pre-rendered to a `briefs` array before it crosses the wire, so
 nothing needs a live closure on the consumer side.
+
+The transport is **TLS and a WebSocket, not polling**. The console opens one `wss://` connection,
+authenticates on the first frame, and receives a slice whenever one changes. Polling survives only
+as the degraded mode inside the provider, so a socket that will not open is slower rather than
+broken. Part 13 is the wire itself: the certificates, the gates, the frames, and the reasoning
+behind each. This part stays about the shape of the two halves.
 
 ## One console per repository, not per plan
 
@@ -100,18 +109,35 @@ Every number the console shows is read, not invented:
 - **plan / doctor** — real `runDoctor`, `doctorPlan`, `renderBrief`, `planKey` from `@paw/core`.
 - **run / budget** — only when a dispatcher was supplied (`paw ui --run`). Outcomes come from
   `dispatchSwarm`; tokens are counted by `meterPort` wrapping the port the run actually calls.
-  `spendUsd` stays 0 because no price list crosses this boundary.
+  `spendUsd` stays 0 because no price list crosses this boundary. The run reports itself **as it
+  happens**: `dispatchSwarm` emits a `DispatchEvent` when each member starts and settles, `trackRun`
+  folds those into `RunProgress`, and the daemon publishes each one. A four-hundred-member run
+  against a real provider therefore fills in member by member instead of staying blank for minutes,
+  which is indistinguishable from a console that has hung.
 - **everything else** — zeros and empty lists, which is the truth about a run that has not happened.
+
+Nothing expensive is recomputed to answer a read. `cache.ts` renders a plan's briefs, slugs and
+findings **once per version of its file** and `composeSnapshot` assembles the cached parts; the old
+`buildSnapshot`, which re-rendered every brief on every request, was deleted rather than left beside
+its replacement. Two builders for one shape is how a console starts showing different data depending
+on which path produced it.
 
 ## The console's layers
 
 ```
 domain/          console.types · plan · consoleState        pure, no React
-application/     hydrateSnapshot · context · hooks          React, no markup
-infrastructure/  snapshotSource                             fetch / injected data
+application/     hydrateSnapshot · applyLiveEvent           React, no markup
+                 context · hooks · useLiveWire
+infrastructure/  snapshotSource · liveSocket · auth         fetch / socket / injected data
 presentation/    atoms · chrome · views · styles · lib      markup only
 main.tsx                                                    boot shell (coverage-excluded)
 ```
+
+`applyLiveEvent` is the twin of `hydrateSnapshot`: hydration maps a whole snapshot into
+`ConsoleData`, and this maps one topic's new value onto the data already held. A slice **replaces**,
+never merges, so the console cannot end up holding half of an old plan and half of a new one, and a
+topic it has no arm for changes nothing at all — which is what lets a newer daemon talk to an older
+console without corrupting it.
 
 State and dispatch live in two contexts, so a panel reads exactly the slice it needs through a hook
 (`usePlan()`, `useMember()`, `useConsoleActions()`) and no component takes a prop it does not own.
@@ -166,12 +192,21 @@ and the process table is empty rather than populated with a plausible fiction.
 
 ## Failing loud
 
-- A snapshot whose `memberTotal` disagrees with its `briefs`/`slugs` throws at hydration.
+- A snapshot whose `memberTotal` disagrees with its `briefs`/`slugs` throws at hydration — over the
+  socket exactly as over HTTP, because `hello` goes through the same door.
 - A missing brief for a scrubbed member throws rather than rendering a blank editor.
-- A failed poll paints a red `daemon unreachable` banner over the last snapshot.
-- A failed run rejects `daemon.dispatched`; `paw ui` prints it and exits non-zero.
+- The wire down paints an amber `live wire down — polling` status with a reconnect button; a refused
+  credential paints a red `credential refused` alert naming the one thing that fixes it. They are
+  separate states because retrying fixes the first and never fixes the second.
+- A failed run rejects `daemon.dispatched`; `paw ui` prints it and exits non-zero. The rejection is
+  claimed the moment it is created, so a run that fails before the caller can attach a handler does
+  not take the process down with it.
 - The daemon's model port refuses to complete anything — `pawd` reports, it does not dispatch.
 - A missing `gui/dist/live.html` degrades to the bootstrap page **and says so on stderr**.
+- A source that throws is reported to the terminal *and* published on the `log` topic, because a
+  console cannot read stderr and a failure reported only to a terminal nobody is watching has been
+  reported to nobody. The ring is bounded at 200 lines and says how many it dropped.
+- A daemon that cannot load its TLS identity does not start. There is no plaintext fallback.
 
 ## Running it
 
@@ -179,7 +214,12 @@ and the process table is empty rather than populated with a plausible fiction.
 # the console over a live daemon — serves the repo you are standing in
 cd .github/PAW
 node bin/paw.mjs ui --port=8971
-# → http://127.0.0.1:8971/  · pick a plan in the console
+# → https://127.0.0.1:8971/#t=<credential>  · pick a plan in the console
+# the fragment carries this boot's credential — treat that URL like a password
+
+# make the browser stop warning about the local CA (per-user, never elevated)
+node bin/paw.mjs trust --dry-run   # prints the exact commands and the fingerprint
+node bin/paw.mjs trust
 
 # with a real (deterministic fake-model) run behind the Herd tab
 node bin/paw.mjs ui <plan.swarm.mjs> --run   # --live dispatches against the provider instead

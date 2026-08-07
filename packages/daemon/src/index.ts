@@ -18,8 +18,23 @@ export type { OsLike, ProcLike } from './host.js';
 
 export { collectSubtree } from './process.js';
 
-export { buildSnapshot, formatUptime } from './snapshot.js';
-export type { SnapshotInputs } from './snapshot.js';
+export { formatUptime } from './snapshot.js';
+
+export { LOG_CAPACITY, createLogRing } from './logRing.js';
+export type { LogRing } from './logRing.js';
+
+export { createBus } from './bus.js';
+export type { BusErrorReporter, LiveBus, LiveListener } from './bus.js';
+
+export {
+  buildPlanSlice,
+  composeSnapshot,
+  createVersionedCache,
+  emptyPlanSlice,
+  idleBudget,
+  idleRun,
+} from './cache.js';
+export type { SnapshotParts, VersionedCache } from './cache.js';
 
 export { route } from './router.js';
 export type { HttpResponse, RouterDeps } from './router.js';
@@ -77,7 +92,13 @@ export { nodeIdentityIo, nodeServerIdentity } from './nodeIdentity.js';
 export { TRUST_NICKNAME, planTrust, trustCommandLine } from './trustStore.js';
 export type { TrustPlan, TrustStep } from './trustStore.js';
 
-export { meterPort, toRunProgress } from './run.js';
-export type { MeteredPort } from './run.js';
+export { meterPort, toRunProgress, trackRun } from './run.js';
+export type { MeteredPort, RunTracker } from './run.js';
+
+export { createSessionRegistry } from './sessions.js';
+export type { LiveSession, SessionRegistry, WsSessionPort } from './sessions.js';
+
+export { decideUpgrade } from './security.js';
+export type { UpgradeRefusal, UpgradeRequest } from './security.js';
 
 export { BOOTSTRAP, GUI_LIVE_PAGE, nodeRuntime, walkFiles } from './nodeRuntime.js';

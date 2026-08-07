@@ -20,6 +20,10 @@ import {
   type PawWindow,
 } from '../../../src/infrastructure/snapshotSource.js';
 import type { AuthWindow } from '../../../src/infrastructure/auth.js';
+import type {
+  SocketWindow,
+  WebSocketConstructor,
+} from '../../../src/infrastructure/liveSocket.js';
 import { makeSnapshot } from '../../fixtures.js';
 
 /**
@@ -28,10 +32,18 @@ import { makeSnapshot } from '../../fixtures.js';
  * @param {string} [hash] - The fragment to boot with.
  * @returns {PawWindow & AuthWindow} The fake window.
  */
-const makeWindow = (hash = ''): PawWindow & AuthWindow => ({
-  location: { hash, pathname: '/', search: '' },
+const makeWindow = (hash = ''): PawWindow & AuthWindow & SocketWindow => ({
+  location: { hash, pathname: '/', search: '', host: '127.0.0.1:8971', protocol: 'https:' },
   history: { replaceState: () => undefined },
 });
+
+/**
+ * A `WebSocket` constructor that opens nothing — `boot` only stores it.
+ */
+const FakeSocket = class {
+  send(): void {}
+  close(): void {}
+} as unknown as WebSocketConstructor;
 
 /**
  * A fetch that answers with a snapshot.
@@ -119,30 +131,32 @@ describe('authedFetch', () => {
 });
 
 describe('boot', () => {
-  it('uses the injected snapshot, polling nothing and browsing nothing', async () => {
+  it('uses the injected snapshot, polling nothing, browsing nothing, connecting nothing', async () => {
     const snapshot = makeSnapshot();
-    const win: PawWindow & AuthWindow = { ...makeWindow(), __PAW_DATA__: snapshot };
+    const win = { ...makeWindow(), __PAW_DATA__: snapshot };
     const fetchFn = okFetch(makeSnapshot({ planName: 'unused' }));
-    const result = await boot(win, fetchFn);
+    const result = await boot(win, fetchFn, FakeSocket);
     expect(result.snapshot).toBe(snapshot);
     expect(result.source).toBeNull();
     expect(result.treeSource).toBeNull();
+    expect(result.connect).toBeNull();
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
-  it('fetches the daemon and keeps both sources', async () => {
+  it('fetches the daemon and keeps every source', async () => {
     const snapshot = makeSnapshot({ planName: 'live' });
-    const result = await boot(makeWindow(), okFetch(snapshot));
+    const result = await boot(makeWindow(), okFetch(snapshot), FakeSocket);
     expect(result.snapshot).toEqual(snapshot);
     expect(result.source).not.toBeNull();
     expect(result.treeSource).not.toBeNull();
+    expect(result.connect).not.toBeNull();
     expect(result.token).toBeNull();
   });
 
   it('adopts the printed credential and presents it on every transport', async () => {
     const fetchFn = okFetch(makeSnapshot());
     const win = makeWindow('#t=boot-token-value');
-    const result = await boot(win, fetchFn);
+    const result = await boot(win, fetchFn, FakeSocket);
 
     expect(result.token).toBe('boot-token-value');
     expect(fetchFn).toHaveBeenCalledWith(STATE_URL, {
@@ -159,7 +173,22 @@ describe('boot', () => {
     const result = await boot(
       { ...makeWindow('#t=ignored'), __PAW_DATA__: makeSnapshot() },
       okFetch({}),
+      FakeSocket,
     );
     expect(result.token).toBeNull();
+  });
+
+  it('polls rather than downgrading when there is no socket to open', async () => {
+    const noSocket = await boot(makeWindow(), okFetch(makeSnapshot()), undefined);
+    expect(noSocket.connect).toBeNull();
+    expect(noSocket.source).not.toBeNull();
+
+    // Served over plain http: the credential must never travel over a wire
+    // anything on the machine can read, so the console polls instead.
+    const plain = {
+      ...makeWindow(),
+      location: { hash: '', pathname: '/', search: '', host: 'x', protocol: 'http:' },
+    };
+    expect((await boot(plain, okFetch(makeSnapshot()), FakeSocket)).connect).toBeNull();
   });
 });

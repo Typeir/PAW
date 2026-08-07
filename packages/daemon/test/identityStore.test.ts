@@ -62,14 +62,26 @@ const meta = (over: Partial<IdentityMeta> = {}): IdentityMeta => ({
  */
 const fakeIo = (
   files: Record<string, string> = {},
-): IdentityIo & { written: Record<string, string>; secrets: string[]; dirs: string[] } => {
+  onAssert: (path: string) => void = () => undefined,
+): IdentityIo & {
+  written: Record<string, string>;
+  secrets: string[];
+  dirs: string[];
+  checked: string[];
+} => {
   const written: Record<string, string> = {};
   const secrets: string[] = [];
   const dirs: string[] = [];
+  const checked: string[] = [];
   return {
     written,
     secrets,
     dirs,
+    checked,
+    assertPrivate: async (path) => {
+      checked.push(path);
+      onAssert(path);
+    },
     ensureDir: async (dir) => {
       dirs.push(dir);
     },
@@ -254,6 +266,23 @@ describe('loadIdentity on a machine that has none', () => {
 });
 
 describe('loadIdentity on a healthy machine', () => {
+  it('re-proves the keys are private on every boot, not only the one that wrote them', async () => {
+    const io = fakeIo(healthy());
+    await loadIdentity(PATHS, io, fakeIssuer(), WHO, NOW);
+    // A key lives for months. A restore, a copy, or a stray chmod in between is
+    // exactly the case the write-time check cannot see.
+    expect(io.checked).toEqual([PATHS.caKey, PATHS.leafKey]);
+  });
+
+  it('refuses to serve when a stored key has become readable by others', async () => {
+    const io = fakeIo(healthy(), (path) => {
+      if (path === PATHS.leafKey) {
+        throw new Error('refusing to serve: leaf.key landed as mode 644');
+      }
+    });
+    await expect(loadIdentity(PATHS, io, fakeIssuer(), WHO, NOW)).rejects.toThrow('mode 644');
+  });
+
   it('serves what is already there and mints nothing', async () => {
     const io = fakeIo(healthy());
     const issuer = fakeIssuer();

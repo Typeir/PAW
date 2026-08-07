@@ -29,15 +29,39 @@ describe('planTrust', () => {
       'Root',
       'C:/paw/identity/ca.crt',
     ]);
-    expect(plan.manual).toEqual([]);
+    expect(plan.manual.length).toBeGreaterThan(0);
   });
 
-  it('installs into the login keychain on macOS, and warns about the password prompt', () => {
+  it('installs into the login keychain on macOS, scoped to SSL, and warns about the prompt', () => {
     const plan = planTrust('darwin', CA, HOME);
+    expect(plan.steps).toHaveLength(1);
     expect(plan.steps[0].command).toBe('security');
-    expect(plan.steps[0].args).toContain('trustRoot');
-    expect(plan.steps[0].args).toContain(`${HOME}/Library/Keychains/login.keychain-db`);
+    // Asserted exactly, not by `toContain`. Without `-p ssl`,
+    // Security.framework treats the trust setting as unrestricted and the CA
+    // becomes trusted for code signing and S/MIME too — and a containment
+    // assertion stays green when someone deletes the flag.
+    expect(plan.steps[0].args).toEqual([
+      'add-trusted-cert',
+      '-r',
+      'trustRoot',
+      '-p',
+      'ssl',
+      '-k',
+      `${HOME}/Library/Keychains/login.keychain-db`,
+      CA,
+    ]);
     expect(plan.manual.join(' ')).toContain('password');
+  });
+
+  it('discloses on Windows that the root cannot be scoped, and how to remove it', () => {
+    const manual = planTrust('win32', 'C:/paw/identity/ca.crt', 'C:/Users/x').manual.join(' ');
+
+    // certutil has no scoping flag. Saying nothing would leave the operator
+    // believing the grant is as narrow as the macOS one; the honest answer is
+    // to name the gap and what actually bounds it.
+    expect(manual).toContain('no flag to scope');
+    expect(manual).toContain('name constraints');
+    expect(manual).toContain('-delstore Root');
   });
 
   it('does the NSS database on Linux and refuses to pretend about the rest', () => {

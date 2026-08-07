@@ -56,6 +56,40 @@ export {
 } from './domain/swarm.js';
 export type { DoctorFinding, SwarmPlan } from './domain/swarm.js';
 
+export {
+  AUTH_TIMEOUT_MS,
+  BACKPRESSURE_CLOSE_BYTES,
+  BACKPRESSURE_RESUME_BYTES,
+  BACKPRESSURE_SKIP_BYTES,
+  BACKPRESSURE_STALE_MS,
+  CLIENT_SILENCE_MS,
+  CLOSE_AUTH,
+  CLOSE_BACKPRESSURE,
+  CLOSE_CAPACITY,
+  CLOSE_MALFORMED,
+  CLOSE_ORIGIN,
+  CLOSE_SHUTDOWN,
+  LIVE_SUBPROTOCOL,
+  LIVE_TOPICS,
+  LIVE_VERSION,
+  MAX_AUTH_FAILURES,
+  MAX_FRAME_BYTES,
+  MAX_MESSAGES_PER_WINDOW,
+  MAX_PREAUTH_SESSIONS,
+  MAX_SESSIONS,
+  MESSAGE_WINDOW_MS,
+  PING_MS,
+  PONG_TIMEOUT_MS,
+  TOPIC_CODES,
+  authFrame,
+  encodeEnvelope,
+  isLiveTopic,
+  parseClientMessage,
+  parseEnvelope,
+  topicOfCode,
+  watchFrame,
+} from './domain/liveWire.js';
+
 export { satisfies } from './domain/role.js';
 export type {
   CostClass,
@@ -93,6 +127,7 @@ export type { DoctorReport } from './application/doctor.js';
 export { dispatchSwarm } from './application/dispatchSwarm.js';
 export type {
   DispatchDeps,
+  DispatchEvent,
   DispatchResult,
   MemberOutcome,
 } from './application/dispatchSwarm.js';
@@ -114,12 +149,20 @@ export type {
 
 export type {
   BudgetSummary,
+  ClientMessage,
   DaemonStatus,
   HostInfo,
   HostProcess,
+  LiveEnvelope,
+  LiveError,
+  LiveTopic,
+  LiveTopicMap,
+  LogEntry,
   MemberView,
   MemberViewState,
   PawSnapshot,
+  PlanSlice,
+  PlansSlice,
   RailChrome,
   RunProgress,
   TreeNode,

@@ -92,6 +92,7 @@ export interface HttpRequest {
  * @property {() => readonly TreeNode[]} tree - Produces the current repository file tree.
  * @property {string} token - The per-boot token every `/api/` request must present.
  * @property {number} port - The bound port, for the host gate and the page's CSP.
+ * @property {readonly string[]} scriptHashes - CSP sources for the page's own inline scripts.
  * @property {readonly string[]} origins - The origins allowed to call the API.
  */
 export interface RouterDeps {
@@ -100,6 +101,7 @@ export interface RouterDeps {
   readonly tree: () => readonly TreeNode[];
   readonly token: string;
   readonly port: number;
+  readonly scriptHashes: readonly string[];
   readonly origins: readonly string[];
 }
 
@@ -227,7 +229,7 @@ export async function route(request: HttpRequest, deps: RouterDeps): Promise<Htt
       status: 200,
       headers: {
         'content-type': 'text/html; charset=utf-8',
-        'content-security-policy': cspFor(deps.port),
+        'content-security-policy': cspFor(deps.port, deps.scriptHashes),
         ...securityHeaders(),
       },
       body: deps.page,

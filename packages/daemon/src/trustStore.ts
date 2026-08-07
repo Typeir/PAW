@@ -91,7 +91,12 @@ export function planTrust(platform: string, caPath: string, home: string): Trust
           elevated: false,
         },
       ],
-      manual: [],
+      manual: [
+        'certutil has no flag to scope a root to TLS, so this CA is trusted for',
+        'every purpose in your user store. Its name constraints and its',
+        'serverAuth EKU are what bound that — it can vouch for loopback TLS and',
+        'nothing else. Remove it with: certutil -user -delstore Root "PAW Local CA"',
+      ],
     };
   }
 
@@ -104,11 +109,17 @@ export function planTrust(platform: string, caPath: string, home: string): Trust
             'add-trusted-cert',
             '-r',
             'trustRoot',
+            // Scoped to SSL. Without `-p`, Security.framework treats the trust
+            // setting as unrestricted and the CA becomes trusted for code
+            // signing, S/MIME and timestamping too — which is a far larger
+            // grant than "my console should not warn".
+            '-p',
+            'ssl',
             '-k',
             `${home}/Library/Keychains/login.keychain-db`,
             caPath,
           ],
-          describe: 'add the CA to your login keychain as a trusted root',
+          describe: 'add the CA to your login keychain as a trusted SSL root',
           elevated: false,
         },
       ],

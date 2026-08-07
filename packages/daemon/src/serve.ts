@@ -24,22 +24,44 @@
  */
 
 import {
+  CLOSE_SHUTDOWN,
+  LIVE_TOPICS,
   buildRegistry,
+  runDoctor,
   type BudgetSummary,
+  type DispatchEvent,
   type DispatchResult,
   type HostInfo,
   type HostProcess,
+  type LogEntry,
   type ModelPort,
   type PawSnapshot,
+  type PlanSlice,
+  type PlansSlice,
   type RunProgress,
   type SwarmPlan,
 } from '@paw/core';
+import { createBus, type LiveBus } from './bus.js';
+import { createLogRing } from './logRing.js';
+import {
+  buildPlanSlice,
+  composeSnapshot,
+  createVersionedCache,
+  emptyPlanSlice,
+  idleBudget,
+  idleRun,
+} from './cache.js';
 import type { ServerIdentity } from './identityStore.js';
 import { discoverPlans, findConfig, selectPlan } from './plans.js';
 import { route, type HttpRequest, type HttpResponse } from './router.js';
-import { allowedOrigins } from './security.js';
-import { toRunProgress } from './run.js';
-import { buildSnapshot } from './snapshot.js';
+import {
+  allowedOrigins,
+  decideUpgrade,
+  inlineScriptHashes,
+  type UpgradeRefusal,
+} from './security.js';
+import { createSessionRegistry, type WsSessionPort } from './sessions.js';
+import { toRunProgress, trackRun } from './run.js';
 import { buildFileTree, type FileEntry } from './tree.js';
 
 /**
@@ -53,6 +75,38 @@ export const LOOPBACK = '127.0.0.1';
  * re-read, in milliseconds.
  */
 export const PROCESS_POLL_MS = 3000;
+
+/**
+ * How often the host facts are re-read and published, in milliseconds. Faster
+ * than the other sources because this tick is also the console's liveness
+ * signal: a client that has heard nothing for several ticks knows the daemon is
+ * gone rather than merely idle.
+ */
+export const HOST_TICK_MS = 1000;
+
+/**
+ * Whether two slice values are the same, by value. Sources publish on change,
+ * and "change" for a process table or a file listing means different contents —
+ * a fresh array of identical rows is not news, and telling every open console
+ * about it three times a second is the waste this comparison exists to avoid.
+ *
+ * @param {unknown} previous - The last published value.
+ * @param {unknown} next - The freshly read one.
+ * @returns {boolean} True when nothing changed.
+ */
+export function sameValue(previous: unknown, next: unknown): boolean {
+  return JSON.stringify(previous) === JSON.stringify(next);
+}
+
+/**
+ * A thrown value as a line an operator can read.
+ *
+ * @param {unknown} error - What was thrown.
+ * @returns {string} The message.
+ */
+export function reason(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 /**
  * Connectors this repo can resolve, for the config doctor.
@@ -97,6 +151,48 @@ export interface TlsMaterial {
 }
 
 /**
+ * What the runtime can tell the daemon about a socket asking to be upgraded.
+ *
+ * @interface UpgradeContext
+ * @property {string} [host] - The request's `Host`.
+ * @property {string} [origin] - The request's `Origin`.
+ * @property {string[]} protocols - The subprotocols it offered.
+ */
+export interface UpgradeContext {
+  readonly host: string | undefined;
+  readonly origin: string | undefined;
+  readonly protocols: readonly string[];
+}
+
+/**
+ * What the runtime drives once a socket has been accepted.
+ *
+ * @interface AcceptedSocket
+ * @property {(raw: string) => Promise<void>} message - One text frame arrived.
+ * @property {() => void} closed - The peer went away.
+ */
+export interface AcceptedSocket {
+  message(raw: string): Promise<void>;
+  closed(): void;
+}
+
+/**
+ * The daemon's half of the WebSocket handshake, injected into the runtime.
+ *
+ * Split in two on purpose: `check` runs while the connection is still plain HTTP
+ * — the cheap place to refuse, where a "no" costs a socket close instead of a
+ * session — and `accept` runs only after the upgrade succeeded.
+ *
+ * @interface SocketHooks
+ * @property {(context: UpgradeContext) => UpgradeRefusal | null} check - Whether to upgrade at all.
+ * @property {(port: WsSessionPort) => AcceptedSocket} accept - Adopt an upgraded socket.
+ */
+export interface SocketHooks {
+  check(context: UpgradeContext): UpgradeRefusal | null;
+  accept(port: WsSessionPort): AcceptedSocket;
+}
+
+/**
  * Every effect the daemon needs, injected.
  *
  * @interface DaemonRuntime
@@ -107,6 +203,8 @@ export interface TlsMaterial {
  * @property {(root: string) => Promise<FileEntry[]>} listFiles - The repository listing under a root.
  * @property {() => HostInfo} readHost - The host facts, read fresh.
  * @property {() => string} now - An ISO timestamp.
+ * @property {() => number} clock - Epoch milliseconds, for wire timestamps and session timers.
+ * @property {(message: string) => void} warn - Report something the operator should see but that must not stop the daemon.
  * @property {() => string} randomToken - A fresh, unguessable session token.
  * @property {() => Promise<ServerIdentity>} identity - This machine's TLS identity, issued or renewed as needed.
  * @property {() => Promise<string>} readPage - The HTML to serve at `/`.
@@ -121,11 +219,14 @@ export interface DaemonRuntime {
   listFiles(root: string): Promise<FileEntry[]>;
   readHost(): HostInfo;
   now(): string;
+  clock(): number;
+  warn(message: string): void;
   randomToken(): string;
   identity(): Promise<ServerIdentity>;
   readPage(): Promise<string>;
   listen(
     handler: (request: HttpRequest) => Promise<HttpResponse>,
+    hooks: SocketHooks,
     port: number,
     host: string,
     tls: TlsMaterial,
@@ -149,8 +250,16 @@ export interface RunReport {
  * Releases the plan's herd. Supplied by the consumer, because choosing the model
  * a run is dispatched against — a deterministic fake, or a live provider — is a
  * composition decision, and the reporting daemon takes no part in it.
+ *
+ * The second argument is how the run reports itself while it happens. A
+ * dispatcher that ignores it still works; one that forwards `dispatchSwarm`'s
+ * progress lets the console fill in member by member instead of staying blank
+ * until the last one lands.
  */
-export type Dispatcher = (plan: SwarmPlan<unknown>) => Promise<RunReport>;
+export type Dispatcher = (
+  plan: SwarmPlan<unknown>,
+  onProgress: (event: DispatchEvent) => void,
+) => Promise<RunReport>;
 
 /**
  * What to serve.
@@ -160,7 +269,8 @@ export type Dispatcher = (plan: SwarmPlan<unknown>) => Promise<RunReport>;
  * @property {string} [configPath] - An explicit config path; otherwise `.paw/config.json` is used when the repo has one.
  * @property {string} [planPath] - A plan to open on; otherwise the console opens with none selected.
  * @property {number} [port] - Port to bind; 0 (the default) takes an ephemeral one.
- * @property {number} [pollMs] - How often to re-read the process table, tree, and plan list.
+ * @property {number} [pollMs] - How often to re-read the process table, tree, config, and plan list.
+ * @property {number} [hostMs] - How often to re-read and publish the host facts.
  * @property {readonly string[]} [allowOrigins] - Extra origins permitted to call the API, e.g. a GUI development server.
  * @property {Dispatcher} [dispatch] - Release the opening plan's herd once, and report the run live.
  */
@@ -170,6 +280,7 @@ export interface DaemonOptions {
   readonly planPath?: string;
   readonly port?: number;
   readonly pollMs?: number;
+  readonly hostMs?: number;
   readonly allowOrigins?: readonly string[];
   readonly dispatch?: Dispatcher;
 }
@@ -183,6 +294,7 @@ export interface DaemonOptions {
  * @property {string} root - The repository being served.
  * @property {string} token - The per-boot credential every API call must present.
  * @property {ServerIdentity} identity - The TLS identity it is serving with, for trust hints and certificate pinning.
+ * @property {LiveBus} bus - Where the sources publish; what a live session subscribes to.
  * @property {string[]} plans - The plans discovered in it.
  * @property {string | null} openedOn - The plan the daemon opened on, if any.
  * @property {Promise<void> | null} dispatched - Settles when a released herd finishes; null when no run was asked for. Rejects loudly if the run failed.
@@ -195,6 +307,7 @@ export interface DaemonHandle {
   readonly root: string;
   readonly token: string;
   readonly identity: ServerIdentity;
+  readonly bus: LiveBus;
   readonly plans: readonly string[];
   readonly openedOn: string | null;
   readonly dispatched: Promise<void> | null;
@@ -268,12 +381,34 @@ export async function runDaemon(
   runtime: DaemonRuntime,
 ): Promise<DaemonHandle> {
   const root = options.root ?? '.';
+  const log = createLogRing(() => runtime.now());
+
+  const bus = createBus((topic, error) => {
+    // Reported straight to the terminal rather than through `report`: a listener
+    // that threw is very often a session, and publishing to the bus from inside
+    // its own fan-out is how one broken session becomes a loop.
+    runtime.warn(`a "${topic}" listener failed: ${reason(error)}`);
+  });
+
+  /**
+   * Tell the operator's terminal and every open console the same thing. A
+   * console cannot read stderr, so a daemon that reported a failing source only
+   * to a terminal nobody is watching has reported it to nobody.
+   *
+   * @param {string} message - What happened.
+   * @param {LogEntry['level']} [level] - How loud it is.
+   */
+  const report = (message: string, level: LogEntry['level'] = 'warn'): void => {
+    runtime.warn(message);
+    bus.publish('log', [log.append(level, message)]);
+  };
+
   let entries = await runtime.listFiles(root);
-  let plans = discoverPlans(entries);
+  const configPath = findConfig(options.configPath, entries);
+  let plansSlice: PlansSlice = { plans: discoverPlans(entries), configPath };
   let tree = buildFileTree(entries);
 
-  const configPath = findConfig(options.configPath, entries);
-  const config =
+  let config =
     configPath === ''
       ? {}
       : (JSON.parse(await runtime.readFile(underRoot(root, configPath))) as Record<
@@ -282,15 +417,21 @@ export async function runDaemon(
         >);
 
   const page = await runtime.readPage();
+  // Hashed once, at boot: the console is a self-contained artifact whose inline
+  // bundle cannot change while the daemon runs, so the CSP can name it exactly
+  // instead of permitting inline scripts in general.
+  const scriptHashes = inlineScriptHashes(page);
   // Before anything is scheduled or bound: a daemon with no usable identity has
   // nothing to serve, and failing here leaves no poller and no socket behind.
   const identity = await runtime.identity();
-  const registry = buildRegistry(config, () => REFUSING_MODEL);
+  let registry = buildRegistry(config, () => REFUSING_MODEL);
+  let doctor = runDoctor(config, registry, KNOWN_CONNECTORS);
   const startedAt = runtime.now();
   const runId = startedAt.slice(11, 19).replace(/:/g, '-');
   const port = options.port ?? 0;
 
   const loaded = new Map<string, LoadedPlan>();
+  const planSlices = createVersionedCache<PlanSlice>();
 
   /**
    * Load a plan, reusing the cached module while the file has not changed.
@@ -314,80 +455,293 @@ export async function runDaemon(
     return fresh;
   };
 
+  /**
+   * The rendered slice for a plan, built once per version of its file. The load
+   * above avoids re-importing an unchanged module; this avoids re-rendering
+   * every brief in it, which is the expensive half.
+   *
+   * @param {string} path - The repo-relative plan path.
+   * @returns {Promise<PlanSlice>} The slice.
+   */
+  const planSliceFor = async (path: string): Promise<PlanSlice> => {
+    const current = await loadPlan(path);
+    return planSlices.read(path, current.modifiedAt, () =>
+      buildPlanSlice(current.plan, current.source, path),
+    );
+  };
+
+  const openedOn = selectPlan(options.planPath ?? null, plansSlice.plans);
   let processes = await runtime.listProcesses();
-  const stopPolling = runtime.schedule(() => {
-    void runtime.listProcesses().then((next) => {
-      processes = next;
+  let configVersion = configPath === '' ? 0 : await runtime.modifiedAt(underRoot(root, configPath));
+  // The last slice published per plan, so a plan is only announced when its
+  // file actually changed. Keyed by path because sessions watch different plans.
+  const published = new Map<string, PlanSlice>();
+
+  /**
+   * Run a source, reporting a failure rather than leaving a rejected promise
+   * loose. A poll that throws — a file deleted mid-read, a plan that stopped
+   * parsing — must not take the daemon down and must not pass unnoticed.
+   *
+   * @param {string} what - The source's name, for the report.
+   * @param {() => Promise<void>} read - The source.
+   */
+  const runSource = (what: string, read: () => Promise<void>): void => {
+    void read().catch((error: unknown) => {
+      report(`${what} source failed: ${reason(error)}`, 'error');
     });
-    void runtime.listFiles(root).then((next) => {
-      entries = next;
-      plans = discoverPlans(next);
-      tree = buildFileTree(next);
+  };
+
+  /**
+   * Re-read the owned process table and publish only a real change.
+   */
+  const readProcesses = async (): Promise<void> => {
+    const next = await runtime.listProcesses();
+    if (!sameValue(processes, next)) {
+      processes = next;
+      bus.publish('processes', next);
+    }
+  };
+
+  /**
+   * Re-read the repository listing, republishing the plan list and the tree
+   * independently — a new source file changes the tree without changing the
+   * plans, and the console should not be told the picker moved when it did not.
+   */
+  const readListing = async (): Promise<void> => {
+    entries = await runtime.listFiles(root);
+    const nextPlans: PlansSlice = { plans: discoverPlans(entries), configPath };
+    if (!sameValue(plansSlice, nextPlans)) {
+      plansSlice = nextPlans;
+      bus.publish('plans', nextPlans);
+    }
+    const nextTree = buildFileTree(entries);
+    if (!sameValue(tree, nextTree)) {
+      tree = nextTree;
+      bus.publish('tree', nextTree);
+    }
+  };
+
+  /**
+   * Re-read the config when its file changes, so an edited config re-runs the
+   * doctor instead of reporting the state of the machine at boot forever.
+   */
+  const readConfig = async (): Promise<void> => {
+    if (configPath === '') {
+      return;
+    }
+    const full = underRoot(root, configPath);
+    const version = await runtime.modifiedAt(full);
+    if (version === configVersion) {
+      return;
+    }
+    configVersion = version;
+    config = JSON.parse(await runtime.readFile(full)) as Record<string, unknown>;
+    registry = buildRegistry(config, () => REFUSING_MODEL);
+    doctor = runDoctor(config, registry, KNOWN_CONNECTORS);
+    bus.publish('doctor', doctor);
+  };
+
+  /**
+   * Re-render every plan somebody is watching when its file changes. The cache
+   * returns the identical object while the version holds, so identity is the
+   * change test and no deep comparison of several hundred briefs is needed.
+   *
+   * The set is the **union of what the sessions watch**, plus whatever the
+   * daemon opened on, because sessions choose their own plan and a session
+   * receives only the slice for the plan it chose. Re-rendering just `openedOn`
+   * would leave every other console rendering briefs that never update again,
+   * with no error and no visible degradation — silently stale, which is worse
+   * than visibly broken.
+   */
+  const readWatchedPlan = async (): Promise<void> => {
+    const wanted = new Set(sessions.watched());
+    if (openedOn !== null) {
+      wanted.add(openedOn);
+    }
+    for (const path of wanted) {
+      if (!plansSlice.plans.includes(path)) {
+        continue;
+      }
+      try {
+        const slice = await planSliceFor(path);
+        if (published.get(path) !== slice) {
+          published.set(path, slice);
+          bus.publish('planDetail', slice);
+        }
+      } catch (error: unknown) {
+        // Per plan, so one broken module does not starve the others. A plan
+        // that stopped parsing is an ordinary thing — the operator is editing
+        // it — and letting it abort the loop would freeze plan updates for
+        // every console watching a different, perfectly healthy plan.
+        report(`plan "${path}" could not be read: ${reason(error)}`, 'error');
+      }
+    }
+    // A plan nobody watches any more is forgotten, so the map cannot grow with
+    // every plan an operator has ever clicked on during a long-lived daemon.
+    for (const path of [...published.keys()]) {
+      if (!wanted.has(path)) {
+        published.delete(path);
+      }
+    }
+  };
+
+  const token = runtime.randomToken();
+  const sessions = createSessionRegistry({
+    token,
+    clock: () => runtime.clock(),
+    snapshot: (plan) => snapshot(plan),
+    plans: () => plansSlice.plans,
+    warn: (message) => report(message, 'error'),
+  });
+
+  // One subscription per topic, forwarding to every live session. The sources
+  // publish once and know nothing about sockets; the sessions receive without
+  // knowing what produced the slice.
+  for (const topic of LIVE_TOPICS) {
+    bus.subscribe(topic, (data) => {
+      sessions.broadcast(topic, data);
+    });
+  }
+
+  const stopHostTicker = runtime.schedule(() => {
+    // Published every tick rather than on change: this is the console's liveness
+    // signal, so silence has to mean "the daemon stopped", not "nothing moved".
+    bus.publish('host', runtime.readHost());
+    // The same tick advances session timers, so an unauthenticated socket is
+    // closed on schedule without a second timer to keep in step with this one.
+    sessions.tick(runtime.clock());
+  }, options.hostMs ?? HOST_TICK_MS);
+
+  const stopPolling = runtime.schedule(() => {
+    runSource('process', readProcesses);
+    runSource('config', readConfig);
+    // Chained, not raced: the plan reader decides what still exists by asking
+    // `plansSlice`, so running it beside the listing reader would let it judge
+    // against last tick's answer and re-render a plan that has just been
+    // deleted. A listing that fails is reported and the plan read still runs
+    // against the last good listing — otherwise one unreadable directory would
+    // freeze every console's plan updates for as long as it stayed unreadable.
+    runSource('listing', async () => {
+      try {
+        await readListing();
+      } catch (error: unknown) {
+        report(`listing source failed: ${reason(error)}`, 'error');
+      }
+      await readWatchedPlan();
     });
   }, options.pollMs ?? PROCESS_POLL_MS);
-
-  const openedOn = selectPlan(options.planPath ?? null, plans);
 
   let run: RunProgress | undefined;
   let budget: BudgetSummary | undefined;
   let socket = `${LOOPBACK}:${port}`;
   const snapshot = async (asked: string | null = openedOn): Promise<PawSnapshot> => {
-    const selected = selectPlan(asked, plans);
-    const current = selected === null ? null : await loadPlan(selected);
-    return buildSnapshot({
+    const selected = selectPlan(asked, plansSlice.plans);
+    return composeSnapshot({
       host: runtime.readHost(),
       processes,
-      config,
-      configPath,
-      plans,
-      selectedPlan: selected,
-      plan: current === null ? null : current.plan,
-      planSource: current === null ? '' : current.source,
-      registry,
-      knownConnectors: KNOWN_CONNECTORS,
-      socket,
+      plans: plansSlice,
+      planDetail: selected === null ? emptyPlanSlice() : await planSliceFor(selected),
+      doctor,
+      run: run ?? idleRun(runId, startedAt),
+      budget: budget ?? idleBudget(),
       violations: [],
+      socket,
       gates: 0,
       keys: modelCount(config),
-      runId,
-      startedAt,
-      run,
-      budget,
     });
   };
 
-  const dispatched = options.dispatch
-    ? (async (dispatch: Dispatcher): Promise<void> => {
-        if (openedOn === null) {
-          throw new Error('cannot release a herd: no plan was named to run');
-        }
-        const report = await dispatch((await loadPlan(openedOn)).plan);
-        run = toRunProgress(report.result, runId, startedAt);
-        budget = report.usage;
-      })(options.dispatch)
-    : null;
+  /**
+   * Release the opening plan's herd, reporting progress as it lands.
+   *
+   * Deliberately **not** started until the socket is bound. A run releases real
+   * members against a real provider and spends real tokens; starting it before
+   * the bind means a daemon that fails on `EADDRINUSE` — an everyday outcome
+   * when the operator names a port — leaves a live run going with nobody
+   * holding it, no console to watch it, and no handle to stop it. The operator
+   * reads "address already in use", reasonably concludes nothing started, and
+   * the provider bill says otherwise.
+   *
+   * @param {Dispatcher} dispatch - The consumer's dispatcher.
+   * @returns {Promise<void>} Settles when the herd finishes.
+   */
+  const release = async (dispatch: Dispatcher): Promise<void> => {
+    if (openedOn === null) {
+      throw new Error('cannot release a herd: no plan was named to run');
+    }
+    const tracker = trackRun(runId, startedAt);
+    const report = await dispatch((await loadPlan(openedOn)).plan, (event) => {
+      run = tracker.apply(event);
+      bus.publish('run', run);
+    });
+    // The finished result is authoritative: the tracker reports what it was
+    // told, and a dispatcher that reported nothing must still end correct.
+    run = toRunProgress(report.result, runId, startedAt);
+    budget = report.usage;
+    bus.publish('run', run);
+    bus.publish('budget', budget);
+  };
 
-  const token = runtime.randomToken();
   let boundPort = port;
   let origins = allowedOrigins(port, options.allowOrigins);
 
-  const server = await runtime.listen(
-    async (request) =>
-      route(request, {
-        page,
-        snapshot,
-        tree: () => tree,
-        token,
+  const hooks: SocketHooks = {
+    check: (context) =>
+      decideUpgrade({
+        host: context.host,
+        origin: context.origin,
+        protocols: context.protocols,
         port: boundPort,
         origins,
+        liveSessions: sessions.live(),
+        preAuthSessions: sessions.preAuth(),
       }),
-    port,
-    LOOPBACK,
-    { cert: identity.cert, key: identity.key },
-  );
+    accept: (socket) => {
+      const session = sessions.open(socket, openedOn);
+      return {
+        message: (raw) => session.receive(raw),
+        closed: () => session.close(CLOSE_SHUTDOWN, 'socket closed'),
+      };
+    },
+  };
+
+  // The pollers are already running by the time the socket is bound, and a bind
+  // can fail — a port the operator named is often already taken. Leaving two
+  // intervals behind on that path means a daemon that failed to start is still
+  // reading the process table every three seconds for the life of the process.
+  let server: ServerHandle;
+  try {
+    server = await runtime.listen(
+      async (request) =>
+        route(request, {
+          page,
+          snapshot,
+          tree: () => tree,
+          token,
+          port: boundPort,
+          scriptHashes,
+          origins,
+        }),
+      hooks,
+      port,
+      LOOPBACK,
+      { cert: identity.cert, key: identity.key },
+    );
+  } catch (error: unknown) {
+    stopHostTicker();
+    stopPolling();
+    sessions.shutdown();
+    throw error;
+  }
   boundPort = server.port;
   origins = allowedOrigins(server.port, options.allowOrigins);
   socket = `${LOOPBACK}:${server.port}`;
+
+  // Now, and not a line earlier — see `release`. The rejection is claimed
+  // immediately because the caller cannot attach a handler until this function
+  // returns, and an unclaimed rejection exits the process.
+  const dispatched = options.dispatch ? release(options.dispatch) : null;
+  dispatched?.catch(() => undefined);
 
   return {
     url: `https://${socket}/`,
@@ -395,12 +749,17 @@ export async function runDaemon(
     root,
     token,
     identity,
-    plans,
+    bus,
+    plans: plansSlice.plans,
     openedOn,
     dispatched,
     snapshot,
     close: async () => {
+      stopHostTicker();
       stopPolling();
+      // Sessions are told why before the socket goes: a console that is closed
+      // with a shutdown code stops retrying, where an abrupt drop reconnects.
+      sessions.shutdown();
       await server.close();
     },
   };

@@ -23,6 +23,8 @@ import { AsnConvert } from '@peculiar/asn1-schema';
 import { NameConstraints, id_ce_nameConstraints } from '@peculiar/asn1-x509';
 import {
   BasicConstraintsExtension,
+  ExtendedKeyUsage,
+  ExtendedKeyUsageExtension,
   X509Certificate as PeculiarCertificate,
 } from '@peculiar/x509';
 import { X509Certificate } from 'node:crypto';
@@ -73,7 +75,37 @@ describe('the local certificate authority', () => {
       (subtree) => subtree.base.dNSName ?? subtree.base.iPAddress,
     );
     expect(permitted).toEqual(['localhost', '127.0.0.0/8', '::1/128']);
-    expect(decoded.excludedSubtrees).toBeUndefined();
+  });
+
+  it('excludes the name forms the permitted subtrees cannot reach', async () => {
+    const ca = await issueCa('dtira', 'LAPTOP', NOW);
+    const extension = new PeculiarCertificate(ca.cert).getExtension(id_ce_nameConstraints);
+    const decoded = AsnConvert.parse(extension!.value, NameConstraints);
+
+    // RFC 5280 §4.2.1.10: a permitted subtree constrains only the name forms a
+    // certificate actually carries — "if no name of the type is in the
+    // certificate, the certificate is acceptable". Without these exclusions a
+    // stolen key could mint an S/MIME or URI certificate that satisfies the
+    // loopback subtrees by carrying no DNS or IP name at all.
+    const excluded = (decoded.excludedSubtrees ?? []).map((subtree) =>
+      subtree.base.rfc822Name !== undefined
+        ? 'rfc822Name'
+        : subtree.base.uniformResourceIdentifier !== undefined
+          ? 'uri'
+          : 'other',
+    );
+    expect(excluded).toEqual(['rfc822Name', 'uri']);
+  });
+
+  it('is a TLS server CA and nothing else', async () => {
+    const ca = await issueCa('dtira', 'LAPTOP', NOW);
+    const eku = new PeculiarCertificate(ca.cert).getExtension(ExtendedKeyUsageExtension);
+
+    // Belt to the name constraints' braces: a name form can be absent, but an
+    // EKU cannot. Together they leave a stolen key able to mint exactly one
+    // thing — a TLS server certificate for this machine's own loopback.
+    expect(eku?.usages).toEqual([ExtendedKeyUsage.serverAuth]);
+    expect(eku?.critical).toBe(true);
   });
 
   it('encodes the OID and the critical flag in the DER itself', async () => {

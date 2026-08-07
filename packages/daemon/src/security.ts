@@ -28,6 +28,7 @@
  * @since 5.0.0
  */
 
+import { LIVE_SUBPROTOCOL, MAX_PREAUTH_SESSIONS, MAX_SESSIONS } from '@paw/core';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
 /**
@@ -221,20 +222,139 @@ export function securityHeaders(): Record<string, string> {
 }
 
 /**
+ * The `'sha256-…'` CSP sources for every inline script in a page.
+ *
+ * The console is a single self-contained file with its bundle inlined, so the
+ * scripts are known at the moment the daemon reads the page and never change
+ * while it runs. Hashing them turns `script-src 'unsafe-inline'` — which permits
+ * *any* inline script, including one injected through a rendering bug — into a
+ * grant naming exactly the bundle that was built.
+ *
+ * The digest covers the element's text content exactly as the browser sees it,
+ * so a script with a `src` is skipped (it has no inline body) and nothing is
+ * trimmed: a single changed byte is a different hash, which is the point.
+ *
+ * @param {string} html - The page as it will be served.
+ * @returns {string[]} The hash sources, in document order, deduplicated.
+ */
+export function inlineScriptHashes(html: string): string[] {
+  const hashes: string[] = [];
+  const script = /<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script\s*>/gi;
+  for (const match of html.matchAll(script)) {
+    const body = match[1];
+    if (body === '') {
+      continue;
+    }
+    const digest = createHash('sha256').update(body, 'utf8').digest('base64');
+    const source = `'sha256-${digest}'`;
+    if (!hashes.includes(source)) {
+      hashes.push(source);
+    }
+  }
+  return hashes;
+}
+
+/**
+ * Why an upgrade was refused, as a plain HTTP response.
+ *
+ * @interface UpgradeRefusal
+ * @property {number} status - The status to answer with.
+ * @property {string} message - The body, which says what failed and nothing more.
+ */
+export interface UpgradeRefusal {
+  readonly status: number;
+  readonly message: string;
+}
+
+/**
+ * What the daemon knows about a socket asking to become a WebSocket.
+ *
+ * @interface UpgradeRequest
+ * @property {string} [host] - The request's `Host`.
+ * @property {string} [origin] - The request's `Origin`.
+ * @property {string[]} protocols - The subprotocols the client offered.
+ * @property {number} port - The bound port.
+ * @property {string[]} origins - The acceptable origins.
+ * @property {number} liveSessions - How many authenticated sessions are open.
+ * @property {number} preAuthSessions - How many sockets are open but unauthenticated.
+ */
+export interface UpgradeRequest {
+  readonly host: string | undefined;
+  readonly origin: string | undefined;
+  readonly protocols: readonly string[];
+  readonly port: number;
+  readonly origins: readonly string[];
+  readonly liveSessions: number;
+  readonly preAuthSessions: number;
+}
+
+/**
+ * Whether a socket may be upgraded, decided before any WebSocket state exists.
+ *
+ * Every refusal here is a plain HTTP response, which is the cheap place to say
+ * no: a rejected upgrade costs the daemon a socket close, where an accepted one
+ * costs a session, a timer, and a buffer. The order is deliberate — identity of
+ * the *request* first (`Host`, then `Origin`, then the subprotocol), then the
+ * daemon's own capacity. A rebinding page must be told 400 whether or not the
+ * daemon happens to be busy, or the answer becomes a probe.
+ *
+ * There is deliberately **no lockout after repeated failures**. On loopback the
+ * daemon cannot tell one local peer from another, so a global cooldown is a
+ * denial of service any local process can trigger against the operator's own
+ * console — strictly worse than the guessing it would prevent, given a 256-bit
+ * credential and a four-socket pre-auth cap. Failures are counted and reported
+ * to the operator instead of being turned into a lock.
+ *
+ * The token is **not** checked here. It arrives in the first frame after the
+ * upgrade, because a browser cannot set headers on a WebSocket handshake and
+ * putting a credential in the URL would write it into every log that records a
+ * request line.
+ *
+ * @param {UpgradeRequest} request - What is known about the socket.
+ * @returns {UpgradeRefusal | null} The refusal, or null when it may proceed.
+ */
+export function decideUpgrade(request: UpgradeRequest): UpgradeRefusal | null {
+  if (!hostAllowed(request.host, request.port)) {
+    return { status: 400, message: 'bad host' };
+  }
+  if (!originAllowed(request.origin, request.origins)) {
+    return { status: 403, message: 'origin not allowed' };
+  }
+  if (!request.protocols.includes(LIVE_SUBPROTOCOL)) {
+    return { status: 400, message: `expected the ${LIVE_SUBPROTOCOL} subprotocol` };
+  }
+  if (request.liveSessions >= MAX_SESSIONS || request.preAuthSessions >= MAX_PREAUTH_SESSIONS) {
+    return { status: 429, message: 'too many sessions' };
+  }
+  return null;
+}
+
+/**
  * The page's Content-Security-Policy, built per boot because the origin — and
  * therefore the one `wss://` the console may open — is not known until the
  * daemon binds a port. Everything is denied by default; the console's own
  * inline bundle and its single socket back to this daemon are the only grants.
  *
  * @param {number} port - The bound port.
+ * @param {readonly string[]} [scriptHashes] - `'sha256-…'` sources for the page's own inline scripts.
  * @returns {string} The policy.
  */
-export function cspFor(port: number): string {
+export function cspFor(port: number, scriptHashes: readonly string[] = []): string {
   const origins = selfOrigins(port);
   const connect = [...origins, ...origins.map((origin) => origin.replace('https://', 'wss://'))];
+  // A hash source and `'unsafe-inline'` are not additive: a browser that
+  // understands hashes ignores `'unsafe-inline'` entirely. So listing the page's
+  // own scripts by digest is what actually narrows the grant, and falling back
+  // to `'unsafe-inline'` only happens when there is no script to hash at all.
+  const script = scriptHashes.length === 0 ? "'unsafe-inline'" : scriptHashes.join(' ');
   return [
     "default-src 'none'",
-    "script-src 'unsafe-inline'",
+    `script-src ${script}`,
+    // Styles stay inline-permitted: the console injects its stylesheet from
+    // React at runtime, so there is no static text to hash. A nonce would mean
+    // rewriting the served HTML per boot, and the exposure it would close —
+    // CSS-based exfiltration on a page whose only data source is this daemon —
+    // does not justify a mutation of the artifact on every request.
     "style-src 'unsafe-inline'",
     "img-src 'self' data:",
     "font-src 'self' data:",

@@ -95,6 +95,8 @@ describe('the live wire', () => {
       });
     const source = (): Promise<PawSnapshot> => answer();
 
+    // A daemon behind the page but no socket to it: the console falls back to
+    // polling rather than sitting on its boot snapshot.
     renderConsole(makeSnapshot(), source, 1000);
     expect(screen.getByText('pawd live · 2h14m · pid 4242')).toBeInTheDocument();
 
@@ -103,6 +105,7 @@ describe('the live wire', () => {
     });
     expect(screen.getByText('pawd live · 9h99m · pid 4242')).toBeInTheDocument();
     expect(screen.getByText('run 2026-08-05T15-40-02')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('live wire down — polling');
     expect(screen.queryByRole('alert')).toBeNull();
 
     answer = async () => {
@@ -111,9 +114,10 @@ describe('the live wire', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
-    const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('daemon unreachable');
-    expect(alert).toHaveTextContent('fetch failed');
+    const banner = screen.getByRole('status');
+    expect(banner).toHaveTextContent('live wire down — polling');
+    expect(banner).toHaveTextContent('fetch failed');
+    // The last snapshot stays on screen, labelled, rather than being cleared.
     expect(screen.getByText('pawd live · 9h99m · pid 4242')).toBeInTheDocument();
   });
 });

@@ -59,12 +59,14 @@ export interface IssuedCert {
  * @property {(path: string) => Promise<string | null>} readText - Read a file, or null when it is absent.
  * @property {(path: string, text: string) => Promise<void>} writeSecret - Write a private key, then prove only this account can read it.
  * @property {(path: string, text: string) => Promise<void>} writePublic - Write a certificate or sidecar.
+ * @property {(path: string) => Promise<void>} assertPrivate - Prove an existing key is still readable by this account alone.
  */
 export interface IdentityIo {
   ensureDir(dir: string): Promise<void>;
   readText(path: string): Promise<string | null>;
   writeSecret(path: string, text: string): Promise<void>;
   writePublic(path: string, text: string): Promise<void>;
+  assertPrivate(path: string): Promise<void>;
 }
 
 /**
@@ -239,6 +241,11 @@ export async function loadIdentity(
 
   if (files !== null && meta !== null) {
     if (action === 'reuse') {
+      // Checked on every boot, not only on the one that wrote them. Permissions
+      // are verified after a write, but a key lives for months and anything can
+      // happen to it in between — a restore, a copy, a `chmod` from a script.
+      await io.assertPrivate(paths.caKey);
+      await io.assertPrivate(paths.leafKey);
       return {
         cert: files.leafCert,
         key: files.leafKey,
@@ -249,6 +256,10 @@ export async function loadIdentity(
       };
     }
     if (action === 'issue-leaf') {
+      // Checked before the CA key is used, not only when it is reused verbatim:
+      // this branch *signs with* that key, so a boot that renews the leaf must
+      // prove the key its whole trust chain rests on is still owner-only.
+      await io.assertPrivate(paths.caKey);
       const leaf = await issuer.issueLeaf(files.caCert, files.caKey, now);
       const renewed: IdentityMeta = {
         ...meta,
