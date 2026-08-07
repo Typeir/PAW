@@ -1,8 +1,8 @@
 # PAW — Non-Negotiable Constraints
 
-These two constraints govern the PAW restoration (the `paw/core` library split and the `pawd`
-daemon). They are **hard rules**: a change that violates either is not "lower quality", it is
-**rejected**. Both are mechanically enforced by a gate — see §Enforcement.
+These three constraints govern the PAW restoration (the `paw/core` library split and the `pawd`
+daemon). They are **hard rules**: a change that violates any of them is not "lower quality", it is
+**rejected**. All are enforced as **checks** — see §Checks.
 
 They are enforced on the `feat/hex-tdd-restoration` branch and forward. Legacy flat modules
 (`pawDb.ts`, `hooks/`, top-level `paw*.ts`) are exempt only until they are migrated into `packages/`;
@@ -17,12 +17,12 @@ code that makes it pass. A commit that adds behaviour with no test that would ha
 is a defect regardless of whether the behaviour works.
 
 **100% coverage is the floor, measured four ways:** statements, branches, functions, lines. The
-coverage gate fails the build below 100% on any of the four. This is not aspirational — the threshold
+coverage check fails the build below 100% on any of the four. This is not aspirational — the threshold
 is set to 100 and CI is red at 99.9.
 
 - An exclusion (`/* c8 ignore */`, `coverage` exclude glob) is a **reviewed exception**, not an
   escape hatch. It carries a one-line justification in the file, and unjustified exclusions fail the
-  hex/quality gate. The default answer to "this line is hard to cover" is "then the design is hard to
+  hexagonal check. The default answer to "this line is hard to cover" is "then the design is hard to
   test — fix the design."
 - Coverage of untested branches is a lie you tell yourself. Branch coverage at 100% is the rule that
   makes it honest.
@@ -117,22 +117,27 @@ stops, rather than waving the work through.
 
 ---
 
-## Enforcement
+## Checks
 
-All three constraints are gates, because [PAW's own thesis](./README.md) is that a rule which is not
-mechanically enforced is advice.
+These are **checks**, and the word matters. *Gate* belongs to the runtime `*.gate.ts` enforcement
+system, which lints a **consumer's** codebase on every edit and never runs over PAW's own source: PAW
+excludes itself through the project's `.pawignore`, and PAW runs from anywhere to anywhere, so its own
+repo is never a gated surface. The invariants below are a separate thing — the standard every change
+to PAW itself is held to. Conflating the two is what let a raw-fetch shim slip a boundary nobody was
+actually enforcing.
 
-| Gate | Fails the build when | Runs in |
-| ---- | -------------------- | ------- |
-| `coverage` | statements / branches / functions / lines < 100% | every `packages/*` test run + CI |
-| `hexagonal` | a `core` file imports an adapter, a consumer, or a bare third-party package; an unjustified coverage exclusion exists | pre-commit + CI |
-| `no-silent-catch` | an empty `catch`, or a `catch` whose body neither rethrows nor produces a surfaced result | pre-commit + CI |
-| `tdd-order` (advisory) | a source file changed with no corresponding test change in the same commit | CI warning, reviewed |
-| `regression` | a golden screenshot differs and was not updated in the same commit | CI for `tui` / `gui` |
+[PAW's thesis](./README.md) is that a rule which is not enforced is advice. Of the checks below,
+`coverage` is the only one enforced mechanically — the test runner's thresholds fail the build below
+100%. The rest are enforced by review: people with eyes, on every change, until and unless a check is
+automated.
 
-The `hexagonal` and `coverage` gates are themselves `packages/core`-authored `QualityGate`s, dogfooding
-the system on itself. See the build order in
-[the decision manifest](../../.ignore/research/byoksdk/17-hardening-worked-examples.md#9-the-build-order-this-scenario-implies).
+| Check | Fails review when | Enforced by |
+| ----- | ----------------- | ----------- |
+| `coverage` | statements / branches / functions / lines < 100% | test-runner thresholds (`packages/*` + CI) |
+| `hexagonal` | a `core` file imports an adapter, a consumer, or a bare third-party package; an unjustified coverage exclusion exists | review |
+| `no-silent-catch` | an empty `catch`, or a `catch` whose body neither rethrows nor produces a surfaced result | review |
+| `tdd-order` | a source file changed with no corresponding test change in the same commit | review |
+| `regression` | a golden screenshot differs and was not updated in the same commit | review (`tui` / `gui`) |
 
 ---
 

@@ -5,14 +5,18 @@ enforcement**, with a live console that reads real host state. A pure core libra
 shells — a CLI, a TUI, a React web console, an Electron desktop shell — and a local daemon consume.
 
 > **⛓ Binding constraints** — on the `feat/hex-tdd-restoration` branch, three hard rules govern all work
-> and are mechanically gated: **(1) TDD, 100% coverage** (unit + E2E/integration + regression);
+> enforced as **checks** — coverage by the test runner, the rest by review: **(1) TDD, 100% coverage** (unit + E2E/integration + regression);
 > **(2) `packages/core` is a pure library** the shells consume — DDD / hexagonal, one-way imports;
 > **(3) fail loud** — no silent catches, no swallow-and-continue. See **[CONSTRAINTS.md](./CONSTRAINTS.md)**
 > before touching `packages/`.
 
-> **Providers**: the GitHub Copilot SDK is the primary herder provider, but it runs behind a proxied
-> `ModelPort` (`createCopilotSdkModel`), so the provider is swappable. BYOK is first-class — DeepSeek
-> (OpenAI-compatible) is wired and verified end-to-end; Anthropic/Codex are a different adapter, not a rewrite.
+> **Providers**: PAW sits *on top of* the GitHub Copilot SDK **runtime** — the agentic harness (tools,
+> hooks, permissions, sub-agents) — BYOK'd to a model. PAW is not a model client itself. Every model call
+> goes through that runtime behind `ModelPort`; the provider is a `{baseUrl, key}` in a data table
+> (DeepSeek, Ollama, OpenAI, Anthropic-format…), never a code path. **Verified 2026-08-07:** the SDK runs
+> headless in-repo (`getAuthStatus`=false) with a custom-tool round-trip — see the model/BYOK path below.
+> *Being removed:* a raw-`fetch` DeepSeek path (`cli/deepseekRuntime.ts`) that bypassed the runtime and so
+> carried no tools — that is drift, not a provider.
 
 ---
 
@@ -34,6 +38,66 @@ shells — a CLI, a TUI, a React web console, an Electron desktop shell — and 
 
 Every package holds at **100% coverage**; process/socket/DOM/OS I/O lives in an excluded shell and is
 proven by an E2E or integration test.
+
+---
+
+## Architecture — the model / BYOK path
+
+The one rule that keeps PAW a *tooling-over-provider* harness and not a raw model client: **every model
+call goes through the Copilot SDK runtime, BYOK'd to a provider.** The SDK is the agentic harness (tools,
+hooks, permissions); PAW orchestrates above it. The provider is data (a `{baseUrl, key}` row), the
+credential is fetched at egress and never held in config, and the SDK is imported in exactly one file.
+
+```
+  consumers                  adapters                        core (pure — no I/O, no 3rd-party)
+ ┌───────────┐              ┌─────────────────────┐         ┌────────────────────────────┐
+ │ cli  tui  │              │ model/copilotSdk.ts │         │ ports/ModelPort            │
+ │ gui       │──compose────▶│ createCopilotSdk-   │◀──impl──│   complete(req) → resp     │
+ │ daemon    │              │   Model(SessionRun) │         │ application/roleRegistry   │
+ └─────┬─────┘              │   [NO sdk import]   │         │   (role → model binding)   │
+       │ provides the       └──────────┬──────────┘         │ ports/SecretPort           │
+       │ SessionRun                    │ injected           └─────────────┬──────────────┘
+       ▼                               │                                  │ egress only
+ ┌──────────────────────────────┐     │      ★ PAW owns egress via CopilotRequestHandler.sendRequest():
+ │ daemon: the SDK SessionRun    │◀────┘      it adds the key from SecretPort, performs the provider
+ │  ★ the ONLY @github/copilot-  │            fetch, and reads `usage` from the response — real tokens,
+ │    sdk import in the repo     │            and the key never reaches the runtime.
+ │  createSession({ provider,    │──────▶   provider = { type, baseUrl } only. DeepSeek is one baseUrl,
+ │    requestHandler })          │            not a code path; no key in config, ever.
+ └───────────────┬───────────────┘
+                 ▼
+      ┌────────────────────────┐   headless: getAuthStatus().isAuthenticated === false.
+      │ Copilot SDK runtime    │   The reason to sit on the SDK at all: tools + hooks + perms
+      │ tools · hooks · perms  │   + sub-agents. A path that skips this is a raw client, not PAW.
+      └────────────────────────┘
+
+  ✗ DRIFT (removed): cli/deepseekRuntime.ts = raw fetch('/chat/completions').
+    It satisfies ModelPort.complete() WITHOUT the SDK — no tools, no hooks — because a plain
+    completion needs nothing the SDK uniquely gives. That shape is what invited the drift.
+
+  ✔ DECIDED 2026-08-07: (1) ModelPort stays complete()→text; a tool-using AgentSessionPort comes
+    later (lamp post below).  (2) egress is daemon-owned — the SDK + key live in pawd, faces RPC in.
+    (3) usage comes from CopilotRequestHandler (PAW owns the provider call), since the SDK's
+    sendAndWait exposes no token usage. Returning 0 would be a silent lie (Constraint 3).
+
+  ⚠ Status: the ★ SDK SessionRun does NOT exist yet. Step 0 (done) only proved the SDK runs
+    headless in-repo. Until step 4, the only model path is the ✗ drift above.
+```
+
+> ## 🚧 LAMP POST — future work: consume the SDK's tools, do **not** build a new MCP
+>
+> The tool-less `complete()` path above is deliberate — memory drafting and gate-explain need no tools.
+> The **agentic** surface (a deferred `AgentSessionPort` for swarm reviewers: `view`/`grep`/`glob` + a
+> `submit_finding` tool, read-only) is where PAW's whole reason for existing lives. When it lands:
+>
+> **Wire the Copilot SDK's *own* surface** — its 16 built-in tools (`view`, `grep`, `glob`, `edit`,
+> `powershell`, `web_fetch`, `sql`, `task`/sub-agents…), its permission model, its hooks, **and its MCP
+> client** — into those sessions via `defineTool` / `availableTools` / `excludedTools`.
+>
+> **Do NOT build a new MCP, a new tool registry, or a new permission/hook system.** The SDK already *is*
+> that, and consuming it is the entire point of sitting on the runtime. Reinventing it is exactly the
+> drift that turned a tooling-over-provider harness into "a lame DeepSeek harness with a funny hexagonal
+> architecture." The day PAW grows its own MCP is the day it has lost the plot.
 
 ---
 
@@ -141,12 +205,13 @@ grants `connect-src` to that origin alone.
 ## Status — built vs planned (honest)
 
 **Built + verified (100% coverage):** core, adapters, connectors, cli, tui, the React console, daemon,
-electron, installer. Live host data over an authenticated `wss` wire, TLS from a name-constrained local CA. Real BYOK dispatch (`--live`, DeepSeek). Native
+electron, installer. Live host data over an authenticated `wss` wire, TLS from a name-constrained local CA. Native
 installer binary via Node SEA; PATH activation + repo hoist. **Swarm file-context** — attach file contents
 to every member's brief via `--context a.ts,src/**` or a multi-select file tree in the console fed by
 `/api/tree`; the rooted reader refuses `..` escapes and `.env*`, and the dry-run is byte-identical to dispatch.
 
 **In progress / planned:**
+- **BYOK through the SDK** — step 0 (done) verified the runtime runs headless in-repo (SDK pinned to `1.0.8`; Test A/B against a stub provider). The real SDK-backed `SessionRun` (daemon) and role-bound model layer (core/adapters) are next; the interim raw-`fetch` DeepSeek path is drift, being removed. See the model/BYOK path diagram above.
 - **Bearer token** on the control API (loopback + owned-subtree only today; a per-boot token is next).
 - **Console release** — the console prints the exact `--context` argument but cannot yet POST a run (no control API); the run leaves via the CLI.
 - **Live herd states** (`running`/`failed`) — needs a per-member progress callback in core (dispatch is batch).

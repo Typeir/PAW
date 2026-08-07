@@ -5,7 +5,11 @@
  * Constraint 1. `src/main.ts` is excluded: it is the I/O shell (a `node:http`
  * server, `ps-list`, dynamic import, the filesystem) whose only job is to gather
  * the real inputs and hand them to the pure `host`, `snapshot`, and `router` this
- * suite tests exhaustively.
+ * suite tests exhaustively. `src/model/sdkModel.ts` is excluded for the same
+ * reason: it is the thin shell that subclasses `@github/copilot-sdk`'s request
+ * handler and spawns the 159 MB Copilot runtime — its pure collaborators
+ * (`providerUsage`, `pawEgressLogic`, `sdkSessionRun`) are unit-covered to 100%,
+ * and the shell itself is proven by the opt-in `PAW_SDK_LIVE` integration test.
  *
  * @module @paw/daemon/vitest.config
  * @version 0.0.0
@@ -21,7 +25,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/main.ts', 'src/index.ts'],
+      exclude: ['src/main.ts', 'src/index.ts', 'src/model/sdkModel.ts'],
       thresholds: {
         statements: 100,
         branches: 100,
