@@ -123,4 +123,7 @@ export type {
 
 export { attachSession, listenSocket } from './infrastructure/socketServer.js';
 export type { ConnSocket, SocketServerHandle } from './infrastructure/socketServer.js';
+
+export { serveEnforcement } from './application/serveEnforcement.js';
+export type { EnforcementOptions } from './application/serveEnforcement.js';
 export { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from './domain/consolePage.js';

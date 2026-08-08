@@ -17,14 +17,21 @@
  */
 
 /**
+ * The canonical event kinds, as a runtime list so a boundary can validate an
+ * event string off the wire without a second hand-kept copy.
+ */
+export const PAW_EVENT_TYPES = [
+  'session.start',
+  'prompt.submitted',
+  'tool.pre',
+  'tool.post',
+  'session.end',
+] as const;
+
+/**
  * The canonical event kinds. Hosts map their own lifecycle names onto these.
  */
-export type PawEventType =
-  | 'session.start'
-  | 'prompt.submitted'
-  | 'tool.pre'
-  | 'tool.post'
-  | 'session.end';
+export type PawEventType = (typeof PAW_EVENT_TYPES)[number];
 
 /**
  * A tool is about to run — the enforcement decision point.

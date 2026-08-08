@@ -43,6 +43,7 @@ export type {
   RpcSuccess,
 } from './domain/rpcWire.js';
 
+export { PAW_EVENT_TYPES } from './domain/event.js';
 export type {
   PawEvent,
   PawEventType,
