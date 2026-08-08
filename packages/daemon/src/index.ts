@@ -105,4 +105,12 @@ export { decideUpgrade } from './infrastructure/security.js';
 export type { UpgradeRefusal, UpgradeRequest } from './infrastructure/security.js';
 
 export { BOOTSTRAP, nodeRuntime, walkFiles } from './infrastructure/nodeRuntime.js';
+
+export {
+  lockPath,
+  projectId,
+  socketPath,
+  tokenPath,
+} from './infrastructure/endpoint.js';
+export type { EndpointEnv } from './infrastructure/endpoint.js';
 export { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from './domain/consolePage.js';
