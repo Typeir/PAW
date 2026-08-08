@@ -73,7 +73,11 @@ beforeAll(async () => {
     connectors: { copilot: copilotHooksConnector },
   };
   endpoint = socketPath(root, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: root });
-  handle = await serveEnforcement({ socketPath: endpoint, token: TOKEN, projectRoot: root, deps });
+  handle = await serveEnforcement({
+    socketPath: endpoint,
+    projectRoot: root,
+    configure: async () => ({ token: TOKEN, deps }),
+  });
 });
 
 afterAll(async () => {

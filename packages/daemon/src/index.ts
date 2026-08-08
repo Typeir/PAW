@@ -121,8 +121,14 @@ export type {
   SessionPush,
 } from './application/rpcSession.js';
 
-export { attachSession, listenSocket } from './infrastructure/socketServer.js';
-export type { ConnSocket, SocketServerHandle } from './infrastructure/socketServer.js';
+export {
+  attachSession,
+  bindSocket,
+  listenSocket,
+  reapSocket,
+  serveSessions,
+} from './infrastructure/socketServer.js';
+export type { BindSeams, ConnSocket, SocketServerHandle } from './infrastructure/socketServer.js';
 
 export { serveEnforcement } from './application/serveEnforcement.js';
 export type { EnforcementOptions } from './application/serveEnforcement.js';

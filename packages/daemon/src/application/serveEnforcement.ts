@@ -1,13 +1,14 @@
 /**
  * PAW Enforcement Service
  *
- * @fileoverview The composition that makes the resident daemon serve enforcement:
- * it owns a store and a gate cache once, and exposes them over the socket as the
- * `hook.dispatch` method, which runs {@link dispatchHook} — the same loop the
- * cold hook used to run per process. A hook is now a thin client of this; the
- * store's single owner and the gate cache's single import are what this buys
- * (doc 10 §2, §8). The caller derives the socket path and token from the project
- * and creates the store/gate/connectors; this only wires and listens.
+ * @fileoverview The composition that makes the resident daemon serve enforcement,
+ * and the order that keeps a single daemon honest: it CLAIMS the endpoint first
+ * (the OS lets exactly one process bind it), and only then runs `configure` to
+ * open the store and write the token. A daemon that loses the race never reaches
+ * `configure`, so it never clobbers the winner's token or store — no reliance on
+ * a removable lockfile for that guarantee. Once claimed, the store and warm gate
+ * cache it owns are exposed as `hook.dispatch`, which runs {@link dispatchHook}
+ * (doc 10 §2, §8). A losing bind releases nothing because it wrote nothing.
  *
  * @module @paw/daemon/application/serveEnforcement
  * @version 0.0.0
@@ -24,24 +25,38 @@ import {
   type PawEventType,
 } from '@paw/core';
 import { createRpcSession } from './rpcSession.js';
-import { listenSocket, type SocketServerHandle } from '../infrastructure/socketServer.js';
+import {
+  bindSocket,
+  serveSessions,
+  type SocketServerHandle,
+} from '../infrastructure/socketServer.js';
 
 const EVENTS: ReadonlySet<string> = new Set(PAW_EVENT_TYPES);
 
 /**
- * What the enforcement service needs, all owned once by the caller.
+ * What `configure` yields once the endpoint is claimed.
+ *
+ * @interface EnforcementConfig
+ * @property {string} token - The handshake token clients must present.
+ * @property {DispatchHookDeps} deps - The store, gates, connectors, and policy the loop runs against.
+ */
+export interface EnforcementConfig {
+  readonly token: string;
+  readonly deps: DispatchHookDeps;
+}
+
+/**
+ * What the enforcement service needs.
  *
  * @interface EnforcementOptions
- * @property {string} socketPath - The endpoint to bind.
- * @property {string} token - The handshake token clients must present.
+ * @property {string} socketPath - The endpoint to claim.
  * @property {string} projectRoot - The root pawd serves, reported at handshake.
- * @property {DispatchHookDeps} deps - The store, gates, connectors, and policy the loop runs against.
+ * @property {() => Promise<EnforcementConfig>} configure - Produces the token and deps, run ONLY after the claim — the place any writes to `.paw` belong.
  */
 export interface EnforcementOptions {
   readonly socketPath: string;
-  readonly token: string;
   readonly projectRoot: string;
-  readonly deps: DispatchHookDeps;
+  configure(): Promise<EnforcementConfig>;
 }
 
 /**
@@ -65,30 +80,32 @@ function toDispatch(params: unknown): HookDispatch | null {
 }
 
 /**
- * Serve enforcement over the socket and return the running server.
+ * Claim the endpoint and serve enforcement, returning the running server.
  *
- * @param {EnforcementOptions} opts - The endpoint, token, root, and owned deps.
- * @returns {Promise<SocketServerHandle>} The running server.
+ * @param {EnforcementOptions} opts - The endpoint, root, and post-claim configure.
+ * @returns {Promise<SocketServerHandle>} The running server; rejects when a live daemon already holds the endpoint (having written nothing).
  */
-export function serveEnforcement(opts: EnforcementOptions): Promise<SocketServerHandle> {
-  const hello = {
-    protocolVersion: RPC_PROTOCOL_VERSION,
-    projectRoot: opts.projectRoot,
-    capabilities: ['gates', 'violations'],
-    health: 'ok',
-  };
-  const methods = {
-    'hook.dispatch': async (params: unknown): Promise<unknown> => {
-      const req = toDispatch(params);
-      return req === null ? { continue: true } : dispatchHook(opts.deps, req);
-    },
-  };
-  return listenSocket(opts.socketPath, () =>
-    createRpcSession({
-      token: opts.token,
+export async function serveEnforcement(opts: EnforcementOptions): Promise<SocketServerHandle> {
+  const server = await bindSocket(opts.socketPath);
+  try {
+    const { token, deps } = await opts.configure();
+    const hello = {
       protocolVersion: RPC_PROTOCOL_VERSION,
-      hello,
-      methods,
-    }),
-  );
+      projectRoot: opts.projectRoot,
+      capabilities: ['gates', 'violations'],
+      health: 'ok',
+    };
+    const methods = {
+      'hook.dispatch': async (params: unknown): Promise<unknown> => {
+        const req = toDispatch(params);
+        return req === null ? { continue: true } : dispatchHook(deps, req);
+      },
+    };
+    return serveSessions(server, () =>
+      createRpcSession({ token, protocolVersion: RPC_PROTOCOL_VERSION, hello, methods }),
+    );
+  } catch (err: unknown) {
+    await new Promise<void>((done) => server.close(() => done()));
+    throw err;
+  }
 }

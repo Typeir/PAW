@@ -72,22 +72,27 @@ export async function startEnforcement(
   seams: StartSeams = {},
 ): Promise<SocketServerHandle> {
   const pawDir = join(root, '.paw');
-  mkdirSync(pawDir, { recursive: true });
-  const token = (seams.randomToken ?? (() => randomBytes(32).toString('hex')))();
-  writeFileSync(tokenPath(pawDir), token, { mode: 0o600 });
-
-  const store = await (seams.makeStore ?? (() => openSqlJsStore(join(pawDir, 'paw.sqlite'))))();
-  const deps: DispatchHookDeps = {
-    store,
-    gates: createGateCache(root),
-    exemptTools: EXEMPT_TOOLS,
-    isIgnored: (path) => IGNORED.test(path),
-    connectors: { copilot: copilotHooksConnector },
-  };
   const endpoint = socketPath(root, {
     platform: process.platform,
     xdgRuntimeDir: process.env.XDG_RUNTIME_DIR,
     tmpdir: tmpdir(),
   });
-  return serveEnforcement({ socketPath: endpoint, token, projectRoot: root, deps });
+  return serveEnforcement({
+    socketPath: endpoint,
+    projectRoot: root,
+    configure: async () => {
+      mkdirSync(pawDir, { recursive: true });
+      const token = (seams.randomToken ?? (() => randomBytes(32).toString('hex')))();
+      writeFileSync(tokenPath(pawDir), token, { mode: 0o600 });
+      const store = await (seams.makeStore ?? (() => openSqlJsStore(join(pawDir, 'paw.sqlite'))))();
+      const deps: DispatchHookDeps = {
+        store,
+        gates: createGateCache(root),
+        exemptTools: EXEMPT_TOOLS,
+        isIgnored: (path) => IGNORED.test(path),
+        connectors: { copilot: copilotHooksConnector },
+      };
+      return { token, deps };
+    },
+  });
 }

@@ -93,7 +93,11 @@ beforeAll(async () => {
     connectors: { test: testConnector },
   };
   endpoint = socketPath(root, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: root });
-  handle = await serveEnforcement({ socketPath: endpoint, token: 'T', projectRoot: root, deps });
+  handle = await serveEnforcement({
+    socketPath: endpoint,
+    projectRoot: root,
+    configure: async () => ({ token: 'T', deps }),
+  });
 });
 
 afterAll(async () => {
@@ -136,5 +140,20 @@ describe('pawd enforcement over a real socket', () => {
     expect((await bad(6, null)).result).toEqual({ continue: true });
 
     c.close();
+  });
+
+  it('releases the claim and rejects when configure fails', async () => {
+    const other = mkdtempSync(path.join(tmpdir(), 'paw-serve-fail-'));
+    const sock = socketPath(other, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: other });
+    await expect(
+      serveEnforcement({
+        socketPath: sock,
+        projectRoot: other,
+        configure: async () => {
+          throw new Error('store unavailable');
+        },
+      }),
+    ).rejects.toThrow('store unavailable');
+    rmSync(other, { recursive: true, force: true });
   });
 });
