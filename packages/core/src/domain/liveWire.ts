@@ -32,7 +32,7 @@
  * @since 5.0.0
  */
 
-import type { ClientMessage, LiveEnvelope, LiveTopic, LiveTopicMap } from '../contracts.js';
+import type { ClientMessage, LiveEnvelope, LiveTopic, LiveTopicMap, RunSettings } from '../contracts.js';
 import type { InitMode } from './initConfig.js';
 
 /**
@@ -101,6 +101,12 @@ export const ATTACH_CODE = 't';
 export const SCOPE_CODE = 'r';
 
 /**
+ * The message code a release request travels as. Like {@link ATTACH_CODE}, it
+ * only asks: the operator approves it in the terminal before a live herd runs.
+ */
+export const RELEASE_CODE = 'x';
+
+/**
  * The init modes an attach request may name. Listed here so the wire refuses a
  * mode the domain does not have, rather than passing an unknown string inward
  * for something further in to reject — or not.
@@ -115,6 +121,53 @@ const ATTACH_MODES: readonly InitMode[] = ['create', 'merge', 'override'];
  */
 function isInitMode(value: unknown): value is InitMode {
   return ATTACH_MODES.some((mode) => mode === value);
+}
+
+/**
+ * Whether a value is an optional count — omitted, or a whole number of one or
+ * more. Used for the release settings a console cannot be trusted to have
+ * validated.
+ *
+ * @param {unknown} value - The candidate.
+ * @returns {boolean} True when absent or a valid count.
+ */
+function isOptionalCount(value: unknown): value is number | undefined {
+  return value === undefined || (typeof value === 'number' && Number.isInteger(value) && value >= 1);
+}
+
+/**
+ * Rebuild {@link RunSettings} from a wire value, field by field, or null when any
+ * field is missing or malformed. An allow-list like the rest of this module: a
+ * frame naming an unknown-shaped setting is refused whole rather than passed
+ * inward half-trusted.
+ *
+ * @param {unknown} value - The candidate settings object.
+ * @returns {RunSettings | null} The settings, or null.
+ */
+function parseRunSettings(value: unknown): RunSettings | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const raw = value as Record<string, unknown>;
+  const maxOutputTokens = raw.maxOutputTokens;
+  const concurrency = raw.concurrency;
+  const context = raw.context;
+  if (typeof raw.plan !== 'string' || raw.plan.length === 0 || typeof raw.live !== 'boolean') {
+    return null;
+  }
+  if (!isOptionalCount(maxOutputTokens) || !isOptionalCount(concurrency)) {
+    return null;
+  }
+  if (context !== undefined && !(Array.isArray(context) && context.every((entry) => typeof entry === 'string'))) {
+    return null;
+  }
+  return {
+    plan: raw.plan,
+    live: raw.live,
+    ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+    ...(concurrency !== undefined ? { concurrency } : {}),
+    ...(context !== undefined ? { context: context as string[] } : {}),
+  };
 }
 
 /**
@@ -331,6 +384,10 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       ? { v: LIVE_VERSION, type: 'attach', path, mode }
       : null;
   }
+  if (message.m === RELEASE_CODE) {
+    const settings = parseRunSettings(message.s);
+    return settings === null ? null : { v: LIVE_VERSION, type: 'release', settings };
+  }
   return null;
 }
 
@@ -420,4 +477,16 @@ export function encodeAttach(path: string, mode: InitMode): string {
  */
 export function encodeScope(path: string): string {
   return JSON.stringify({ v: LIVE_VERSION, m: SCOPE_CODE, p: path });
+}
+
+/**
+ * The `release` frame a console, TUI, or `paw ui` sends to ask the daemon to run
+ * a plan's herd. Asking is all it does — the operator approves it in the terminal
+ * before a live run spends anything. See {@link ClientMessage}.
+ *
+ * @param {RunSettings} settings - What to run and how.
+ * @returns {string} The frame's text.
+ */
+export function encodeRelease(settings: RunSettings): string {
+  return JSON.stringify({ v: LIVE_VERSION, m: RELEASE_CODE, s: settings });
 }

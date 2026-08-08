@@ -43,6 +43,7 @@ import {
   encodeEnvelope,
   isLiveTopic,
   parseClientMessage,
+  encodeRelease,
   parseEnvelope,
   topicOfCode,
   watchFrame,
@@ -233,6 +234,53 @@ describe('parseClientMessage', () => {
     const huge = authFrame('a'.repeat(MAX_FRAME_BYTES));
     expect(huge.length).toBeGreaterThan(MAX_FRAME_BYTES);
     expect(parseClientMessage(huge)).toBeNull();
+  });
+
+  it('round-trips a release request with every setting', () => {
+    const settings = {
+      plan: 'plans/lore.swarm.mjs',
+      live: true,
+      maxOutputTokens: 4096,
+      concurrency: 8,
+      context: ['a.ts', 'src/**'],
+    };
+    expect(parseClientMessage(encodeRelease(settings))).toEqual({ v: 1, type: 'release', settings });
+  });
+
+  it('round-trips a release request carrying only its required settings', () => {
+    expect(parseClientMessage(encodeRelease({ plan: 'p', live: false }))).toEqual({
+      v: 1,
+      type: 'release',
+      settings: { plan: 'p', live: false },
+    });
+  });
+
+  it('refuses release settings that are missing or malformed', () => {
+    for (const frame of [
+      '{"v":1,"m":"x"}',
+      '{"v":1,"m":"x","s":null}',
+      '{"v":1,"m":"x","s":[]}',
+      '{"v":1,"m":"x","s":"nope"}',
+      '{"v":1,"m":"x","s":{"live":true}}',
+      '{"v":1,"m":"x","s":{"plan":"","live":true}}',
+      '{"v":1,"m":"x","s":{"plan":"p"}}',
+      '{"v":1,"m":"x","s":{"plan":"p","live":"yes"}}',
+      '{"v":1,"m":"x","s":{"plan":"p","live":true,"maxOutputTokens":0}}',
+      '{"v":1,"m":"x","s":{"plan":"p","live":true,"maxOutputTokens":"lots"}}',
+      '{"v":1,"m":"x","s":{"plan":"p","live":true,"concurrency":2.5}}',
+      '{"v":1,"m":"x","s":{"plan":"p","live":true,"context":"a.ts"}}',
+      '{"v":1,"m":"x","s":{"plan":"p","live":true,"context":[1]}}',
+    ]) {
+      expect(parseClientMessage(frame)).toBeNull();
+    }
+  });
+
+  it('drops unrecognised release settings rather than passing them through', () => {
+    expect(parseClientMessage('{"v":1,"m":"x","s":{"plan":"p","live":true,"admin":1}}')).toEqual({
+      v: 1,
+      type: 'release',
+      settings: { plan: 'p', live: true },
+    });
   });
 });
 

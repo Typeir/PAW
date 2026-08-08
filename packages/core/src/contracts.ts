@@ -393,13 +393,16 @@ export interface LiveEnvelope<T extends LiveTopic = LiveTopic> {
  * The only three things a client may say, decoded. Anything else is a protocol
  * violation and closes the connection — a control socket does not negotiate.
  *
- * `auth` and `watch` manage a subscription. `attach` is different in kind and
- * deliberately narrow: it *requests* that PAW be attached to a repository, and
- * the daemon's whole part in it is to remember that someone asked. It performs
- * no write and gains no filesystem authority — an operator approves the request
- * out-of-band, in the terminal that started the daemon, and the process that
- * already had that authority does the work. Kill the daemon mid-flow and nothing
- * has happened, which is the property a POST route would have cost.
+ * `auth` and `watch` manage a subscription. `attach` and `release` are different
+ * in kind and deliberately narrow: each *requests* an action, and the daemon's
+ * whole part is to remember that someone asked. It performs no write, spends no
+ * money, and gains no authority — an operator approves the request out-of-band,
+ * in the terminal that started the daemon, and the process that already had that
+ * authority does the work. Kill the daemon mid-flow and nothing has happened,
+ * which is the property a POST route would have cost. `release` is what keeps a
+ * console-, TUI-, or `paw ui`-triggered live herd non-autonomous: the CLI's
+ * standalone runner is the autonomous path; everything through the daemon asks
+ * first.
  */
 export type ClientMessage =
   | { readonly v: 1; readonly type: 'auth'; readonly token: string }
@@ -410,4 +413,26 @@ export type ClientMessage =
       readonly type: 'attach';
       readonly path: string;
       readonly mode: InitMode;
-    };
+    }
+  | { readonly v: 1; readonly type: 'release'; readonly settings: RunSettings };
+
+/**
+ * The settings a console, TUI, or `paw ui` carries when it asks the daemon to
+ * release a herd — the run capabilities every surface exposes identically, so a
+ * run behaves the same whichever face configured it. Only the presentation
+ * differs; this is the shared shape the wire moves and the daemon acts on.
+ *
+ * @interface RunSettings
+ * @property {string} plan - The plan the daemon holds to release, by the name the console watches it under.
+ * @property {boolean} live - Whether to dispatch against the live provider (spends) or the deterministic fake.
+ * @property {number} [maxOutputTokens] - Per-run output ceiling; omitted takes each model's default.
+ * @property {number} [concurrency] - Members in flight at once; omitted takes the dispatcher default.
+ * @property {readonly string[]} [context] - File globs whose contents attach to every member's brief.
+ */
+export interface RunSettings {
+  readonly plan: string;
+  readonly live: boolean;
+  readonly maxOutputTokens?: number;
+  readonly concurrency?: number;
+  readonly context?: readonly string[];
+}
