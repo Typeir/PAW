@@ -13,6 +13,7 @@
  */
 
 export { createNodeFileReader, resolveInRoot } from './file/nodeFileReader.js';
+export { createNodeGateRunner } from './gate/nodeGateRunner.js';
 export { createNodeFs } from './file/nodeFs.js';
 export { createNodeProcess } from './process/nodeProcess.js';
 export { createMemoryStore } from './store/memoryStore.js';
