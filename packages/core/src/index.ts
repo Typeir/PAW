@@ -15,6 +15,14 @@
 export { decidePreToolUse } from './domain/enforcement.js';
 export type { Decision, PreToolInput } from './domain/enforcement.js';
 
+export { chainCommand, mergeHookCommand } from './domain/hookMerge.js';
+export type {
+  HookMerge,
+  HookMergeSpec,
+  HookShell,
+  MergeAction,
+} from './domain/hookMerge.js';
+
 export type {
   PawEvent,
   PawEventType,
