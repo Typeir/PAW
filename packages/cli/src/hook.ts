@@ -1,13 +1,13 @@
 /**
- * PAW Hook Bridge
+ * PAW Hook Bridge (thin client)
  *
- * @fileoverview `paw hook --<host> <event>` — the bridge from a host's hook
- * process to PAW's loop. It reads the host's native payload on stdin, selects the
- * host's connector, translates the payload into a canonical event, runs it
- * through {@link handleEvent}, and writes the connector's native output back. The
- * per-event I/O is the connector's (the proven, ported translation); this module
- * only routes host + event to it. The event argument is authoritative — it is
- * what `hooks.json` wired — so it stamps the host event name before translation.
+ * @fileoverview `paw hook --<host> <event>` — a thin client of the resident
+ * daemon (doc 10 §7). It reads the host's hook payload from stdin, asks pawd to
+ * decide via `hook.dispatch`, and writes pawd's answer back — or, on any daemon
+ * trouble, the host's do-nothing output. It owns no store, no gates, no
+ * connector: those live in the daemon, where one owner and one warm cache serve
+ * every hook. Fail-open is the whole contract, so a daemon problem never bricks a
+ * hook.
  *
  * @module @paw/cli/hook
  * @version 0.0.0
@@ -15,20 +15,14 @@
  * @since 5.0.0
  */
 
-import {
-  handleEvent,
-  type HandleDeps,
-  type HostConnector,
-  type PawEventType,
-} from '@paw/core';
-import { copilotHooksConnector } from '@paw/connectors';
+import { rpcCall } from './pawdClient.js';
 
 /**
- * The stdin/stdout seam, injected so the router is testable without a process.
+ * The stdin/stdout seam, injected so the bridge tests without a process.
  *
  * @interface HookIo
  * @property {() => Promise<string>} readStdin - Read the whole host payload.
- * @property {(text: string) => void} writeStdout - Emit the connector's output.
+ * @property {(text: string) => void} writeStdout - Emit the host output.
  */
 export interface HookIo {
   readStdin(): Promise<string>;
@@ -36,85 +30,58 @@ export interface HookIo {
 }
 
 /**
- * Read-only tools never blocked by violations, ported from the legacy
- * `preToolUse` hook. The agent needs these to diagnose and fix.
- */
-export const EXEMPT_TOOLS: ReadonlySet<string> = new Set([
-  'read_file',
-  'view_image',
-  'grep_search',
-  'file_search',
-  'semantic_search',
-  'list_dir',
-  'get_errors',
-  'get_terminal_output',
-  'memory',
-  'manage_todo_list',
-  'vscode_askQuestions',
-  'tool_search_tool_regex',
-  'fetch_webpage',
-  'task_complete',
-]);
-
-/**
- * Canonical event → the host event name a connector keys its translation on.
- */
-const EVENT_HOOK_NAME: Record<PawEventType, string> = {
-  'session.start': 'SessionStart',
-  'prompt.submitted': 'UserPromptSubmit',
-  'tool.pre': 'PreToolUse',
-  'tool.post': 'PostToolUse',
-  'session.end': 'Stop',
-};
-
-/**
- * The host connectors `paw hook --<host>` can select.
- */
-export const HOST_CONNECTORS: Record<string, HostConnector> = {
-  copilot: copilotHooksConnector,
-};
-
-/**
- * Whether a string names a canonical event.
+ * What the bridge needs to make one call.
  *
- * @param {string} x - The candidate event name.
- * @returns {boolean} True when it is a {@link PawEventType}.
+ * @interface HookOptions
+ * @property {string} host - The host key the command named.
+ * @property {string} event - The canonical event the command named.
+ * @property {string} socketPath - The daemon endpoint.
+ * @property {string} tokenPath - The handshake token file.
+ * @property {HookIo} io - The stdin/stdout seam.
+ * @property {typeof rpcCall} [call] - The RPC call; injected in tests.
  */
-function isEventType(x: string): x is PawEventType {
-  return Object.prototype.hasOwnProperty.call(EVENT_HOOK_NAME, x);
+export interface HookOptions {
+  readonly host: string;
+  readonly event: string;
+  readonly socketPath: string;
+  readonly tokenPath: string;
+  readonly io: HookIo;
+  readonly call?: typeof rpcCall;
 }
 
 /**
- * Route one host hook invocation through PAW's loop.
+ * Parse the host payload, treating a non-object or malformed body as empty — the
+ * daemon decides on whatever it can, and an unreadable payload just resolves to
+ * nothing to enforce.
  *
- * @param {string} host - The host key (e.g. `copilot`).
- * @param {string} event - The canonical event the command names (e.g. `tool.pre`).
- * @param {HookIo} io - The stdin/stdout seam.
- * @param {HandleDeps} deps - The loop dependencies (store, gates, exempt, ignore).
- * @param {Record<string, HostConnector>} [connectors] - The host registry; defaults to {@link HOST_CONNECTORS}.
- * @returns {Promise<number>} The process exit code — always 0; the decision rides in the JSON.
+ * @param {string} raw - The stdin text.
+ * @returns {Record<string, unknown>} The payload object, or {}.
  */
-export async function runHook(
-  host: string,
-  event: string,
-  io: HookIo,
-  deps: HandleDeps,
-  connectors: Record<string, HostConnector> = HOST_CONNECTORS,
-): Promise<number> {
-  const connector = connectors[host];
-  if (!connector) {
-    throw new Error(`unknown hook host "${host}"`);
+function safePayload(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return typeof parsed === 'object' && parsed !== null
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
   }
-  if (!isEventType(event)) {
-    throw new Error(`unknown hook event "${event}"`);
-  }
-  const raw = JSON.parse(await io.readStdin()) as Record<string, unknown>;
-  const pawEvent = connector.toEvent({ ...raw, hookEventName: EVENT_HOOK_NAME[event] });
-  if (!pawEvent) {
-    io.writeStdout(JSON.stringify({ continue: true }));
-    return 0;
-  }
-  const response = await handleEvent(pawEvent, deps);
-  io.writeStdout(JSON.stringify(connector.fromResponse(response)));
+}
+
+/**
+ * Bridge one host hook invocation to the daemon.
+ *
+ * @param {HookOptions} opts - Host, event, endpoint, io, and optional call seam.
+ * @returns {Promise<number>} The exit code — always 0; the decision rides in the JSON.
+ */
+export async function runHook(opts: HookOptions): Promise<number> {
+  const payload = safePayload(await opts.io.readStdin());
+  const call = opts.call ?? rpcCall;
+  const result = await call(opts.socketPath, opts.tokenPath, 'hook.dispatch', {
+    host: opts.host,
+    event: opts.event,
+    payload,
+  });
+  opts.io.writeStdout(JSON.stringify(result ?? { continue: true }));
   return 0;
 }

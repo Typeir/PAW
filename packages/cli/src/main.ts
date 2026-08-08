@@ -33,9 +33,9 @@
  */
 
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
@@ -47,7 +47,6 @@ import {
   dispatchSwarm,
   doctorPlan,
   runDoctor,
-  type HandleDeps,
   type InitMode,
   type ModelCapabilities,
   type ModelPort,
@@ -56,15 +55,8 @@ import {
   type SwarmPlan,
   type Violation,
 } from '@paw/core';
-import {
-  createNodeFileReader,
-  createNodeFs,
-  createNodeGateRunner,
-  createNodeSqliteDriver,
-  createSqlStore,
-  loadNodeSqliteCtor,
-} from '@paw/adapters';
-import { EXEMPT_TOOLS, runHook } from './hook.js';
+import { createNodeFileReader, createNodeFs } from '@paw/adapters';
+import { runHook } from './hook.js';
 import { createHerdWriter } from './herdWriter.js';
 import {
   attachOutcomeLine,
@@ -84,6 +76,8 @@ import {
   pawHome,
   planTrust,
   runDaemon,
+  socketPath,
+  tokenPath,
   trustCommandLine,
   walkFiles,
   type DaemonHandle,
@@ -108,8 +102,6 @@ import {
 const KNOWN_CONNECTORS = ['copilot-hooks'];
 
 const HOST_FLAGS = ['copilot'];
-
-const HOOK_IGNORED = /(^|\/)(\.paw|\.git|node_modules|dist|coverage|\.next)(\/|$)/;
 
 const NOOP_PORT: ModelPort = {
   complete: async () => ({ content: '', inputTokens: 0, outputTokens: 0 }),
@@ -228,18 +220,13 @@ async function runCheck(): Promise<never> {
 }
 
 /**
- * Run the `hook` subcommand: bridge a host's hook process into PAW's loop. The
- * command names the host (a flag) and the event (its value) — e.g.
- * `paw hook --copilot "tool.pre"`.
- *
- * This is the STANDALONE (no-daemon) composition: it opens a `node:sqlite` store
- * under `.paw` per invocation. That engine is file-locked, so concurrent hooks
- * serialise rather than race — but a per-hook open is only safe on native
- * `node:sqlite`, never on the sql.js/wasm fallback (whole-file export races and
- * rebuilds the runtime each call). The daemon-owned path — pawd holding one
- * StorePort + GateRunner + runtime, with this command a thin client — is the
- * correct mode for sql.js machines and the target for a running pawd. See the
- * `pawd-owns-the-enforcement-store` note.
+ * Run the `hook` subcommand: a thin client of the resident daemon. The command
+ * names the host (a flag) and the event (its value) — e.g.
+ * `paw hook --copilot "tool.pre"`. It derives this repository's socket and token
+ * from the working directory and hands the round trip to {@link runHook}, which
+ * asks pawd to decide and writes the answer — or, with no daemon reachable, the
+ * host's do-nothing output. No store, no gates, no per-hook state: the daemon
+ * owns all of it (doc 10 §7).
  *
  * @param {string[]} rest - The words after `hook`.
  * @returns {Promise<number>} The exit code (0; the decision rides in the JSON).
@@ -252,28 +239,18 @@ async function runHookCommand(rest: string[]): Promise<number> {
   }
   const event = args.values.get(host) as string;
   const root = process.cwd();
-  const pawDir = resolve(root, '.paw');
-  if (!existsSync(pawDir)) {
-    mkdirSync(pawDir, { recursive: true });
-  }
-  const Database = await loadNodeSqliteCtor();
-  const db = new Database(resolve(pawDir, 'paw.sqlite'));
-  const deps: HandleDeps = {
-    store: createSqlStore(createNodeSqliteDriver(db)),
-    gates: createNodeGateRunner(root),
-    exemptTools: EXEMPT_TOOLS,
-    isIgnored: (path) => HOOK_IGNORED.test(path),
-  };
-  try {
-    return await runHook(
-      host,
-      event,
-      { readStdin, writeStdout: (text) => process.stdout.write(text) },
-      deps,
-    );
-  } finally {
-    db.close();
-  }
+  const endpoint = socketPath(root, {
+    platform: process.platform,
+    xdgRuntimeDir: process.env.XDG_RUNTIME_DIR,
+    tmpdir: tmpdir(),
+  });
+  return runHook({
+    host,
+    event,
+    socketPath: endpoint,
+    tokenPath: tokenPath(resolve(root, '.paw')),
+    io: { readStdin, writeStdout: (text) => process.stdout.write(text) },
+  });
 }
 
 /**
