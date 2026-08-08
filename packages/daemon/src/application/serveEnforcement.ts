@@ -52,11 +52,13 @@ export interface EnforcementConfig {
  * @property {string} socketPath - The endpoint to claim.
  * @property {string} projectRoot - The root pawd serves, reported at handshake.
  * @property {() => Promise<EnforcementConfig>} configure - Produces the token and deps, run ONLY after the claim — the place any writes to `.paw` belong.
+ * @property {{ ms: number; onIdle: () => void }} [idle] - Close and signal after this many ms with no hook call; omit to stay resident. Doc 10 §9c — industrial is not leaking a process per repo forever.
  */
 export interface EnforcementOptions {
   readonly socketPath: string;
   readonly projectRoot: string;
   configure(): Promise<EnforcementConfig>;
+  readonly idle?: { ms: number; onIdle: () => void };
 }
 
 /**
@@ -87,6 +89,23 @@ function toDispatch(params: unknown): HookDispatch | null {
  */
 export async function serveEnforcement(opts: EnforcementOptions): Promise<SocketServerHandle> {
   const server = await bindSocket(opts.socketPath);
+  const idle = opts.idle;
+  let handle: SocketServerHandle;
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  const resetIdle = (): void => {
+    if (!idle) {
+      return;
+    }
+    const onIdle = idle.onIdle;
+    if (idleTimer !== undefined) {
+      clearTimeout(idleTimer);
+    }
+    idleTimer = setTimeout(() => {
+      void handle.close().then(onIdle);
+    }, idle.ms);
+    idleTimer.unref();
+  };
+
   try {
     const { token, deps } = await opts.configure();
     const hello = {
@@ -97,13 +116,16 @@ export async function serveEnforcement(opts: EnforcementOptions): Promise<Socket
     };
     const methods = {
       'hook.dispatch': async (params: unknown): Promise<unknown> => {
+        resetIdle();
         const req = toDispatch(params);
         return req === null ? { continue: true } : dispatchHook(deps, req);
       },
     };
-    return serveSessions(server, () =>
+    handle = serveSessions(server, () =>
       createRpcSession({ token, protocolVersion: RPC_PROTOCOL_VERSION, hello, methods }),
     );
+    resetIdle();
+    return handle;
   } catch (err: unknown) {
     await new Promise<void>((done) => server.close(() => done()));
     throw err;

@@ -54,10 +54,12 @@ const IGNORED = /(^|\/)(\.paw|\.git|node_modules|dist|coverage|\.next)(\/|$)/;
  * @interface StartSeams
  * @property {() => string} [randomToken] - Generate the handshake token; defaults to 32 random bytes hex.
  * @property {() => Promise<StorePort> | StorePort} [makeStore] - Build the store; defaults to the disk-backed sql.js store under `.paw`.
+ * @property {{ ms: number; onIdle: () => void }} [idle] - Close and signal after this quiet period; omit to stay resident.
  */
 export interface StartSeams {
   randomToken?: () => string;
   makeStore?: () => Promise<StorePort> | StorePort;
+  idle?: { ms: number; onIdle: () => void };
 }
 
 /**
@@ -80,6 +82,7 @@ export async function startEnforcement(
   return serveEnforcement({
     socketPath: endpoint,
     projectRoot: root,
+    idle: seams.idle,
     configure: async () => {
       mkdirSync(pawDir, { recursive: true });
       const token = (seams.randomToken ?? (() => randomBytes(32).toString('hex')))();

@@ -320,7 +320,9 @@ function autostartSeams(root: string): AutostartSeams {
  * @returns {Promise<never>} Never resolves.
  */
 async function runPawd(root: string): Promise<never> {
-  await startEnforcement(root);
+  await startEnforcement(root, {
+    idle: { ms: 3_600_000, onIdle: () => process.exit(0) },
+  });
   return new Promise<never>(() => undefined);
 }
 

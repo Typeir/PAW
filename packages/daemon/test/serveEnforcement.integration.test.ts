@@ -51,6 +51,7 @@ const testConnector: HostConnector = {
 let root: string;
 let handle: SocketServerHandle;
 let endpoint: string;
+let deps: DispatchHookDeps;
 
 /** A client that sends one frame and resolves with the next response line. */
 function open(pathName: string) {
@@ -85,7 +86,7 @@ beforeAll(async () => {
   writeFileSync(path.join(root, 'src', 'x.ts'), 'export const x = 1; // BADCODE\n');
   writeFileSync(path.join(root, 'src', 'other.ts'), 'export const y = 2;\n');
 
-  const deps: DispatchHookDeps = {
+  deps = {
     store: createMemoryStore(),
     gates: createGateCache(root),
     exemptTools: new Set(['read_file']),
@@ -154,6 +155,27 @@ describe('pawd enforcement over a real socket', () => {
         },
       }),
     ).rejects.toThrow('store unavailable');
+    rmSync(other, { recursive: true, force: true });
+  });
+
+  it('closes and signals after idle, resetting on each call', async () => {
+    const other = mkdtempSync(path.join(tmpdir(), 'paw-idle-'));
+    const sock = socketPath(other, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: other });
+    let idled = 0;
+    await serveEnforcement({
+      socketPath: sock,
+      projectRoot: other,
+      idle: { ms: 80, onIdle: () => { idled += 1; } },
+      configure: async () => ({ token: 'T', deps }),
+    });
+    const c = open(sock);
+    await c.ready;
+    await c.send(1, 'connect', { token: 'T', protocolVersion: 1 });
+    await c.send(2, 'hook.dispatch', { host: 'test', event: 'tool.pre', payload: {} });
+    c.close();
+
+    await new Promise((r) => setTimeout(r, 250));
+    expect(idled).toBe(1);
     rmSync(other, { recursive: true, force: true });
   });
 });
