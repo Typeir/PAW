@@ -23,7 +23,7 @@ import type { WebSocket } from 'ws';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adoptSocket, refuseUpgrade } from '../src/infrastructure/http/consoleServer.js';
 import { offeredProtocols } from '../src/infrastructure/http/httpMessage.js';
-import type { SocketHooks } from '../src/serve.js';
+import type { SocketHooks } from '../src/application/daemonContracts.js';
 import type { WsSessionPort } from '../src/domain/session.js';
 
 /**

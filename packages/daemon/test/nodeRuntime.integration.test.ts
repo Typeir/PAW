@@ -48,12 +48,12 @@ import {
   toHostProcess,
 } from '../src/infrastructure/http/httpMessage.js';
 import { BOOTSTRAP, nodeRuntime, walkFiles } from '../src/infrastructure/nodeRuntime.js';
+import { runDaemon } from '../src/application/runDaemon.js';
 import {
   REFUSING_MODEL,
-  runDaemon,
   type DaemonHandle,
   type SocketHooks,
-} from '../src/serve.js';
+} from '../src/application/daemonContracts.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, 'fixtures');

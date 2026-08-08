@@ -11,7 +11,7 @@
 
 import type { DispatchEvent, DispatchResult, ModelPort } from '@paw/core';
 import { describe, expect, it } from 'vitest';
-import { meterPort, toRunProgress, trackRun } from '../src/run.js';
+import { meterPort, toRunProgress, trackRun } from '../src/application/run.js';
 
 const inner: ModelPort = {
   complete: async (request) => ({

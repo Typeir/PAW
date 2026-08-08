@@ -29,7 +29,7 @@ import type {
   RunSettings,
   SwarmPlan,
 } from '@paw/core';
-import { meterPort } from '../run.js';
+import { meterPort } from './run.js';
 
 /**
  * The slice of a herd writer the engine drives — each settled member is written

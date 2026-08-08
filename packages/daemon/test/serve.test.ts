@@ -34,17 +34,17 @@ import { CA_DAYS, LEAF_DAYS, META_VERSION, addDays } from '../src/domain/identit
 import type { ServerIdentity } from '../src/infrastructure/identityStore.js';
 import { UnknownPlanError } from '../src/domain/plans.js';
 import type { HttpRequest, HttpResponse } from '../src/domain/router.js';
+import { runDaemon } from '../src/application/runDaemon.js';
 import {
   LOOPBACK,
   modelCount,
-  runDaemon,
   toPlan,
   underRoot,
   type DaemonRuntime,
   type ServerHandle,
   type SocketHooks,
   type TlsMaterial,
-} from '../src/serve.js';
+} from '../src/application/daemonContracts.js';
 import type { FileEntry } from '../src/domain/tree.js';
 
 const TOKEN = 'test-token-value-0123456789abcdef';

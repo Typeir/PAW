@@ -22,7 +22,7 @@
 import { consolePage } from './domain/consolePage.js';
 import { identityNotice } from './infrastructure/identityStore.js';
 import { nodeRuntime } from './infrastructure/nodeRuntime.js';
-import { runDaemon } from './serve.js';
+import { runDaemon } from './application/runDaemon.js';
 
 /**
  * Daemon entrypoint.

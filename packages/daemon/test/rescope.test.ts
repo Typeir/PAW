@@ -32,12 +32,8 @@ import {
 import { describe, expect, it } from 'vitest';
 import { CA_DAYS, LEAF_DAYS, META_VERSION, addDays } from '../src/domain/identity.js';
 import type { ServerIdentity } from '../src/infrastructure/identityStore.js';
-import {
-  runDaemon,
-  type DaemonRuntime,
-  type ServerHandle,
-  type SocketHooks,
-} from '../src/serve.js';
+import { runDaemon } from '../src/application/runDaemon.js';
+import type { DaemonRuntime, ServerHandle, SocketHooks } from '../src/application/daemonContracts.js';
 import type { FileEntry } from '../src/domain/tree.js';
 
 const TOKEN = 'test-token-value-0123456789abcdef';

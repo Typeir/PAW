@@ -31,21 +31,38 @@ import {
   type AttachState,
   type BudgetSummary,
   type DispatchEvent,
-  type DispatchResult,
   type HostInfo,
   type HostProcess,
-  type InitMode,
-  type RunSettings,
   type LogEntry,
-  type ModelPort,
   type PawSnapshot,
   type PlanSlice,
   type PlansSlice,
   type RunProgress,
   type SwarmPlan,
 } from '@paw/core';
-import { createBus, type LiveBus } from './domain/bus.js';
-import { createLogRing } from './domain/logRing.js';
+import {
+  HOST_TICK_MS,
+  LOOPBACK,
+  PROCESS_POLL_MS,
+  REFUSING_MODEL,
+  modelCount,
+  reason,
+  sameValue,
+  toPlan,
+  underRoot,
+  type AcceptedSocket,
+  type DaemonHandle,
+  type DaemonOptions,
+  type DaemonRuntime,
+  type Dispatcher,
+  type RunReport,
+  type ServerHandle,
+  type SocketHooks,
+  type TlsMaterial,
+  type UpgradeContext,
+} from './daemonContracts.js';
+import { createBus, type LiveBus } from '../domain/bus.js';
+import { createLogRing } from '../domain/logRing.js';
 import {
   buildPlanSlice,
   composeSnapshot,
@@ -53,318 +70,25 @@ import {
   emptyPlanSlice,
   idleBudget,
   idleRun,
-} from './domain/cache.js';
-import type { ServerIdentity } from './infrastructure/identityStore.js';
-import { discoverPlans, findConfig, selectPlan } from './domain/plans.js';
-import { route, type HttpRequest, type HttpResponse } from './domain/router.js';
+} from '../domain/cache.js';
+import type { ServerIdentity } from '../infrastructure/identityStore.js';
+import { discoverPlans, findConfig, selectPlan } from '../domain/plans.js';
+import { route, type HttpRequest, type HttpResponse } from '../domain/router.js';
 import {
   allowedOrigins,
   decideUpgrade,
   inlineScriptHashes,
   type UpgradeRefusal,
-} from './infrastructure/security.js';
-import { createSessionRegistry } from './application/sessionRegistry.js';
-import type { WsSessionPort } from './domain/session.js';
+} from '../infrastructure/security.js';
+import { createSessionRegistry } from './sessionRegistry.js';
+import type { WsSessionPort } from '../domain/session.js';
 import { toRunProgress, trackRun } from './run.js';
-import { buildFileTree, type FileEntry } from './domain/tree.js';
-
-/**
- * The loopback address the daemon binds. The control API is local-only by
- * construction: it reports host processes, and that never leaves the machine.
- */
-export const LOOPBACK = '127.0.0.1';
-
-/**
- * How often the owned-process table, the file tree, and the plan list are
- * re-read, in milliseconds.
- */
-export const PROCESS_POLL_MS = 3000;
-
-/**
- * How often the host facts are re-read and published, in milliseconds. Faster
- * than the other sources because this tick is also the console's liveness
- * signal: a client that has heard nothing for several ticks knows the daemon is
- * gone rather than merely idle.
- */
-export const HOST_TICK_MS = 1000;
-
-/**
- * Whether two slice values are the same, by value. Sources publish on change,
- * and "change" for a process table or a file listing means different contents —
- * a fresh array of identical rows is not news, and telling every open console
- * about it three times a second is the waste this comparison exists to avoid.
- *
- * @param {unknown} previous - The last published value.
- * @param {unknown} next - The freshly read one.
- * @returns {boolean} True when nothing changed.
- */
-export function sameValue(previous: unknown, next: unknown): boolean {
-  return JSON.stringify(previous) === JSON.stringify(next);
-}
-
-/**
- * A thrown value as a line an operator can read.
- *
- * @param {unknown} error - What was thrown.
- * @returns {string} The message.
- */
-export function reason(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+import { buildFileTree, type FileEntry } from '../domain/tree.js';
 
 /**
  * Connectors this repo can resolve, for the config doctor.
  */
 const KNOWN_CONNECTORS = ['copilot-hooks'];
-
-/**
- * The port every role is bound to while the daemon is only reporting. `pawd`
- * builds a registry so the doctor can say whether a role's model satisfies it,
- * and never dispatches a member — so a call here means something asked the
- * reporting daemon to spend tokens, and it refuses loudly instead of quietly
- * returning an empty completion that a caller would treat as a model's answer.
- */
-export const REFUSING_MODEL: ModelPort = {
-  complete: async () => {
-    throw new Error('pawd reports state and does not dispatch members');
-  },
-};
-
-/**
- * A bound HTTP server.
- *
- * @interface ServerHandle
- * @property {number} port - The port actually bound (resolved when 0 was asked for).
- * @property {() => Promise<void>} close - Stop listening.
- */
-export interface ServerHandle {
-  readonly port: number;
-  close(): Promise<void>;
-}
-
-/**
- * The certificate a server presents.
- *
- * @interface TlsMaterial
- * @property {string} cert - The server certificate chain, PEM.
- * @property {string} key - Its private key, PEM.
- */
-export interface TlsMaterial {
-  readonly cert: string;
-  readonly key: string;
-}
-
-/**
- * What the runtime can tell the daemon about a socket asking to be upgraded.
- *
- * @interface UpgradeContext
- * @property {string} [host] - The request's `Host`.
- * @property {string} [origin] - The request's `Origin`.
- * @property {string[]} protocols - The subprotocols it offered.
- */
-export interface UpgradeContext {
-  readonly host: string | undefined;
-  readonly origin: string | undefined;
-  readonly protocols: readonly string[];
-}
-
-/**
- * What the runtime drives once a socket has been accepted.
- *
- * @interface AcceptedSocket
- * @property {(raw: string) => Promise<void>} message - One text frame arrived.
- * @property {() => void} closed - The peer went away.
- */
-export interface AcceptedSocket {
-  message(raw: string): Promise<void>;
-  closed(): void;
-}
-
-/**
- * The daemon's half of the WebSocket handshake, injected into the runtime.
- *
- * Split in two on purpose: `check` runs while the connection is still plain HTTP
- * — the cheap place to refuse, where a "no" costs a socket close instead of a
- * session — and `accept` runs only after the upgrade succeeded.
- *
- * @interface SocketHooks
- * @property {(context: UpgradeContext) => UpgradeRefusal | null} check - Whether to upgrade at all.
- * @property {(port: WsSessionPort) => AcceptedSocket} accept - Adopt an upgraded socket.
- */
-export interface SocketHooks {
-  check(context: UpgradeContext): UpgradeRefusal | null;
-  accept(port: WsSessionPort): AcceptedSocket;
-}
-
-/**
- * Every effect the daemon needs, injected.
- *
- * @interface DaemonRuntime
- * @property {(path: string) => Promise<string>} readFile - Read a file as UTF-8 text.
- * @property {(path: string, version: number) => Promise<unknown>} importModule - Import a module, reloading it when `version` changes.
- * @property {(path: string) => Promise<number>} modifiedAt - A file's last-modified time in milliseconds.
- * @property {() => Promise<HostProcess[]>} listProcesses - The processes PAW owns.
- * @property {(root: string) => Promise<FileEntry[]>} listFiles - The repository listing under a root.
- * @property {() => HostInfo} readHost - The host facts, read fresh.
- * @property {() => string} now - An ISO timestamp.
- * @property {() => number} clock - Epoch milliseconds, for wire timestamps and session timers.
- * @property {(message: string) => void} warn - Report something the operator should see but that must not stop the daemon.
- * @property {() => string} randomToken - A fresh, unguessable session token.
- * @property {() => Promise<ServerIdentity>} identity - This machine's TLS identity, issued or renewed as needed.
- * @property {() => Promise<string>} readPage - The HTML to serve at `/`.
- * @property {(handler, port, host, tls) => Promise<ServerHandle>} listen - Bind a TLS server.
- * @property {(fn, ms) => () => void} schedule - Run `fn` every `ms`; returns a canceller.
- */
-export interface DaemonRuntime {
-  readFile(path: string): Promise<string>;
-  importModule(path: string, version: number): Promise<unknown>;
-  modifiedAt(path: string): Promise<number>;
-  listProcesses(): Promise<HostProcess[]>;
-  listFiles(root: string): Promise<FileEntry[]>;
-  readHost(): HostInfo;
-  now(): string;
-  clock(): number;
-  warn(message: string): void;
-  randomToken(): string;
-  identity(): Promise<ServerIdentity>;
-  readPage(): Promise<string>;
-  listen(
-    handler: (request: HttpRequest) => Promise<HttpResponse>,
-    hooks: SocketHooks,
-    port: number,
-    host: string,
-    tls: TlsMaterial,
-  ): Promise<ServerHandle>;
-  schedule(fn: () => void, ms: number): () => void;
-}
-
-/**
- * What a real dispatch reported back.
- *
- * @interface RunReport
- * @property {DispatchResult} result - Core's own dispatch result.
- * @property {BudgetSummary} usage - The tokens the run actually spent.
- */
-export interface RunReport {
-  readonly result: DispatchResult;
-  readonly usage: BudgetSummary;
-}
-
-/**
- * Releases the plan's herd. Supplied by the consumer, because choosing the model
- * a run is dispatched against — a deterministic fake, or a live provider — is a
- * composition decision, and the reporting daemon takes no part in it.
- *
- * The second argument is how the run reports itself while it happens. A
- * dispatcher that ignores it still works; one that forwards `dispatchSwarm`'s
- * progress lets the console fill in member by member instead of staying blank
- * until the last one lands.
- */
-export type Dispatcher = (
-  plan: SwarmPlan<unknown>,
-  onProgress: (event: DispatchEvent) => void,
-) => Promise<RunReport>;
-
-/**
- * What to serve.
- *
- * @interface DaemonOptions
- * @property {string} [root] - The repository to serve; defaults to the working directory.
- * @property {string} [configPath] - An explicit config path; otherwise `.paw/config.json` is used when the repo has one.
- * @property {string} [planPath] - A plan to open on; otherwise the console opens with none selected.
- * @property {number} [port] - Port to bind; 0 (the default) takes an ephemeral one.
- * @property {number} [pollMs] - How often to re-read the process table, tree, config, and plan list.
- * @property {number} [hostMs] - How often to re-read and publish the host facts.
- * @property {readonly string[]} [allowOrigins] - Extra origins permitted to call the API, e.g. a GUI development server.
- * @property {Dispatcher} [dispatch] - Release the opening plan's herd once, and report the run live.
- * @property {string} [scopeCeiling] - Permit consoles to re-scope the daemon, within this directory. Omit to refuse every scope request.
- * @property {(path: string, mode: InitMode) => void} [onAttach] - Receive attach requests. The daemon never writes; whoever supplies this decides.
- */
-export interface DaemonOptions {
-  readonly root?: string;
-  readonly configPath?: string;
-  readonly planPath?: string;
-  readonly port?: number;
-  readonly pollMs?: number;
-  readonly hostMs?: number;
-  readonly allowOrigins?: readonly string[];
-  readonly dispatch?: Dispatcher;
-  readonly scopeCeiling?: string;
-  onAttach?(path: string, mode: InitMode): void;
-  onRelease?(settings: RunSettings): void;
-}
-
-/**
- * A running daemon.
- *
- * @interface DaemonHandle
- * @property {string} url - The URL the console is served at.
- * @property {number} port - The bound port.
- * @property {string} root - The repository being served.
- * @property {string} token - The per-boot credential every API call must present.
- * @property {ServerIdentity} identity - The TLS identity it is serving with, for trust hints and certificate pinning.
- * @property {LiveBus} bus - Where the sources publish; what a live session subscribes to.
- * @property {string[]} plans - The plans discovered in it.
- * @property {string | null} openedOn - The plan the daemon opened on, if any.
- * @property {Promise<void> | null} dispatched - Settles when a released herd finishes; null when no run was asked for. Rejects loudly if the run failed.
- * @property {(plan?: string | null) => Promise<PawSnapshot>} snapshot - The current snapshot for a plan, read live.
- * @property {(path: string) => Promise<void>} rescope - Point the daemon at another repository and republish. Unbounded, unlike the console's scope request: the caller already holds the process.
- * @property {() => Promise<void>} close - Stop polling and stop listening.
- */
-export interface DaemonHandle {
-  readonly url: string;
-  readonly port: number;
-  readonly root: string;
-  readonly token: string;
-  readonly identity: ServerIdentity;
-  readonly bus: LiveBus;
-  readonly plans: readonly string[];
-  readonly openedOn: string | null;
-  readonly dispatched: Promise<void> | null;
-  snapshot(plan?: string | null): Promise<PawSnapshot>;
-  rescope(path: string): Promise<void>;
-  close(): Promise<void>;
-}
-
-/**
- * Take the swarm plan out of an imported module, failing loud when the module
- * exports none — a selection that is not a plan has nothing to show.
- *
- * @param {unknown} mod - The imported module.
- * @param {string} path - The path it came from, for the error message.
- * @returns {SwarmPlan<unknown>} The plan.
- */
-export function toPlan(mod: unknown, path: string): SwarmPlan<unknown> {
-  const holder = mod as { default?: SwarmPlan<unknown>; plan?: SwarmPlan<unknown> };
-  const plan = holder?.default ?? holder?.plan;
-  if (!plan || typeof plan.brief !== 'function') {
-    throw new Error(`"${path}" does not export a swarm plan`);
-  }
-  return plan;
-}
-
-/**
- * How many models the config declares — the Keys rail count.
- *
- * @param {Record<string, unknown>} config - The parsed config.
- * @returns {number} The model count.
- */
-export function modelCount(config: Record<string, unknown>): number {
-  const models = config.models;
-  return models !== null && typeof models === 'object' ? Object.keys(models).length : 0;
-}
-
-/**
- * A repo-relative path as the runtime should open it.
- *
- * @param {string} root - The served repository.
- * @param {string} path - A repo-relative path.
- * @returns {string} The path to hand the runtime.
- */
-export function underRoot(root: string, path: string): string {
-  const base = root === '' ? '.' : root.replace(/\\/g, '/').replace(/\/+$/, '');
-  return `${base}/${path}`;
-}
 
 /**
  * A plan loaded from disk, with what it was loaded from.

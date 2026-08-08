@@ -28,7 +28,7 @@ import {
 } from '@paw/core';
 import type { HttpRequest, HttpResponse } from '../../domain/router.js';
 import type { UpgradeRefusal } from '../security.js';
-import type { AcceptedSocket, ServerHandle, SocketHooks, TlsMaterial } from '../../serve.js';
+import type { AcceptedSocket, ServerHandle, SocketHooks, TlsMaterial } from '../../application/daemonContracts.js';
 import type { WsSessionPort } from '../../domain/session.js';
 import { firstHeader, offeredProtocols, toRequest } from './httpMessage.js';
 

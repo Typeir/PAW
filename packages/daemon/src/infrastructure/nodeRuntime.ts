@@ -28,7 +28,7 @@ import psList from 'ps-list';
 import type { HostProcess } from '@paw/core';
 import { readHostInfo } from '../domain/host.js';
 import { IGNORED_DIRS, type FileEntry } from '../domain/tree.js';
-import type { DaemonRuntime, ServerHandle } from '../serve.js';
+import type { DaemonRuntime, ServerHandle } from '../application/daemonContracts.js';
 import { nodeServerIdentity } from './nodeIdentity.js';
 import { collectSubtree } from './process.js';
 import { TOKEN_BYTES } from './security.js';

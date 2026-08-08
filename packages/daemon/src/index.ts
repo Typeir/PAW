@@ -51,15 +51,15 @@ export {
   selectPlan,
 } from './domain/plans.js';
 
+export { runDaemon } from './application/runDaemon.js';
 export {
   LOOPBACK,
   PROCESS_POLL_MS,
   REFUSING_MODEL,
   modelCount,
-  runDaemon,
   toPlan,
   underRoot,
-} from './serve.js';
+} from './application/daemonContracts.js';
 export type {
   DaemonHandle,
   DaemonOptions,
@@ -68,7 +68,7 @@ export type {
   RunReport,
   ServerHandle,
   TlsMaterial,
-} from './serve.js';
+} from './application/daemonContracts.js';
 
 export {
   CA_WARN_DAYS,
@@ -92,8 +92,8 @@ export { nodeIdentityIo, nodeServerIdentity } from './infrastructure/nodeIdentit
 export { TRUST_NICKNAME, planTrust, trustCommandLine } from './infrastructure/trustStore.js';
 export type { TrustPlan, TrustStep } from './infrastructure/trustStore.js';
 
-export { meterPort, toRunProgress, trackRun } from './run.js';
-export type { MeteredPort, RunTracker } from './run.js';
+export { meterPort, toRunProgress, trackRun } from './application/run.js';
+export type { MeteredPort, RunTracker } from './application/run.js';
 
 export { openLiveHerd } from './infrastructure/model/openLiveHerd.js';
 export type { LiveSdkRegistry } from './infrastructure/model/liveSdkRegistry.js';
