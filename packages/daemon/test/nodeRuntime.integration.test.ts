@@ -35,19 +35,19 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { consolePage } from '../src/domain/consolePage.js';
 import { issueCa } from '../src/infrastructure/nodeIdentity.js';
 import {
-  BOOTSTRAP,
   LOOPBACK_V6,
   bindLoopbackV6,
   bindServer,
-  boundPort,
   closeServer,
   createConsoleServer,
+} from '../src/infrastructure/http/consoleServer.js';
+import {
+  boundPort,
   firstHeader,
-  nodeRuntime,
   requestTarget,
   toHostProcess,
-  walkFiles,
-} from '../src/nodeRuntime.js';
+} from '../src/infrastructure/http/httpMessage.js';
+import { BOOTSTRAP, nodeRuntime, walkFiles } from '../src/infrastructure/nodeRuntime.js';
 import {
   REFUSING_MODEL,
   runDaemon,

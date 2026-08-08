@@ -21,7 +21,8 @@ import { CLOSE_MALFORMED, PING_MS, PONG_TIMEOUT_MS } from '@paw/core';
 import type { Duplex } from 'node:stream';
 import type { WebSocket } from 'ws';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { adoptSocket, offeredProtocols, refuseUpgrade } from '../src/nodeRuntime.js';
+import { adoptSocket, refuseUpgrade } from '../src/infrastructure/http/consoleServer.js';
+import { offeredProtocols } from '../src/infrastructure/http/httpMessage.js';
 import type { SocketHooks } from '../src/serve.js';
 import type { WsSessionPort } from '../src/sessions.js';
 

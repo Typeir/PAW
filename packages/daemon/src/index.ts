@@ -104,5 +104,5 @@ export type { LiveSession, SessionRegistry, WsSessionPort } from './sessions.js'
 export { decideUpgrade } from './infrastructure/security.js';
 export type { UpgradeRefusal, UpgradeRequest } from './infrastructure/security.js';
 
-export { BOOTSTRAP, nodeRuntime, walkFiles } from './nodeRuntime.js';
+export { BOOTSTRAP, nodeRuntime, walkFiles } from './infrastructure/nodeRuntime.js';
 export { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from './domain/consolePage.js';
