@@ -375,4 +375,22 @@ describe('dispatchSwarm output budget', () => {
     expect(seen).toEqual([CAP.maxOutputTokens, CAP.maxOutputTokens]);
     expect(CAP.maxOutputTokens).toBeGreaterThan(512);
   });
+
+  it('lets a per-run override replace the model ceiling for every member', async () => {
+    const seen: (number | undefined)[] = [];
+    const capturing: ModelPort = {
+      complete: async (req) => {
+        seen.push(req.maxOutputTokens);
+        return { content: 'x', inputTokens: 1, outputTokens: 1 };
+      },
+    };
+
+    await dispatchSwarm(plan({ args: { n: 2 } }), {
+      registry: registry({ port: capturing }),
+      files: reader(),
+      maxOutputTokens: 512,
+    });
+
+    expect(seen).toEqual([512, 512]);
+  });
 });

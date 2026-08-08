@@ -67,6 +67,7 @@ export interface DispatchResult {
  * @property {(key: string) => boolean} [alreadyDone] - Resume predicate; true skips a member whose key already completed.
  * @property {(event: DispatchEvent) => void | Promise<void>} [onProgress] - Told as each member starts and settles, so a watcher can show a run filling in, or persist it. Awaited when it returns a promise.
  * @property {number} [concurrency] - How many members may be in flight at once; defaults to {@link DEFAULT_CONCURRENCY}. Values below one are treated as one.
+ * @property {number} [maxOutputTokens] - Per-run override of the bound model's output ceiling: every member's request carries this instead of the model's declared default. Undefined leaves each member on the model default. A caller collects it however it likes — a flag, a prompt, a selector — but the behaviour lives here so every surface caps a run the same way.
  */
 export interface DispatchDeps<A> {
   readonly registry: RoleRegistry;
@@ -75,6 +76,7 @@ export interface DispatchDeps<A> {
   readonly alreadyDone?: (key: string) => boolean;
   readonly onProgress?: (event: DispatchEvent) => void | Promise<void>;
   readonly concurrency?: number;
+  readonly maxOutputTokens?: number;
 }
 
 /**
@@ -196,7 +198,7 @@ export async function dispatchSwarm<A>(
     const res = await handle.port.complete({
       model: handle.modelId,
       prompt: await composeBrief(plan, member, deps.files),
-      maxOutputTokens: handle.maxOutputTokens,
+      maxOutputTokens: deps.maxOutputTokens ?? handle.maxOutputTokens,
     });
     await settle({ member, key, state: 'done', content: res.content });
   };
