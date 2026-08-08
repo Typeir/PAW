@@ -63,6 +63,31 @@ export function concurrencyFrom(args: ParsedArgs): number | undefined {
 }
 
 /**
+ * The per-run output ceiling, from an operator's flags.
+ *
+ * `--max-tokens=N` caps every member's generated tokens for this run, overriding
+ * the bound model's declared default — the honest lever for "let the answers run
+ * longer" or "keep them short and cheap". Absent, each member takes the model's
+ * default. The value is only collected here; `dispatchSwarm` applies it, so the
+ * CLI, the TUI, and the console all cap a run the same way.
+ *
+ * @param {ParsedArgs} args - The parsed subcommand arguments.
+ * @returns {number | undefined} The ceiling, or undefined to take the model default.
+ * @throws {Error} When `--max-tokens` is not a positive whole number.
+ */
+export function maxTokensFrom(args: ParsedArgs): number | undefined {
+  const raw = args.values.get('max-tokens');
+  if (raw === undefined) {
+    return undefined;
+  }
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`--max-tokens must be a whole number of one or more, got "${raw}"`);
+  }
+  return parsed;
+}
+
+/**
  * Split an argv, given the flags that take a value. Both `--flag value` and
  * `--flag=value` are accepted, because both are what people type.
  *

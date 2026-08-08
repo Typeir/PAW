@@ -80,6 +80,7 @@ import {
 } from '@paw/daemon';
 import {
   concurrencyFrom,
+  maxTokensFrom,
   parseArgs,
   resolveContext,
   splitPatterns,
@@ -222,7 +223,7 @@ async function runSwarm(
   rest: string[],
   print: (lines: string[]) => void,
 ): Promise<number> {
-  const args = parseArgs(rest, ['context', 'concurrency']);
+  const args = parseArgs(rest, ['context', 'concurrency', 'max-tokens']);
   const live = args.flags.has('live');
   const [sub, planPath, memberArg] = args.positional;
   const plan = await loadPlan(planPath);
@@ -256,6 +257,7 @@ async function runSwarm(
         registry,
         files: createNodeFileReader(process.cwd()),
         concurrency: concurrencyFrom(args),
+        maxOutputTokens: maxTokensFrom(args),
         onProgress: (event) => writer.onProgress(event),
       });
       print(formatHerd(result));
@@ -286,6 +288,7 @@ function uiDispatcher(
   live: boolean,
   attached: readonly string[],
   concurrency: number | undefined,
+  maxOutputTokens: number | undefined,
 ): Dispatcher {
   return async (plan, onProgress) => {
     const { registry: base, close } = live
@@ -304,6 +307,7 @@ function uiDispatcher(
         registry: { declarations: base.declarations, bindings },
         files: createNodeFileReader(process.cwd()),
         concurrency,
+        maxOutputTokens,
         onProgress: async (event) => {
           onProgress(event);
           await writer.onProgress(event);
@@ -407,7 +411,7 @@ async function runUi(
   rest: string[],
   print: (lines: string[]) => void,
 ): Promise<never> {
-  const args = parseArgs(rest, ['context', 'port', 'root', 'config', 'concurrency']);
+  const args = parseArgs(rest, ['context', 'port', 'root', 'config', 'concurrency', 'max-tokens']);
   const [planPath] = args.positional;
   const live = args.flags.has('live');
   const shouldRun = args.flags.has('run');
@@ -429,7 +433,7 @@ async function runUi(
         void approveAttach(path, mode, () => handle);
       },
       ...(shouldRun
-        ? { dispatch: uiDispatcher(live, attached, concurrencyFrom(args)) }
+        ? { dispatch: uiDispatcher(live, attached, concurrencyFrom(args), maxTokensFrom(args)) }
         : {}),
     },
     nodeRuntime(consolePage()),

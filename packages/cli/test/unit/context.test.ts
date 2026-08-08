@@ -16,6 +16,7 @@ import type { SwarmPlan } from '@paw/core';
 import { describe, expect, it } from 'vitest';
 import {
   concurrencyFrom,
+  maxTokensFrom,
   globToRegExp,
   isGlob,
   parseArgs,
@@ -168,6 +169,25 @@ describe('concurrencyFrom', () => {
     for (const bad of ['0', '-2', '2.5', 'lots']) {
       expect(() =>
         concurrencyFrom(parseArgs([`--concurrency=${bad}`], ['concurrency'])),
+      ).toThrow(/whole number/);
+    }
+  });
+});
+
+describe('maxTokensFrom', () => {
+  it('takes the model default when nothing is asked for', () => {
+    expect(maxTokensFrom(parseArgs([], ['max-tokens']))).toBeUndefined();
+  });
+
+  it('takes an explicit ceiling, in either spelling', () => {
+    expect(maxTokensFrom(parseArgs(['--max-tokens=512'], ['max-tokens']))).toBe(512);
+    expect(maxTokensFrom(parseArgs(['--max-tokens', '2000'], ['max-tokens']))).toBe(2000);
+  });
+
+  it('refuses a ceiling that is not a positive whole number', () => {
+    for (const bad of ['0', '-2', '2.5', 'lots']) {
+      expect(() =>
+        maxTokensFrom(parseArgs([`--max-tokens=${bad}`], ['max-tokens'])),
       ).toThrow(/whole number/);
     }
   });
