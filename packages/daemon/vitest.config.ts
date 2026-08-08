@@ -25,7 +25,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/main.ts', 'src/index.ts', 'src/model/sdkModel.ts', 'src/model/openLiveHerd.ts'],
+      exclude: ['src/main.ts', 'src/index.ts', 'src/infrastructure/model/sdkModel.ts', 'src/infrastructure/model/openLiveHerd.ts'],
       thresholds: {
         statements: 100,
         branches: 100,

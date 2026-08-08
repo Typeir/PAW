@@ -39,10 +39,10 @@ import {
   type HostProcess,
 } from '@paw/core';
 import { readHostInfo } from './host.js';
-import { nodeServerIdentity } from './nodeIdentity.js';
-import { collectSubtree } from './process.js';
+import { nodeServerIdentity } from './infrastructure/nodeIdentity.js';
+import { collectSubtree } from './infrastructure/process.js';
 import type { HttpRequest, HttpResponse } from './router.js';
-import { TOKEN_BYTES, type UpgradeRefusal } from './security.js';
+import { TOKEN_BYTES, type UpgradeRefusal } from './infrastructure/security.js';
 import type {
   AcceptedSocket,
   DaemonRuntime,

@@ -54,7 +54,7 @@ import {
   idleBudget,
   idleRun,
 } from './cache.js';
-import type { ServerIdentity } from './identityStore.js';
+import type { ServerIdentity } from './infrastructure/identityStore.js';
 import { discoverPlans, findConfig, selectPlan } from './plans.js';
 import { route, type HttpRequest, type HttpResponse } from './router.js';
 import {
@@ -62,7 +62,7 @@ import {
   decideUpgrade,
   inlineScriptHashes,
   type UpgradeRefusal,
-} from './security.js';
+} from './infrastructure/security.js';
 import { createSessionRegistry, type WsSessionPort } from './sessions.js';
 import { toRunProgress, trackRun } from './run.js';
 import { buildFileTree, type FileEntry } from './tree.js';

@@ -31,7 +31,7 @@ import {
 } from '@paw/core';
 import { describe, expect, it, vi } from 'vitest';
 import { CA_DAYS, LEAF_DAYS, META_VERSION, addDays } from '../src/identity.js';
-import type { ServerIdentity } from '../src/identityStore.js';
+import type { ServerIdentity } from '../src/infrastructure/identityStore.js';
 import { UnknownPlanError } from '../src/plans.js';
 import type { HttpRequest, HttpResponse } from '../src/router.js';
 import {

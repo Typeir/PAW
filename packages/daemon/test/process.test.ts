@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { HostProcess } from '@paw/core';
-import { collectSubtree } from '../src/process.js';
+import { collectSubtree } from '../src/infrastructure/process.js';
 
 const p = (pid: number, ppid: number, name: string): HostProcess => ({ pid, ppid, name });
 

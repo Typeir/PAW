@@ -11,8 +11,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelPort, SwarmPlan } from '@paw/core';
-import { liveSdkRegistryFor, type OpenModel } from '../../src/model/liveSdkRegistry.js';
-import type { OpenSdkModelOptions } from '../../src/model/sdkModel.js';
+import { liveSdkRegistryFor, type OpenModel } from '../../src/infrastructure/model/liveSdkRegistry.js';
+import type { OpenSdkModelOptions } from '../../src/infrastructure/model/sdkModel.js';
 
 const PLAN = { name: 'monsters', role: 'lore.author', members: () => 1, brief: () => 'x' } as unknown as SwarmPlan<unknown>;
 const fakePort: ModelPort = { complete: async () => ({ content: '', inputTokens: 0, outputTokens: 0 }) };

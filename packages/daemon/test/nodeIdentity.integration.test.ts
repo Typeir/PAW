@@ -45,7 +45,7 @@ import {
   nodeSecretOps,
   nodeServerIdentity,
   pemToDer,
-} from '../src/nodeIdentity.js';
+} from '../src/infrastructure/nodeIdentity.js';
 
 const NOW = new Date('2026-08-06T12:00:00.000Z');
 

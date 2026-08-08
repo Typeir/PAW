@@ -12,8 +12,8 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { handleEgress, type EgressDeps } from '../../src/model/pawEgressLogic.js';
-import type { TokenUsage } from '../../src/model/providerUsage.js';
+import { handleEgress, type EgressDeps } from '../../src/infrastructure/model/pawEgressLogic.js';
+import type { TokenUsage } from '../../src/infrastructure/model/providerUsage.js';
 
 const URL = 'https://api.example.com/v1/chat/completions';
 

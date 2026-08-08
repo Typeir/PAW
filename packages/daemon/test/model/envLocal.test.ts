@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { parseDeepseekEnv } from '../../src/model/envLocal.js';
+import { parseDeepseekEnv } from '../../src/infrastructure/model/envLocal.js';
 
 describe('parseDeepseekEnv', () => {
   it('reads DEEPSEEK_ names and strips surrounding quotes', () => {

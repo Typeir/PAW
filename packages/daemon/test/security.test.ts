@@ -29,7 +29,7 @@ import {
   securityHeaders,
   selfOrigins,
   verifyToken,
-} from '../src/security.js';
+} from '../src/infrastructure/security.js';
 
 const TOKEN = 'kA7Zr3pQ9x_TokenValue-1234567890abcdefghijklmnop';
 

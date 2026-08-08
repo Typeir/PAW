@@ -64,7 +64,7 @@ import {
   type PawSnapshot,
   type PlanSlice,
 } from '@paw/core';
-import { verifyToken } from './security.js';
+import { verifyToken } from './infrastructure/security.js';
 
 /**
  * The socket, as this file needs it.

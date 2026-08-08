@@ -32,8 +32,8 @@ import {
   trustAdvice,
   type IdentityAction,
   type IdentityMeta,
-} from './identity.js';
-import type { IdentityPaths } from './pawHome.js';
+} from '../identity.js';
+import type { IdentityPaths } from '../pawHome.js';
 
 /**
  * A freshly issued certificate and its key.

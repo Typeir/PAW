@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { TRUST_NICKNAME, planTrust, trustCommandLine } from '../src/trustStore.js';
+import { TRUST_NICKNAME, planTrust, trustCommandLine } from '../src/infrastructure/trustStore.js';
 
 const CA = '/home/x/.local/share/paw/identity/ca.crt';
 const HOME = '/home/x';

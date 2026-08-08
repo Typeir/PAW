@@ -26,7 +26,7 @@ import {
   hardenSecretDir,
   modeIsPrivate,
   type SecretOps,
-} from '../src/secretFile.js';
+} from '../src/infrastructure/secretFile.js';
 
 const KEY = 'C:\\Users\\dtira\\AppData\\Local\\paw\\identity\\ca.key';
 

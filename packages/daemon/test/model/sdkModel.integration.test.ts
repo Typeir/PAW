@@ -16,7 +16,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { openSdkModel } from '../../src/model/sdkModel.js';
+import { openSdkModel } from '../../src/infrastructure/model/sdkModel.js';
 
 const LIVE = process.env.PAW_SDK_LIVE === '1';
 

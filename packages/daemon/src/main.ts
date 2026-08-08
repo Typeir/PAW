@@ -20,7 +20,7 @@
  */
 
 import { consolePage } from './consolePage.js';
-import { identityNotice } from './identityStore.js';
+import { identityNotice } from './infrastructure/identityStore.js';
 import { nodeRuntime } from './nodeRuntime.js';
 import { runDaemon } from './serve.js';
 

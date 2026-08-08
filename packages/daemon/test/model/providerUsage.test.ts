@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { parseProviderUsage } from '../../src/model/providerUsage.js';
+import { parseProviderUsage } from '../../src/infrastructure/model/providerUsage.js';
 
 describe('parseProviderUsage', () => {
   it('reads the OpenAI Chat Completions shape', () => {

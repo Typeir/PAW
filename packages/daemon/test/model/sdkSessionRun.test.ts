@@ -10,8 +10,8 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { createSdkSessionRun, type SdkClientLike, type SdkSessionLike } from '../../src/model/sdkSessionRun.js';
-import type { TokenUsage } from '../../src/model/providerUsage.js';
+import { createSdkSessionRun, type SdkClientLike, type SdkSessionLike } from '../../src/infrastructure/model/sdkSessionRun.js';
+import type { TokenUsage } from '../../src/infrastructure/model/providerUsage.js';
 
 const PROVIDER = { type: 'openai', baseUrl: 'https://api.deepseek.com' } as const;
 

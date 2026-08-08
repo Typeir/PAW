@@ -68,14 +68,14 @@ import {
   addDays,
   caSubject,
   formatFingerprint,
-} from './identity.js';
+} from '../identity.js';
 import {
   loadIdentity,
   type IdentityIo,
   type IdentityIssuer,
   type ServerIdentity,
 } from './identityStore.js';
-import { identityPaths, pawHome, type HomeEnv } from './pawHome.js';
+import { identityPaths, pawHome, type HomeEnv } from '../pawHome.js';
 import {
   SECRET_DIR_MODE,
   SECRET_MODE,

@@ -19,7 +19,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PawSnapshot, TreeNode } from '@paw/core';
 import { UnknownPlanError } from '../src/plans.js';
 import { route, type HttpRequest, type RouterDeps } from '../src/router.js';
-import { allowedOrigins, inlineScriptHashes } from '../src/security.js';
+import { allowedOrigins, inlineScriptHashes } from '../src/infrastructure/security.js';
 
 const PORT = 8971;
 const TOKEN = 'router-token-value-0123456789abcdef';

@@ -33,7 +33,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { consolePage } from '../src/consolePage.js';
-import { issueCa } from '../src/nodeIdentity.js';
+import { issueCa } from '../src/infrastructure/nodeIdentity.js';
 import {
   BOOTSTRAP,
   LOOPBACK_V6,

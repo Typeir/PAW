@@ -31,7 +31,7 @@ import {
   type IdentityIssuer,
   type IdentityIo,
   type ServerIdentity,
-} from '../src/identityStore.js';
+} from '../src/infrastructure/identityStore.js';
 import { identityPaths } from '../src/pawHome.js';
 
 const NOW = new Date('2026-08-06T12:00:00.000Z');

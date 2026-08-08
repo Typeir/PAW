@@ -16,7 +16,7 @@
 export { readHostInfo } from './host.js';
 export type { OsLike, ProcLike } from './host.js';
 
-export { collectSubtree } from './process.js';
+export { collectSubtree } from './infrastructure/process.js';
 
 export { formatUptime } from './snapshot.js';
 
@@ -81,28 +81,28 @@ export {
 } from './identity.js';
 export type { IdentityAction, IdentityMeta } from './identity.js';
 
-export { identityNotice, loadIdentity, markTrusted } from './identityStore.js';
-export type { IdentityIo, IdentityIssuer, ServerIdentity } from './identityStore.js';
+export { identityNotice, loadIdentity, markTrusted } from './infrastructure/identityStore.js';
+export type { IdentityIo, IdentityIssuer, ServerIdentity } from './infrastructure/identityStore.js';
 
 export { identityPaths, pawHome } from './pawHome.js';
 export type { HomeEnv, IdentityPaths } from './pawHome.js';
 
-export { nodeIdentityIo, nodeServerIdentity } from './nodeIdentity.js';
+export { nodeIdentityIo, nodeServerIdentity } from './infrastructure/nodeIdentity.js';
 
-export { TRUST_NICKNAME, planTrust, trustCommandLine } from './trustStore.js';
-export type { TrustPlan, TrustStep } from './trustStore.js';
+export { TRUST_NICKNAME, planTrust, trustCommandLine } from './infrastructure/trustStore.js';
+export type { TrustPlan, TrustStep } from './infrastructure/trustStore.js';
 
 export { meterPort, toRunProgress, trackRun } from './run.js';
 export type { MeteredPort, RunTracker } from './run.js';
 
-export { openLiveHerd } from './model/openLiveHerd.js';
-export type { LiveSdkRegistry } from './model/liveSdkRegistry.js';
+export { openLiveHerd } from './infrastructure/model/openLiveHerd.js';
+export type { LiveSdkRegistry } from './infrastructure/model/liveSdkRegistry.js';
 
 export { createSessionRegistry } from './sessions.js';
 export type { LiveSession, SessionRegistry, WsSessionPort } from './sessions.js';
 
-export { decideUpgrade } from './security.js';
-export type { UpgradeRefusal, UpgradeRequest } from './security.js';
+export { decideUpgrade } from './infrastructure/security.js';
+export type { UpgradeRefusal, UpgradeRequest } from './infrastructure/security.js';
 
 export { BOOTSTRAP, nodeRuntime, walkFiles } from './nodeRuntime.js';
 export { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from './consolePage.js';
