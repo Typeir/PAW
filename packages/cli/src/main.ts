@@ -32,9 +32,10 @@
  * @since 5.0.0
  */
 
-import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { execFile, spawn } from 'node:child_process';
+import { closeSync, existsSync, openSync, statSync, unlinkSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { connect } from 'node:net';
 import { homedir, tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -74,6 +75,7 @@ import {
   nodeServerIdentity,
   openLiveHerd,
   pawHome,
+  lockPath,
   planTrust,
   runDaemon,
   socketPath,
@@ -83,6 +85,8 @@ import {
   type DaemonHandle,
   type Dispatcher,
 } from '@paw/daemon';
+import { ensureDaemon, type AutostartSeams } from './autostart.js';
+import { startEnforcement } from './pawdStart.js';
 import {
   concurrencyFrom,
   maxTokensFrom,
@@ -239,18 +243,85 @@ async function runHookCommand(rest: string[]): Promise<number> {
   }
   const event = args.values.get(host) as string;
   const root = process.cwd();
+  const pawDir = resolve(root, '.paw');
   const endpoint = socketPath(root, {
     platform: process.platform,
     xdgRuntimeDir: process.env.XDG_RUNTIME_DIR,
     tmpdir: tmpdir(),
   });
+  await ensureDaemon(endpoint, lockPath(pawDir), autostartSeams(root));
   return runHook({
     host,
     event,
     socketPath: endpoint,
-    tokenPath: tokenPath(resolve(root, '.paw')),
+    tokenPath: tokenPath(pawDir),
     io: { readStdin, writeStdout: (text) => process.stdout.write(text) },
   });
+}
+
+/**
+ * The real autostart effects: probe by opening a connection, take the lock by
+ * exclusive create, spawn a detached pawd running this CLI's `__pawd` entry, and
+ * sleep with a timer.
+ *
+ * @param {string} root - The project root pawd would serve.
+ * @returns {AutostartSeams} The effects for {@link ensureDaemon}.
+ */
+function autostartSeams(root: string): AutostartSeams {
+  return {
+    probe: (sock) =>
+      new Promise((res) => {
+        const socket = connect(sock);
+        const settle = (up: boolean): void => {
+          socket.destroy();
+          res(up);
+        };
+        socket.once('connect', () => settle(true));
+        socket.once('error', () => settle(false));
+        setTimeout(() => settle(false), 500).unref();
+      }),
+    lockAgeMs: (lp) => {
+      try {
+        return Date.now() - statSync(lp).mtimeMs;
+      } catch {
+        return null;
+      }
+    },
+    acquire: (lp) => {
+      try {
+        closeSync(openSync(lp, 'wx'));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    release: (lp) => {
+      try {
+        unlinkSync(lp);
+      } catch {
+        /* already gone */
+      }
+    },
+    spawn: () => {
+      spawn(process.execPath, [process.argv[1], '__pawd', root], {
+        detached: true,
+        stdio: 'ignore',
+      }).unref();
+    },
+    wait: (ms) => new Promise((r) => setTimeout(r, ms)),
+  };
+}
+
+/**
+ * The `__pawd` entry: bring enforcement up for a root and stay resident. This is
+ * what autostart spawns; it never returns until the process is killed.
+ *
+ * @param {string} root - The project root to serve.
+ * @returns {Promise<never>} Never resolves.
+ */
+async function runPawd(root: string): Promise<never> {
+  await startEnforcement(root);
+  return new Promise<never>(() => undefined);
 }
 
 /**
@@ -604,6 +675,9 @@ async function main(): Promise<number> {
   }
   if (command === 'hook') {
     return runHookCommand(rest);
+  }
+  if (command === '__pawd') {
+    return runPawd(rest[0] ?? process.cwd());
   }
   if (command === 'doctor') {
     const config = await loadConfig(rest[0]);
