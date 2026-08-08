@@ -35,6 +35,7 @@ import {
   type HostInfo,
   type HostProcess,
   type InitMode,
+  type RunSettings,
   type LogEntry,
   type ModelPort,
   type PawSnapshot,
@@ -289,6 +290,7 @@ export interface DaemonOptions {
   readonly dispatch?: Dispatcher;
   readonly scopeCeiling?: string;
   onAttach?(path: string, mode: InitMode): void;
+  onRelease?(settings: RunSettings): void;
 }
 
 /**
@@ -662,6 +664,7 @@ export async function runDaemon(
           },
         }),
     ...(options.onAttach === undefined ? {} : { onAttach: options.onAttach }),
+    ...(options.onRelease === undefined ? {} : { onRelease: options.onRelease }),
   });
 
   // One subscription per topic, forwarding to every live session. The sources

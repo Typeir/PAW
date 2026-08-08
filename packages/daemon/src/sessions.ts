@@ -58,6 +58,7 @@ import {
   parseClientMessage,
   withinRoot,
   type InitMode,
+  type RunSettings,
   type LiveTopic,
   type LiveTopicMap,
   type PawSnapshot,
@@ -90,6 +91,7 @@ export interface WsSessionPort {
  * @property {(message: string) => void} warn - Report something without dying of it.
  * @property {(path: string, mode: InitMode) => void} [onAttach] - Hand an attach request to whoever started the daemon; omit to refuse the request outright.
  * @property {(path: string) => void} [onScope] - Point the daemon at a repository; omit when it is already scoped.
+ * @property {(settings: RunSettings) => void} [onRelease] - Hand a release request to whoever started the daemon; omit to refuse it. Like attach, the daemon only remembers that someone asked — nothing runs and nothing is spent until the operator approves in the terminal.
  * @property {string} [scopeCeiling] - The directory a scope request may not escape; a missing ceiling refuses every request.
  */
 export interface SessionDeps {
@@ -100,6 +102,7 @@ export interface SessionDeps {
   warn(message: string): void;
   onAttach?(path: string, mode: InitMode): void;
   onScope?(path: string): void;
+  onRelease?(settings: RunSettings): void;
   readonly scopeCeiling?: string;
 }
 
@@ -214,6 +217,33 @@ function dispatchAttach(
   onAttach(path, mode);
   return {
     code: 'attach-pending',
+    message: 'approve this in the terminal running pawd',
+  };
+}
+
+/**
+ * Record that a console asked for a plan's herd to be released.
+ *
+ * Symmetric to {@link dispatchAttach}: the daemon's whole part is remembering the
+ * request. It spends nothing and runs nothing — an operator approves in the
+ * terminal that started pawd, which is what keeps a console-triggered live herd
+ * non-autonomous. The CLI's standalone runner is the path that needs no approval.
+ *
+ * @param {RunSettings} settings - What the console asked to run and how.
+ * @param {SessionDeps} deps - What the session was built with.
+ * @returns {LiveTopicMap['error']} What to tell the console.
+ */
+function dispatchRelease(settings: RunSettings, deps: SessionDeps): LiveTopicMap['error'] {
+  const { onRelease } = deps;
+  if (onRelease === undefined) {
+    return {
+      code: 'release-unavailable',
+      message: 'this daemon cannot take release requests',
+    };
+  }
+  onRelease(settings);
+  return {
+    code: 'release-pending',
     message: 'approve this in the terminal running pawd',
   };
 }
@@ -427,6 +457,11 @@ export function createSession(
 
       if (message.type === 'attach') {
         write('error', dispatchAttach(message.path, message.mode, deps));
+        return;
+      }
+
+      if (message.type === 'release') {
+        write('error', dispatchRelease(message.settings, deps));
         return;
       }
 

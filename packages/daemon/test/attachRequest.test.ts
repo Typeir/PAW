@@ -17,9 +17,11 @@
 import {
   authFrame,
   encodeAttach,
+  encodeRelease,
   encodeScope,
   parseEnvelope,
   type PawSnapshot,
+  type RunSettings,
 } from '@paw/core';
 import { describe, expect, it } from 'vitest';
 import { createSession, type SessionDeps, type WsSessionPort } from '../src/sessions.js';
@@ -227,5 +229,63 @@ describe('attach requests', () => {
 
     expect(deps.requests).toEqual([]);
     expect(session.state()).toBe('closed');
+  });
+});
+
+/**
+ * Session deps recording release requests instead of running them.
+ *
+ * @param {boolean} listening - Whether an `onRelease` handler is supplied.
+ * @returns {SessionDeps & { released: RunSettings[] }} The deps.
+ */
+function releaseDeps(listening = true): SessionDeps & { released: RunSettings[] } {
+  const released: RunSettings[] = [];
+  return {
+    released,
+    token: TOKEN,
+    clock: (): number => 0,
+    snapshot: async (): Promise<PawSnapshot> => ({}) as PawSnapshot,
+    plans: (): readonly string[] => [],
+    warn: (): void => {},
+    ...(listening
+      ? {
+          onRelease: (settings: RunSettings): void => {
+            released.push(settings);
+          },
+        }
+      : {}),
+  } as SessionDeps & { released: RunSettings[] };
+}
+
+describe('release requests', () => {
+  it('hands the request to the shell and points the console at the terminal', async () => {
+    const port = fakePort();
+    const deps = releaseDeps();
+    const session = createSession(port, deps, noopWatcher(), null);
+    await session.receive(authFrame(TOKEN));
+
+    await session.receive(encodeRelease({ plan: 'plans/lore.swarm.mjs', live: true, maxOutputTokens: 512 }));
+
+    expect(deps.released).toEqual([{ plan: 'plans/lore.swarm.mjs', live: true, maxOutputTokens: 512 }]);
+    expect(parseEnvelope(port.sent[port.sent.length - 1])?.data).toEqual({
+      code: 'release-pending',
+      message: 'approve this in the terminal running pawd',
+    });
+    expect(session.state()).toBe('live');
+  });
+
+  it('refuses when nobody is listening, rather than spending silently', async () => {
+    const port = fakePort();
+    const deps = releaseDeps(false);
+    const session = createSession(port, deps, noopWatcher(), null);
+    await session.receive(authFrame(TOKEN));
+
+    await session.receive(encodeRelease({ plan: 'p', live: false }));
+
+    expect(deps.released).toEqual([]);
+    expect(parseEnvelope(port.sent[port.sent.length - 1])?.data).toEqual({
+      code: 'release-unavailable',
+      message: 'this daemon cannot take release requests',
+    });
   });
 });

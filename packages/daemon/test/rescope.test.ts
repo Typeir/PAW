@@ -20,12 +20,14 @@
 import {
   authFrame,
   encodeAttach,
+  encodeRelease,
   encodeScope,
   parseEnvelope,
   type AttachState,
   type HostInfo,
   type HostProcess,
   type PlansSlice,
+  type RunSettings,
 } from '@paw/core';
 import { describe, expect, it } from 'vitest';
 import { CA_DAYS, LEAF_DAYS, META_VERSION, addDays } from '../src/identity.js';
@@ -277,6 +279,30 @@ describe('rescoping a running daemon', () => {
     expect(asked).toEqual([['/home/x/bare', 'merge']]);
     expect(latest(sent, 'error')).toEqual({
       code: 'attach-pending',
+      message: 'approve this in the terminal running pawd',
+    });
+    await daemon.close();
+  });
+
+  it('hands release requests to whoever started it, and runs nothing itself', async () => {
+    const asked: RunSettings[] = [];
+    const { runtime, captured } = makeRuntime();
+    const daemon = await runDaemon(
+      {
+        root: '/home/x/bare',
+        onRelease: (settings) => {
+          asked.push(settings);
+        },
+      },
+      runtime,
+    );
+    const { sent, socket } = await openConsole(captured.hooks as SocketHooks);
+
+    await socket.message(encodeRelease({ plan: 'plans/lore.swarm.mjs', live: true, concurrency: 4 }));
+
+    expect(asked).toEqual([{ plan: 'plans/lore.swarm.mjs', live: true, concurrency: 4 }]);
+    expect(latest(sent, 'error')).toEqual({
+      code: 'release-pending',
       message: 'approve this in the terminal running pawd',
     });
     await daemon.close();
