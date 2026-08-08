@@ -120,4 +120,7 @@ export type {
   RpcSessionContext,
   SessionPush,
 } from './application/rpcSession.js';
+
+export { attachSession, listenSocket } from './infrastructure/socketServer.js';
+export type { ConnSocket, SocketServerHandle } from './infrastructure/socketServer.js';
 export { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from './domain/consolePage.js';

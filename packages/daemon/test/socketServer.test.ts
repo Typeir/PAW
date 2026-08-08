@@ -1,0 +1,76 @@
+/**
+ * @fileoverview Unit tests for the per-connection wiring, driven through a fake
+ * socket so the write, close-on-session-say-so, and error-swallow branches are
+ * exercised deterministically without coaxing a real socket into resetting. The
+ * real bind/accept/close path is covered by the integration tier.
+ *
+ * @module @paw/daemon/test/socketServer
+ */
+
+import { describe, expect, it } from 'vitest';
+import { createRpcSession } from '../src/application/rpcSession.js';
+import { attachSession, type ConnSocket } from '../src/infrastructure/socketServer.js';
+
+const session = () =>
+  createRpcSession({
+    token: 'T',
+    protocolVersion: 1,
+    hello: { ok: true },
+    methods: { echo: async (p) => p },
+  });
+
+const line = (obj: unknown): string => `${JSON.stringify(obj)}\n`;
+const connect = (token = 'T') =>
+  line({ jsonrpc: '2.0', id: 1, method: 'connect', params: { token, protocolVersion: 1 } });
+
+/** A fake socket capturing writes, its end, and its data/error handlers. */
+function fakeSocket() {
+  const handlers: { data?: (c: string) => void; error?: (e: Error) => void } = {};
+  const written: string[] = [];
+  let ended = false;
+  const socket: ConnSocket = {
+    setEncoding: () => undefined,
+    on(event, listener) {
+      if (event === 'data') {
+        handlers.data = listener as (c: string) => void;
+      } else {
+        handlers.error = listener as (e: Error) => void;
+      }
+    },
+    write: (d) => {
+      written.push(d);
+    },
+    end: () => {
+      ended = true;
+    },
+  };
+  return { socket, handlers, written, isEnded: () => ended };
+}
+
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe('attachSession', () => {
+  it('writes the session output for a chunk and does not close a good handshake', async () => {
+    const f = fakeSocket();
+    attachSession(f.socket, session());
+    f.handlers.data?.(connect());
+    await flush();
+    expect(JSON.parse(f.written[0]).result).toEqual({ ok: true });
+    expect(f.isEnded()).toBe(false);
+  });
+
+  it('ends the socket when the session refuses', async () => {
+    const f = fakeSocket();
+    attachSession(f.socket, session());
+    f.handlers.data?.(connect('wrong'));
+    await flush();
+    expect(JSON.parse(f.written[0]).error.code).toBe(-32600);
+    expect(f.isEnded()).toBe(true);
+  });
+
+  it('swallows a socket error rather than throwing', () => {
+    const f = fakeSocket();
+    attachSession(f.socket, session());
+    expect(() => f.handlers.error?.(new Error('reset'))).not.toThrow();
+  });
+});
