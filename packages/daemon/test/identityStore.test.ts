@@ -22,7 +22,7 @@ import {
   META_VERSION,
   addDays,
   type IdentityMeta,
-} from '../src/identity.js';
+} from '../src/domain/identity.js';
 import {
   identityNotice,
   loadIdentity,
@@ -32,7 +32,7 @@ import {
   type IdentityIo,
   type ServerIdentity,
 } from '../src/infrastructure/identityStore.js';
-import { identityPaths } from '../src/pawHome.js';
+import { identityPaths } from '../src/domain/pawHome.js';
 
 const NOW = new Date('2026-08-06T12:00:00.000Z');
 const PATHS = identityPaths('/home/x/.local/share/paw');

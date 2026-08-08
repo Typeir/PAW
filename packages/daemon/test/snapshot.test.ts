@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { formatUptime } from '../src/snapshot.js';
+import { formatUptime } from '../src/domain/snapshot.js';
 
 describe('formatUptime', () => {
   it('drops to the largest unit that fits, and pads the smaller one', () => {

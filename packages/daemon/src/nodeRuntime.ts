@@ -38,10 +38,10 @@ import {
   PONG_TIMEOUT_MS,
   type HostProcess,
 } from '@paw/core';
-import { readHostInfo } from './host.js';
+import { readHostInfo } from './domain/host.js';
 import { nodeServerIdentity } from './infrastructure/nodeIdentity.js';
 import { collectSubtree } from './infrastructure/process.js';
-import type { HttpRequest, HttpResponse } from './router.js';
+import type { HttpRequest, HttpResponse } from './domain/router.js';
 import { TOKEN_BYTES, type UpgradeRefusal } from './infrastructure/security.js';
 import type {
   AcceptedSocket,
@@ -51,7 +51,7 @@ import type {
   TlsMaterial,
 } from './serve.js';
 import type { WsSessionPort } from './sessions.js';
-import { IGNORED_DIRS, type FileEntry } from './tree.js';
+import { IGNORED_DIRS, type FileEntry } from './domain/tree.js';
 
 /**
  * How long a client may take to send its request headers. Node's default is

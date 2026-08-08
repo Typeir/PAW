@@ -30,7 +30,7 @@ import {
   type RunSettings,
 } from '@paw/core';
 import { describe, expect, it } from 'vitest';
-import { CA_DAYS, LEAF_DAYS, META_VERSION, addDays } from '../src/identity.js';
+import { CA_DAYS, LEAF_DAYS, META_VERSION, addDays } from '../src/domain/identity.js';
 import type { ServerIdentity } from '../src/infrastructure/identityStore.js';
 import {
   runDaemon,
@@ -38,7 +38,7 @@ import {
   type ServerHandle,
   type SocketHooks,
 } from '../src/serve.js';
-import type { FileEntry } from '../src/tree.js';
+import type { FileEntry } from '../src/domain/tree.js';
 
 const TOKEN = 'test-token-value-0123456789abcdef';
 

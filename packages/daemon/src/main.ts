@@ -19,7 +19,7 @@
  * @since 5.0.0
  */
 
-import { consolePage } from './consolePage.js';
+import { consolePage } from './domain/consolePage.js';
 import { identityNotice } from './infrastructure/identityStore.js';
 import { nodeRuntime } from './nodeRuntime.js';
 import { runDaemon } from './serve.js';

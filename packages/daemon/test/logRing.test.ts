@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { LOG_CAPACITY, createLogRing } from '../src/logRing.js';
+import { LOG_CAPACITY, createLogRing } from '../src/domain/logRing.js';
 
 /**
  * A clock that ticks one second per call, so ordering is visible.

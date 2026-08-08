@@ -44,8 +44,8 @@ import {
   type RunProgress,
   type SwarmPlan,
 } from '@paw/core';
-import { createBus, type LiveBus } from './bus.js';
-import { createLogRing } from './logRing.js';
+import { createBus, type LiveBus } from './domain/bus.js';
+import { createLogRing } from './domain/logRing.js';
 import {
   buildPlanSlice,
   composeSnapshot,
@@ -53,10 +53,10 @@ import {
   emptyPlanSlice,
   idleBudget,
   idleRun,
-} from './cache.js';
+} from './domain/cache.js';
 import type { ServerIdentity } from './infrastructure/identityStore.js';
-import { discoverPlans, findConfig, selectPlan } from './plans.js';
-import { route, type HttpRequest, type HttpResponse } from './router.js';
+import { discoverPlans, findConfig, selectPlan } from './domain/plans.js';
+import { route, type HttpRequest, type HttpResponse } from './domain/router.js';
 import {
   allowedOrigins,
   decideUpgrade,
@@ -65,7 +65,7 @@ import {
 } from './infrastructure/security.js';
 import { createSessionRegistry, type WsSessionPort } from './sessions.js';
 import { toRunProgress, trackRun } from './run.js';
-import { buildFileTree, type FileEntry } from './tree.js';
+import { buildFileTree, type FileEntry } from './domain/tree.js';
 
 /**
  * The loopback address the daemon binds. The control API is local-only by

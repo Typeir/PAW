@@ -13,18 +13,18 @@
  * @since 5.0.0
  */
 
-export { readHostInfo } from './host.js';
-export type { OsLike, ProcLike } from './host.js';
+export { readHostInfo } from './domain/host.js';
+export type { OsLike, ProcLike } from './domain/host.js';
 
 export { collectSubtree } from './infrastructure/process.js';
 
-export { formatUptime } from './snapshot.js';
+export { formatUptime } from './domain/snapshot.js';
 
-export { LOG_CAPACITY, createLogRing } from './logRing.js';
-export type { LogRing } from './logRing.js';
+export { LOG_CAPACITY, createLogRing } from './domain/logRing.js';
+export type { LogRing } from './domain/logRing.js';
 
-export { createBus } from './bus.js';
-export type { BusErrorReporter, LiveBus, LiveListener } from './bus.js';
+export { createBus } from './domain/bus.js';
+export type { BusErrorReporter, LiveBus, LiveListener } from './domain/bus.js';
 
 export {
   buildPlanSlice,
@@ -33,14 +33,14 @@ export {
   emptyPlanSlice,
   idleBudget,
   idleRun,
-} from './cache.js';
-export type { SnapshotParts, VersionedCache } from './cache.js';
+} from './domain/cache.js';
+export type { SnapshotParts, VersionedCache } from './domain/cache.js';
 
-export { route } from './router.js';
-export type { HttpResponse, RouterDeps } from './router.js';
+export { route } from './domain/router.js';
+export type { HttpResponse, RouterDeps } from './domain/router.js';
 
-export { IGNORED_DIRS, buildFileTree, findSubtree } from './tree.js';
-export type { FileEntry } from './tree.js';
+export { IGNORED_DIRS, buildFileTree, findSubtree } from './domain/tree.js';
+export type { FileEntry } from './domain/tree.js';
 
 export {
   CONFIG_PATH,
@@ -49,7 +49,7 @@ export {
   discoverPlans,
   findConfig,
   selectPlan,
-} from './plans.js';
+} from './domain/plans.js';
 
 export {
   LOOPBACK,
@@ -78,14 +78,14 @@ export {
   chromiumFingerprint,
   formatFingerprint,
   trustAdvice,
-} from './identity.js';
-export type { IdentityAction, IdentityMeta } from './identity.js';
+} from './domain/identity.js';
+export type { IdentityAction, IdentityMeta } from './domain/identity.js';
 
 export { identityNotice, loadIdentity, markTrusted } from './infrastructure/identityStore.js';
 export type { IdentityIo, IdentityIssuer, ServerIdentity } from './infrastructure/identityStore.js';
 
-export { identityPaths, pawHome } from './pawHome.js';
-export type { HomeEnv, IdentityPaths } from './pawHome.js';
+export { identityPaths, pawHome } from './domain/pawHome.js';
+export type { HomeEnv, IdentityPaths } from './domain/pawHome.js';
 
 export { nodeIdentityIo, nodeServerIdentity } from './infrastructure/nodeIdentity.js';
 
@@ -105,4 +105,4 @@ export { decideUpgrade } from './infrastructure/security.js';
 export type { UpgradeRefusal, UpgradeRequest } from './infrastructure/security.js';
 
 export { BOOTSTRAP, nodeRuntime, walkFiles } from './nodeRuntime.js';
-export { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from './consolePage.js';
+export { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from './domain/consolePage.js';

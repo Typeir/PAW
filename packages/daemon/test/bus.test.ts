@@ -14,7 +14,7 @@
 
 import type { HostInfo } from '@paw/core';
 import { describe, expect, it, vi } from 'vitest';
-import { createBus } from '../src/bus.js';
+import { createBus } from '../src/domain/bus.js';
 
 const HOST: HostInfo = {
   pid: 42,

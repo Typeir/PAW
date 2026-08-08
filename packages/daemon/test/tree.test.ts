@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { IGNORED_DIRS, buildFileTree, findSubtree, type FileEntry } from '../src/tree.js';
+import { IGNORED_DIRS, buildFileTree, findSubtree, type FileEntry } from '../src/domain/tree.js';
 
 const entries: FileEntry[] = [
   { path: 'README.md', isFile: true },

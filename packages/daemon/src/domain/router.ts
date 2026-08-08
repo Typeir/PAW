@@ -34,7 +34,7 @@ import {
   originAllowed,
   securityHeaders,
   verifyToken,
-} from './infrastructure/security.js';
+} from '../infrastructure/security.js';
 import { findSubtree } from './tree.js';
 
 /**

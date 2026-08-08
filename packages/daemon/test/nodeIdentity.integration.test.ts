@@ -36,7 +36,7 @@ import {
   CA_DAYS,
   LEAF_DAYS,
   addDays,
-} from '../src/identity.js';
+} from '../src/domain/identity.js';
 import {
   issueCa,
   issueLeaf,

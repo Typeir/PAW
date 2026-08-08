@@ -30,10 +30,10 @@ import {
   type SwarmPlan,
 } from '@paw/core';
 import { describe, expect, it, vi } from 'vitest';
-import { CA_DAYS, LEAF_DAYS, META_VERSION, addDays } from '../src/identity.js';
+import { CA_DAYS, LEAF_DAYS, META_VERSION, addDays } from '../src/domain/identity.js';
 import type { ServerIdentity } from '../src/infrastructure/identityStore.js';
-import { UnknownPlanError } from '../src/plans.js';
-import type { HttpRequest, HttpResponse } from '../src/router.js';
+import { UnknownPlanError } from '../src/domain/plans.js';
+import type { HttpRequest, HttpResponse } from '../src/domain/router.js';
 import {
   LOOPBACK,
   modelCount,
@@ -45,7 +45,7 @@ import {
   type SocketHooks,
   type TlsMaterial,
 } from '../src/serve.js';
-import type { FileEntry } from '../src/tree.js';
+import type { FileEntry } from '../src/domain/tree.js';
 
 const TOKEN = 'test-token-value-0123456789abcdef';
 

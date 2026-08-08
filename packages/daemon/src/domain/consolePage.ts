@@ -53,7 +53,7 @@ export function resolveConsolePage(
 ): string {
   const candidates = [
     join(moduleDir, 'gui', CONSOLE_PAGE_FILE),
-    join(moduleDir, '..', '..', 'gui', 'dist', CONSOLE_PAGE_FILE),
+    join(moduleDir, '..', '..', '..', 'gui', 'dist', CONSOLE_PAGE_FILE),
   ];
   return candidates.find(exists) ?? candidates[0];
 }

@@ -32,7 +32,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { consolePage } from '../src/consolePage.js';
+import { consolePage } from '../src/domain/consolePage.js';
 import { issueCa } from '../src/infrastructure/nodeIdentity.js';
 import {
   BOOTSTRAP,
@@ -286,10 +286,10 @@ describe('the daemon on the real runtime', () => {
     expect(tree.some((node) => node.name === 'node_modules')).toBe(false);
 
     const src = tree.find((node) => node.name === 'src');
-    expect(src?.children.map((child) => child.name)).toContain('tree.ts');
+    expect(src?.children.map((child) => child.name)).toContain('index.ts');
 
     const narrowed = (await (await authed(`${daemon.url}api/tree?root=src`, daemon)).json()) as TreeNode[];
-    expect(narrowed.map((node) => node.path)).toContain('src/tree.ts');
+    expect(narrowed.map((node) => node.path)).toContain('src/index.ts');
 
     expect((await authed(`${daemon.url}api/tree?root=nope`, daemon)).status).toBe(404);
   });

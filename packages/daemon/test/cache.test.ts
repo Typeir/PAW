@@ -28,7 +28,7 @@ import {
   emptyPlanSlice,
   idleBudget,
   idleRun,
-} from '../src/cache.js';
+} from '../src/domain/cache.js';
 
 const HOST: HostInfo = {
   pid: 42,

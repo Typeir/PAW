@@ -17,8 +17,8 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import type { PawSnapshot, TreeNode } from '@paw/core';
-import { UnknownPlanError } from '../src/plans.js';
-import { route, type HttpRequest, type RouterDeps } from '../src/router.js';
+import { UnknownPlanError } from '../src/domain/plans.js';
+import { route, type HttpRequest, type RouterDeps } from '../src/domain/router.js';
 import { allowedOrigins, inlineScriptHashes } from '../src/infrastructure/security.js';
 
 const PORT = 8971;

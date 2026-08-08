@@ -16,8 +16,8 @@ import {
   discoverPlans,
   findConfig,
   selectPlan,
-} from '../src/plans.js';
-import type { FileEntry } from '../src/tree.js';
+} from '../src/domain/plans.js';
+import type { FileEntry } from '../src/domain/tree.js';
 
 const entries: FileEntry[] = [
   { path: '.paw', isFile: false },

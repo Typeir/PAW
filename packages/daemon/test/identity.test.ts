@@ -32,8 +32,8 @@ import {
   isUsableMeta,
   trustAdvice,
   type IdentityMeta,
-} from '../src/identity.js';
-import { identityPaths, pawHome } from '../src/pawHome.js';
+} from '../src/domain/identity.js';
+import { identityPaths, pawHome } from '../src/domain/pawHome.js';
 
 const NOW = new Date('2026-08-06T12:00:00.000Z');
 

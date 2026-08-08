@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from '../src/consolePage.js';
+import { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from '../src/domain/consolePage.js';
 
 /**
  * Normalise a path for comparison regardless of platform separator.
@@ -35,7 +35,7 @@ describe('resolveConsolePage', () => {
   });
 
   it('falls back to the source checkout layout', () => {
-    const src = '/repo/packages/daemon/src';
+    const src = '/repo/packages/daemon/src/domain';
     const found = resolveConsolePage(src, (p) =>
       fwd(p) === `/repo/packages/gui/dist/${CONSOLE_PAGE_FILE}`,
     );

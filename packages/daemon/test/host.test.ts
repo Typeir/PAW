@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { readHostInfo, type OsLike, type ProcLike } from '../src/host.js';
+import { readHostInfo, type OsLike, type ProcLike } from '../src/domain/host.js';
 
 const proc: ProcLike = {
   pid: 4242,
