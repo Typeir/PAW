@@ -1,21 +1,39 @@
 /**
  * @fileoverview Covers {@link handleEgress}, the pure core of PAW's daemon-owned
- * BYOK egress: it stamps the provider key onto the outbound request, performs the
- * call through an injected fetch, and — only for a successful response tied to a
- * session — reads token usage from the body and reports it. Proven here with a
- * fake fetch and no SDK, so the real `CopilotRequestHandler` subclass stays a thin
- * shell. The key is asserted present on the request the fetch receives, never
- * logged.
+ * BYOK egress: it stamps the provider key onto the outbound request, stamps the
+ * session's output ceiling onto a chat-completion body (the only place the
+ * provider learns `max_tokens`, since the SDK forwards none), performs the call
+ * through an injected fetch, and — only for a successful response tied to a
+ * session — reads token usage from the body and reports it. Proven with a fake
+ * fetch and no SDK. The key is asserted present on the request the fetch
+ * receives, never logged.
  *
  * @module @paw/daemon/test/model/pawEgressLogic
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { handleEgress } from '../../src/model/pawEgressLogic.js';
+import { handleEgress, type EgressDeps } from '../../src/model/pawEgressLogic.js';
 import type { TokenUsage } from '../../src/model/providerUsage.js';
+
+const URL = 'https://api.example.com/v1/chat/completions';
 
 const jsonResponse = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+/**
+ * Base egress deps: no cap, an ok empty-usage response, overridable per test.
+ *
+ * @param over - Overrides.
+ */
+function deps(over: Partial<EgressDeps> = {}): EgressDeps {
+  return {
+    authToken: async () => 'sk-secret',
+    fetchImpl: async () => jsonResponse({ usage: { prompt_tokens: 0, completion_tokens: 0 } }),
+    onUsage: () => undefined,
+    maxTokensFor: () => undefined,
+    ...over,
+  };
+}
 
 describe('handleEgress', () => {
   it('stamps the key on the request, calls through, and reports usage for a session', async () => {
@@ -26,36 +44,106 @@ describe('handleEgress', () => {
       return jsonResponse({ usage: { prompt_tokens: 11, completion_tokens: 4 } });
     });
 
-    const res = await handleEgress(new Request('https://api.example.com/v1/chat/completions', { method: 'POST' }), 'sess-1', {
-      authToken: async () => 'sk-secret',
+    const res = await handleEgress(new Request(URL, { method: 'POST' }), 'sess-1', deps({
       fetchImpl,
       onUsage: (sessionId, usage) => recorded.push({ sessionId, usage }),
-    });
+    }));
 
     expect(seenAuth).toBe('Bearer sk-secret');
-    expect(fetchImpl).toHaveBeenCalledOnce();
     expect(recorded).toEqual([{ sessionId: 'sess-1', usage: { inputTokens: 11, outputTokens: 4 } }]);
     expect(res.status).toBe(200);
   });
 
   it('does not report usage for a non-2xx response', async () => {
     const onUsage = vi.fn();
-    const res = await handleEgress(new Request('https://api.example.com/v1/chat/completions'), 'sess-2', {
-      authToken: () => 'sk',
+    const res = await handleEgress(new Request(URL), 'sess-2', deps({
       fetchImpl: async () => jsonResponse({ error: 'nope' }, 500),
       onUsage,
-    });
+    }));
     expect(res.status).toBe(500);
     expect(onUsage).not.toHaveBeenCalled();
   });
 
   it('does not report usage when there is no session to attribute it to', async () => {
     const onUsage = vi.fn();
-    await handleEgress(new Request('https://api.example.com/v1/chat/completions'), undefined, {
-      authToken: () => 'sk',
+    await handleEgress(new Request(URL), undefined, deps({
       fetchImpl: async () => jsonResponse({ usage: { prompt_tokens: 1, completion_tokens: 1 } }),
       onUsage,
-    });
+    }));
     expect(onUsage).not.toHaveBeenCalled();
+  });
+
+  it('stamps max_tokens onto a chat-completion body when a cap applies', async () => {
+    let sent: Record<string, unknown> = {};
+    await handleEgress(
+      new Request(URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'm', messages: [{ role: 'user', content: 'hi' }] }),
+      }),
+      'sess-3',
+      deps({
+        maxTokensFor: () => 256,
+        fetchImpl: async (req) => {
+          sent = (await req.json()) as Record<string, unknown>;
+          return jsonResponse({ usage: { prompt_tokens: 1, completion_tokens: 1 } });
+        },
+      }),
+    );
+    expect(sent.max_tokens).toBe(256);
+    expect(sent.messages).toBeDefined();
+  });
+
+  it('leaves a JSON body that is not a chat-completion untouched', async () => {
+    let sent: Record<string, unknown> = {};
+    await handleEgress(
+      new Request(URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ping: true }),
+      }),
+      'sess-4',
+      deps({
+        maxTokensFor: () => 256,
+        fetchImpl: async (req) => {
+          sent = (await req.json()) as Record<string, unknown>;
+          return jsonResponse({ usage: { prompt_tokens: 0, completion_tokens: 0 } });
+        },
+      }),
+    );
+    expect(sent).toEqual({ ping: true });
+    expect(sent.max_tokens).toBeUndefined();
+  });
+
+  it('does not touch a non-POST request even when a cap applies', async () => {
+    let method = '';
+    await handleEgress(
+      new Request(URL, { method: 'GET' }),
+      'sess-5',
+      deps({
+        maxTokensFor: () => 256,
+        fetchImpl: async (req) => {
+          method = req.method;
+          return jsonResponse({ usage: { prompt_tokens: 0, completion_tokens: 0 } });
+        },
+      }),
+    );
+    expect(method).toBe('GET');
+  });
+
+  it('does not touch a non-JSON POST even when a cap applies', async () => {
+    let text = '';
+    await handleEgress(
+      new Request(URL, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'raw' }),
+      'sess-6',
+      deps({
+        maxTokensFor: () => 256,
+        fetchImpl: async (req) => {
+          text = await req.text();
+          return jsonResponse({ usage: { prompt_tokens: 0, completion_tokens: 0 } });
+        },
+      }),
+    );
+    expect(text).toBe('raw');
   });
 });

@@ -31,14 +31,19 @@ function fakeClient(session: Partial<SdkSessionLike> & { sessionId: string }): {
 }
 
 describe('createSdkSessionRun', () => {
-  it('runs a tool-less completion and returns content with the recorded usage', async () => {
+  it('runs a tool-less completion, publishes the output cap for the egress, then clears it', async () => {
     const usage = new Map<string, TokenUsage>([['s1', { inputTokens: 11, outputTokens: 4 }]]);
+    const maxTokens = new Map<string, number>();
+    let capDuringSend: number | undefined;
     const { client, disconnect, createSession } = fakeClient({
       sessionId: 's1',
-      sendAndWait: async () => ({ data: { content: 'a monster stirs' } }),
+      sendAndWait: async () => {
+        capDuringSend = maxTokens.get('s1');
+        return { data: { content: 'a monster stirs' } };
+      },
     });
 
-    const run = createSdkSessionRun(client, PROVIDER, usage);
+    const run = createSdkSessionRun(client, PROVIDER, usage, maxTokens);
     const result = await run({ model: 'deepseek-chat', prompt: 'Describe a monster.', maxOutputTokens: 8192 });
 
     expect(result).toEqual({ content: 'a monster stirs', inputTokens: 11, outputTokens: 4 });
@@ -49,22 +54,35 @@ describe('createSdkSessionRun', () => {
         availableTools: [],
       }),
     );
+    expect(capDuringSend).toBe(8192);
+    expect(maxTokens.has('s1')).toBe(false);
     expect(disconnect).toHaveBeenCalledOnce();
     expect(usage.has('s1')).toBe(false);
   });
 
-  it('coalesces an empty reply to an empty string', async () => {
+  it('publishes no cap when the request names no maxOutputTokens', async () => {
     const usage = new Map<string, TokenUsage>([['s2', { inputTokens: 1, outputTokens: 0 }]]);
-    const { client } = fakeClient({ sessionId: 's2', sendAndWait: async () => undefined });
-    const run = createSdkSessionRun(client, PROVIDER, usage);
+    const maxTokens = new Map<string, number>();
+    let capDuringSend: number | undefined = -1;
+    const { client } = fakeClient({
+      sessionId: 's2',
+      sendAndWait: async () => {
+        capDuringSend = maxTokens.get('s2');
+        return undefined;
+      },
+    });
+    const run = createSdkSessionRun(client, PROVIDER, usage, maxTokens);
     expect(await run({ model: 'm', prompt: 'p' })).toEqual({ content: '', inputTokens: 1, outputTokens: 0 });
+    expect(capDuringSend).toBeUndefined();
   });
 
-  it('throws, but still disconnects, when no usage was recorded', async () => {
+  it('throws, but still disconnects and clears the cap, when no usage was recorded', async () => {
     const usage = new Map<string, TokenUsage>();
+    const maxTokens = new Map<string, number>();
     const { client, disconnect } = fakeClient({ sessionId: 's3', sendAndWait: async () => ({ data: { content: 'x' } }) });
-    const run = createSdkSessionRun(client, PROVIDER, usage);
-    await expect(run({ model: 'm', prompt: 'p' })).rejects.toThrow(/no usage recorded/i);
+    const run = createSdkSessionRun(client, PROVIDER, usage, maxTokens);
+    await expect(run({ model: 'm', prompt: 'p', maxOutputTokens: 512 })).rejects.toThrow(/no usage recorded/i);
     expect(disconnect).toHaveBeenCalledOnce();
+    expect(maxTokens.has('s3')).toBe(false);
   });
 });

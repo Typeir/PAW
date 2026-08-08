@@ -74,12 +74,14 @@ export async function openSdkModel(
   options: OpenSdkModelOptions,
 ): Promise<{ port: ModelPort; close: () => Promise<void> }> {
   const usageBySession = new Map<string, TokenUsage>();
+  const maxTokensBySession = new Map<string, number>();
   const egress = new PawEgress({
     authToken: options.authToken,
     fetchImpl: (request) => fetch(request),
     onUsage: (sessionId, usage) => {
       usageBySession.set(sessionId, usage);
     },
+    maxTokensFor: (sessionId) => (sessionId === undefined ? undefined : maxTokensBySession.get(sessionId)),
   });
   const client = new CopilotClient({
     requestHandler: egress,
@@ -89,7 +91,12 @@ export async function openSdkModel(
     logLevel: 'error',
   });
   await client.start();
-  const run = createSdkSessionRun(client as unknown as SdkClientLike, options.provider, usageBySession);
+  const run = createSdkSessionRun(
+    client as unknown as SdkClientLike,
+    options.provider,
+    usageBySession,
+    maxTokensBySession,
+  );
   return {
     port: createCopilotSdkModel(run),
     close: async () => {

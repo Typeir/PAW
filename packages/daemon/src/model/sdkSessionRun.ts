@@ -71,6 +71,7 @@ const DEFAULT_DEADLINE_MS = 120_000;
  * @param {SdkClientLike} client - The shared, already-started client.
  * @param {ProviderBlock} provider - The BYOK provider target.
  * @param {Map<string, TokenUsage>} usageBySession - Usage the egress records, keyed by session id.
+ * @param {Map<string, number>} maxTokensBySession - The output ceiling this run publishes for the egress to stamp onto the outbound body; the SDK forwards no `max_tokens` of its own, so without this the provider generates unbounded.
  * @param {number} [deadlineMs] - Wall-clock ceiling for one completion.
  * @returns {SessionRun} The provider boundary a model port wraps.
  */
@@ -78,6 +79,7 @@ export function createSdkSessionRun(
   client: SdkClientLike,
   provider: ProviderBlock,
   usageBySession: Map<string, TokenUsage>,
+  maxTokensBySession: Map<string, number>,
   deadlineMs: number = DEFAULT_DEADLINE_MS,
 ): SessionRun {
   return async (request: ModelRequest) => {
@@ -89,6 +91,9 @@ export function createSdkSessionRun(
       enableConfigDiscovery: false,
       streaming: false,
     });
+    if (request.maxOutputTokens !== undefined) {
+      maxTokensBySession.set(session.sessionId, request.maxOutputTokens);
+    }
     try {
       const reply = await session.sendAndWait({ prompt: request.prompt }, deadlineMs);
       const usage = usageBySession.get(session.sessionId);
@@ -104,6 +109,7 @@ export function createSdkSessionRun(
         outputTokens: usage.outputTokens,
       };
     } finally {
+      maxTokensBySession.delete(session.sessionId);
       await session.disconnect();
     }
   };

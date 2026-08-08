@@ -28,11 +28,13 @@ describe.skipIf(!LIVE)('SDK model egress (integration)', () => {
 
   it('runs a completion through PAW-owned egress and recovers content and real usage', async () => {
     let sawAuth = false;
+    let lastBody = '';
     const server = createServer((req, res) => {
       sawAuth ||= req.headers.authorization === 'Bearer sk-stub';
       let body = '';
       req.on('data', (chunk) => (body += chunk));
       req.on('end', () => {
+        lastBody = body;
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({
           id: 'chatcmpl-stub', object: 'chat.completion', created: 1, model: 'stub-model',
@@ -60,6 +62,7 @@ describe.skipIf(!LIVE)('SDK model egress (integration)', () => {
       expect(result.inputTokens).toBe(42);
       expect(result.outputTokens).toBe(7);
       expect(sawAuth).toBe(true);
+      expect((JSON.parse(lastBody) as { max_tokens?: number }).max_tokens).toBe(256);
     } finally {
       await close();
       await new Promise<void>((resolve) => server.close(() => resolve()));
