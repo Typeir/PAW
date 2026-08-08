@@ -23,6 +23,26 @@ export type {
   MergeAction,
 } from './domain/hookMerge.js';
 
+export {
+  RPC_ERROR,
+  RPC_PROTOCOL_VERSION,
+  encodeFrame,
+  parseFrame,
+  rpcFailure,
+  rpcNotification,
+  rpcRequest,
+  rpcSuccess,
+  splitFrames,
+} from './domain/rpcWire.js';
+export type {
+  RpcErrorBody,
+  RpcFailure,
+  RpcFrame,
+  RpcNotification,
+  RpcRequest,
+  RpcSuccess,
+} from './domain/rpcWire.js';
+
 export type {
   PawEvent,
   PawEventType,
