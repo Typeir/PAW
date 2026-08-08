@@ -6,6 +6,8 @@
  * and prints what the formatters return:
  *
  *   paw check                     read a decision-input on stdin, allow/deny (exit 0/2)
+ *   paw hook --copilot "tool.pre" bridge a host hook into the loop (stdin payload
+ *                                 -> connector -> handleEvent -> native output)
  *   paw doctor <config.json>      validate config + role bindings
  *   paw swarm doctor <plan.mjs>   validate a swarm plan
  *   paw swarm show <plan> <n>     print member n's rendered brief
@@ -31,7 +33,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
@@ -45,6 +47,7 @@ import {
   dispatchSwarm,
   doctorPlan,
   runDoctor,
+  type HandleDeps,
   type InitMode,
   type ModelCapabilities,
   type ModelPort,
@@ -53,7 +56,15 @@ import {
   type SwarmPlan,
   type Violation,
 } from '@paw/core';
-import { createNodeFileReader, createNodeFs } from '@paw/adapters';
+import {
+  createNodeFileReader,
+  createNodeFs,
+  createNodeGateRunner,
+  createNodeSqliteDriver,
+  createSqlStore,
+  loadNodeSqliteCtor,
+} from '@paw/adapters';
+import { EXEMPT_TOOLS, runHook } from './hook.js';
 import { createHerdWriter } from './herdWriter.js';
 import {
   attachOutcomeLine,
@@ -95,6 +106,10 @@ import {
 } from './format.js';
 
 const KNOWN_CONNECTORS = ['copilot-hooks'];
+
+const HOST_FLAGS = ['copilot'];
+
+const HOOK_IGNORED = /(^|\/)(\.paw|\.git|node_modules|dist|coverage|\.next)(\/|$)/;
 
 const NOOP_PORT: ModelPort = {
   complete: async () => ({ content: '', inputTokens: 0, outputTokens: 0 }),
@@ -210,6 +225,55 @@ async function runCheck(): Promise<never> {
   const out = decisionToOutput(decidePreToolUse(input));
   process.stdout.write(`${out.text}\n`);
   process.exit(out.exitCode);
+}
+
+/**
+ * Run the `hook` subcommand: bridge a host's hook process into PAW's loop. The
+ * command names the host (a flag) and the event (its value) — e.g.
+ * `paw hook --copilot "tool.pre"`.
+ *
+ * This is the STANDALONE (no-daemon) composition: it opens a `node:sqlite` store
+ * under `.paw` per invocation. That engine is file-locked, so concurrent hooks
+ * serialise rather than race — but a per-hook open is only safe on native
+ * `node:sqlite`, never on the sql.js/wasm fallback (whole-file export races and
+ * rebuilds the runtime each call). The daemon-owned path — pawd holding one
+ * StorePort + GateRunner + runtime, with this command a thin client — is the
+ * correct mode for sql.js machines and the target for a running pawd. See the
+ * `pawd-owns-the-enforcement-store` note.
+ *
+ * @param {string[]} rest - The words after `hook`.
+ * @returns {Promise<number>} The exit code (0; the decision rides in the JSON).
+ */
+async function runHookCommand(rest: string[]): Promise<number> {
+  const args = parseArgs(rest, HOST_FLAGS);
+  const host = HOST_FLAGS.find((h) => args.values.get(h) !== undefined);
+  if (host === undefined) {
+    throw new Error('paw hook needs a host and event: paw hook --copilot "tool.pre"');
+  }
+  const event = args.values.get(host) as string;
+  const root = process.cwd();
+  const pawDir = resolve(root, '.paw');
+  if (!existsSync(pawDir)) {
+    mkdirSync(pawDir, { recursive: true });
+  }
+  const Database = await loadNodeSqliteCtor();
+  const db = new Database(resolve(pawDir, 'paw.sqlite'));
+  const deps: HandleDeps = {
+    store: createSqlStore(createNodeSqliteDriver(db)),
+    gates: createNodeGateRunner(root),
+    exemptTools: EXEMPT_TOOLS,
+    isIgnored: (path) => HOOK_IGNORED.test(path),
+  };
+  try {
+    return await runHook(
+      host,
+      event,
+      { readStdin, writeStdout: (text) => process.stdout.write(text) },
+      deps,
+    );
+  } finally {
+    db.close();
+  }
 }
 
 /**
@@ -560,6 +624,9 @@ async function main(): Promise<number> {
   if (command === 'check') {
     await runCheck();
     return 0;
+  }
+  if (command === 'hook') {
+    return runHookCommand(rest);
   }
   if (command === 'doctor') {
     const config = await loadConfig(rest[0]);

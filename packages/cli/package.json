@@ -15,6 +15,7 @@
   "dependencies": {
     "@paw/daemon": "file:../daemon",
     "@paw/adapters": "file:../adapters",
+    "@paw/connectors": "file:../connectors",
     "@paw/core": "file:../core"
   },
   "devDependencies": {
