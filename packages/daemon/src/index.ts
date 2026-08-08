@@ -113,4 +113,11 @@ export {
   tokenPath,
 } from './infrastructure/endpoint.js';
 export type { EndpointEnv } from './infrastructure/endpoint.js';
+
+export { createRpcSession } from './application/rpcSession.js';
+export type {
+  RpcSession,
+  RpcSessionContext,
+  SessionPush,
+} from './application/rpcSession.js';
 export { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from './domain/consolePage.js';
