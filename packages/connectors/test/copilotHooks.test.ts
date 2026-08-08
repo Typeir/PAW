@@ -15,6 +15,16 @@
 import { describe, expect, it } from 'vitest';
 import { copilotHooksConnector as c } from '../src/copilotHooks.js';
 
+describe('copilotHooksConnector.eventName', () => {
+  it('maps each canonical event to its Copilot name', () => {
+    expect(c.eventName('tool.pre')).toBe('PreToolUse');
+    expect(c.eventName('tool.post')).toBe('PostToolUse');
+    expect(c.eventName('prompt.submitted')).toBe('UserPromptSubmit');
+    expect(c.eventName('session.start')).toBe('SessionStart');
+    expect(c.eventName('session.end')).toBe('Stop');
+  });
+});
+
 describe('copilotHooksConnector.toEvent', () => {
   it('returns null for a non-object payload', () => {
     expect(c.toEvent('nope')).toBeNull();

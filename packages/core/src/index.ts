@@ -73,6 +73,9 @@ export type { HandleDeps } from './application/handleEvent.js';
 export { checkEdit } from './application/checkEdit.js';
 export type { CheckEditDeps } from './application/checkEdit.js';
 
+export { dispatchHook } from './application/dispatchHook.js';
+export type { DispatchHookDeps, HookDispatch } from './application/dispatchHook.js';
+
 export {
   allIndirect,
   directlyViolatedFiles,

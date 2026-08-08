@@ -15,7 +15,19 @@
  * @since 5.0.0
  */
 
-import type { HostConnector, PawEvent, PawResponse } from '@paw/core';
+import type { HostConnector, PawEvent, PawEventType, PawResponse } from '@paw/core';
+
+/**
+ * This host's native name for each canonical event, the forward of what
+ * {@link copilotHooksConnector.toEvent} keys on.
+ */
+const COPILOT_EVENT_NAME: Record<PawEventType, string> = {
+  'session.start': 'SessionStart',
+  'prompt.submitted': 'UserPromptSubmit',
+  'tool.pre': 'PreToolUse',
+  'tool.post': 'PostToolUse',
+  'session.end': 'Stop',
+};
 
 /**
  * Coerce a value to a non-empty string, or null.
@@ -111,6 +123,10 @@ function toolName(raw: Record<string, unknown>): string {
  */
 export const copilotHooksConnector: HostConnector = {
   name: 'copilot-hooks',
+
+  eventName(type: PawEventType): string | null {
+    return COPILOT_EVENT_NAME[type];
+  },
 
   toEvent(raw: unknown): PawEvent | null {
     if (typeof raw !== 'object' || raw === null) {

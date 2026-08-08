@@ -15,7 +15,7 @@
  * @since 5.0.0
  */
 
-import type { PawEvent, PawResponse } from '../domain/event.js';
+import type { PawEvent, PawEventType, PawResponse } from '../domain/event.js';
 import type { HealthReport } from '../domain/gate.js';
 import type { Violation } from '../domain/violation.js';
 
@@ -29,11 +29,13 @@ import type { Violation } from '../domain/violation.js';
  *
  * @interface HostConnector
  * @property {string} name - Connector id, matched against `PawConfig.connector`.
+ * @property {(type: PawEventType) => (string | null)} eventName - This host's native name for a canonical event (e.g. `tool.pre` → `PreToolUse`), or null when the host has no such event. Lets a caller that knows the canonical event feed `toEvent` without the host guessing.
  * @property {(raw: unknown) => (PawEvent | null)} toEvent - Translate a host payload to a canonical event, or null when the payload is not PAW-relevant.
  * @property {(response: PawResponse) => unknown} fromResponse - Translate a canonical response to the host's native output shape.
  */
 export interface HostConnector {
   readonly name: string;
+  eventName(type: PawEventType): string | null;
   toEvent(raw: unknown): PawEvent | null;
   fromResponse(response: PawResponse): unknown;
 }
