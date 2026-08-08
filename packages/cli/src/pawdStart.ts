@@ -20,7 +20,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createGateCache, createMemoryStore } from '@paw/adapters';
+import { createGateCache, openSqlJsStore } from '@paw/adapters';
 import { copilotHooksConnector } from '@paw/connectors';
 import type { DispatchHookDeps, StorePort } from '@paw/core';
 import { serveEnforcement, socketPath, tokenPath, type SocketServerHandle } from '@paw/daemon';
@@ -53,11 +53,11 @@ const IGNORED = /(^|\/)(\.paw|\.git|node_modules|dist|coverage|\.next)(\/|$)/;
  *
  * @interface StartSeams
  * @property {() => string} [randomToken] - Generate the handshake token; defaults to 32 random bytes hex.
- * @property {() => StorePort} [makeStore] - Build the store; defaults to in-memory.
+ * @property {() => Promise<StorePort> | StorePort} [makeStore] - Build the store; defaults to the disk-backed sql.js store under `.paw`.
  */
 export interface StartSeams {
   randomToken?: () => string;
-  makeStore?: () => StorePort;
+  makeStore?: () => Promise<StorePort> | StorePort;
 }
 
 /**
@@ -67,14 +67,18 @@ export interface StartSeams {
  * @param {StartSeams} [seams] - Optional injectable seams.
  * @returns {Promise<SocketServerHandle>} The running daemon.
  */
-export function startEnforcement(root: string, seams: StartSeams = {}): Promise<SocketServerHandle> {
+export async function startEnforcement(
+  root: string,
+  seams: StartSeams = {},
+): Promise<SocketServerHandle> {
   const pawDir = join(root, '.paw');
   mkdirSync(pawDir, { recursive: true });
   const token = (seams.randomToken ?? (() => randomBytes(32).toString('hex')))();
   writeFileSync(tokenPath(pawDir), token, { mode: 0o600 });
 
+  const store = await (seams.makeStore ?? (() => openSqlJsStore(join(pawDir, 'paw.sqlite'))))();
   const deps: DispatchHookDeps = {
-    store: (seams.makeStore ?? createMemoryStore)(),
+    store,
     gates: createGateCache(root),
     exemptTools: EXEMPT_TOOLS,
     isIgnored: (path) => IGNORED.test(path),

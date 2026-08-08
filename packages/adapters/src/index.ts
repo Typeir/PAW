@@ -19,6 +19,7 @@ export { createNodeFs } from './file/nodeFs.js';
 export { createNodeProcess } from './process/nodeProcess.js';
 export { createMemoryStore } from './store/memoryStore.js';
 export { createSqlStore } from './store/sql/sqlStore.js';
+export { openSqlJsStore } from './store/sql/openSqlJsStore.js';
 export { STORE_SCHEMA_SQL } from './store/sql/schema.js';
 export type { SqlDriver, SqlRow, SqlValue } from './store/sql/driver.js';
 export {
