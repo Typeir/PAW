@@ -24,7 +24,8 @@ import {
   type RunSettings,
 } from '@paw/core';
 import { describe, expect, it } from 'vitest';
-import { createSession, type SessionDeps, type WsSessionPort } from '../src/sessions.js';
+import { createSession } from '../src/application/session.js';
+import type { SessionDeps, WsSessionPort } from '../src/domain/session.js';
 
 const TOKEN = 'a-token';
 

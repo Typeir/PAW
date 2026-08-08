@@ -24,7 +24,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adoptSocket, refuseUpgrade } from '../src/infrastructure/http/consoleServer.js';
 import { offeredProtocols } from '../src/infrastructure/http/httpMessage.js';
 import type { SocketHooks } from '../src/serve.js';
-import type { WsSessionPort } from '../src/sessions.js';
+import type { WsSessionPort } from '../src/domain/session.js';
 
 /**
  * A stub socket that records what was done to it and lets a test fire its events.

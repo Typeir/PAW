@@ -63,7 +63,8 @@ import {
   inlineScriptHashes,
   type UpgradeRefusal,
 } from './infrastructure/security.js';
-import { createSessionRegistry, type WsSessionPort } from './sessions.js';
+import { createSessionRegistry } from './application/sessionRegistry.js';
+import type { WsSessionPort } from './domain/session.js';
 import { toRunProgress, trackRun } from './run.js';
 import { buildFileTree, type FileEntry } from './domain/tree.js';
 

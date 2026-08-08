@@ -98,8 +98,8 @@ export type { MeteredPort, RunTracker } from './run.js';
 export { openLiveHerd } from './infrastructure/model/openLiveHerd.js';
 export type { LiveSdkRegistry } from './infrastructure/model/liveSdkRegistry.js';
 
-export { createSessionRegistry } from './sessions.js';
-export type { LiveSession, SessionRegistry, WsSessionPort } from './sessions.js';
+export { createSessionRegistry } from './application/sessionRegistry.js';
+export type { LiveSession, SessionRegistry, WsSessionPort } from './domain/session.js';
 
 export { decideUpgrade } from './infrastructure/security.js';
 export type { UpgradeRefusal, UpgradeRequest } from './infrastructure/security.js';

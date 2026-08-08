@@ -35,12 +35,9 @@ import {
   type PawSnapshot,
 } from '@paw/core';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  createSession,
-  createSessionRegistry,
-  type SessionDeps,
-  type WsSessionPort,
-} from '../src/sessions.js';
+import { createSession } from '../src/application/session.js';
+import { createSessionRegistry } from '../src/application/sessionRegistry.js';
+import type { SessionDeps, WsSessionPort } from '../src/domain/session.js';
 
 const TOKEN = 'a-token-worth-256-bits-or-so-really';
 const PLANS = ['plans/lore.swarm.mjs', 'plans/edit.swarm.mjs'];
