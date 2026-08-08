@@ -16,6 +16,7 @@
  */
 
 import type { PawEvent, PawResponse } from '../domain/event.js';
+import type { HealthReport } from '../domain/gate.js';
 import type { Violation } from '../domain/violation.js';
 
 /**
@@ -59,6 +60,20 @@ export interface StorePort {
     sessionId: string | null,
   ): Promise<void>;
   resolveForFile(filePath: string, sessionId: string | null): Promise<number>;
+}
+
+/**
+ * Runs a project's quality gates against a set of files and returns the report
+ * the detector reasons over. Discovery, dynamic loading, context building, and
+ * per-gate execution are all the adapter's concern (the legacy `pawGates` +
+ * `gateContext`, ported); the use-case only asks "gate these paths". Bound to a
+ * project root at its composition root, so callers pass paths alone.
+ *
+ * @interface GateRunner
+ * @property {(relativePaths: readonly string[]) => Promise<HealthReport>} runForFiles - Run every applicable gate against these project-relative paths.
+ */
+export interface GateRunner {
+  runForFiles(relativePaths: readonly string[]): Promise<HealthReport>;
 }
 
 /**

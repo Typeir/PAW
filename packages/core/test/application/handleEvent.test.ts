@@ -15,11 +15,40 @@
 import { describe, expect, it } from 'vitest';
 import type { Violation } from '../../src/domain/violation.js';
 import type { PawEvent } from '../../src/domain/event.js';
-import type { StorePort } from '../../src/ports/index.js';
+import type { GateRunner, StorePort } from '../../src/ports/index.js';
 import {
   handleEvent,
   type HandleDeps,
 } from '../../src/application/handleEvent.js';
+
+const failingGates: GateRunner = {
+  async runForFiles() {
+    return {
+      timestamp: 't',
+      mode: 'changed-only',
+      changedFiles: null,
+      overall: 'FAIL',
+      summary: { totalGates: 1, passed: 0, failed: 1, totalFindings: 1, hasCritical: true },
+      gates: [
+        {
+          gate: 'no-bad',
+          passed: false,
+          severity: 'critical',
+          findings: [{ file: 'src/b.ts', rule: 'no-bad', message: 'BADCODE' }],
+          stats: { filesChecked: 1, findingsCount: 1, durationMs: 0 },
+        },
+      ],
+    };
+  },
+};
+
+const toolPost = (): PawEvent => ({
+  type: 'tool.post',
+  sessionId: 'sess-1',
+  toolName: 'edit',
+  editedPaths: ['src/b.ts'],
+  failed: false,
+});
 
 const store = (violations: Violation[]): StorePort => ({
   unresolvedFor: async () => violations,
@@ -98,6 +127,15 @@ describe('handleEvent', () => {
       deps(),
     );
     expect(r).toEqual({ kind: 'noop' });
+  });
+
+  it('runs the detector on a post-tool event when a runner is present', async () => {
+    const r = await handleEvent(toolPost(), deps({ gates: failingGates }));
+    expect(r).toEqual({ kind: 'block', reason: expect.stringContaining('BADCODE') });
+  });
+
+  it('is a noop for a post-tool event with no gate runner', async () => {
+    expect(await handleEvent(toolPost(), deps())).toEqual({ kind: 'noop' });
   });
 
   it('is a noop for events it does not act on yet', async () => {

@@ -16,7 +16,8 @@
 
 import type { Decision } from '../domain/enforcement.js';
 import type { PawEvent, PawResponse } from '../domain/event.js';
-import type { StorePort } from '../ports/index.js';
+import type { GateRunner, StorePort } from '../ports/index.js';
+import { checkEdit } from './checkEdit.js';
 import { checkTool, type CheckToolRequest } from './checkTool.js';
 
 /**
@@ -26,12 +27,14 @@ import { checkTool, type CheckToolRequest } from './checkTool.js';
  * @property {StorePort} store - The violation store, for the enforcement decision.
  * @property {ReadonlySet<string>} exemptTools - Read-only tools never blocked by violations.
  * @property {(path: string) => boolean} isIgnored - Whether a path is pawignored.
+ * @property {GateRunner} [gates] - Runs gates on edited files for `tool.post`; omit to skip detection.
  * @property {(sessionId: string | null) => Promise<string>} [loadL1] - Produces the L1 context block for a prompt; omit to inject nothing.
  */
 export interface HandleDeps {
   readonly store: StorePort;
   readonly exemptTools: ReadonlySet<string>;
   readonly isIgnored: (path: string) => boolean;
+  readonly gates?: GateRunner;
   readonly loadL1?: (sessionId: string | null) => Promise<string>;
 }
 
@@ -75,6 +78,15 @@ export async function handleEvent(
         ignoredPaths,
       };
       return decisionToResponse(await checkTool(deps.store, req));
+    }
+    case 'tool.post': {
+      if (!deps.gates) {
+        return { kind: 'noop' };
+      }
+      return checkEdit(
+        { store: deps.store, gates: deps.gates, isIgnored: deps.isIgnored },
+        event,
+      );
     }
     case 'prompt.submitted': {
       if (!deps.loadL1) {

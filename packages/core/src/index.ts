@@ -34,11 +34,24 @@ export type {
   ToolPreEvent,
 } from './domain/event.js';
 
+export type {
+  GateContext,
+  GateFinding,
+  GatePort,
+  GateResult,
+  GateStats,
+  HealthReport,
+  QualityGate,
+} from './domain/gate.js';
+
 export { validateConfig } from './domain/config.js';
 export type { ConfigProblem, PawConfig } from './domain/config.js';
 
 export { handleEvent } from './application/handleEvent.js';
 export type { HandleDeps } from './application/handleEvent.js';
+
+export { checkEdit } from './application/checkEdit.js';
+export type { CheckEditDeps } from './application/checkEdit.js';
 
 export {
   allIndirect,
@@ -175,6 +188,7 @@ export type {
   ConfigPort,
   FileReaderPort,
   FileSystemPort,
+  GateRunner,
   HostConnector,
   ModelPort,
   ModelRequest,
