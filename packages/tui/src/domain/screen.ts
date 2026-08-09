@@ -342,7 +342,7 @@ function viewBody(state: TuiState): string[] {
  */
 function footer(state: TuiState): string[] {
   return state.view === 'daemon'
-    ? ['d refresh · p prune · s stop · 1/2/3 views · q quit']
+    ? ['d refresh · r restart · p prune · s stop · 1/2/3 views · q quit']
     : ['1/2/3 view · g gates · d daemon · j/k member · q quit'];
 }
 

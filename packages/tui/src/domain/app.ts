@@ -106,13 +106,16 @@ export type Msg =
 /**
  * An action the shell runs, feeding its result back as a {@link Msg}. The daemon
  * actions all resolve to a fresh {@link DaemonSnapshot}: refresh reads it, prune
- * clears violations then re-reads, stop asks the daemon to exit.
+ * clears violations then re-reads, stop asks the daemon to exit, and restart
+ * shells out to `paw daemon restart` to bring pawd back (or start it when none is
+ * running) before re-reading.
  */
 export type Effect =
   | { readonly kind: 'run-gates' }
   | { readonly kind: 'daemon-refresh' }
   | { readonly kind: 'daemon-prune' }
-  | { readonly kind: 'daemon-stop' };
+  | { readonly kind: 'daemon-stop' }
+  | { readonly kind: 'daemon-restart' };
 
 /**
  * A reducer step: the next state and any effects to run.
@@ -222,6 +225,8 @@ function onKey(state: TuiState, key: string): Step {
       return daemonAction(state, { kind: 'daemon-prune' });
     case 's':
       return daemonAction(state, { kind: 'daemon-stop' });
+    case 'r':
+      return daemonAction(state, { kind: 'daemon-restart' });
     case 'q':
       return stay({ ...state, quit: true });
     default:

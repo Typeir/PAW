@@ -4,8 +4,10 @@
  * @fileoverview The process shell: it loads a config and a plan, runs the doctor
  * and a deterministic herd for the read-only views, then drives the effect-
  * reducer against stdin. A keypress becomes a message; the reducer returns the
- * next state and any effects; the shell runs each effect (a verb — gates first)
- * and feeds the result back as a message. Two input modes share the loop — a raw
+ * next state and any effects; the shell runs each effect (a verb — gates on the
+ * working tree, and the daemon verbs over the socket, with restart shelling out to
+ * `paw daemon restart`) and feeds the result back as a message. Two input modes
+ * share the loop — a raw
  * keypress stream on a TTY, and a batch fold over piped input for the E2E — so a
  * snapshot test drives the same transitions a person does. Holds no rules and is
  * excluded from unit coverage (process I/O, dynamic import); the E2E spawns it.
@@ -201,6 +203,14 @@ async function runEffect(effect: Effect, root: string): Promise<Msg> {
   if (effect.kind === 'run-gates') {
     const report: HealthReport = await createNodeGateRunner(root).runForFiles(changedFiles(root));
     return { kind: 'gates', report };
+  }
+  if (effect.kind === 'daemon-restart') {
+    try {
+      execFileSync('paw', ['daemon', 'restart'], { cwd: root, stdio: 'ignore', shell: true });
+    } catch {
+      // A restart that fails to run just leaves the snapshot showing not-running.
+    }
+    return { kind: 'daemon', snapshot: await daemonSnapshot(root) };
   }
   const { endpoint, token } = daemonEndpoint(root);
   if (effect.kind === 'daemon-stop') {

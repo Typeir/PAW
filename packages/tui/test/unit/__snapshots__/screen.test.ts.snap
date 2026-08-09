@@ -91,7 +91,7 @@ exports[`render > frames a running daemon holding no violations 1`] = `
   "│                                                                      │",
   "│ No outstanding violations.                                           │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ d refresh · p prune · s stop · 1/2/3 views · q quit                  │",
+  "│ d refresh · r restart · p prune · s stop · 1/2/3 views · q quit      │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -115,7 +115,7 @@ exports[`render > frames a running daemon, capping the file list 1`] = `
   "│ ✗ src/f7.ts  (no-any)                                                │",
   "│ …and 1 more file(s)                                                  │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ d refresh · p prune · s stop · 1/2/3 views · q quit                  │",
+  "│ d refresh · r restart · p prune · s stop · 1/2/3 views · q quit      │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -132,7 +132,7 @@ exports[`render > frames a running daemon, grouping violations by file 1`] = `
   "│ ✗ src/a.ts  (no-any, jsdoc)                                          │",
   "│ ✗ src/b.ts  (no-any)                                                 │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ d refresh · p prune · s stop · 1/2/3 views · q quit                  │",
+  "│ d refresh · r restart · p prune · s stop · 1/2/3 views · q quit      │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -144,7 +144,7 @@ exports[`render > frames a stopped daemon 1`] = `
   "│                                                                      │",
   "│ No daemon is running for this repository.                            │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ d refresh · p prune · s stop · 1/2/3 views · q quit                  │",
+  "│ d refresh · r restart · p prune · s stop · 1/2/3 views · q quit      │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -183,7 +183,7 @@ exports[`render > frames the daemon view before any query 1`] = `
   "│                                                                      │",
   "│ No daemon query yet — press d.                                       │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ d refresh · p prune · s stop · 1/2/3 views · q quit                  │",
+  "│ d refresh · r restart · p prune · s stop · 1/2/3 views · q quit      │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -195,7 +195,7 @@ exports[`render > frames the daemon view while a query is in progress 1`] = `
   "│                                                                      │",
   "│ Talking to the daemon…                                               │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ d refresh · p prune · s stop · 1/2/3 views · q quit                  │",
+  "│ d refresh · r restart · p prune · s stop · 1/2/3 views · q quit      │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;

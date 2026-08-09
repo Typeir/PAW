@@ -156,6 +156,12 @@ describe('reduce', () => {
     expect(step.effects).toEqual([{ kind: 'daemon-stop' }]);
   });
 
+  it('restarts on r from the idle daemon view: busy, one daemon-restart effect', () => {
+    const step = key(idleDaemon(), 'r');
+    expect(step.state.busy).toBe(true);
+    expect(step.effects).toEqual([{ kind: 'daemon-restart' }]);
+  });
+
   it('ignores p outside the daemon view', () => {
     const s = initialState(data);
     const step = key(s, 'p');
