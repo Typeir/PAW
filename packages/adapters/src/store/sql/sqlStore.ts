@@ -40,6 +40,20 @@ UPDATE violations SET resolved_at = datetime('now')
 WHERE resolved_at IS NULL AND file_path = ? AND session_id IS ?
 `;
 
+const SELECT_OUTSTANDING = `
+SELECT id, file_path, rule, message, indirect_fix
+FROM violations
+WHERE resolved_at IS NULL
+ORDER BY id
+`;
+
+const PRUNE_ALL = `UPDATE violations SET resolved_at = datetime('now') WHERE resolved_at IS NULL`;
+
+const PRUNE_FILE = `
+UPDATE violations SET resolved_at = datetime('now')
+WHERE resolved_at IS NULL AND file_path = ?
+`;
+
 const SELECT_CONFIG = 'SELECT value FROM paw_config WHERE key = ?';
 
 const UPSERT_CONFIG = `
@@ -99,6 +113,16 @@ export function createSqlStore(driver: SqlDriver): StorePort & ConfigPort {
       sessionId: string | null,
     ): Promise<number> {
       return driver.run(RESOLVE_FOR_FILE, [filePath, sessionId]);
+    },
+
+    async outstanding(): Promise<Violation[]> {
+      return driver.all(SELECT_OUTSTANDING, []).map(toViolation);
+    },
+
+    async prune(filePath: string | null): Promise<number> {
+      return filePath === null
+        ? driver.run(PRUNE_ALL, [])
+        : driver.run(PRUNE_FILE, [filePath]);
     },
 
     async getConfig(key: string): Promise<string | null> {

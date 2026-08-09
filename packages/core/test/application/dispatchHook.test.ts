@@ -24,6 +24,8 @@ const fakeStore = (violations: Violation[] = []): StorePort => ({
   unresolvedFor: async () => violations,
   raise: async () => undefined,
   resolveForFile: async () => 0,
+  outstanding: async () => violations,
+  prune: async () => 0,
 });
 
 const cleanGates: GateRunner = {

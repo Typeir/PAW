@@ -54,6 +54,8 @@ export interface HostConnector {
  * @property {(sessionId: string | null) => Promise<Violation[]>} unresolvedFor - Unresolved violations in scope for a session, plus project-scoped ones.
  * @property {(violations: readonly Violation[], sessionId: string | null) => Promise<void>} raise - Record new violations for a file within a session.
  * @property {(filePath: string, sessionId: string | null) => Promise<number>} resolveForFile - Mark a file's violations resolved; returns the number cleared.
+ * @property {() => Promise<Violation[]>} outstanding - Every unresolved violation across all sessions — the operator's whole-repo view, not one session's.
+ * @property {(filePath: string | null) => Promise<number>} prune - Resolve outstanding violations across all sessions: one file's when a path is given, otherwise all; returns the number cleared.
  */
 export interface StorePort {
   unresolvedFor(sessionId: string | null): Promise<Violation[]>;
@@ -62,6 +64,8 @@ export interface StorePort {
     sessionId: string | null,
   ): Promise<void>;
   resolveForFile(filePath: string, sessionId: string | null): Promise<number>;
+  outstanding(): Promise<Violation[]>;
+  prune(filePath: string | null): Promise<number>;
 }
 
 /**

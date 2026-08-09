@@ -122,6 +122,15 @@ export async function serveEnforcement(opts: EnforcementOptions): Promise<Socket
         const req = toDispatch(params);
         return req === null ? { continue: true } : dispatchHook(deps, req);
       },
+      'violations.list': async (): Promise<unknown> => {
+        resetIdle();
+        return { violations: await deps.store.outstanding() };
+      },
+      'violations.prune': async (params: unknown): Promise<unknown> => {
+        resetIdle();
+        const file = (params as { file?: unknown })?.file;
+        return { cleared: await deps.store.prune(typeof file === 'string' ? file : null) };
+      },
     };
     const control = opts.control;
     if (control) {

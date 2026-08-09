@@ -19,10 +19,12 @@ import type {
   DoctorReport,
   HealthReport,
   SwarmPlan,
+  Violation,
 } from '@paw/core';
 import { renderBrief } from '@paw/core';
 
 const GATE_FINDING_CAP = 25;
+const VIOLATION_CAP = 40;
 
 /**
  * Render a mark for a boolean status.
@@ -85,6 +87,62 @@ export function formatGateReport(report: HealthReport): string[] {
     lines.push(`  ${mark(true)} all gates clean`);
   }
   return lines;
+}
+
+/**
+ * Render the outstanding-violations list, grouped by file and capped so a large
+ * backlog stays readable. A null result means no daemon answered.
+ *
+ * @param {{ violations?: Violation[] } | null} result - The `violations.list` reply.
+ * @returns {string[]} Terminal lines.
+ */
+export function formatViolations(result: { violations?: Violation[] } | null): string[] {
+  if (result === null) {
+    return ['violations: no daemon is running for this repository'];
+  }
+  const violations = result.violations ?? [];
+  if (violations.length === 0) {
+    return ['violations: none outstanding'];
+  }
+  const byFile = new Map<string, Violation[]>();
+  for (const v of violations) {
+    const group = byFile.get(v.filePath) ?? [];
+    group.push(v);
+    byFile.set(v.filePath, group);
+  }
+  const lines = [`violations: ${violations.length} outstanding across ${byFile.size} file(s)`];
+  let shown = 0;
+  for (const [file, group] of byFile) {
+    if (shown >= VIOLATION_CAP) {
+      break;
+    }
+    lines.push(`  ${file}`);
+    for (const v of group) {
+      if (shown >= VIOLATION_CAP) {
+        break;
+      }
+      lines.push(`    ${v.rule}: ${v.message}`);
+      shown += 1;
+    }
+  }
+  if (violations.length > shown) {
+    lines.push(`  …and ${violations.length - shown} more`);
+  }
+  return lines;
+}
+
+/**
+ * Render the outcome of a prune. A null result means no daemon answered.
+ *
+ * @param {{ cleared?: number } | null} result - The `violations.prune` reply.
+ * @param {string | null} file - The file pruned, or null for all files.
+ * @returns {string[]} Terminal lines.
+ */
+export function formatPruned(result: { cleared?: number } | null, file: string | null): string[] {
+  if (result === null) {
+    return ['prune: no daemon is running for this repository'];
+  }
+  return [`pruned ${result.cleared ?? 0} violation(s) — ${file ?? 'all files'}`];
 }
 
 /**

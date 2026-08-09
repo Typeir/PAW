@@ -78,5 +78,20 @@ export function createMemoryStore(): StorePort {
       }
       return resolved;
     },
+
+    async outstanding(): Promise<Violation[]> {
+      return rows.filter((r) => !r.resolved).map((r) => r.violation);
+    },
+
+    async prune(filePath: string | null): Promise<number> {
+      let cleared = 0;
+      for (const r of rows) {
+        if (!r.resolved && (filePath === null || r.violation.filePath === filePath)) {
+          r.resolved = true;
+          cleared += 1;
+        }
+      }
+      return cleared;
+    },
   };
 }

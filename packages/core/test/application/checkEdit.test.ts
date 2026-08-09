@@ -36,6 +36,12 @@ function fakeStore() {
       resolved.push({ path, sessionId });
       return 1;
     },
+    async outstanding() {
+      return [];
+    },
+    async prune() {
+      return 0;
+    },
   };
   return { port, raised, resolved };
 }

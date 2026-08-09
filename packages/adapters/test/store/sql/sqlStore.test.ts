@@ -114,6 +114,23 @@ describe.each(DRIVERS)('createSqlStore over %s', (_name, open) => {
     expect(await store.resolveForFile('src/a.ts', 'sess-1')).toBe(0);
   });
 
+  it('lists outstanding rows across every session', async () => {
+    await store.raise([v()], 'sess-1');
+    await store.raise([v({ filePath: 'src/b.ts' })], 'sess-2');
+    await store.raise([v({ filePath: 'src/c.ts' })], null);
+    expect((await store.outstanding()).map((r) => r.filePath)).toEqual(['src/a.ts', 'src/b.ts', 'src/c.ts']);
+  });
+
+  it('prunes one file across all sessions, then prunes the rest', async () => {
+    await store.raise([v()], 'sess-1');
+    await store.raise([v()], 'sess-2');
+    await store.raise([v({ filePath: 'src/b.ts' })], null);
+    expect(await store.prune('src/a.ts')).toBe(2);
+    expect((await store.outstanding()).map((r) => r.filePath)).toEqual(['src/b.ts']);
+    expect(await store.prune(null)).toBe(1);
+    expect(await store.outstanding()).toEqual([]);
+  });
+
   it('reads back config it wrote', async () => {
     await store.setConfig('paw.enabled', 'false');
     expect(await store.getConfig('paw.enabled')).toBe('false');

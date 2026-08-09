@@ -24,7 +24,87 @@ import {
   formatGateReport,
   formatHerd,
   formatPlanDoctor,
+  formatPruned,
+  formatViolations,
 } from '../../src/format.js';
+
+describe('formatViolations', () => {
+  it('reports no daemon on a null result', () => {
+    expect(formatViolations(null)).toEqual(['violations: no daemon is running for this repository']);
+  });
+
+  it('reports an empty backlog', () => {
+    expect(formatViolations({ violations: [] })).toEqual(['violations: none outstanding']);
+  });
+
+  it('treats a missing violations field as empty', () => {
+    expect(formatViolations({})).toEqual(['violations: none outstanding']);
+  });
+
+  it('groups outstanding violations by file', () => {
+    expect(
+      formatViolations({
+        violations: [
+          { id: 1, filePath: 'src/a.ts', rule: 'no-any', message: 'no any', indirectFix: false },
+          { id: 2, filePath: 'src/a.ts', rule: 'no-console', message: 'no log', indirectFix: false },
+          { id: 3, filePath: 'src/b.ts', rule: 'jsdoc', message: 'missing', indirectFix: false },
+        ],
+      }),
+    ).toEqual([
+      'violations: 3 outstanding across 2 file(s)',
+      '  src/a.ts',
+      '    no-any: no any',
+      '    no-console: no log',
+      '  src/b.ts',
+      '    jsdoc: missing',
+    ]);
+  });
+
+  it('caps a large backlog across many files and summarises the overflow', () => {
+    const violations = Array.from({ length: 50 }, (_, i) => ({
+      id: i,
+      filePath: `src/f${i}.ts`,
+      rule: 'r',
+      message: 'm',
+      indirectFix: false,
+    }));
+    const out = formatViolations({ violations });
+    expect(out[0]).toBe('violations: 50 outstanding across 50 file(s)');
+    expect(out).toContain('  …and 10 more');
+  });
+
+  it('caps within a single busy file', () => {
+    const violations = Array.from({ length: 50 }, (_, i) => ({
+      id: i,
+      filePath: 'src/a.ts',
+      rule: 'r',
+      message: `m${i}`,
+      indirectFix: false,
+    }));
+    const out = formatViolations({ violations });
+    expect(out[0]).toBe('violations: 50 outstanding across 1 file(s)');
+    expect(out.filter((l) => l.startsWith('    r: ')).length).toBe(40);
+    expect(out).toContain('  …and 10 more');
+  });
+});
+
+describe('formatPruned', () => {
+  it('reports no daemon on a null result', () => {
+    expect(formatPruned(null, null)).toEqual(['prune: no daemon is running for this repository']);
+  });
+
+  it('reports an all-files prune', () => {
+    expect(formatPruned({ cleared: 3 }, null)).toEqual(['pruned 3 violation(s) — all files']);
+  });
+
+  it('treats a missing cleared field as zero', () => {
+    expect(formatPruned({}, null)).toEqual(['pruned 0 violation(s) — all files']);
+  });
+
+  it('reports a single-file prune', () => {
+    expect(formatPruned({ cleared: 1 }, 'src/a.ts')).toEqual(['pruned 1 violation(s) — src/a.ts']);
+  });
+});
 
 /**
  * Build a health report with defaults, overriding only what a case needs.

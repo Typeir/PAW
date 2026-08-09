@@ -128,6 +128,29 @@ describe('pawd enforcement over a real socket', () => {
     c.close();
   });
 
+  it('lists outstanding violations and prunes them by file and in full', async () => {
+    writeFileSync(path.join(root, 'src', 'dirty.ts'), 'export const d = 1; // BADCODE\n');
+    const c = open(endpoint);
+    await c.ready;
+    await c.send(1, 'connect', { token: 'T', protocolVersion: 1 });
+
+    expect(
+      (await c.send(2, 'hook.dispatch', { host: 'test', event: 'tool.post', payload: { paths: ['src/dirty.ts'] } })).result,
+    ).toMatchObject({ kind: 'block' });
+
+    const listed = (await c.send(3, 'violations.list', {})).result as { violations: { filePath: string }[] };
+    expect(listed.violations.some((v) => v.filePath === 'src/dirty.ts')).toBe(true);
+
+    expect((await c.send(4, 'violations.prune', { file: 'src/dirty.ts' })).result).toMatchObject({ cleared: 1 });
+    const after = (await c.send(5, 'violations.list', {})).result as { violations: { filePath: string }[] };
+    expect(after.violations.some((v) => v.filePath === 'src/dirty.ts')).toBe(false);
+
+    expect((await c.send(6, 'violations.prune', {})).result).toMatchObject({ cleared: expect.any(Number) });
+    expect(((await c.send(7, 'violations.list', {})).result as { violations: unknown[] }).violations).toEqual([]);
+
+    c.close();
+  });
+
   it('answers a malformed dispatch with a bare continue', async () => {
     const c = open(endpoint);
     await c.ready;

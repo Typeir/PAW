@@ -62,4 +62,23 @@ describe('createMemoryStore', () => {
     expect(await store.resolveForFile('src/a.ts', null)).toBe(1);
     expect((await store.unresolvedFor('sess-1')).length).toBe(1);
   });
+
+  it('lists outstanding violations across every session', async () => {
+    const store = createMemoryStore();
+    await store.raise([v()], 'sess-1');
+    await store.raise([v({ filePath: 'src/b.ts' })], 'sess-2');
+    await store.raise([v({ filePath: 'src/c.ts' })], null);
+    expect((await store.outstanding()).map((r) => r.filePath)).toEqual(['src/a.ts', 'src/b.ts', 'src/c.ts']);
+  });
+
+  it('prunes one file across all sessions, then all remaining', async () => {
+    const store = createMemoryStore();
+    await store.raise([v()], 'sess-1');
+    await store.raise([v()], 'sess-2');
+    await store.raise([v({ filePath: 'src/b.ts' })], null);
+    expect(await store.prune('src/a.ts')).toBe(2);
+    expect((await store.outstanding()).map((r) => r.filePath)).toEqual(['src/b.ts']);
+    expect(await store.prune(null)).toBe(1);
+    expect(await store.outstanding()).toEqual([]);
+  });
 });

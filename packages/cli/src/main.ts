@@ -31,6 +31,7 @@ import { runCheck } from './commands/check.js';
 import { runDaemonCommand } from './commands/daemonCommand.js';
 import { runGates } from './commands/gates.js';
 import { runInit } from './commands/init.js';
+import { runViolations } from './commands/violations.js';
 import { runHookCommand } from './commands/hookCommand.js';
 import { runPawd } from './commands/pawd.js';
 import { runSwarm } from './commands/swarm.js';
@@ -90,6 +91,9 @@ async function main(): Promise<number> {
   }
   if (command === 'sync') {
     return runInit(rest, print, 'merge');
+  }
+  if (command === 'violations') {
+    return runViolations(rest, print);
   }
   if (command === 'doctor') {
     const config = await loadConfig(rest[0]);
