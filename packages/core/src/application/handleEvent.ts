@@ -29,6 +29,7 @@ import { checkTool, type CheckToolRequest } from './checkTool.js';
  * @property {(path: string) => boolean} isIgnored - Whether a path is pawignored.
  * @property {GateRunner} [gates] - Runs gates on edited files for `tool.post`; omit to skip detection.
  * @property {(sessionId: string | null) => Promise<string>} [loadL1] - Produces the L1 context block for a prompt; omit to inject nothing.
+ * @property {(path: string) => string} [toRelative] - Normalise a host path (possibly absolute) to project-relative before the loop reasons over it; omit to leave paths as given.
  */
 export interface HandleDeps {
   readonly store: StorePort;
@@ -36,6 +37,7 @@ export interface HandleDeps {
   readonly isIgnored: (path: string) => boolean;
   readonly gates?: GateRunner;
   readonly loadL1?: (sessionId: string | null) => Promise<string>;
+  readonly toRelative?: (path: string) => string;
 }
 
 /**
@@ -64,15 +66,15 @@ export async function handleEvent(
   event: PawEvent,
   deps: HandleDeps,
 ): Promise<PawResponse> {
+  const rel = deps.toRelative ?? ((p: string) => p);
   switch (event.type) {
     case 'tool.pre': {
-      const ignoredPaths = new Set(
-        event.targetPaths.filter((p) => deps.isIgnored(p)),
-      );
+      const targetPaths = event.targetPaths.map(rel);
+      const ignoredPaths = new Set(targetPaths.filter((p) => deps.isIgnored(p)));
       const req: CheckToolRequest = {
         sessionId: event.sessionId,
         toolName: event.toolName,
-        targetPaths: event.targetPaths,
+        targetPaths,
         envMatch: event.envMatch,
         exemptTools: deps.exemptTools,
         ignoredPaths,
@@ -85,7 +87,7 @@ export async function handleEvent(
       }
       return checkEdit(
         { store: deps.store, gates: deps.gates, isIgnored: deps.isIgnored },
-        event,
+        { ...event, editedPaths: event.editedPaths.map(rel) },
       );
     }
     case 'prompt.submitted': {

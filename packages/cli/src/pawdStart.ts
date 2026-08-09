@@ -22,7 +22,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createGateCache, openSqlJsStore } from '@paw/adapters';
 import { copilotHooksConnector } from '@paw/connectors';
-import type { DispatchHookDeps, StorePort } from '@paw/core';
+import { toProjectRelative, type DispatchHookDeps, type StorePort } from '@paw/core';
 import { serveEnforcement, socketPath, tokenPath, type SocketServerHandle } from '@paw/daemon';
 
 /**
@@ -96,6 +96,7 @@ export async function startEnforcement(
         gates: createGateCache(root),
         exemptTools: EXEMPT_TOOLS,
         isIgnored: (path) => IGNORED.test(path),
+        toRelative: (path) => toProjectRelative(root, path),
         connectors: { copilot: copilotHooksConnector },
       };
       return { token, deps };

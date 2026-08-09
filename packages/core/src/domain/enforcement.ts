@@ -106,5 +106,8 @@ export function decidePreToolUse(i: PreToolInput): Decision {
     return { kind: 'allow', additionalContext: formatIndirectNudge(i.violations) };
   }
 
-  return { kind: 'deny', reason: formatOutstanding([...directlyViolated]) };
+  return {
+    kind: 'deny',
+    reason: formatOutstanding(i.violations.filter((v) => !v.indirectFix)),
+  };
 }

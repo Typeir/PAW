@@ -97,6 +97,14 @@ describe('handleEvent', () => {
     expect(r).toEqual({ kind: 'deny', reason: expect.stringContaining('src/a.ts') });
   });
 
+  it('normalises an absolute target so fixing the violated file is allowed', async () => {
+    const r = await handleEvent(
+      toolPre({ targetPaths: ['C:/repo/src/a.ts'] }),
+      deps({ store: store([direct]), toRelative: (p) => p.replace('C:/repo/', '') }),
+    );
+    expect(r).toEqual({ kind: 'allow' });
+  });
+
   it('allows when every targeted path is pawignored', async () => {
     const r = await handleEvent(
       toolPre({ targetPaths: ['dist/x.js'] }),

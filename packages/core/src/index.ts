@@ -68,6 +68,8 @@ export type {
 export { validateConfig } from './domain/config.js';
 export type { ConfigProblem, PawConfig } from './domain/config.js';
 
+export { toProjectRelative } from './domain/projectPath.js';
+
 export { handleEvent } from './application/handleEvent.js';
 export type { HandleDeps } from './application/handleEvent.js';
 

@@ -74,16 +74,22 @@ describe('formatIndirectNudge', () => {
 });
 
 describe('formatOutstanding', () => {
-  it('lists each outstanding file under a deny header', () => {
-    expect(formatOutstanding(['src/a.ts', 'src/c.ts'])).toBe(
-      'Fix outstanding violations before using other tools:\n- src/a.ts\n- src/c.ts',
+  it('lists each file with the rules failing on it', () => {
+    expect(
+      formatOutstanding([
+        V({ filePath: 'src/a.ts', rule: 'jsdoc' }),
+        V({ filePath: 'src/a.ts', rule: 'no-any' }),
+        V({ filePath: 'src/c.ts', rule: 'no-console' }),
+      ]),
+    ).toBe(
+      'Fix outstanding violations before using other tools:\n- src/a.ts (jsdoc, no-any)\n- src/c.ts (no-console)',
     );
   });
 
   it('summarises the tail when there are more files than the cap', () => {
-    const files = Array.from({ length: 20 }, (_, i) => `src/f${i}.ts`);
-    const out = formatOutstanding(files);
-    expect(out).toContain('- src/f0.ts');
+    const many = Array.from({ length: 20 }, (_, i) => V({ filePath: `src/f${i}.ts`, rule: 'r' }));
+    const out = formatOutstanding(many);
+    expect(out).toContain('- src/f0.ts (r)');
     expect(out).toContain('…and 5 more file(s)');
     expect(out).not.toContain('src/f19.ts');
   });

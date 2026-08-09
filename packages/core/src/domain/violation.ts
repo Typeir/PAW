@@ -97,14 +97,24 @@ export function formatIndirectNudge(violations: readonly Violation[]): string {
 }
 
 /**
- * The deny reason listing the directly-violated files that must be fixed first,
- * capped so the agent can read it rather than have it redirected away.
+ * The deny reason: each directly-violated file with the rules failing on it, so
+ * the agent knows which file to open and what to fix — not merely that something
+ * is wrong somewhere. Bounded so it stays displayable.
  *
- * @param {readonly string[]} files - Directly-violated file paths.
- * @returns {string} A bounded deny reason.
+ * @param {readonly Violation[]} violations - The directly-violated (non-indirect) violations.
+ * @returns {string} A bounded deny reason, one line per file.
  */
-export function formatOutstanding(files: readonly string[]): string {
-  const shown = files.slice(0, MAX_ITEMS).map((f) => `- ${f}`);
+export function formatOutstanding(violations: readonly Violation[]): string {
+  const byFile = new Map<string, Set<string>>();
+  for (const v of violations) {
+    const rules = byFile.get(v.filePath) ?? new Set<string>();
+    rules.add(v.rule);
+    byFile.set(v.filePath, rules);
+  }
+  const files = [...byFile.entries()];
+  const shown = files
+    .slice(0, MAX_ITEMS)
+    .map(([file, rules]) => `- ${file} (${[...rules].join(', ')})`);
   if (files.length > MAX_ITEMS) {
     shown.push(`- …and ${files.length - MAX_ITEMS} more file(s)`);
   }
