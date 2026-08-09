@@ -48,7 +48,19 @@ function singleFileContext(
     changedFiles: changed,
     staged: false,
     async targetFiles(appliesTo: string[]): Promise<string[]> {
-      return [...changed].filter((f) => appliesTo.some((ext) => f.endsWith(ext)));
+      const matched = [...changed].filter((f) =>
+        appliesTo.some((ext) => f.endsWith(ext)),
+      );
+      const existing: string[] = [];
+      for (const f of matched) {
+        try {
+          await fs.access(path.join(rootDir, f));
+          existing.push(f);
+        } catch {
+          /* deleted since the edit — nothing left to check, not a gate error */
+        }
+      }
+      return existing;
     },
     async readFile(relativePath: string): Promise<string> {
       const norm = relativePath.replace(/\\/g, '/');

@@ -306,10 +306,20 @@ function autostartSeams(root: string): AutostartSeams {
       }
     },
     spawn: () => {
-      spawn(process.execPath, [...process.execArgv, process.argv[1], '__pawd', root], {
-        detached: true,
-        stdio: 'ignore',
-      }).unref();
+      const child = spawn(
+        process.execPath,
+        [...process.execArgv, process.argv[1], '__pawd', root],
+        {
+          detached: true,
+          stdio: 'ignore',
+          // Without this, Windows gives the detached child its own console,
+          // which keeps it tethered to the host's console/job — so the editor
+          // that ran the spawning hook waits on the daemon it must not wait on.
+          windowsHide: true,
+        },
+      );
+      child.on('error', () => undefined);
+      child.unref();
     },
     wait: (ms) => new Promise((r) => setTimeout(r, ms)),
   };

@@ -151,6 +151,14 @@ describe('createNodeGateRunner', () => {
     expect(todo).toMatchObject({ passed: false, severity: 'warning' });
   });
 
+  it('skips a changed file that no longer exists instead of erroring on it', async () => {
+    const report = await createNodeGateRunner(path.join(root, 'main')).runForFiles(['src/deleted.ts']);
+    expect(report.overall).toBe('PASS');
+    expect(report.summary.hasCritical).toBe(false);
+    const errored = report.gates.some((g) => g.findings.some((f) => f.rule === 'gate-error'));
+    expect(errored).toBe(false);
+  });
+
   it('contains a throwing gate as a critical gate-error finding', async () => {
     const report = await createNodeGateRunner(path.join(root, 'boom')).runForFiles(['src/x.ts']);
     expect(report.overall).toBe('FAIL');
