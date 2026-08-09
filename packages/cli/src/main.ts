@@ -29,6 +29,7 @@ import { buildRegistry, runDoctor, type ModelPort } from '@paw/core';
 import { formatDoctor } from './format.js';
 import { runCheck } from './commands/check.js';
 import { runDaemonCommand } from './commands/daemonCommand.js';
+import { runGates } from './commands/gates.js';
 import { runHookCommand } from './commands/hookCommand.js';
 import { runPawd } from './commands/pawd.js';
 import { runSwarm } from './commands/swarm.js';
@@ -74,6 +75,9 @@ async function main(): Promise<number> {
   }
   if (command === 'daemon') {
     return runDaemonCommand(rest, print);
+  }
+  if (command === 'gates') {
+    return runGates(rest, print);
   }
   if (command === 'doctor') {
     const config = await loadConfig(rest[0]);

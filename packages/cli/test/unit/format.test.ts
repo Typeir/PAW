@@ -15,14 +15,93 @@ import { describe, expect, it } from 'vitest';
 import type {
   DispatchResult,
   DoctorReport,
+  HealthReport,
   SwarmPlan,
 } from '@paw/core';
 import {
   formatBrief,
   formatDoctor,
+  formatGateReport,
   formatHerd,
   formatPlanDoctor,
 } from '../../src/format.js';
+
+/**
+ * Build a health report with defaults, overriding only what a case needs.
+ *
+ * @param {Partial<HealthReport>} over - Fields to override.
+ * @returns {HealthReport} The report.
+ */
+const gateReport = (over: Partial<HealthReport> = {}): HealthReport => ({
+  timestamp: 't',
+  mode: 'full',
+  changedFiles: null,
+  overall: 'PASS',
+  summary: { totalGates: 0, passed: 0, failed: 0, totalFindings: 0, hasCritical: false },
+  gates: [],
+  ...over,
+});
+
+describe('formatGateReport', () => {
+  it('renders a clean run', () => {
+    const report = gateReport({
+      overall: 'PASS',
+      summary: { totalGates: 2, passed: 2, failed: 0, totalFindings: 0, hasCritical: false },
+      gates: [
+        { gate: 'a', passed: true, severity: 'critical', findings: [], stats: { filesChecked: 1, findingsCount: 0, durationMs: 0 } },
+        { gate: 'b', passed: true, severity: 'warning', findings: [], stats: { filesChecked: 1, findingsCount: 0, durationMs: 0 } },
+      ],
+    });
+    expect(formatGateReport(report)).toEqual([
+      'gates: PASS · 2/2 gate(s) · 0 finding(s)',
+      '  ✓ all gates clean',
+    ]);
+  });
+
+  it('lists each failing gate with located and unlocated findings', () => {
+    const report = gateReport({
+      overall: 'FAIL',
+      summary: { totalGates: 2, passed: 1, failed: 1, totalFindings: 2, hasCritical: true },
+      gates: [
+        { gate: 'ok', passed: true, severity: 'warning', findings: [], stats: { filesChecked: 1, findingsCount: 0, durationMs: 0 } },
+        {
+          gate: 'no-bad',
+          passed: false,
+          severity: 'critical',
+          findings: [
+            { file: 'src/a.ts', line: 3, rule: 'no-bad', message: 'bad' },
+            { file: 'src/b.ts', rule: 'no-bad', message: 'worse' },
+          ],
+          stats: { filesChecked: 2, findingsCount: 2, durationMs: 0 },
+        },
+      ],
+    });
+    expect(formatGateReport(report)).toEqual([
+      'gates: FAIL · 1/2 gate(s) · 2 finding(s)',
+      '  ✗ no-bad (critical) — 2 finding(s)',
+      '      src/a.ts:3  no-bad: bad',
+      '      src/b.ts  no-bad: worse',
+    ]);
+  });
+
+  it('caps findings and summarises the overflow', () => {
+    const findings = Array.from({ length: 30 }, (_, i) => ({
+      file: `src/f${i}.ts`,
+      line: 1,
+      rule: 'r',
+      message: 'm',
+    }));
+    const report = gateReport({
+      overall: 'FAIL',
+      summary: { totalGates: 1, passed: 0, failed: 1, totalFindings: 30, hasCritical: true },
+      gates: [{ gate: 'g', passed: false, severity: 'critical', findings, stats: { filesChecked: 30, findingsCount: 30, durationMs: 0 } }],
+    });
+    const out = formatGateReport(report);
+    expect(out[0]).toBe('gates: FAIL · 0/1 gate(s) · 30 finding(s)');
+    expect(out).toContain('      …and 5 more');
+    expect(out.filter((l) => l.startsWith('      src/'))).toHaveLength(25);
+  });
+});
 
 describe('formatDoctor', () => {
   it('renders a ready install', () => {

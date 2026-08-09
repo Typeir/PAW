@@ -17,9 +17,12 @@ import type {
   DispatchResult,
   DoctorFinding,
   DoctorReport,
+  HealthReport,
   SwarmPlan,
 } from '@paw/core';
 import { renderBrief } from '@paw/core';
+
+const GATE_FINDING_CAP = 25;
 
 /**
  * Render a mark for a boolean status.
@@ -49,6 +52,37 @@ export function formatDoctor(report: DoctorReport): string[] {
       ? ` — ${row.satisfaction.reasons.join('; ')}`
       : '';
     lines.push(`  ${mark(ok)} role ${row.role} → ${bound}${detail}`);
+  }
+  return lines;
+}
+
+/**
+ * Render a gate run's health report as terminal lines: a one-line summary, then
+ * each failing gate with its findings, capped so a large run stays readable.
+ *
+ * @param {HealthReport} report - The report from the gate runner.
+ * @returns {string[]} Terminal lines.
+ */
+export function formatGateReport(report: HealthReport): string[] {
+  const { summary } = report;
+  const lines = [
+    `gates: ${report.overall} · ${summary.passed}/${summary.totalGates} gate(s) · ${summary.totalFindings} finding(s)`,
+  ];
+  for (const gate of report.gates) {
+    if (gate.passed) {
+      continue;
+    }
+    lines.push(`  ${mark(false)} ${gate.gate} (${gate.severity}) — ${gate.findings.length} finding(s)`);
+    for (const finding of gate.findings.slice(0, GATE_FINDING_CAP)) {
+      const at = finding.line !== undefined ? `${finding.file}:${finding.line}` : finding.file;
+      lines.push(`      ${at}  ${finding.rule}: ${finding.message}`);
+    }
+    if (gate.findings.length > GATE_FINDING_CAP) {
+      lines.push(`      …and ${gate.findings.length - GATE_FINDING_CAP} more`);
+    }
+  }
+  if (report.overall === 'PASS') {
+    lines.push(`  ${mark(true)} all gates clean`);
   }
   return lines;
 }
