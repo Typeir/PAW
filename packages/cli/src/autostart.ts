@@ -30,7 +30,7 @@ const STALE_MS = 30_000;
  * @property {(lockPath: string) => number | null} lockAgeMs - Age of the lock in ms, or null when absent.
  * @property {(lockPath: string) => boolean} acquire - Exclusively create the lock; true when this caller won.
  * @property {(lockPath: string) => void} release - Remove the lock, tolerating its absence.
- * @property {() => void} spawn - Spawn pawd, detached.
+ * @property {() => void | Promise<void>} spawn - Spawn pawd off the caller's tree; may resolve once the spawn has been handed off.
  * @property {(ms: number) => Promise<void>} wait - Sleep.
  */
 export interface AutostartSeams {
@@ -38,7 +38,7 @@ export interface AutostartSeams {
   lockAgeMs(lockPath: string): number | null;
   acquire(lockPath: string): boolean;
   release(lockPath: string): void;
-  spawn(): void;
+  spawn(): void | Promise<void>;
   wait(ms: number): Promise<void>;
 }
 
@@ -82,7 +82,7 @@ export async function ensureDaemon(
   }
   if (seams.acquire(lockPath)) {
     try {
-      seams.spawn();
+      await seams.spawn();
       await waitForSocket(socketPath, seams);
     } finally {
       seams.release(lockPath);

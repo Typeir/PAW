@@ -263,8 +263,58 @@ async function runHookCommand(rest: string[]): Promise<number> {
 }
 
 /**
+ * Spawn the resident daemon so it does not stay inside the host editor's job.
+ *
+ * On Windows a hook's detached child is still a member of the editor's job
+ * object, so the editor waits on the never-exiting daemon and the spawning hook
+ * hangs (the ~18-minute cold-hook hang). `windowsHide` did not cut the tether
+ * because the tether is the job, not the console, and Node's `detached` sets
+ * `DETACHED_PROCESS`, not `CREATE_BREAKAWAY_FROM_JOB` (which it will not expose).
+ * Creating pawd through WMI `Win32_Process.Create` makes it a child of the WMI
+ * host instead — outside the editor's job and its pseudo-console — via a
+ * short-lived PowerShell launcher that itself exits at once. On posix there is
+ * no such tether: a plain detached, unref'd child already outlives the hook, so
+ * that path is kept unchanged and never touches WMI.
+ *
+ * @param {string} root - The project root pawd will serve.
+ * @returns {void | Promise<void>} Posix is fire-and-forget; Windows resolves once
+ * the short-lived launcher has created pawd, after which the caller polls the socket.
+ */
+function spawnPawd(root: string): void | Promise<void> {
+  const argv = [...process.execArgv, process.argv[1], '__pawd', root];
+  if (process.platform !== 'win32') {
+    const child = spawn(process.execPath, argv, { detached: true, stdio: 'ignore' });
+    child.on('error', () => undefined);
+    child.unref();
+    return;
+  }
+  const commandLine = [process.execPath, ...argv].map((part) => `"${part}"`).join(' ');
+  const quote = (value: string): string => value.replace(/'/g, "''");
+  const script =
+    `Invoke-CimMethod -ClassName Win32_Process -MethodName Create ` +
+    `-Arguments @{CommandLine='${quote(commandLine)}'; CurrentDirectory='${quote(root)}'} | Out-Null`;
+  // Pass the script base64-encoded (PowerShell wants UTF-16LE): Node's Windows
+  // argument escaping mangles the embedded quotes of a plain -Command string,
+  // which silently produced a malformed WMI call that spawned nothing.
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  // Await the launcher rather than detach it: it must finish the WMI create
+  // before the hook's process.exit(), which would otherwise tear the cold-
+  // starting launcher down mid-flight and spawn nothing. The launcher exits at
+  // once; pawd, created by the WMI host, is off the editor's job and lives on.
+  return new Promise<void>((resolve) => {
+    const launcher = spawn(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
+      { stdio: 'ignore', windowsHide: true },
+    );
+    launcher.on('error', () => resolve());
+    launcher.on('exit', () => resolve());
+  });
+}
+
+/**
  * The real autostart effects: probe by opening a connection, take the lock by
- * exclusive create, spawn a detached pawd running this CLI's `__pawd` entry, and
+ * exclusive create, spawn pawd off the editor's job via {@link spawnPawd}, and
  * sleep with a timer.
  *
  * @param {string} root - The project root pawd would serve.
@@ -305,22 +355,7 @@ function autostartSeams(root: string): AutostartSeams {
         /* already gone */
       }
     },
-    spawn: () => {
-      const child = spawn(
-        process.execPath,
-        [...process.execArgv, process.argv[1], '__pawd', root],
-        {
-          detached: true,
-          stdio: 'ignore',
-          // Without this, Windows gives the detached child its own console,
-          // which keeps it tethered to the host's console/job — so the editor
-          // that ran the spawning hook waits on the daemon it must not wait on.
-          windowsHide: true,
-        },
-      );
-      child.on('error', () => undefined);
-      child.unref();
-    },
+    spawn: () => spawnPawd(root),
     wait: (ms) => new Promise((r) => setTimeout(r, ms)),
   };
 }
