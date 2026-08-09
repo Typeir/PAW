@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { runHook, type HookIo, type HookOptions } from '../../src/hook.js';
+import { runHook, type HookIo, type HookOptions } from '../../src/application/hook.js';
 
 const io = (stdin: string): HookIo & { out: string[] } => {
   const out: string[] = [];

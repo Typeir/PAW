@@ -5,7 +5,7 @@
  * resident pawd over the socket. Both are clients that fail gracefully when no
  * daemon answers — an absent daemon is a state to report, not an error.
  *
- * @module @paw/cli/commands/daemonCommand
+ * @module @paw/cli/infrastructure/commands/daemonCommand
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
@@ -14,8 +14,8 @@
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { lockPath, rpcCall, socketPath, tokenPath } from '@paw/daemon';
-import { ensureDaemon } from '../autostart.js';
-import { formatDaemonStatus, formatDaemonStop } from '../daemonStatus.js';
+import { ensureDaemon } from '../../application/autostart.js';
+import { formatDaemonStatus, formatDaemonStop } from '../../domain/daemonStatus.js';
 import { autostartSeams } from './pawd.js';
 
 /**

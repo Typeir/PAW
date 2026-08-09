@@ -23,7 +23,7 @@ import {
   resolveContext,
   splitPatterns,
   withContext,
-} from '../../src/context.js';
+} from '../../src/domain/context.js';
 
 const LISTING = [
   'src/main.ts',

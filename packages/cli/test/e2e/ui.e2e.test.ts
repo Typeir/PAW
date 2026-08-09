@@ -22,7 +22,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = join(HERE, '..', '..');
 const TSX = join(PKG, 'node_modules', 'tsx', 'dist', 'cli.mjs');
-const MAIN = join(PKG, 'src', 'main.ts');
+const MAIN = join(PKG, 'src', 'infrastructure', 'main.ts');
 
 let child: ChildProcess | null = null;
 let home = '';

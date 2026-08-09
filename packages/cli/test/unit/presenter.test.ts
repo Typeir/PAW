@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { makeConsolePresenter } from '../../src/presenter.js';
+import { makeConsolePresenter } from '../../src/application/presenter.js';
 
 describe('makeConsolePresenter', () => {
   it('prefixes each severity level distinctly', () => {

@@ -6,7 +6,7 @@
  * `--run` dispatcher that meters a real herd release, and the out-of-band attach
  * approval the console requests over the socket and the operator answers here.
  *
- * @module @paw/cli/commands/ui
+ * @module @paw/cli/infrastructure/commands/ui
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
@@ -31,9 +31,9 @@ import {
   attachOutcomeLine,
   attachPromptLines,
   readAttachAnswer,
-} from '../attachPrompt.js';
-import { createHerdWriter } from '../herdWriter.js';
-import { concurrencyFrom, maxTokensFrom, parseArgs, withContext } from '../context.js';
+} from '../../domain/attachPrompt.js';
+import { createHerdWriter } from '../../application/herdWriter.js';
+import { concurrencyFrom, maxTokensFrom, parseArgs, withContext } from '../../domain/context.js';
 import { fakeRegistryFor, resolveContextArg } from './swarm.js';
 
 /**

@@ -7,7 +7,7 @@
  * reason `main.ts` is: raw process I/O, exercised by the E2E suites that spawn
  * the CLI.
  *
- * @module @paw/cli/stdin
+ * @module @paw/cli/infrastructure/stdin
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

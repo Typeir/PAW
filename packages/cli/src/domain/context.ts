@@ -10,7 +10,7 @@
  * Constraint 3: a pattern that matches nothing is a mistake worth stopping for,
  * not a quietly empty attachment.
  *
- * @module @paw/cli/context
+ * @module @paw/cli/domain/context
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

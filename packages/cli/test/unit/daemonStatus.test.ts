@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { formatDaemonStatus, formatDaemonStop } from '../../src/daemonStatus.js';
+import { formatDaemonStatus, formatDaemonStop } from '../../src/domain/daemonStatus.js';
 
 describe('formatDaemonStatus', () => {
   it('renders a running daemon', () => {

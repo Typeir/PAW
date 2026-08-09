@@ -13,7 +13,7 @@
 
 import type { DispatchEvent, FileSystemPort, SwarmPlan } from '@paw/core';
 import { describe, expect, it } from 'vitest';
-import { createHerdWriter, declaredOutputs } from '../../src/herdWriter.js';
+import { createHerdWriter, declaredOutputs } from '../../src/application/herdWriter.js';
 
 /**
  * A plan whose members write to `out/<n>.md`.

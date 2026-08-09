@@ -6,7 +6,7 @@
  * the pure formatters over its result — a null result means no daemon answered,
  * which is a normal state to report, not an error to throw.
  *
- * @module @paw/cli/daemonStatus
+ * @module @paw/cli/domain/daemonStatus
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

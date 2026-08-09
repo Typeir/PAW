@@ -7,7 +7,7 @@
  * and writes the answer — or, with no daemon reachable, the host's do-nothing
  * output. No store, no gates, no per-hook state: the daemon owns all of it.
  *
- * @module @paw/cli/commands/hookCommand
+ * @module @paw/cli/infrastructure/commands/hookCommand
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
@@ -16,9 +16,9 @@
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { lockPath, socketPath, tokenPath } from '@paw/daemon';
-import { ensureDaemon } from '../autostart.js';
-import { runHook } from '../hook.js';
-import { parseArgs } from '../context.js';
+import { ensureDaemon } from '../../application/autostart.js';
+import { runHook } from '../../application/hook.js';
+import { parseArgs } from '../../domain/context.js';
 import { readStdin } from '../stdin.js';
 import { autostartSeams } from './pawd.js';
 

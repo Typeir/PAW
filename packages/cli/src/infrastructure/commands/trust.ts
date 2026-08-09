@@ -7,7 +7,7 @@
  * and the fingerprint, and the identity is marked trusted only once every step
  * actually succeeded, never on intent.
  *
- * @module @paw/cli/commands/trust
+ * @module @paw/cli/infrastructure/commands/trust
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

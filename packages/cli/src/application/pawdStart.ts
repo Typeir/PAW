@@ -10,7 +10,7 @@
  * race the cold hooks had; durable sql.js persistence across daemon restarts is
  * the remaining follow-up (doc 10 §8a).
  *
- * @module @paw/cli/pawdStart
+ * @module @paw/cli/application/pawdStart
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

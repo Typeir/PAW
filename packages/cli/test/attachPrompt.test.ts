@@ -16,7 +16,7 @@ import {
   attachOutcomeLine,
   attachPromptLines,
   readAttachAnswer,
-} from '../src/attachPrompt.js';
+} from '../src/domain/attachPrompt.js';
 
 describe('attachPromptLines', () => {
   it('names the repository and the mode', () => {

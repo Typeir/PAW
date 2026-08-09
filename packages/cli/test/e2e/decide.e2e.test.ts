@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TSX = join(PKG, 'node_modules', 'tsx', 'dist', 'cli.mjs');
-const MAIN = join(PKG, 'src', 'main.ts');
+const MAIN = join(PKG, 'src', 'infrastructure', 'main.ts');
 
 /**
  * Run the CLI as a child process with the given stdin, resolving with its

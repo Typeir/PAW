@@ -14,7 +14,7 @@
  * bought. For the same reason a member whose file already exists can be skipped,
  * so a re-run resumes instead of paying twice.
  *
- * @module @paw/cli/herdWriter
+ * @module @paw/cli/application/herdWriter
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

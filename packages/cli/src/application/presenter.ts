@@ -5,7 +5,7 @@
  * that lets one core back a CLI, a TUI, and a GUI. The write sink is injected so
  * the adapter is pure and unit-testable without touching `process.stdout`.
  *
- * @module @paw/cli/presenter
+ * @module @paw/cli/application/presenter
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

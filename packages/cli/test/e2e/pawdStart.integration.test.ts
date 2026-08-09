@@ -16,8 +16,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createMemoryStore } from '@paw/adapters';
 import { socketPath, tokenPath } from '@paw/daemon';
 import type { SocketServerHandle } from '@paw/daemon';
-import { startEnforcement } from '../../src/pawdStart.js';
-import { runHook } from '../../src/hook.js';
+import { startEnforcement } from '../../src/application/pawdStart.js';
+import { runHook } from '../../src/application/hook.js';
 
 const NO_BAD = `export const gate = {
   id: 'no-bad', name: 'No BADCODE', port: 'code-quality', severity: 'critical', appliesTo: ['.ts'],

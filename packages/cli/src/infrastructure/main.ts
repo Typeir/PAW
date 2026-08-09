@@ -18,7 +18,7 @@
  * from unit coverage and exercised by the E2E, which spawns this entry. Fails
  * loud: an unknown command or a malformed input exits non-zero with a message.
  *
- * @module @paw/cli/main
+ * @module @paw/cli/infrastructure/main
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
@@ -26,7 +26,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { buildRegistry, runDoctor, type ModelPort } from '@paw/core';
-import { formatDoctor } from './format.js';
+import { formatDoctor } from '../domain/format.js';
 import { runCheck } from './commands/check.js';
 import { runDaemonCommand } from './commands/daemonCommand.js';
 import { runGates } from './commands/gates.js';

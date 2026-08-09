@@ -9,7 +9,7 @@
  * every hook. Fail-open is the whole contract, so a daemon problem never bricks a
  * hook.
  *
- * @module @paw/cli/hook
+ * @module @paw/cli/application/hook
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

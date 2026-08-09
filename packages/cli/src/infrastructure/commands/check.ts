@@ -5,14 +5,14 @@
  * decision, and exit 0/2. This is the stdin + `process.exit` shell of the
  * enforcement decision; the decision itself is `@paw/core`'s `decidePreToolUse`.
  *
- * @module @paw/cli/commands/check
+ * @module @paw/cli/infrastructure/commands/check
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
  */
 
 import { decidePreToolUse, type PreToolInput, type Violation } from '@paw/core';
-import { decisionToOutput } from '../render.js';
+import { decisionToOutput } from '../../domain/render.js';
 import { readStdin } from '../stdin.js';
 
 /**

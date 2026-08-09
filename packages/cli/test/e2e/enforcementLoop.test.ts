@@ -19,7 +19,7 @@ import { createGateCache, createMemoryStore } from '@paw/adapters';
 import { copilotHooksConnector } from '@paw/connectors';
 import type { DispatchHookDeps } from '@paw/core';
 import { serveEnforcement, socketPath, type SocketServerHandle } from '@paw/daemon';
-import { runHook } from '../../src/hook.js';
+import { runHook } from '../../src/application/hook.js';
 
 const NO_BAD = `export const gate = {
   id: 'no-bad', name: 'No BADCODE', port: 'code-quality', severity: 'critical', appliesTo: ['.ts'],

@@ -9,7 +9,7 @@
  * one attach use-case that `paw`, `paw-setup`, and the console all share, so they
  * cannot drift. `--dry-run` plans and writes nothing.
  *
- * @module @paw/cli/commands/init
+ * @module @paw/cli/infrastructure/commands/init
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

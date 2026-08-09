@@ -6,7 +6,7 @@
  * the live provider under `--live`). Also home to the herd helpers the `ui`
  * command shares — plan loading, `--context` expansion, and the fake registry.
  *
- * @module @paw/cli/commands/swarm
+ * @module @paw/cli/infrastructure/commands/swarm
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
@@ -27,7 +27,7 @@ import {
 } from '@paw/core';
 import { createNodeFileReader, createNodeFs } from '@paw/adapters';
 import { openLiveHerd, walkFiles } from '@paw/daemon';
-import { createHerdWriter } from '../herdWriter.js';
+import { createHerdWriter } from '../../application/herdWriter.js';
 import {
   concurrencyFrom,
   maxTokensFrom,
@@ -35,8 +35,8 @@ import {
   resolveContext,
   splitPatterns,
   withContext,
-} from '../context.js';
-import { formatBrief, formatHerd, formatPlanDoctor } from '../format.js';
+} from '../../domain/context.js';
+import { formatBrief, formatHerd, formatPlanDoctor } from '../../domain/format.js';
 
 /**
  * The capabilities a fake or noop model advertises — everything on, cost trivial.

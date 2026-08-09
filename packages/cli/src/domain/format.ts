@@ -7,7 +7,7 @@
  * The process shell in `main.ts` loads files, calls core, and prints what these
  * return.
  *
- * @module @paw/cli/format
+ * @module @paw/cli/domain/format
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

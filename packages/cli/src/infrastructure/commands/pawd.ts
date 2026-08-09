@@ -7,7 +7,7 @@
  * `runPawd` that brings enforcement up for a root and stays resident. All
  * process-shell; the pure autostart decision tree lives in `autostart.ts`.
  *
- * @module @paw/cli/commands/pawd
+ * @module @paw/cli/infrastructure/commands/pawd
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
@@ -16,8 +16,8 @@
 import { spawn } from 'node:child_process';
 import { closeSync, openSync, statSync, unlinkSync } from 'node:fs';
 import { connect } from 'node:net';
-import { type AutostartSeams } from '../autostart.js';
-import { startEnforcement } from '../pawdStart.js';
+import { type AutostartSeams } from '../../application/autostart.js';
+import { startEnforcement } from '../../application/pawdStart.js';
 
 /**
  * Spawn the resident daemon so it does not stay inside the host editor's job.

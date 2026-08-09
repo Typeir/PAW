@@ -12,7 +12,7 @@
  * The filesystem, spawn, connect, and clock are injected, so the whole decision
  * tree tests without a process or a real socket.
  *
- * @module @paw/cli/autostart
+ * @module @paw/cli/application/autostart
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

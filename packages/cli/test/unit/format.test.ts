@@ -26,7 +26,7 @@ import {
   formatPlanDoctor,
   formatPruned,
   formatViolations,
-} from '../../src/format.js';
+} from '../../src/domain/format.js';
 
 describe('formatViolations', () => {
   it('reports no daemon on a null result', () => {

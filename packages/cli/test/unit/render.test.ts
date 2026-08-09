@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { decisionToOutput } from '../../src/render.js';
+import { decisionToOutput } from '../../src/domain/render.js';
 
 describe('decisionToOutput', () => {
   it('renders a bare allow as ALLOW with exit 0', () => {

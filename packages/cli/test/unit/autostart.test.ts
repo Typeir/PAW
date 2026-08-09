@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ensureDaemon, type AutostartSeams } from '../../src/autostart.js';
+import { ensureDaemon, type AutostartSeams } from '../../src/application/autostart.js';
 
 /**
  * Seams whose probe follows a scripted sequence (the last value repeats), with

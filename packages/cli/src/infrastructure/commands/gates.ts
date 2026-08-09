@@ -8,7 +8,7 @@
  * pre-commit check. Both feed the same `@paw/adapters` node runner pawd uses on
  * a hook, so a manual run and an enforced one agree.
  *
- * @module @paw/cli/commands/gates
+ * @module @paw/cli/infrastructure/commands/gates
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
@@ -16,8 +16,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { createNodeGateRunner } from '@paw/adapters';
-import { parseArgs } from '../context.js';
-import { formatGateReport } from '../format.js';
+import { parseArgs } from '../../domain/context.js';
+import { formatGateReport } from '../../domain/format.js';
 
 /**
  * Run a git command under a root and return its non-empty, slash-normalised

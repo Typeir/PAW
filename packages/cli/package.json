@@ -5,7 +5,7 @@
   "description": "PAW CLI — a driving adapter that consumes @paw/core. Holds no domain logic.",
   "type": "module",
   "bin": {
-    "paw": "./src/main.ts"
+    "paw": "./src/infrastructure/main.ts"
   },
   "scripts": {
     "test": "vitest run",

@@ -13,7 +13,7 @@
  * Pure: `main.ts` owns stdin and the write, this decides what is shown and what
  * a keystroke means.
  *
- * @module @paw/cli/attachPrompt
+ * @module @paw/cli/domain/attachPrompt
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

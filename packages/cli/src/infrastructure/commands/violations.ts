@@ -8,7 +8,7 @@
  * answers. The manual escape hatch for a backlog that survived, e.g. a file that
  * was deleted rather than fixed.
  *
- * @module @paw/cli/commands/violations
+ * @module @paw/cli/infrastructure/commands/violations
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
@@ -18,7 +18,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import type { Violation } from '@paw/core';
 import { rpcCall, socketPath, tokenPath } from '@paw/daemon';
-import { formatPruned, formatViolations } from '../format.js';
+import { formatPruned, formatViolations } from '../../domain/format.js';
 
 /**
  * Run the `violations` subcommand.

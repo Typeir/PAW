@@ -6,7 +6,7 @@
  * The process shell that reads stdin and calls `process.exit` lives in `main.ts`
  * and is covered by the E2E, per CONSTRAINTS.md Constraint 1.
  *
- * @module @paw/cli/render
+ * @module @paw/cli/domain/render
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
