@@ -94,14 +94,30 @@ export function createSqlJsDriver(
   db: SqlJsDatabase,
   persist: SqlJsPersist,
 ): SqlDriver {
-  const flush = (): void => {
-    persist(db.export());
+  // The whole-file write is deferred while a transaction is open: `export()`
+  // serialises the database, and doing that mid-transaction ends the transaction
+  // out from under the caller. So a `begin` raises the depth, a `commit`/
+  // `rollback` lowers it, and the persist happens only once the outermost
+  // transaction has closed — the committed (or rolled-back) state, written once.
+  let txDepth = 0;
+  const track = (sql: string): void => {
+    if (/^\s*begin\b/i.test(sql)) {
+      txDepth += 1;
+    } else if (/^\s*(commit|rollback|end)\b/i.test(sql)) {
+      txDepth = Math.max(0, txDepth - 1);
+    }
+  };
+  const commit = (sql: string): void => {
+    track(sql);
+    if (txDepth === 0) {
+      persist(db.export());
+    }
   };
 
   return {
     exec(sql: string): void {
       db.run(sql);
-      flush();
+      commit(sql);
     },
 
     all(sql: string, params: readonly SqlValue[] = []): readonly SqlRow[] {
@@ -122,7 +138,7 @@ export function createSqlJsDriver(
     run(sql: string, params: readonly SqlValue[] = []): number {
       db.run(sql, [...params]);
       const changed = db.getRowsModified();
-      flush();
+      commit(sql);
       return changed;
     },
 

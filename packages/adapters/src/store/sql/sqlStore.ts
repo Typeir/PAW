@@ -2,16 +2,18 @@
  * PAW SQL Store Adapter
  *
  * @fileoverview A {@link StorePort} and {@link ConfigPort} over any
- * {@link SqlDriver}, so both supported engines share one implementation and
- * cannot drift apart in behaviour. The semantics are the ones
- * {@link createMemoryStore} defines as canonical, restated in SQL: a session
- * sees its own rows plus the project-scoped ones, and resolution matches a
- * scope exactly rather than by that same visibility rule — clearing a file in
- * one session must not retire another session's row for it.
+ * {@link SqlDriver}, built on Kysely — the typed query builder is the store's
+ * default interface now, so the SQL is generated from a schema Kysely checks
+ * rather than hand-written strings, and both supported engines still share one
+ * implementation and cannot drift. The semantics are the ones
+ * {@link createMemoryStore} defines as canonical: a session sees its own rows
+ * plus the project-scoped ones, and resolution matches a scope exactly rather
+ * than by that same visibility rule — clearing a file in one session must not
+ * retire another session's row for it.
  *
- * `session_id IS ?` rather than `= ?` throughout: SQLite's `IS` compares NULL to
- * NULL as equal, which is what "project scope" means here, and what `=` would
- * silently get wrong.
+ * Session scope is expressed as `where('session_id', 'is', null)` for the
+ * project rows and `= sessionId` for a session's own — NULL-safe by construction,
+ * where the raw form needed `IS ?` to avoid `= NULL` silently matching nothing.
  *
  * @module @paw/adapters/store/sql/sqlStore
  * @version 0.0.0
@@ -20,61 +22,34 @@
  */
 
 import type { ConfigPort, StorePort, Violation } from '@paw/core';
-import type { SqlDriver, SqlRow } from './driver.js';
+import { sql } from 'kysely';
+import type { SqlDriver } from './driver.js';
+import { createKysely, type Database } from './kyselyDialect.js';
 import { STORE_SCHEMA_SQL } from './schema.js';
 
-const SELECT_UNRESOLVED = `
-SELECT id, file_path, rule, message, indirect_fix
-FROM violations
-WHERE resolved_at IS NULL AND (session_id IS ? OR session_id IS NULL)
-ORDER BY id
-`;
+/** A selected violation row, before it is mapped back to the domain shape. */
+type ViolationRow = Pick<
+  Database['violations'],
+  'file_path' | 'rule' | 'message' | 'indirect_fix'
+> & { id: number };
 
-const INSERT_VIOLATION = `
-INSERT INTO violations (file_path, rule, message, indirect_fix, session_id)
-VALUES (?, ?, ?, ?, ?)
-`;
-
-const RESOLVE_FOR_FILE = `
-UPDATE violations SET resolved_at = datetime('now')
-WHERE resolved_at IS NULL AND file_path = ? AND session_id IS ?
-`;
-
-const SELECT_OUTSTANDING = `
-SELECT id, file_path, rule, message, indirect_fix
-FROM violations
-WHERE resolved_at IS NULL
-ORDER BY id
-`;
-
-const PRUNE_ALL = `UPDATE violations SET resolved_at = datetime('now') WHERE resolved_at IS NULL`;
-
-const PRUNE_FILE = `
-UPDATE violations SET resolved_at = datetime('now')
-WHERE resolved_at IS NULL AND file_path = ?
-`;
-
-const SELECT_CONFIG = 'SELECT value FROM paw_config WHERE key = ?';
-
-const UPSERT_CONFIG = `
-INSERT INTO paw_config (key, value) VALUES (?, ?)
-ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
-`;
+/** The columns a violation query reads. */
+const VIOLATION_COLUMNS = ['id', 'file_path', 'rule', 'message', 'indirect_fix'] as const;
 
 /**
  * Rebuild a {@link Violation} from its stored row, restoring `indirectFix` to a
  * boolean from the integer SQLite stores it as.
  *
- * @param {SqlRow} row - The stored row.
+ * @param {ViolationRow} row - The stored row.
  * @returns {Violation} The domain violation.
  */
-function toViolation(row: SqlRow): Violation {
+function toViolation(row: ViolationRow): Violation {
   return {
     id: Number(row.id),
-    filePath: String(row.file_path),
-    rule: String(row.rule),
-    message: String(row.message),
-    indirectFix: Number(row.indirect_fix) !== 0,
+    filePath: row.file_path,
+    rule: row.rule,
+    message: row.message,
+    indirectFix: row.indirect_fix !== 0,
   };
 }
 
@@ -87,10 +62,22 @@ function toViolation(row: SqlRow): Violation {
  */
 export function createSqlStore(driver: SqlDriver): StorePort & ConfigPort {
   driver.exec(STORE_SCHEMA_SQL);
+  const db = createKysely(driver);
+  const now = sql<string>`datetime('now')`;
 
   return {
     async unresolvedFor(sessionId: string | null): Promise<Violation[]> {
-      return driver.all(SELECT_UNRESOLVED, [sessionId]).map(toViolation);
+      const base = db
+        .selectFrom('violations')
+        .select(VIOLATION_COLUMNS)
+        .where('resolved_at', 'is', null);
+      const scoped =
+        sessionId === null
+          ? base.where('session_id', 'is', null)
+          : base.where((eb) =>
+              eb.or([eb('session_id', '=', sessionId), eb('session_id', 'is', null)]),
+            );
+      return (await scoped.orderBy('id').execute()).map(toViolation);
     },
 
     async raise(
@@ -98,13 +85,16 @@ export function createSqlStore(driver: SqlDriver): StorePort & ConfigPort {
       sessionId: string | null,
     ): Promise<void> {
       for (const violation of violations) {
-        driver.run(INSERT_VIOLATION, [
-          violation.filePath,
-          violation.rule,
-          violation.message,
-          violation.indirectFix ? 1 : 0,
-          sessionId,
-        ]);
+        await db
+          .insertInto('violations')
+          .values({
+            file_path: violation.filePath,
+            rule: violation.rule,
+            message: violation.message,
+            indirect_fix: violation.indirectFix ? 1 : 0,
+            session_id: sessionId,
+          })
+          .execute();
       }
     },
 
@@ -112,26 +102,52 @@ export function createSqlStore(driver: SqlDriver): StorePort & ConfigPort {
       filePath: string,
       sessionId: string | null,
     ): Promise<number> {
-      return driver.run(RESOLVE_FOR_FILE, [filePath, sessionId]);
+      const base = db
+        .updateTable('violations')
+        .set({ resolved_at: now })
+        .where('resolved_at', 'is', null)
+        .where('file_path', '=', filePath);
+      const scoped =
+        sessionId === null
+          ? base.where('session_id', 'is', null)
+          : base.where('session_id', '=', sessionId);
+      return Number((await scoped.executeTakeFirst()).numUpdatedRows);
     },
 
     async outstanding(): Promise<Violation[]> {
-      return driver.all(SELECT_OUTSTANDING, []).map(toViolation);
+      const rows = await db
+        .selectFrom('violations')
+        .select(VIOLATION_COLUMNS)
+        .where('resolved_at', 'is', null)
+        .orderBy('id')
+        .execute();
+      return rows.map(toViolation);
     },
 
     async prune(filePath: string | null): Promise<number> {
-      return filePath === null
-        ? driver.run(PRUNE_ALL, [])
-        : driver.run(PRUNE_FILE, [filePath]);
+      const base = db
+        .updateTable('violations')
+        .set({ resolved_at: now })
+        .where('resolved_at', 'is', null);
+      const scoped = filePath === null ? base : base.where('file_path', '=', filePath);
+      return Number((await scoped.executeTakeFirst()).numUpdatedRows);
     },
 
     async getConfig(key: string): Promise<string | null> {
-      const rows = driver.all(SELECT_CONFIG, [key]);
-      return rows.length === 0 ? null : String(rows[0].value);
+      const row = await db
+        .selectFrom('paw_config')
+        .select('value')
+        .where('key', '=', key)
+        .executeTakeFirst();
+      return row === undefined ? null : row.value;
     },
 
     async setConfig(key: string, value: string): Promise<void> {
-      driver.run(UPSERT_CONFIG, [key, value]);
+      await db
+        .insertInto('paw_config')
+        .values({ key, value })
+        .onConflict((oc) => oc.column('key').doUpdateSet({ value, updated_at: now }))
+        .execute();
     },
   };
 }

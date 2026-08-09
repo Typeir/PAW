@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@paw/core": "file:../core",
+    "kysely": "^0.29.4",
     "sql.js": "^1.14.1"
   },
   "devDependencies": {
