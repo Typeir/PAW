@@ -51,22 +51,27 @@ export function firstHeader(value: string | string[] | undefined): string | unde
 }
 
 /**
- * Assemble the request the router reads from Node's incoming message.
+ * Assemble the request the router reads from Node's incoming message. The body is
+ * read from the socket by the server and passed in, so this stays a pure function
+ * of the message and the already-buffered body.
  *
  * @param {IncomingMessage} req - The incoming request.
  * @param {string} host - The bound host, to resolve a relative URL against.
+ * @param {string} [body] - The buffered request body, for a write.
  * @returns {HttpRequest} The routed request.
  */
-export function toRequest(req: IncomingMessage, host: string): HttpRequest {
+export function toRequest(req: IncomingMessage, host: string, body?: string): HttpRequest {
   const target = requestTarget(req.method, req.url, host);
   return {
     method: target.method,
     path: target.path,
     query: target.query,
+    body,
     headers: {
       authorization: firstHeader(req.headers.authorization),
       origin: firstHeader(req.headers.origin),
       host: firstHeader(req.headers.host),
+      contentType: firstHeader(req.headers['content-type']),
     },
   };
 }

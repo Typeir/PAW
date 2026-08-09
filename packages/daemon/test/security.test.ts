@@ -258,8 +258,8 @@ describe('corsHeadersFor', () => {
     const headers = corsHeadersFor('http://localhost:5173', allowed);
     expect(headers['access-control-allow-origin']).toBe('http://localhost:5173');
     expect(headers['access-control-allow-origin']).not.toBe('*');
-    expect(headers['access-control-allow-methods']).toBe('GET, OPTIONS');
-    expect(headers['access-control-allow-headers']).toBe('authorization');
+    expect(headers['access-control-allow-methods']).toBe('GET, POST, PUT, DELETE, OPTIONS');
+    expect(headers['access-control-allow-headers']).toBe('authorization, content-type');
     expect(headers.vary).toBe('Origin');
   });
 

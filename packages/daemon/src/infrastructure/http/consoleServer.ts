@@ -15,7 +15,7 @@
  * @since 5.0.0
  */
 
-import { STATUS_CODES } from 'node:http';
+import { STATUS_CODES, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createServer, type Server as TlsServer } from 'node:https';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -27,6 +27,7 @@ import {
   PONG_TIMEOUT_MS,
 } from '@paw/core';
 import type { HttpRequest, HttpResponse } from '../../domain/router.js';
+import { CONTROL_BODY_CAP, isWriteMethod } from '../../domain/control.js';
 import type { UpgradeRefusal } from '../security.js';
 import type { AcceptedSocket, ServerHandle, SocketHooks, TlsMaterial } from '../../application/daemonContracts.js';
 import type { WsSessionPort } from '../../domain/session.js';
@@ -45,6 +46,73 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const MIN_TLS = 'TLSv1.2';
 
 /**
+ * Read a request body off the socket, refusing at the cap. Counting as it streams
+ * means an oversized body is rejected the chunk it crosses the line, not after the
+ * whole of it is already resident in memory.
+ *
+ * @param {AsyncIterable<Buffer | string>} source - The request stream.
+ * @param {number} cap - The largest body to buffer, in bytes.
+ * @returns {Promise<{ ok: true; body: string } | { ok: false }>} The body, or an overflow.
+ */
+export async function readBody(
+  source: AsyncIterable<Buffer | string>,
+  cap: number,
+): Promise<{ ok: true; body: string } | { ok: false }> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of source) {
+    const buf = typeof chunk === 'string' ? Buffer.from(chunk) : chunk;
+    size += buf.length;
+    if (size > cap) {
+      return { ok: false };
+    }
+    chunks.push(buf);
+  }
+  return { ok: true, body: Buffer.concat(chunks).toString('utf8') };
+}
+
+/**
+ * Turn one request into one response: buffer a write's body under the cap, route
+ * it, and write what the router returned. A body over the cap is a 413 the router
+ * never has to see; a body is read only for a write, so a read never waits on a
+ * stream. Any thrown error is a 500 that says nothing — an error message from a
+ * control API is reconnaissance.
+ *
+ * @param {IncomingMessage} req - The incoming request.
+ * @param {ServerResponse} res - The response to write.
+ * @param {string} host - The bound host, to resolve a relative URL against.
+ * @param {(request: HttpRequest) => Promise<HttpResponse>} handler - The router.
+ * @returns {Promise<void>} When the response has been written.
+ */
+export async function answerRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  host: string,
+  handler: (request: HttpRequest) => Promise<HttpResponse>,
+): Promise<void> {
+  try {
+    let body: string | undefined;
+    if (isWriteMethod(req.method ?? 'GET')) {
+      const read = await readBody(req, CONTROL_BODY_CAP);
+      if (!read.ok) {
+        res.writeHead(413, { 'content-type': 'text/plain; charset=utf-8' });
+        res.end('payload too large');
+        return;
+      }
+      body = read.body;
+    }
+    const routed = await handler(toRequest(req, host, body));
+    res.writeHead(routed.status, routed.headers);
+    res.end(routed.body);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`pawd: request failed: ${message}\n`);
+    res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end('internal error');
+  }
+}
+
+/**
  * A TLS server that answers with the router, refuses to hold a connection open
  * on a trickle of header bytes, and never tells a client why a request failed —
  * an error message from a control API is reconnaissance.
@@ -60,18 +128,7 @@ export function createConsoleServer(
   host: string,
 ): TlsServer {
   const server = createServer({ cert: tls.cert, key: tls.key, minVersion: MIN_TLS }, (req, res) => {
-    void handler(toRequest(req, host)).then(
-      (routed) => {
-        res.writeHead(routed.status, routed.headers);
-        res.end(routed.body);
-      },
-      (err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err);
-        process.stderr.write(`pawd: request failed: ${message}\n`);
-        res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
-        res.end('internal error');
-      },
-    );
+    void answerRequest(req, res, host, handler);
   });
   server.headersTimeout = HEADERS_TIMEOUT_MS;
   server.requestTimeout = REQUEST_TIMEOUT_MS;

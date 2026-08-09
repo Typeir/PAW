@@ -39,6 +39,15 @@ export type { SnapshotParts, VersionedCache } from './domain/cache.js';
 export { route } from './domain/router.js';
 export type { HttpResponse, RouterDeps } from './domain/router.js';
 
+export { CONTROL_BODY_CAP, WRITE_METHODS, isWriteMethod, parseControlBody } from './domain/control.js';
+export type {
+  BodyParse,
+  ControlHandler,
+  ControlPort,
+  ControlRequest,
+  ControlResult,
+} from './domain/control.js';
+
 export { IGNORED_DIRS, buildFileTree, findSubtree } from './domain/tree.js';
 export type { FileEntry } from './domain/tree.js';
 

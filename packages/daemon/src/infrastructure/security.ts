@@ -197,8 +197,8 @@ export function corsHeadersFor(
   return {
     vary: 'Origin',
     'access-control-allow-origin': origin,
-    'access-control-allow-methods': 'GET, OPTIONS',
-    'access-control-allow-headers': 'authorization',
+    'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'access-control-allow-headers': 'authorization, content-type',
     'access-control-max-age': '600',
   };
 }

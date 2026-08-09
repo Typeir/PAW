@@ -26,6 +26,7 @@
 
 import type { PawSnapshot, TreeNode } from '@paw/core';
 import { UnknownPlanError } from './plans.js';
+import { isWriteMethod, parseControlBody, type ControlPort } from './control.js';
 import {
   bearerFrom,
   corsHeadersFor,
@@ -60,11 +61,13 @@ export interface HttpResponse {
  * @property {string} [authorization] - The bearer credential.
  * @property {string} [origin] - The requesting page's origin, when a browser sent it.
  * @property {string} [host] - The authority the client believes it reached.
+ * @property {string} [contentType] - The body's media type, gated on writes.
  */
 export interface RequestHeaders {
   readonly authorization?: string;
   readonly origin?: string;
   readonly host?: string;
+  readonly contentType?: string;
 }
 
 /**
@@ -75,12 +78,14 @@ export interface RequestHeaders {
  * @property {string} path - The path, without the query string.
  * @property {URLSearchParams} [query] - The parsed query string.
  * @property {RequestHeaders} [headers] - The headers the router reads.
+ * @property {string} [body] - The raw request body, present on writes.
  */
 export interface HttpRequest {
   readonly method: string;
   readonly path: string;
   readonly query?: URLSearchParams;
   readonly headers?: RequestHeaders;
+  readonly body?: string;
 }
 
 /**
@@ -94,6 +99,7 @@ export interface HttpRequest {
  * @property {number} port - The bound port, for the host gate and the page's CSP.
  * @property {readonly string[]} scriptHashes - CSP sources for the page's own inline scripts.
  * @property {readonly string[]} origins - The origins allowed to call the API.
+ * @property {ControlPort} [control] - The writes this daemon exposes; absent leaves it observational.
  */
 export interface RouterDeps {
   readonly page: string;
@@ -103,6 +109,7 @@ export interface RouterDeps {
   readonly port: number;
   readonly scriptHashes: readonly string[];
   readonly origins: readonly string[];
+  readonly control?: ControlPort;
 }
 
 /**
@@ -126,15 +133,17 @@ function refuse(
 }
 
 /**
- * A JSON response, never cached — every read is of live state.
+ * A JSON response, never cached — every read is of live state, and a write's
+ * result is only ever true at the instant it is produced.
  *
  * @param {unknown} body - The value to serialise.
  * @param {Record<string, string>} cors - The CORS headers this request earned.
+ * @param {number} [status] - The status code; 200 for a read.
  * @returns {HttpResponse} The response.
  */
-function json(body: unknown, cors: Record<string, string>): HttpResponse {
+function json(body: unknown, cors: Record<string, string>, status = 200): HttpResponse {
   return {
-    status: 200,
+    status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
@@ -197,10 +206,55 @@ function treeResponse(
 }
 
 /**
+ * Answer a write — POST, PUT, or DELETE. Observational by default: a daemon with
+ * no control port refuses every write with 405 and never looks at the credential,
+ * which is the posture a read-only deployment keeps. With a control port, the same
+ * gates a read faces apply (host already passed; origin, then token), the body is
+ * sanitised, and the request is dispatched to the handler registered for its
+ * method and path. An unknown route is a 404 raised *after* the token gate, so an
+ * unauthenticated caller can neither drive a write nor map which writes exist.
+ *
+ * @param {HttpRequest} request - The request.
+ * @param {RouterDeps} deps - The control port and security policy.
+ * @param {RequestHeaders} headers - The request headers, already defaulted.
+ * @param {Record<string, string>} cors - The CORS headers this request earned.
+ * @returns {Promise<HttpResponse>} The response.
+ */
+async function writeResponse(
+  request: HttpRequest,
+  deps: RouterDeps,
+  headers: RequestHeaders,
+  cors: Record<string, string>,
+): Promise<HttpResponse> {
+  if (deps.control === undefined) {
+    return refuse(405, 'method not allowed', cors);
+  }
+  if (!request.path.startsWith('/api/')) {
+    return refuse(404, 'not found', cors);
+  }
+  if (!originAllowed(headers.origin, deps.origins)) {
+    return refuse(403, 'origin not allowed', cors);
+  }
+  if (!verifyToken(deps.token, bearerFrom(headers.authorization))) {
+    return refuse(401, 'unauthorized', { ...cors, 'www-authenticate': 'Bearer realm="pawd"' });
+  }
+  const parsed = parseControlBody(request.body ?? '', headers.contentType);
+  if (!parsed.ok) {
+    return refuse(parsed.status, parsed.message, cors);
+  }
+  const handler = deps.control.handlers[`${request.method} ${request.path}`];
+  if (handler === undefined) {
+    return refuse(404, 'not found', cors);
+  }
+  const result = await handler({ query: request.query, body: parsed.body });
+  return json(result.body, cors, result.status);
+}
+
+/**
  * Route a request to a response.
  *
  * @param {HttpRequest} request - The request.
- * @param {RouterDeps} deps - The page, snapshot, tree, and security policy.
+ * @param {RouterDeps} deps - The page, snapshot, tree, control port, and security policy.
  * @returns {Promise<HttpResponse>} The response to write.
  */
 export async function route(request: HttpRequest, deps: RouterDeps): Promise<HttpResponse> {
@@ -218,6 +272,10 @@ export async function route(request: HttpRequest, deps: RouterDeps): Promise<Htt
       return refuse(403, 'origin not allowed', cors);
     }
     return { status: 204, headers: { ...securityHeaders(), ...cors }, body: '' };
+  }
+
+  if (isWriteMethod(request.method)) {
+    return writeResponse(request, deps, headers, cors);
   }
 
   if (request.method !== 'GET') {

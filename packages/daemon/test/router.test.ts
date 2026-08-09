@@ -19,6 +19,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PawSnapshot, TreeNode } from '@paw/core';
 import { UnknownPlanError } from '../src/domain/plans.js';
 import { route, type HttpRequest, type RouterDeps } from '../src/domain/router.js';
+import type { ControlRequest, ControlResult } from '../src/domain/control.js';
 import { allowedOrigins, inlineScriptHashes } from '../src/infrastructure/security.js';
 
 const PORT = 8971;
@@ -190,8 +191,8 @@ describe('preflight', () => {
     );
     expect(res.status).toBe(204);
     expect(res.body).toBe('');
-    expect(res.headers['access-control-allow-methods']).toBe('GET, OPTIONS');
-    expect(res.headers['access-control-allow-headers']).toBe('authorization');
+    expect(res.headers['access-control-allow-methods']).toBe('GET, POST, PUT, DELETE, OPTIONS');
+    expect(res.headers['access-control-allow-headers']).toBe('authorization, content-type');
     expect(res.headers).not.toHaveProperty('access-control-allow-credentials');
   });
 
@@ -276,6 +277,11 @@ describe('the routes themselves', () => {
     expect((await route(req('/api/state', { method: 'DELETE' }), deps)).status).toBe(405);
   });
 
+  it('rejects a method that is neither a read, a write, nor a preflight', async () => {
+    expect((await route(req('/api/state', { method: 'PATCH' }), deps)).status).toBe(405);
+    expect((await route(req('/', { method: 'HEAD' }), deps)).status).toBe(405);
+  });
+
   it('answers 404 for an unknown path outside the API', async () => {
     const res = await route(req('/nope'), deps);
     expect(res.status).toBe(404);
@@ -306,5 +312,129 @@ describe('what must never leak', () => {
     const fake = await route(req('/api/nope', { headers: { authorization: undefined } }), deps);
     expect(real.status).toBe(fake.status);
     expect(real.body).toBe(fake.body);
+  });
+});
+
+const control = {
+  handlers: {
+    'DELETE /api/violations': async ({ query }: ControlRequest): Promise<ControlResult> => ({
+      status: 200,
+      body: { cleared: query?.get('file') ? 1 : 9 },
+    }),
+    'POST /api/echo': async ({ body }: ControlRequest): Promise<ControlResult> => ({
+      status: 201,
+      body: { echoed: body },
+    }),
+    'PUT /api/plan': async (): Promise<ControlResult> => ({ status: 200, body: { ok: true } }),
+    'POST /api/bad': async (): Promise<ControlResult> => ({ status: 422, body: { error: 'nope' } }),
+  },
+};
+
+const cdeps: RouterDeps = { ...deps, control };
+
+/**
+ * A write request as the console's own page would send it: a bearer token, the
+ * daemon's origin, and a JSON body.
+ *
+ * @param {string} method - The write method.
+ * @param {string} path - The path.
+ * @param {Partial<HttpRequest>} [over] - Overrides.
+ * @returns {HttpRequest} The request.
+ */
+const write = (method: string, path: string, over: Partial<HttpRequest> = {}): HttpRequest =>
+  req(path, {
+    method,
+    body: '{}',
+    ...over,
+    headers: { contentType: 'application/json', ...over.headers },
+  });
+
+describe('the write pipeline', () => {
+  it('refuses every write when the daemon exposes no control port', async () => {
+    for (const method of ['POST', 'PUT', 'DELETE']) {
+      expect((await route(write(method, '/api/violations'), deps)).status).toBe(405);
+    }
+  });
+
+  it('dispatches a DELETE to its handler, threading the query', async () => {
+    const all = await route(write('DELETE', '/api/violations'), cdeps);
+    expect(all.status).toBe(200);
+    expect(JSON.parse(all.body)).toEqual({ cleared: 9 });
+    const one = await route(
+      write('DELETE', '/api/violations', { query: new URLSearchParams('file=src/a.ts') }),
+      cdeps,
+    );
+    expect(JSON.parse(one.body)).toEqual({ cleared: 1 });
+  });
+
+  it('dispatches a POST, passing the sanitised body and the handler’s status', async () => {
+    const res = await route(write('POST', '/api/echo', { body: '{"n":2}' }), cdeps);
+    expect(res.status).toBe(201);
+    expect(JSON.parse(res.body)).toEqual({ echoed: { n: 2 } });
+  });
+
+  it('dispatches a PUT', async () => {
+    expect((await route(write('PUT', '/api/plan'), cdeps)).status).toBe(200);
+  });
+
+  it('accepts a bodyless write, taking its parameters from the query', async () => {
+    const res = await route(
+      write('DELETE', '/api/violations', {
+        body: undefined,
+        query: new URLSearchParams('file=src/a.ts'),
+        headers: { contentType: undefined },
+      }),
+      cdeps,
+    );
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ cleared: 1 });
+  });
+
+  it('renders a handler’s own refusal status as json, not as a text refusal', async () => {
+    const res = await route(write('POST', '/api/bad'), cdeps);
+    expect(res.status).toBe(422);
+    expect(JSON.parse(res.body)).toEqual({ error: 'nope' });
+  });
+
+  it('refuses a write aimed off the API with 404', async () => {
+    expect((await route(write('POST', '/nope'), cdeps)).status).toBe(404);
+  });
+
+  it('refuses a stranger’s origin with 403, before the token or any dispatch', async () => {
+    const res = await route(
+      write('DELETE', '/api/violations', { headers: { origin: 'https://evil.example' } }),
+      cdeps,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('refuses a missing or wrong token with 401', async () => {
+    expect(
+      (await route(write('DELETE', '/api/violations', { headers: { authorization: undefined } }), cdeps))
+        .status,
+    ).toBe(401);
+    expect(
+      (await route(write('DELETE', '/api/violations', { headers: { authorization: 'Bearer wrong' } }), cdeps))
+        .status,
+    ).toBe(401);
+  });
+
+  it('refuses a non-json content type with 415', async () => {
+    const res = await route(write('POST', '/api/echo', { headers: { contentType: 'text/plain' } }), cdeps);
+    expect(res.status).toBe(415);
+  });
+
+  it('refuses malformed json with 400 and a non-object body with 422', async () => {
+    expect((await route(write('POST', '/api/echo', { body: '{bad' }), cdeps)).status).toBe(400);
+    expect((await route(write('POST', '/api/echo', { body: '[1]' }), cdeps)).status).toBe(422);
+  });
+
+  it('answers 404 for an unknown write route once authenticated', async () => {
+    expect((await route(write('DELETE', '/api/unknown'), cdeps)).status).toBe(404);
+  });
+
+  it('never leaks the token through the write path', async () => {
+    const res = await route(write('DELETE', '/api/violations'), cdeps);
+    expect(JSON.stringify(res)).not.toContain(TOKEN);
   });
 });
