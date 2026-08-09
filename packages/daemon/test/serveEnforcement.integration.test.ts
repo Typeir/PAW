@@ -178,4 +178,30 @@ describe('pawd enforcement over a real socket', () => {
     expect(idled).toBe(1);
     rmSync(other, { recursive: true, force: true });
   });
+
+  it('reports status and stops on request when control is wired', async () => {
+    const other = mkdtempSync(path.join(tmpdir(), 'paw-ctl-'));
+    const sock = socketPath(other, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: other });
+    let stopped = 0;
+    await serveEnforcement({
+      socketPath: sock,
+      projectRoot: other,
+      control: { pid: 4242, now: () => 1000, onStop: () => { stopped += 1; } },
+      configure: async () => ({ token: 'T', deps }),
+    });
+    const c = open(sock);
+    await c.ready;
+    await c.send(1, 'connect', { token: 'T', protocolVersion: 1 });
+
+    const status = (await c.send(2, 'daemon.status', {})).result as Record<string, unknown>;
+    expect(status).toMatchObject({ pid: 4242, protocolVersion: 1, health: 'ok', projectRoot: other });
+    expect(typeof status.uptimeMs).toBe('number');
+
+    expect((await c.send(3, 'daemon.stop', {})).result).toEqual({ stopping: true });
+    c.close();
+
+    await new Promise((r) => setTimeout(r, 120));
+    expect(stopped).toBe(1);
+    rmSync(other, { recursive: true, force: true });
+  });
 });

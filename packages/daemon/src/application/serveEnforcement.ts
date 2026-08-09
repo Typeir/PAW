@@ -53,12 +53,14 @@ export interface EnforcementConfig {
  * @property {string} projectRoot - The root pawd serves, reported at handshake.
  * @property {() => Promise<EnforcementConfig>} configure - Produces the token and deps, run ONLY after the claim — the place any writes to `.paw` belong.
  * @property {{ ms: number; onIdle: () => void }} [idle] - Close and signal after this many ms with no hook call; omit to stay resident. Doc 10 §9c — industrial is not leaking a process per repo forever.
+ * @property {{ pid: number; now: () => number; onStop: () => void }} [control] - Enables `daemon.status`/`daemon.stop`; the pid and clock they report, and the shutdown they trigger. Doc 10 §12.
  */
 export interface EnforcementOptions {
   readonly socketPath: string;
   readonly projectRoot: string;
   configure(): Promise<EnforcementConfig>;
   readonly idle?: { ms: number; onIdle: () => void };
+  readonly control?: { pid: number; now: () => number; onStop: () => void };
 }
 
 /**
@@ -114,13 +116,30 @@ export async function serveEnforcement(opts: EnforcementOptions): Promise<Socket
       capabilities: ['gates', 'violations'],
       health: 'ok',
     };
-    const methods = {
+    const methods: Record<string, (params: unknown) => Promise<unknown>> = {
       'hook.dispatch': async (params: unknown): Promise<unknown> => {
         resetIdle();
         const req = toDispatch(params);
         return req === null ? { continue: true } : dispatchHook(deps, req);
       },
     };
+    const control = opts.control;
+    if (control) {
+      const startedAt = control.now();
+      methods['daemon.status'] = async () => ({
+        pid: control.pid,
+        uptimeMs: control.now() - startedAt,
+        protocolVersion: RPC_PROTOCOL_VERSION,
+        health: 'ok',
+        projectRoot: opts.projectRoot,
+      });
+      methods['daemon.stop'] = async () => {
+        setTimeout(() => {
+          void handle.close().then(control.onStop);
+        }, 50).unref();
+        return { stopping: true };
+      };
+    }
     handle = serveSessions(server, () =>
       createRpcSession({ token, protocolVersion: RPC_PROTOCOL_VERSION, hello, methods }),
     );

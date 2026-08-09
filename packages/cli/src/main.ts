@@ -8,6 +8,7 @@
  *   paw check                     read a decision-input on stdin, allow/deny (exit 0/2)
  *   paw hook --copilot "tool.pre" bridge a host hook into the loop (stdin payload
  *                                 -> connector -> handleEvent -> native output)
+ *   paw daemon status|stop        inspect or stop this repo's resident pawd
  *   paw doctor <config.json>      validate config + role bindings
  *   paw swarm doctor <plan.mjs>   validate a swarm plan
  *   paw swarm show <plan> <n>     print member n's rendered brief
@@ -87,6 +88,8 @@ import {
 } from '@paw/daemon';
 import { ensureDaemon, type AutostartSeams } from './autostart.js';
 import { startEnforcement } from './pawdStart.js';
+import { rpcCall } from './pawdClient.js';
+import { formatDaemonStatus, formatDaemonStop } from './daemonStatus.js';
 import {
   concurrencyFrom,
   maxTokensFrom,
@@ -322,8 +325,44 @@ function autostartSeams(root: string): AutostartSeams {
 async function runPawd(root: string): Promise<never> {
   await startEnforcement(root, {
     idle: { ms: 3_600_000, onIdle: () => process.exit(0) },
+    control: { pid: process.pid, now: () => Date.now(), onStop: () => process.exit(0) },
   });
   return new Promise<never>(() => undefined);
+}
+
+/**
+ * Run the `daemon` subcommand: inspect or stop this repository's resident daemon
+ * over the socket (doc 10 §12). `status` prints what pawd reports, or that none
+ * is running; `stop` asks it to shut down. Both are clients that fail gracefully
+ * when no daemon answers — an absent daemon is a state to report, not an error.
+ *
+ * @param {string[]} rest - The words after `daemon`.
+ * @param {(lines: string[]) => void} print - Line printer.
+ * @returns {Promise<number>} 0 when a daemon answered, 1 when none did.
+ */
+async function runDaemonCommand(
+  rest: string[],
+  print: (lines: string[]) => void,
+): Promise<number> {
+  const sub = rest[0];
+  const root = process.cwd();
+  const endpoint = socketPath(root, {
+    platform: process.platform,
+    xdgRuntimeDir: process.env.XDG_RUNTIME_DIR,
+    tmpdir: tmpdir(),
+  });
+  const token = tokenPath(resolve(root, '.paw'));
+  if (sub === 'status') {
+    const status = await rpcCall(endpoint, token, 'daemon.status', {});
+    print(formatDaemonStatus(status as Record<string, unknown> | null));
+    return status === null ? 1 : 0;
+  }
+  if (sub === 'stop') {
+    const result = await rpcCall(endpoint, token, 'daemon.stop', {});
+    print(formatDaemonStop(result));
+    return result === null ? 1 : 0;
+  }
+  throw new Error(`unknown daemon subcommand "${sub ?? '(none)'}" — try status or stop`);
 }
 
 /**
@@ -680,6 +719,9 @@ async function main(): Promise<number> {
   }
   if (command === '__pawd') {
     return runPawd(rest[0] ?? process.cwd());
+  }
+  if (command === 'daemon') {
+    return runDaemonCommand(rest, print);
   }
   if (command === 'doctor') {
     const config = await loadConfig(rest[0]);
