@@ -48,6 +48,9 @@ export type {
   ControlResult,
 } from './domain/control.js';
 
+export { enforcementControl } from './application/enforcementControl.js';
+export type { EnforcementControlSeams } from './application/enforcementControl.js';
+
 export { IGNORED_DIRS, buildFileTree, findSubtree } from './domain/tree.js';
 export type { FileEntry } from './domain/tree.js';
 

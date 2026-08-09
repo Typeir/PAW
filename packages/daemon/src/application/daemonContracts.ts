@@ -28,6 +28,7 @@ import type {
   SwarmPlan,
 } from '@paw/core';
 import type { LiveBus } from '../domain/bus.js';
+import type { ControlPort } from '../domain/control.js';
 import type { HttpRequest, HttpResponse } from '../domain/router.js';
 import type { WsSessionPort } from '../domain/session.js';
 import type { FileEntry } from '../domain/tree.js';
@@ -231,6 +232,7 @@ export interface DaemonOptions {
   readonly allowOrigins?: readonly string[];
   readonly dispatch?: Dispatcher;
   readonly scopeCeiling?: string;
+  readonly control?: ControlPort;
   onAttach?(path: string, mode: InitMode): void;
   onRelease?(settings: RunSettings): void;
 }

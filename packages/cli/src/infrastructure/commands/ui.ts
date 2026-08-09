@@ -19,6 +19,7 @@ import { applyInit, dispatchSwarm, type InitMode } from '@paw/core';
 import { createNodeFileReader, createNodeFs } from '@paw/adapters';
 import {
   consolePage,
+  enforcementControl,
   identityNotice,
   meterPort,
   nodeRuntime,
@@ -170,6 +171,7 @@ export async function runUi(
   const attached = await resolveContextArg(args.values.get('context'));
   const portValue = args.values.get('port');
   const root = args.values.get('root') ?? '.';
+  const control = args.flags.has('control');
   let handle: DaemonHandle | null = null;
   const daemon = await runDaemon(
     {
@@ -181,6 +183,7 @@ export async function runUi(
       onAttach: (path, mode) => {
         void approveAttach(path, mode, () => handle);
       },
+      ...(control ? { control: enforcementControl(root) } : {}),
       ...(shouldRun
         ? { dispatch: uiDispatcher(live, attached, concurrencyFrom(args), maxTokensFrom(args)) }
         : {}),
@@ -201,6 +204,9 @@ export async function runUi(
     shouldRun
       ? `releasing the herd (${live ? 'live' : 'fake'} model) · the console fills in as it lands`
       : 'no run released · pass --run to dispatch',
+    control
+      ? 'control enabled · the console may prune violations and stop enforcement'
+      : 'observational · pass --control to let the console write',
     'open that URL for the console · ctrl-c to stop',
   ]);
   daemon.dispatched?.catch((err: unknown) => {

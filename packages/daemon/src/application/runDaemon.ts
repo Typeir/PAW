@@ -519,6 +519,7 @@ export async function runDaemon(
           port: boundPort,
           scriptHashes,
           origins,
+          control: options.control,
         }),
       hooks,
       port,
