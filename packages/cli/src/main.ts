@@ -306,7 +306,7 @@ function autostartSeams(root: string): AutostartSeams {
       }
     },
     spawn: () => {
-      spawn(process.execPath, [process.argv[1], '__pawd', root], {
+      spawn(process.execPath, [...process.execArgv, process.argv[1], '__pawd', root], {
         detached: true,
         stdio: 'ignore',
       }).unref();
