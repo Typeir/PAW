@@ -1,14 +1,14 @@
 /**
  * PAW TUI
  *
- * @fileoverview The driving side of the hexagon: the process shell that loads a
- * config and a plan, runs the doctor and a deterministic herd for the views to
- * render, then drives the pure {@link reduce}/{@link render} loop against stdin.
- * Two input modes share one reducer — a raw-mode keypress loop on a TTY, and a
- * batch fold over piped input for the E2E — so the same transitions a snapshot
- * test proves are the ones a person drives. Holds no rules and is excluded from
- * unit coverage (process I/O, dynamic import); the E2E spawns it. Fails loud: a
- * bad command or a plan-less module exits non-zero.
+ * @fileoverview The process shell: it loads a config and a plan, runs the doctor
+ * and a deterministic herd for the read-only views, then drives the effect-
+ * reducer against stdin. A keypress becomes a message; the reducer returns the
+ * next state and any effects; the shell runs each effect (a verb — gates first)
+ * and feeds the result back as a message. Two input modes share the loop — a raw
+ * keypress stream on a TTY, and a batch fold over piped input for the E2E — so a
+ * snapshot test drives the same transitions a person does. Holds no rules and is
+ * excluded from unit coverage (process I/O, dynamic import); the E2E spawns it.
  *
  * @module @paw/tui/main
  * @version 0.0.0
@@ -16,6 +16,7 @@
  * @since 5.0.0
  */
 
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -23,13 +24,21 @@ import {
   buildRegistry,
   dispatchSwarm,
   runDoctor,
+  type HealthReport,
   type ModelCapabilities,
   type ModelPort,
   type RoleRegistry,
   type SwarmPlan,
 } from '@paw/core';
-import { createNodeFileReader } from '@paw/adapters';
-import { initialState, reduce, type TuiData, type TuiState } from './app.js';
+import { createNodeFileReader, createNodeGateRunner } from '@paw/adapters';
+import {
+  initialState,
+  reduce,
+  type Effect,
+  type Msg,
+  type TuiData,
+  type TuiState,
+} from './app.js';
 import { render } from './screen.js';
 
 const KNOWN_CONNECTORS = ['copilot-hooks'];
@@ -94,7 +103,7 @@ function fakeRegistryFor(plan: SwarmPlan<unknown>): RoleRegistry {
 }
 
 /**
- * Load everything the views render: the doctor report and a released herd.
+ * Load everything the read-only views render: the doctor report and a herd.
  *
  * @param {string} configPath - Path to the config.
  * @param {string} planPath - Path to the plan.
@@ -115,6 +124,45 @@ async function loadData(configPath: string, planPath: string): Promise<TuiData> 
 }
 
 /**
+ * The working-tree change set: unstaged, staged, and untracked files.
+ *
+ * @param {string} root - The repository root.
+ * @returns {string[]} Deduped, slash-normalised paths.
+ */
+function changedFiles(root: string): string[] {
+  const git = (args: string[]): string[] => {
+    try {
+      return execFileSync('git', args, { cwd: root, encoding: 'utf8' })
+        .split('\n')
+        .map((line) => line.trim().replace(/\\/g, '/'))
+        .filter((line) => line.length > 0);
+    } catch {
+      return [];
+    }
+  };
+  return [
+    ...new Set([
+      ...git(['diff', '--name-only', 'HEAD']),
+      ...git(['diff', '--cached', '--name-only']),
+      ...git(['ls-files', '--others', '--exclude-standard']),
+    ]),
+  ];
+}
+
+/**
+ * Run one effect and produce the message that carries its result.
+ *
+ * @param {Effect} effect - The effect to run.
+ * @param {string} root - The repository root.
+ * @returns {Promise<Msg>} The result message.
+ */
+async function runEffect(effect: Effect, root: string): Promise<Msg> {
+  const report: HealthReport = await createNodeGateRunner(root).runForFiles(changedFiles(root));
+  void effect;
+  return { kind: 'gates', report };
+}
+
+/**
  * Paint a screen to stdout, clearing the terminal first.
  *
  * @param {TuiState} state - The state to render.
@@ -124,42 +172,58 @@ function paint(state: TuiState): void {
 }
 
 /**
- * Drive the reducer with a raw-mode keypress loop on a TTY.
+ * Drive the effect-reducer with a raw-mode keypress loop on a TTY.
  *
  * @param {TuiState} start - The initial state.
+ * @param {string} root - The repository root.
  */
-function runInteractive(start: TuiState): void {
+function runInteractive(start: TuiState, root: string): void {
   let state = start;
+  const dispatch = async (msg: Msg): Promise<void> => {
+    const step = reduce(state, msg);
+    state = step.state;
+    paint(state);
+    if (state.quit) {
+      process.stdin.setRawMode?.(false);
+      process.exit(0);
+    }
+    for (const effect of step.effects) {
+      await dispatch(await runEffect(effect, root));
+    }
+  };
   paint(state);
   process.stdin.setRawMode?.(true);
   process.stdin.resume();
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (chunk: string) => {
     for (const key of chunk) {
-      state = reduce(state, key);
+      void dispatch({ kind: 'key', key });
     }
-    if (state.quit) {
-      process.stdin.setRawMode?.(false);
-      process.exit(0);
-    }
-    paint(state);
   });
 }
 
 /**
- * Fold the reducer over all of piped stdin, then print the final screen once —
- * the deterministic path the E2E drives.
+ * Fold the reducer over all of piped stdin, running effects between keys, then
+ * print the final screen once — the deterministic path the E2E drives.
  *
  * @param {TuiState} start - The initial state.
+ * @param {string} root - The repository root.
  */
-async function runBatch(start: TuiState): Promise<void> {
+async function runBatch(start: TuiState, root: string): Promise<void> {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) {
     chunks.push(chunk as Buffer);
   }
   let state = start;
+  const dispatch = async (msg: Msg): Promise<void> => {
+    const step = reduce(state, msg);
+    state = step.state;
+    for (const effect of step.effects) {
+      await dispatch(await runEffect(effect, root));
+    }
+  };
   for (const key of Buffer.concat(chunks).toString('utf8')) {
-    state = reduce(state, key);
+    await dispatch({ kind: 'key', key });
   }
   process.stdout.write(`${render(state).lines.join('\n')}\n`);
 }
@@ -173,10 +237,11 @@ async function main(): Promise<void> {
     throw new Error('usage: paw-tui <config.json> <plan.mjs>');
   }
   const state = initialState(await loadData(configPath, planPath));
+  const root = process.cwd();
   if (process.stdin.isTTY) {
-    runInteractive(state);
+    runInteractive(state, root);
   } else {
-    await runBatch(state);
+    await runBatch(state, root);
   }
 }
 

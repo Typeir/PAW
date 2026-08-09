@@ -24,6 +24,13 @@ import {
   type InitConflict,
 } from '@paw/core';
 import type { TuiState, View } from './app.js';
+
+const GATE_FINDING_CAP = 8;
+
+/**
+ * The key that selects each view, shown in the tab bar.
+ */
+const TAB_KEY: Record<View, string> = { doctor: '1', plan: '2', herd: '3', gates: 'g' };
 import { INIT_OPTIONS, type InitPromptState } from './initPrompt.js';
 
 /**
@@ -129,10 +136,10 @@ export function renderInitPrompt(state: InitPromptState): Screen {
  * @returns {string} The tab line.
  */
 function tabs(view: View): string {
-  const names: View[] = ['doctor', 'plan', 'herd'];
+  const names: View[] = ['doctor', 'plan', 'herd', 'gates'];
   return names
-    .map((n, i) => (n === view ? `▸${i + 1} ${n}◂` : ` ${i + 1} ${n} `))
-    .join('  ');
+    .map((n) => (n === view ? `▸${TAB_KEY[n]} ${n}◂` : ` ${TAB_KEY[n]} ${n} `))
+    .join(' ');
 }
 
 /**
@@ -202,6 +209,45 @@ function herdBody(herd: DispatchResult | null): string[] {
 }
 
 /**
+ * Build the gates view body: a run in progress, a prompt before the first run,
+ * or the last run's report grouped by failing gate.
+ *
+ * @param {TuiState} state - The current state.
+ * @returns {string[]} Body lines.
+ */
+function gatesBody(state: TuiState): string[] {
+  if (state.busy) {
+    return ['Running gates on the working-tree changes…'];
+  }
+  const report = state.gates;
+  if (report === null) {
+    return ['No gate run yet — press g to gate your changes.'];
+  }
+  const { summary } = report;
+  const lines = [
+    `${report.overall} · ${summary.passed}/${summary.totalGates} gate(s) · ${summary.totalFindings} finding(s)`,
+    '',
+  ];
+  for (const gate of report.gates) {
+    if (gate.passed) {
+      continue;
+    }
+    lines.push(`✗ ${gate.gate} (${gate.severity}) — ${gate.findings.length}`);
+    for (const finding of gate.findings.slice(0, GATE_FINDING_CAP)) {
+      const at = finding.line !== undefined ? `${finding.file}:${finding.line}` : finding.file;
+      lines.push(`   ${at}  ${finding.rule}`);
+    }
+    if (gate.findings.length > GATE_FINDING_CAP) {
+      lines.push(`   …and ${gate.findings.length - GATE_FINDING_CAP} more`);
+    }
+  }
+  if (report.gates.every((gate) => gate.passed)) {
+    lines.push('✓ all gates clean');
+  }
+  return lines;
+}
+
+/**
  * Select the body for the active view.
  *
  * @param {TuiState} state - The current state.
@@ -214,6 +260,9 @@ function viewBody(state: TuiState): string[] {
   if (state.view === 'plan') {
     return planBody(state);
   }
+  if (state.view === 'gates') {
+    return gatesBody(state);
+  }
   return herdBody(state.data.herd);
 }
 
@@ -225,6 +274,6 @@ function viewBody(state: TuiState): string[] {
  */
 export function render(state: TuiState): Screen {
   const body = [tabs(state.view), '', ...viewBody(state)];
-  const footer = ['1/2/3 view · j/k select member · q quit'];
+  const footer = ['1/2/3 view · g run gates · j/k member · q quit'];
   return { lines: frame('PAW', body, footer) };
 }

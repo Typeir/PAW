@@ -17,10 +17,45 @@ import { describe, expect, it } from 'vitest';
 import type {
   DispatchResult,
   DoctorReport,
+  HealthReport,
   SwarmPlan,
 } from '@paw/core';
 import { initialState, type TuiData, type TuiState } from '../../src/app.js';
 import { render } from '../../src/screen.js';
+
+const gateStat = { filesChecked: 1, findingsCount: 0, durationMs: 0 };
+
+const failReport: HealthReport = {
+  timestamp: 't',
+  mode: 'changed-only',
+  changedFiles: null,
+  overall: 'FAIL',
+  summary: { totalGates: 2, passed: 1, failed: 1, totalFindings: 10, hasCritical: true },
+  gates: [
+    { gate: 'ok', passed: true, severity: 'warning', findings: [], stats: gateStat },
+    {
+      gate: 'no-any',
+      passed: false,
+      severity: 'critical',
+      findings: Array.from({ length: 10 }, (_, i) => ({
+        file: `src/f${i}.ts`,
+        ...(i === 0 ? {} : { line: i + 1 }),
+        rule: 'no-any',
+        message: 'no any',
+      })),
+      stats: { ...gateStat, findingsCount: 10 },
+    },
+  ],
+};
+
+const passReport: HealthReport = {
+  timestamp: 't',
+  mode: 'changed-only',
+  changedFiles: null,
+  overall: 'PASS',
+  summary: { totalGates: 1, passed: 1, failed: 0, totalFindings: 0, hasCritical: false },
+  gates: [{ gate: 'ok', passed: true, severity: 'warning', findings: [], stats: gateStat }],
+};
 
 /**
  * A plan whose brief has a short line, an exactly-68-char line (the frame's inner
@@ -109,6 +144,22 @@ describe('render', () => {
 
   it('frames an unreleased herd', () => {
     expect(render(stateOn('herd', { herd: null })).lines).toMatchSnapshot();
+  });
+
+  it('frames the gates view while a run is in progress', () => {
+    expect(render({ ...stateOn('gates', {}), busy: true }).lines).toMatchSnapshot();
+  });
+
+  it('frames the gates view before any run', () => {
+    expect(render(stateOn('gates', {})).lines).toMatchSnapshot();
+  });
+
+  it('frames a failing gate run, capping a busy gate and locating findings', () => {
+    expect(render({ ...stateOn('gates', {}), gates: failReport }).lines).toMatchSnapshot();
+  });
+
+  it('frames a passing gate run', () => {
+    expect(render({ ...stateOn('gates', {}), gates: passReport }).lines).toMatchSnapshot();
   });
 
   it('truncates an over-long line with an ellipsis and pads a short one', () => {
