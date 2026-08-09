@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@paw/adapters": "file:../adapters",
-    "@paw/core": "file:../core"
+    "@paw/core": "file:../core",
+    "@paw/daemon": "file:../daemon"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^2.1.9",

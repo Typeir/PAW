@@ -22,15 +22,23 @@ import {
   type DispatchResult,
   type DoctorReport,
   type InitConflict,
+  type Violation,
 } from '@paw/core';
 import type { TuiState, View } from './app.js';
 
 const GATE_FINDING_CAP = 8;
+const VIOLATION_FILE_CAP = 8;
 
 /**
  * The key that selects each view, shown in the tab bar.
  */
-const TAB_KEY: Record<View, string> = { doctor: '1', plan: '2', herd: '3', gates: 'g' };
+const TAB_KEY: Record<View, string> = {
+  doctor: '1',
+  plan: '2',
+  herd: '3',
+  gates: 'g',
+  daemon: 'd',
+};
 import { INIT_OPTIONS, type InitPromptState } from './initPrompt.js';
 
 /**
@@ -136,7 +144,7 @@ export function renderInitPrompt(state: InitPromptState): Screen {
  * @returns {string} The tab line.
  */
 function tabs(view: View): string {
-  const names: View[] = ['doctor', 'plan', 'herd', 'gates'];
+  const names: View[] = ['doctor', 'plan', 'herd', 'gates', 'daemon'];
   return names
     .map((n) => (n === view ? `▸${TAB_KEY[n]} ${n}◂` : ` ${TAB_KEY[n]} ${n} `))
     .join(' ');
@@ -248,6 +256,62 @@ function gatesBody(state: TuiState): string[] {
 }
 
 /**
+ * List outstanding violations grouped by file, capped, with each file's rules.
+ *
+ * @param {readonly Violation[]} violations - The outstanding violations.
+ * @returns {string[]} Body lines.
+ */
+function violationLines(violations: readonly Violation[]): string[] {
+  const byFile = new Map<string, Set<string>>();
+  for (const v of violations) {
+    const rules = byFile.get(v.filePath) ?? new Set<string>();
+    rules.add(v.rule);
+    byFile.set(v.filePath, rules);
+  }
+  const files = [...byFile.entries()];
+  const lines = [`${violations.length} outstanding across ${files.length} file(s):`, ''];
+  for (const [file, rules] of files.slice(0, VIOLATION_FILE_CAP)) {
+    lines.push(`✗ ${file}  (${[...rules].join(', ')})`);
+  }
+  if (files.length > VIOLATION_FILE_CAP) {
+    lines.push(`…and ${files.length - VIOLATION_FILE_CAP} more file(s)`);
+  }
+  return lines;
+}
+
+/**
+ * Build the daemon view body: a query in progress, a prompt before the first
+ * query, a not-running notice, or the running daemon's status and the violations
+ * it is holding.
+ *
+ * @param {TuiState} state - The current state.
+ * @returns {string[]} Body lines.
+ */
+function daemonBody(state: TuiState): string[] {
+  if (state.busy) {
+    return ['Talking to the daemon…'];
+  }
+  const snapshot = state.daemon;
+  if (snapshot === null) {
+    return ['No daemon query yet — press d.'];
+  }
+  if (snapshot.status === null) {
+    return ['No daemon is running for this repository.'];
+  }
+  const { status, violations } = snapshot;
+  const lines = [
+    `● running · pid ${status.pid} · up ${Math.floor(status.uptimeMs / 1000)}s · ${status.health}`,
+    '',
+  ];
+  if (violations.length === 0) {
+    lines.push('No outstanding violations.');
+    return lines;
+  }
+  lines.push(...violationLines(violations));
+  return lines;
+}
+
+/**
  * Select the body for the active view.
  *
  * @param {TuiState} state - The current state.
@@ -263,7 +327,23 @@ function viewBody(state: TuiState): string[] {
   if (state.view === 'gates') {
     return gatesBody(state);
   }
+  if (state.view === 'daemon') {
+    return daemonBody(state);
+  }
   return herdBody(state.data.herd);
+}
+
+/**
+ * The keybinding footer for the active view — the daemon view shows its own
+ * actions, every other view the shared navigation.
+ *
+ * @param {TuiState} state - The current state.
+ * @returns {string[]} Footer lines.
+ */
+function footer(state: TuiState): string[] {
+  return state.view === 'daemon'
+    ? ['d refresh · p prune · s stop · 1/2/3 views · q quit']
+    : ['1/2/3 view · g gates · d daemon · j/k member · q quit'];
 }
 
 /**
@@ -274,6 +354,5 @@ function viewBody(state: TuiState): string[] {
  */
 export function render(state: TuiState): Screen {
   const body = [tabs(state.view), '', ...viewBody(state)];
-  const footer = ['1/2/3 view · g run gates · j/k member · q quit'];
-  return { lines: frame('PAW', body, footer) };
+  return { lines: frame('PAW', body, footer(state)) };
 }

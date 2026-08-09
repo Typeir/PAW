@@ -18,6 +18,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -29,11 +30,15 @@ import {
   type ModelPort,
   type RoleRegistry,
   type SwarmPlan,
+  type Violation,
 } from '@paw/core';
 import { createNodeFileReader, createNodeGateRunner } from '@paw/adapters';
+import { rpcCall, socketPath, tokenPath } from '@paw/daemon';
 import {
   initialState,
   reduce,
+  type DaemonSnapshot,
+  type DaemonStatus,
   type Effect,
   type Msg,
   type TuiData,
@@ -150,16 +155,62 @@ function changedFiles(root: string): string[] {
 }
 
 /**
- * Run one effect and produce the message that carries its result.
+ * The daemon endpoint and handshake token for this repository — the same
+ * addressing the CLI's daemon and violations verbs use.
+ *
+ * @param {string} root - The repository root.
+ * @returns {{ endpoint: string; token: string }} The socket path and token path.
+ */
+function daemonEndpoint(root: string): { endpoint: string; token: string } {
+  return {
+    endpoint: socketPath(root, {
+      platform: process.platform,
+      xdgRuntimeDir: process.env.XDG_RUNTIME_DIR,
+      tmpdir: tmpdir(),
+    }),
+    token: tokenPath(resolve(root, '.paw')),
+  };
+}
+
+/**
+ * Read the daemon's status and the violations it holds into one snapshot. Either
+ * call resolving null (no daemon) yields a not-running snapshot.
+ *
+ * @param {string} root - The repository root.
+ * @returns {Promise<DaemonSnapshot>} The snapshot.
+ */
+async function daemonSnapshot(root: string): Promise<DaemonSnapshot> {
+  const { endpoint, token } = daemonEndpoint(root);
+  const status = (await rpcCall(endpoint, token, 'daemon.status', {})) as DaemonStatus | null;
+  const listed = (await rpcCall(endpoint, token, 'violations.list', {})) as
+    | { violations?: Violation[] }
+    | null;
+  return { status, violations: listed?.violations ?? [] };
+}
+
+/**
+ * Run one effect and produce the message that carries its result. Gates run the
+ * project's gates on the working-tree changes; the daemon actions go over the
+ * socket, each resolving to a fresh {@link DaemonSnapshot}.
  *
  * @param {Effect} effect - The effect to run.
  * @param {string} root - The repository root.
  * @returns {Promise<Msg>} The result message.
  */
 async function runEffect(effect: Effect, root: string): Promise<Msg> {
-  const report: HealthReport = await createNodeGateRunner(root).runForFiles(changedFiles(root));
-  void effect;
-  return { kind: 'gates', report };
+  if (effect.kind === 'run-gates') {
+    const report: HealthReport = await createNodeGateRunner(root).runForFiles(changedFiles(root));
+    return { kind: 'gates', report };
+  }
+  const { endpoint, token } = daemonEndpoint(root);
+  if (effect.kind === 'daemon-stop') {
+    await rpcCall(endpoint, token, 'daemon.stop', {});
+    return { kind: 'daemon', snapshot: { status: null, violations: [] } };
+  }
+  if (effect.kind === 'daemon-prune') {
+    await rpcCall(endpoint, token, 'violations.prune', {});
+  }
+  return { kind: 'daemon', snapshot: await daemonSnapshot(root) };
 }
 
 /**

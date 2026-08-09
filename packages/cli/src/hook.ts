@@ -15,7 +15,7 @@
  * @since 5.0.0
  */
 
-import { rpcCall } from './pawdClient.js';
+import { rpcCall } from '@paw/daemon';
 
 /**
  * The stdin/stdout seam, injected so the bridge tests without a process.

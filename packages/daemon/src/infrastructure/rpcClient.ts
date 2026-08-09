@@ -9,9 +9,11 @@
  * be bricked by a daemon problem, which is the whole reason enforcement is
  * allowed to move off the cold path.
  *
- * `connect` and `readToken` are injected so every branch tests without a pipe.
+ * Lives in the daemon package beside the endpoint addressing and the RPC wire so
+ * every driving adapter — cli, tui — shares one client. `connect` and `readToken`
+ * are injected so every branch tests without a pipe.
  *
- * @module @paw/cli/pawdClient
+ * @module @paw/daemon/rpcClient
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
@@ -42,7 +44,7 @@ const DEFAULT_TIMEOUT_MS = 8000;
  * @interface RpcCallDeps
  * @property {(path: string) => Socket} [connect] - Open the socket; defaults to `node:net`.
  * @property {(path: string) => string} [readToken] - Read the handshake token; defaults to reading the file.
- * @property {number} [timeoutMs] - Give-up deadline; defaults to 2s.
+ * @property {number} [timeoutMs] - Give-up deadline; defaults to 8s.
  */
 export interface RpcCallDeps {
   connect?: (path: string) => Socket;

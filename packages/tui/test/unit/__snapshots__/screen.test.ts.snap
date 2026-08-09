@@ -3,7 +3,7 @@
 exports[`render > frames a failing gate run, capping a busy gate and locating findings 1`] = `
 [
   "┌─ PAW ────────────────────────────────────────────────────────────────┐",
-  "│  1 doctor   2 plan   3 herd  ▸g gates◂                               │",
+  "│  1 doctor   2 plan   3 herd  ▸g gates◂  d daemon                     │",
   "│                                                                      │",
   "│ FAIL · 1/2 gate(s) · 10 finding(s)                                   │",
   "│                                                                      │",
@@ -18,7 +18,7 @@ exports[`render > frames a failing gate run, capping a busy gate and locating fi
   "│    src/f7.ts:8  no-any                                               │",
   "│    …and 2 more                                                       │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ 1/2/3 view · g run gates · j/k member · q quit                       │",
+  "│ 1/2/3 view · g gates · d daemon · j/k member · q quit                │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -26,13 +26,13 @@ exports[`render > frames a failing gate run, capping a busy gate and locating fi
 exports[`render > frames a passing gate run 1`] = `
 [
   "┌─ PAW ────────────────────────────────────────────────────────────────┐",
-  "│  1 doctor   2 plan   3 herd  ▸g gates◂                               │",
+  "│  1 doctor   2 plan   3 herd  ▸g gates◂  d daemon                     │",
   "│                                                                      │",
   "│ PASS · 1/1 gate(s) · 0 finding(s)                                    │",
   "│                                                                      │",
   "│ ✓ all gates clean                                                    │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ 1/2/3 view · g run gates · j/k member · q quit                       │",
+  "│ 1/2/3 view · g gates · d daemon · j/k member · q quit                │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -40,14 +40,14 @@ exports[`render > frames a passing gate run 1`] = `
 exports[`render > frames a ready doctor 1`] = `
 [
   "┌─ PAW ────────────────────────────────────────────────────────────────┐",
-  "│ ▸1 doctor◂  2 plan   3 herd   g gates                                │",
+  "│ ▸1 doctor◂  2 plan   3 herd   g gates   d daemon                     │",
   "│                                                                      │",
   "│ PAW is ready.                                                        │",
   "│                                                                      │",
   "│ ✓ edit.apply → ds-flash                                              │",
   "│ ✓ memory.draft → (unbound)                                           │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ 1/2/3 view · g run gates · j/k member · q quit                       │",
+  "│ 1/2/3 view · g gates · d daemon · j/k member · q quit                │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -55,14 +55,14 @@ exports[`render > frames a ready doctor 1`] = `
 exports[`render > frames a refused herd 1`] = `
 [
   "┌─ PAW ────────────────────────────────────────────────────────────────┐",
-  "│  1 doctor   2 plan  ▸3 herd◂  g gates                                │",
+  "│  1 doctor   2 plan  ▸3 herd◂  g gates   d daemon                     │",
   "│                                                                      │",
   "│ Release REFUSED.                                                     │",
   "│                                                                      │",
   "│ ✓ count                                                              │",
   "│ ✗ file-conflict — two members target x                               │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ 1/2/3 view · g run gates · j/k member · q quit                       │",
+  "│ 1/2/3 view · g gates · d daemon · j/k member · q quit                │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -70,14 +70,81 @@ exports[`render > frames a refused herd 1`] = `
 exports[`render > frames a released herd 1`] = `
 [
   "┌─ PAW ────────────────────────────────────────────────────────────────┐",
-  "│  1 doctor   2 plan  ▸3 herd◂  g gates                                │",
+  "│  1 doctor   2 plan  ▸3 herd◂  g gates   d daemon                     │",
   "│                                                                      │",
   "│ 1 done · 1 skipped                                                   │",
   "│                                                                      │",
   "│ ✓ member 0 (alpha)                                                   │",
   "│ · member 1 (beta)                                                    │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ 1/2/3 view · g run gates · j/k member · q quit                       │",
+  "│ 1/2/3 view · g gates · d daemon · j/k member · q quit                │",
+  "└──────────────────────────────────────────────────────────────────────┘",
+]
+`;
+
+exports[`render > frames a running daemon holding no violations 1`] = `
+[
+  "┌─ PAW ────────────────────────────────────────────────────────────────┐",
+  "│  1 doctor   2 plan   3 herd   g gates  ▸d daemon◂                    │",
+  "│                                                                      │",
+  "│ ● running · pid 4242 · up 65s · ok                                   │",
+  "│                                                                      │",
+  "│ No outstanding violations.                                           │",
+  "├──────────────────────────────────────────────────────────────────────┤",
+  "│ d refresh · p prune · s stop · 1/2/3 views · q quit                  │",
+  "└──────────────────────────────────────────────────────────────────────┘",
+]
+`;
+
+exports[`render > frames a running daemon, capping the file list 1`] = `
+[
+  "┌─ PAW ────────────────────────────────────────────────────────────────┐",
+  "│  1 doctor   2 plan   3 herd   g gates  ▸d daemon◂                    │",
+  "│                                                                      │",
+  "│ ● running · pid 1 · up 0s · ok                                       │",
+  "│                                                                      │",
+  "│ 9 outstanding across 9 file(s):                                      │",
+  "│                                                                      │",
+  "│ ✗ src/f0.ts  (no-any)                                                │",
+  "│ ✗ src/f1.ts  (no-any)                                                │",
+  "│ ✗ src/f2.ts  (no-any)                                                │",
+  "│ ✗ src/f3.ts  (no-any)                                                │",
+  "│ ✗ src/f4.ts  (no-any)                                                │",
+  "│ ✗ src/f5.ts  (no-any)                                                │",
+  "│ ✗ src/f6.ts  (no-any)                                                │",
+  "│ ✗ src/f7.ts  (no-any)                                                │",
+  "│ …and 1 more file(s)                                                  │",
+  "├──────────────────────────────────────────────────────────────────────┤",
+  "│ d refresh · p prune · s stop · 1/2/3 views · q quit                  │",
+  "└──────────────────────────────────────────────────────────────────────┘",
+]
+`;
+
+exports[`render > frames a running daemon, grouping violations by file 1`] = `
+[
+  "┌─ PAW ────────────────────────────────────────────────────────────────┐",
+  "│  1 doctor   2 plan   3 herd   g gates  ▸d daemon◂                    │",
+  "│                                                                      │",
+  "│ ● running · pid 4242 · up 5s · ok                                    │",
+  "│                                                                      │",
+  "│ 3 outstanding across 2 file(s):                                      │",
+  "│                                                                      │",
+  "│ ✗ src/a.ts  (no-any, jsdoc)                                          │",
+  "│ ✗ src/b.ts  (no-any)                                                 │",
+  "├──────────────────────────────────────────────────────────────────────┤",
+  "│ d refresh · p prune · s stop · 1/2/3 views · q quit                  │",
+  "└──────────────────────────────────────────────────────────────────────┘",
+]
+`;
+
+exports[`render > frames a stopped daemon 1`] = `
+[
+  "┌─ PAW ────────────────────────────────────────────────────────────────┐",
+  "│  1 doctor   2 plan   3 herd   g gates  ▸d daemon◂                    │",
+  "│                                                                      │",
+  "│ No daemon is running for this repository.                            │",
+  "├──────────────────────────────────────────────────────────────────────┤",
+  "│ d refresh · p prune · s stop · 1/2/3 views · q quit                  │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -85,14 +152,14 @@ exports[`render > frames a released herd 1`] = `
 exports[`render > frames an unready doctor with config and role problems 1`] = `
 [
   "┌─ PAW ────────────────────────────────────────────────────────────────┐",
-  "│ ▸1 doctor◂  2 plan   3 herd   g gates                                │",
+  "│ ▸1 doctor◂  2 plan   3 herd   g gates   d daemon                     │",
   "│                                                                      │",
   "│ PAW is NOT ready.                                                    │",
   "│                                                                      │",
   "│ ✗ config.connector — unknown connector "x"                           │",
   "│ ✗ review.judge → weak (requires reasoning)                           │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ 1/2/3 view · g run gates · j/k member · q quit                       │",
+  "│ 1/2/3 view · g gates · d daemon · j/k member · q quit                │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -100,11 +167,35 @@ exports[`render > frames an unready doctor with config and role problems 1`] = `
 exports[`render > frames an unreleased herd 1`] = `
 [
   "┌─ PAW ────────────────────────────────────────────────────────────────┐",
-  "│  1 doctor   2 plan  ▸3 herd◂  g gates                                │",
+  "│  1 doctor   2 plan  ▸3 herd◂  g gates   d daemon                     │",
   "│                                                                      │",
   "│ No herd released yet.                                                │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ 1/2/3 view · g run gates · j/k member · q quit                       │",
+  "│ 1/2/3 view · g gates · d daemon · j/k member · q quit                │",
+  "└──────────────────────────────────────────────────────────────────────┘",
+]
+`;
+
+exports[`render > frames the daemon view before any query 1`] = `
+[
+  "┌─ PAW ────────────────────────────────────────────────────────────────┐",
+  "│  1 doctor   2 plan   3 herd   g gates  ▸d daemon◂                    │",
+  "│                                                                      │",
+  "│ No daemon query yet — press d.                                       │",
+  "├──────────────────────────────────────────────────────────────────────┤",
+  "│ d refresh · p prune · s stop · 1/2/3 views · q quit                  │",
+  "└──────────────────────────────────────────────────────────────────────┘",
+]
+`;
+
+exports[`render > frames the daemon view while a query is in progress 1`] = `
+[
+  "┌─ PAW ────────────────────────────────────────────────────────────────┐",
+  "│  1 doctor   2 plan   3 herd   g gates  ▸d daemon◂                    │",
+  "│                                                                      │",
+  "│ Talking to the daemon…                                               │",
+  "├──────────────────────────────────────────────────────────────────────┤",
+  "│ d refresh · p prune · s stop · 1/2/3 views · q quit                  │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -112,11 +203,11 @@ exports[`render > frames an unreleased herd 1`] = `
 exports[`render > frames the gates view before any run 1`] = `
 [
   "┌─ PAW ────────────────────────────────────────────────────────────────┐",
-  "│  1 doctor   2 plan   3 herd  ▸g gates◂                               │",
+  "│  1 doctor   2 plan   3 herd  ▸g gates◂  d daemon                     │",
   "│                                                                      │",
   "│ No gate run yet — press g to gate your changes.                      │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ 1/2/3 view · g run gates · j/k member · q quit                       │",
+  "│ 1/2/3 view · g gates · d daemon · j/k member · q quit                │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -124,11 +215,11 @@ exports[`render > frames the gates view before any run 1`] = `
 exports[`render > frames the gates view while a run is in progress 1`] = `
 [
   "┌─ PAW ────────────────────────────────────────────────────────────────┐",
-  "│  1 doctor   2 plan   3 herd  ▸g gates◂                               │",
+  "│  1 doctor   2 plan   3 herd  ▸g gates◂  d daemon                     │",
   "│                                                                      │",
   "│ Running gates on the working-tree changes…                           │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ 1/2/3 view · g run gates · j/k member · q quit                       │",
+  "│ 1/2/3 view · g gates · d daemon · j/k member · q quit                │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;
@@ -136,7 +227,7 @@ exports[`render > frames the gates view while a run is in progress 1`] = `
 exports[`render > frames the plan view with the selected member brief 1`] = `
 [
   "┌─ PAW ────────────────────────────────────────────────────────────────┐",
-  "│  1 doctor  ▸2 plan◂  3 herd   g gates                                │",
+  "│  1 doctor  ▸2 plan◂  3 herd   g gates   d daemon                     │",
   "│                                                                      │",
   "│ plan: demo · role edit.apply · 2 members                             │",
   "│                                                                      │",
@@ -148,7 +239,7 @@ exports[`render > frames the plan view with the selected member brief 1`] = `
   "│ EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE │",
   "│ LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL… │",
   "├──────────────────────────────────────────────────────────────────────┤",
-  "│ 1/2/3 view · g run gates · j/k member · q quit                       │",
+  "│ 1/2/3 view · g gates · d daemon · j/k member · q quit                │",
   "└──────────────────────────────────────────────────────────────────────┘",
 ]
 `;

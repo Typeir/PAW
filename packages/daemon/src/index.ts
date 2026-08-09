@@ -133,3 +133,6 @@ export type { BindSeams, ConnSocket, SocketServerHandle } from './infrastructure
 export { serveEnforcement } from './application/serveEnforcement.js';
 export type { EnforcementOptions } from './application/serveEnforcement.js';
 export { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from './domain/consolePage.js';
+
+export { rpcCall } from './infrastructure/rpcClient.js';
+export type { RpcCallDeps } from './infrastructure/rpcClient.js';

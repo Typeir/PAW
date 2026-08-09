@@ -2,16 +2,18 @@
  * @fileoverview Unit tests for the daemon client, driven through a fake socket so
  * every fail-open path is deterministic: a good round trip returns the result;
  * a missing token, a connection error, an error frame, a malformed frame, and a
- * timeout each resolve to null; and a late event after settling is ignored. So
- * `pawdClient.ts` reaches 100% without a pipe.
+ * timeout each resolve to null; and a late event after settling is ignored. Two
+ * cases omit an injected seam so the real default runs — reading a token from
+ * disk, and opening a real socket — both against dead endpoints so they fail open
+ * fast. So `rpcClient.ts` reaches 100% without a live pipe.
  *
- * @module @paw/cli/test/unit/pawdClient
+ * @module @paw/daemon/test/rpcClient
  */
 
 import type { Socket } from 'node:net';
 import { describe, expect, it } from 'vitest';
 import { encodeFrame, rpcFailure, rpcSuccess } from '@paw/core';
-import { rpcCall } from '../../src/pawdClient.js';
+import { rpcCall } from '../src/infrastructure/rpcClient.js';
 
 /** A fake socket whose events the test drives directly. */
 function fakeSocket() {
@@ -85,5 +87,15 @@ describe('rpcCall', () => {
     const p = rpcCall('sock', 'tok', 'm', {}, { connect: () => f.socket, readToken: () => 'T', timeoutMs: 20 });
     f.emit('connect');
     expect(await p).toBeNull();
+  });
+
+  it('reads the token from disk when no reader is injected', async () => {
+    const r = await rpcCall('sock', '/no/such/token', 'm', {}, { connect: () => fakeSocket().socket });
+    expect(r).toBeNull();
+  });
+
+  it('opens a real socket when no connector is injected', async () => {
+    const r = await rpcCall('/no/such/socket.sock', 'tok', 'm', {}, { readToken: () => 'T', timeoutMs: 200 });
+    expect(r).toBeNull();
   });
 });

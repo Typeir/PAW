@@ -17,8 +17,7 @@
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import type { Violation } from '@paw/core';
-import { socketPath, tokenPath } from '@paw/daemon';
-import { rpcCall } from '../pawdClient.js';
+import { rpcCall, socketPath, tokenPath } from '@paw/daemon';
 import { formatPruned, formatViolations } from '../format.js';
 
 /**

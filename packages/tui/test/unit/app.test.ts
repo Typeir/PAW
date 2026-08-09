@@ -2,9 +2,10 @@
  * PAW TUI Reducer Tests
  *
  * @fileoverview Drives every transition of the pure effect-reducer — the view
- * switches, member selection with both clamps, quit, the unknown-key no-op, and
- * the gates action (start → busy + effect, the busy guard, and folding the
- * result) — so `app.ts` reaches 100%.
+ * switches, member selection with both clamps, quit, the unknown-key no-op, the
+ * gates action, and the daemon verbs (open + refresh, the busy guard, folding a
+ * snapshot, and prune/stop gated to the idle daemon view) — so `app.ts` reaches
+ * 100%.
  *
  * @module @paw/tui/test/unit/app
  * @version 0.0.0
@@ -14,7 +15,13 @@
 
 import { describe, expect, it } from 'vitest';
 import type { DispatchResult, DoctorReport, HealthReport, SwarmPlan } from '@paw/core';
-import { initialState, reduce, type TuiData, type TuiState } from '../../src/app.js';
+import {
+  initialState,
+  reduce,
+  type DaemonSnapshot,
+  type TuiData,
+  type TuiState,
+} from '../../src/app.js';
 
 const plan: SwarmPlan<{ files: string[] }> = {
   name: 'demo',
@@ -37,7 +44,16 @@ const report: HealthReport = {
   gates: [],
 };
 
+const snapshot: DaemonSnapshot = {
+  status: { pid: 42, uptimeMs: 5000, health: 'ok', projectRoot: '/repo' },
+  violations: [],
+};
+
 const key = (state: TuiState, k: string) => reduce(state, { kind: 'key', key: k });
+
+/** The idle daemon view: opened with d, then a snapshot folded to clear busy. */
+const idleDaemon = (): TuiState =>
+  reduce(key(initialState(data), 'd').state, { kind: 'daemon', snapshot }).state;
 
 describe('initialState', () => {
   it('starts on the doctor view, first member, nothing running', () => {
@@ -46,6 +62,7 @@ describe('initialState', () => {
       member: 0,
       data,
       gates: null,
+      daemon: null,
       busy: false,
       quit: false,
     });
@@ -101,6 +118,55 @@ describe('reduce', () => {
     expect(step.state.busy).toBe(false);
     expect(step.state.gates).toBe(report);
     expect(step.state.view).toBe('gates');
+    expect(step.effects).toEqual([]);
+  });
+
+  it('opens the daemon view on d: busy, one daemon-refresh effect', () => {
+    const step = key(initialState(data), 'd');
+    expect(step.state.busy).toBe(true);
+    expect(step.state.view).toBe('daemon');
+    expect(step.effects).toEqual([{ kind: 'daemon-refresh' }]);
+  });
+
+  it('does not query the daemon again while one query is busy', () => {
+    const busy = key(initialState(data), 'd').state;
+    const step = key(busy, 'd');
+    expect(step.state).toBe(busy);
+    expect(step.effects).toEqual([]);
+  });
+
+  it('folds a daemon snapshot: clears busy, stores it, shows daemon', () => {
+    const busy = key(initialState(data), 'd').state;
+    const step = reduce(busy, { kind: 'daemon', snapshot });
+    expect(step.state.busy).toBe(false);
+    expect(step.state.daemon).toBe(snapshot);
+    expect(step.state.view).toBe('daemon');
+    expect(step.effects).toEqual([]);
+  });
+
+  it('prunes on p from the idle daemon view: busy, one daemon-prune effect', () => {
+    const step = key(idleDaemon(), 'p');
+    expect(step.state.busy).toBe(true);
+    expect(step.effects).toEqual([{ kind: 'daemon-prune' }]);
+  });
+
+  it('stops on s from the idle daemon view: busy, one daemon-stop effect', () => {
+    const step = key(idleDaemon(), 's');
+    expect(step.state.busy).toBe(true);
+    expect(step.effects).toEqual([{ kind: 'daemon-stop' }]);
+  });
+
+  it('ignores p outside the daemon view', () => {
+    const s = initialState(data);
+    const step = key(s, 'p');
+    expect(step.state).toBe(s);
+    expect(step.effects).toEqual([]);
+  });
+
+  it('ignores p while the daemon view is busy', () => {
+    const busy = key(initialState(data), 'd').state;
+    const step = key(busy, 'p');
+    expect(step.state).toBe(busy);
     expect(step.effects).toEqual([]);
   });
 });

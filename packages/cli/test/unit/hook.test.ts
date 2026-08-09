@@ -18,7 +18,7 @@ const io = (stdin: string): HookIo & { out: string[] } => {
 /** A fake RPC call that records the params it was given and returns `ret`. */
 const fakeCall = (ret: unknown | null) => {
   const params: unknown[] = [];
-  const call: typeof import('../../src/pawdClient.js').rpcCall = async (_s, _t, _m, p) => {
+  const call: typeof import('@paw/daemon').rpcCall = async (_s, _t, _m, p) => {
     params.push(p);
     return ret;
   };

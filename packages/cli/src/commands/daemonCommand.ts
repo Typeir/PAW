@@ -13,9 +13,8 @@
 
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { lockPath, socketPath, tokenPath } from '@paw/daemon';
+import { lockPath, rpcCall, socketPath, tokenPath } from '@paw/daemon';
 import { ensureDaemon } from '../autostart.js';
-import { rpcCall } from '../pawdClient.js';
 import { formatDaemonStatus, formatDaemonStop } from '../daemonStatus.js';
 import { autostartSeams } from './pawd.js';
 

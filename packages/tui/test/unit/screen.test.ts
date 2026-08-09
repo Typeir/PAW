@@ -20,7 +20,12 @@ import type {
   HealthReport,
   SwarmPlan,
 } from '@paw/core';
-import { initialState, type TuiData, type TuiState } from '../../src/app.js';
+import {
+  initialState,
+  type DaemonSnapshot,
+  type TuiData,
+  type TuiState,
+} from '../../src/app.js';
 import { render } from '../../src/screen.js';
 
 const gateStat = { filesChecked: 1, findingsCount: 0, durationMs: 0 };
@@ -105,6 +110,33 @@ const refusedHerd: DispatchResult = {
   outcomes: [],
 };
 
+const runningDaemon: DaemonSnapshot = {
+  status: { pid: 4242, uptimeMs: 65_000, health: 'ok', projectRoot: '/repo' },
+  violations: [],
+};
+
+const daemonWithViolations: DaemonSnapshot = {
+  status: { pid: 4242, uptimeMs: 5000, health: 'ok', projectRoot: '/repo' },
+  violations: [
+    { id: 1, filePath: 'src/a.ts', rule: 'no-any', message: 'x', indirectFix: false },
+    { id: 2, filePath: 'src/a.ts', rule: 'jsdoc', message: 'y', indirectFix: false },
+    { id: 3, filePath: 'src/b.ts', rule: 'no-any', message: 'z', indirectFix: false },
+  ],
+};
+
+const daemonManyFiles: DaemonSnapshot = {
+  status: { pid: 1, uptimeMs: 0, health: 'ok', projectRoot: '/repo' },
+  violations: Array.from({ length: 9 }, (_, i) => ({
+    id: i,
+    filePath: `src/f${i}.ts`,
+    rule: 'no-any',
+    message: 'm',
+    indirectFix: false,
+  })),
+};
+
+const stoppedDaemon: DaemonSnapshot = { status: null, violations: [] };
+
 /**
  * Build a state on a given view with the given data pieces.
  *
@@ -160,6 +192,30 @@ describe('render', () => {
 
   it('frames a passing gate run', () => {
     expect(render({ ...stateOn('gates', {}), gates: passReport }).lines).toMatchSnapshot();
+  });
+
+  it('frames the daemon view while a query is in progress', () => {
+    expect(render({ ...stateOn('daemon', {}), busy: true }).lines).toMatchSnapshot();
+  });
+
+  it('frames the daemon view before any query', () => {
+    expect(render(stateOn('daemon', {})).lines).toMatchSnapshot();
+  });
+
+  it('frames a stopped daemon', () => {
+    expect(render({ ...stateOn('daemon', {}), daemon: stoppedDaemon }).lines).toMatchSnapshot();
+  });
+
+  it('frames a running daemon holding no violations', () => {
+    expect(render({ ...stateOn('daemon', {}), daemon: runningDaemon }).lines).toMatchSnapshot();
+  });
+
+  it('frames a running daemon, grouping violations by file', () => {
+    expect(render({ ...stateOn('daemon', {}), daemon: daemonWithViolations }).lines).toMatchSnapshot();
+  });
+
+  it('frames a running daemon, capping the file list', () => {
+    expect(render({ ...stateOn('daemon', {}), daemon: daemonManyFiles }).lines).toMatchSnapshot();
   });
 
   it('truncates an over-long line with an ellipsis and pads a short one', () => {
