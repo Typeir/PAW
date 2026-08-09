@@ -18,7 +18,10 @@
 import type { ToolPostEvent, PawResponse } from '../domain/event.js';
 import type { GateFinding } from '../domain/gate.js';
 import type { GateRunner, StorePort } from '../ports/index.js';
-import type { Violation } from '../domain/violation.js';
+import { truncate, type Violation } from '../domain/violation.js';
+
+const MAX_RULE_LINES = 12;
+const MAX_MESSAGE = 160;
 
 /**
  * What the detector needs.
@@ -66,17 +69,47 @@ function toViolation(f: GateFinding): Violation {
 }
 
 /**
- * The block reason listing each finding, one per line.
+ * A single message, clipped so one rule line stays short.
+ *
+ * @param {string} text - The finding message.
+ * @returns {string} The message, clipped with an ellipsis when long.
+ */
+function clip(text: string): string {
+  return text.length > MAX_MESSAGE ? `${text.slice(0, MAX_MESSAGE - 1)}…` : text;
+}
+
+/**
+ * The block reason as ONE line per rule type — a count and a sample, not every
+ * finding. Three hundred `console-log` hits collapse to a single line the agent
+ * can actually read and act on, rather than a wall large enough to be redirected
+ * to a file it never sees. Capped in both directions (rule lines, total length).
  *
  * @param {readonly GateFinding[]} findings - The critical findings.
- * @returns {string} A multi-line reason shown to the agent.
+ * @returns {string} A bounded, per-rule block reason.
  */
 function formatFindings(findings: readonly GateFinding[]): string {
-  const lines = findings.map((f) => {
-    const loc = f.line !== undefined ? `:${f.line}` : '';
-    return `- [${f.rule}] ${f.message} (${f.file}${loc})`;
+  const byRule = new Map<string, GateFinding[]>();
+  for (const f of findings) {
+    const group = byRule.get(f.rule);
+    if (group) {
+      group.push(f);
+    } else {
+      byRule.set(f.rule, [f]);
+    }
+  }
+  const rules = [...byRule.entries()];
+  const lines = rules.slice(0, MAX_RULE_LINES).map(([rule, group]) => {
+    const first = group[0];
+    const at = `${first.file}${first.line !== undefined ? `:${first.line}` : ''}`;
+    return group.length > 1
+      ? `- ${rule} ×${group.length}: ${clip(first.message)} (e.g. ${at})`
+      : `- ${rule}: ${clip(first.message)} (${at})`;
   });
-  return `Gate violations must be fixed before continuing:\n${lines.join('\n')}`;
+  if (rules.length > MAX_RULE_LINES) {
+    lines.push(`- …and ${rules.length - MAX_RULE_LINES} more rule type(s)`);
+  }
+  const header = `Fix these before continuing — ${findings.length} gate violation(s) across ${rules.length} rule type(s):`;
+  return truncate(`${header}\n${lines.join('\n')}`);
 }
 
 /**

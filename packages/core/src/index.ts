@@ -82,6 +82,7 @@ export {
   directlyViolatedFiles,
   formatIndirectNudge,
   formatOutstanding,
+  truncate,
 } from './domain/violation.js';
 export type { Violation } from './domain/violation.js';
 

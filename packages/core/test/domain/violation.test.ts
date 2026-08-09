@@ -17,6 +17,7 @@ import {
   directlyViolatedFiles,
   formatIndirectNudge,
   formatOutstanding,
+  truncate,
   type Violation,
 } from '../../src/domain/violation.js';
 
@@ -77,5 +78,29 @@ describe('formatOutstanding', () => {
     expect(formatOutstanding(['src/a.ts', 'src/c.ts'])).toBe(
       'Fix outstanding violations before using other tools:\n- src/a.ts\n- src/c.ts',
     );
+  });
+
+  it('summarises the tail when there are more files than the cap', () => {
+    const files = Array.from({ length: 20 }, (_, i) => `src/f${i}.ts`);
+    const out = formatOutstanding(files);
+    expect(out).toContain('- src/f0.ts');
+    expect(out).toContain('…and 5 more file(s)');
+    expect(out).not.toContain('src/f19.ts');
+  });
+});
+
+describe('truncate', () => {
+  it('leaves short text and caps long text with a marker', () => {
+    expect(truncate('short', 100)).toBe('short');
+    expect(truncate('x'.repeat(50), 10)).toBe(`${'x'.repeat(10)}\n…[truncated]`);
+  });
+});
+
+describe('capping long nudges', () => {
+  it('summarises the tail when there are more indirect violations than the cap', () => {
+    const many = Array.from({ length: 18 }, (_, i) =>
+      V({ filePath: `src/f${i}.ts`, message: 'missing test', indirectFix: true }),
+    );
+    expect(formatIndirectNudge(many)).toContain('…and 3 more');
   });
 });

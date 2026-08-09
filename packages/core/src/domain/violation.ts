@@ -59,25 +59,54 @@ export function allIndirect(violations: readonly Violation[]): boolean {
 }
 
 /**
- * The hidden nudge shown when only indirect-fix violations remain.
- *
- * @param {readonly Violation[]} violations - The indirect-fix violations.
- * @returns {string} A multi-line nudge listing each file and message.
+ * The most items any enforcement reason lists before summarising the rest, and
+ * the hard character ceiling on the whole reason. A hook output too large to
+ * display inline is enforcement the agent is blind to — the feedback is
+ * redirected to a file it never reads, so it cannot self-correct. Both caps keep
+ * every reason small enough to reach the agent.
  */
-export function formatIndirectNudge(violations: readonly Violation[]): string {
-  const lines = violations
-    .map((v) => `- ${v.filePath}: ${v.message}`)
-    .join('\n');
-  return `Indirect fix required before continuing:\n${lines}`;
+const MAX_ITEMS = 15;
+const MAX_REASON = 4000;
+
+/**
+ * Cap a reason's length so it always fits an inline display.
+ *
+ * @param {string} text - The reason.
+ * @param {number} [max] - The character ceiling; defaults to {@link MAX_REASON}.
+ * @returns {string} The reason, truncated with a marker when it exceeds the ceiling.
+ */
+export function truncate(text: string, max: number = MAX_REASON): string {
+  return text.length > max ? `${text.slice(0, max)}\n…[truncated]` : text;
 }
 
 /**
- * The deny reason listing the directly-violated files that must be fixed first.
+ * The hidden nudge shown when only indirect-fix violations remain, capped so it
+ * stays displayable.
+ *
+ * @param {readonly Violation[]} violations - The indirect-fix violations.
+ * @returns {string} A bounded nudge listing files and messages.
+ */
+export function formatIndirectNudge(violations: readonly Violation[]): string {
+  const shown = violations
+    .slice(0, MAX_ITEMS)
+    .map((v) => `- ${v.filePath}: ${v.message}`);
+  if (violations.length > MAX_ITEMS) {
+    shown.push(`- …and ${violations.length - MAX_ITEMS} more`);
+  }
+  return truncate(`Indirect fix required before continuing:\n${shown.join('\n')}`);
+}
+
+/**
+ * The deny reason listing the directly-violated files that must be fixed first,
+ * capped so the agent can read it rather than have it redirected away.
  *
  * @param {readonly string[]} files - Directly-violated file paths.
- * @returns {string} A multi-line deny reason.
+ * @returns {string} A bounded deny reason.
  */
 export function formatOutstanding(files: readonly string[]): string {
-  const detail = files.map((f) => `- ${f}`).join('\n');
-  return `Fix outstanding violations before using other tools:\n${detail}`;
+  const shown = files.slice(0, MAX_ITEMS).map((f) => `- ${f}`);
+  if (files.length > MAX_ITEMS) {
+    shown.push(`- …and ${files.length - MAX_ITEMS} more file(s)`);
+  }
+  return truncate(`Fix outstanding violations before using other tools:\n${shown.join('\n')}`);
 }

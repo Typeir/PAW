@@ -166,8 +166,8 @@ describe('checkEdit — critical run blocks and records', () => {
 
     expect(r.kind).toBe('block');
     if (r.kind === 'block') {
-      expect(r.reason).toContain('[no-bad] BADCODE present (src/a.ts:3)');
-      expect(r.reason).toContain('(src/a.ts)');
+      expect(r.reason).toContain('2 gate violation(s) across 1 rule type(s)');
+      expect(r.reason).toContain('no-bad ×2: BADCODE present (e.g. src/a.ts:3)');
     }
     expect(store.resolved).toEqual([{ path: 'src/a.ts', sessionId: 'sess-1' }]);
     expect(store.raised).toHaveLength(1);
@@ -175,6 +175,28 @@ describe('checkEdit — critical run blocks and records', () => {
       { id: 0, filePath: 'src/a.ts', rule: 'no-bad', message: 'BADCODE present', indirectFix: false },
       { id: 0, filePath: 'src/a.ts', rule: 'no-bad', message: 'another', indirectFix: true },
     ]);
+  });
+
+  it('collapses many findings to one line per rule and caps the rest', async () => {
+    const store = fakeStore();
+    const findings = Array.from({ length: 14 }, (_, i) => ({
+      file: `src/f${i}.ts`,
+      rule: `rule-${i}`,
+      message: 'x'.repeat(200),
+    }));
+    const r = await checkEdit(
+      { store: store.port, gates: runnerOf([result({ findings })]), isIgnored: () => false },
+      event(['src/f0.ts']),
+    );
+
+    expect(r.kind).toBe('block');
+    if (r.kind === 'block') {
+      expect(r.reason).toContain('14 gate violation(s) across 14 rule type(s)');
+      expect(r.reason).toContain('rule-0: ');
+      expect(r.reason).toContain('…');
+      expect(r.reason).toContain('…and 2 more rule type(s)');
+      expect(r.reason).not.toContain('rule-13');
+    }
   });
 
   it('skips ignored paths but still gates the rest', async () => {
