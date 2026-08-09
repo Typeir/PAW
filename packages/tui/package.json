@@ -5,7 +5,7 @@
   "description": "PAW TUI — a driving adapter that consumes @paw/core. A pure renderer and reducer behind a thin process shell.",
   "type": "module",
   "bin": {
-    "paw-tui": "./src/main.ts"
+    "paw-tui": "./src/infrastructure/main.ts"
   },
   "scripts": {
     "test": "vitest run",

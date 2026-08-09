@@ -14,7 +14,7 @@
  * Pure, like the rest of the TUI's state: the shell reads the file and performs
  * the write, this maps a keypress to an intent.
  *
- * @module @paw/tui/initPrompt
+ * @module @paw/tui/domain/initPrompt
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

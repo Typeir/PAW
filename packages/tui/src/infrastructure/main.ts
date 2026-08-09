@@ -10,7 +10,7 @@
  * snapshot test drives the same transitions a person does. Holds no rules and is
  * excluded from unit coverage (process I/O, dynamic import); the E2E spawns it.
  *
- * @module @paw/tui/main
+ * @module @paw/tui/infrastructure/main
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
@@ -43,8 +43,8 @@ import {
   type Msg,
   type TuiData,
   type TuiState,
-} from './app.js';
-import { render } from './screen.js';
+} from '../domain/app.js';
+import { render } from '../domain/screen.js';
 
 const KNOWN_CONNECTORS = ['copilot-hooks'];
 

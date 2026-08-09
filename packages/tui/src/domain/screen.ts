@@ -9,7 +9,7 @@
  * report and decorate it; the domain truth (ok, blocking, released) already lives
  * in core, so these only choose glyphs and layout.
  *
- * @module @paw/tui/screen
+ * @module @paw/tui/domain/screen
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0

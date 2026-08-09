@@ -21,7 +21,7 @@ import {
   type DaemonSnapshot,
   type TuiData,
   type TuiState,
-} from '../../src/app.js';
+} from '../../src/domain/app.js';
 
 const plan: SwarmPlan<{ files: string[] }> = {
   name: 'demo',

@@ -19,8 +19,8 @@ import {
   INIT_OPTIONS,
   initPromptState,
   reduceInitPrompt,
-} from '../src/initPrompt.js';
-import { renderInitPrompt } from '../src/screen.js';
+} from '../src/domain/initPrompt.js';
+import { renderInitPrompt } from '../src/domain/screen.js';
 
 const UNSTAMPED: InitConflict = { kind: 'unstamped' };
 const STAMPED: InitConflict = {

@@ -25,8 +25,8 @@ import {
   type DaemonSnapshot,
   type TuiData,
   type TuiState,
-} from '../../src/app.js';
-import { render } from '../../src/screen.js';
+} from '../../src/domain/app.js';
+import { render } from '../../src/domain/screen.js';
 
 const gateStat = { filesChecked: 1, findingsCount: 0, durationMs: 0 };
 

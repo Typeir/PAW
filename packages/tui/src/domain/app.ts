@@ -10,7 +10,7 @@
  * daemon verbs (status, violations, prune, stop) over the same socket the CLI
  * uses.
  *
- * @module @paw/tui/app
+ * @module @paw/tui/domain/app
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
