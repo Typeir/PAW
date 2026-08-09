@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * PAW CLI launcher
+ * PAW installer launcher
  *
- * @fileoverview Runs the V1 CLI (`packages/cli`) under tsx, forwarding arguments.
- * `paw <command>` until a published binary exists.
+ * @fileoverview Runs the V1 installer (`packages/installer`) under tsx, forwarding
+ * arguments. `paw-setup <path|init>` until a published binary exists.
  *
- * @module @paw/bin/paw
+ * @module @paw/bin/paw-setup
  */
 
 import { spawn } from 'node:child_process';
@@ -16,7 +16,7 @@ const entry = join(
   dirname(fileURLToPath(import.meta.url)),
   '..',
   'packages',
-  'cli',
+  'installer',
   'src',
   'main.ts',
 );

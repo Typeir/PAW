@@ -8,25 +8,26 @@
     "node": ">=18"
   },
   "bin": {
-    "paw": "dist/cli.mjs",
-    "paw-setup": "dist/paw-setup.mjs"
+    "paw": "bin/paw.mjs",
+    "paw-setup": "bin/paw-setup.mjs"
   },
   "files": [
-    "dist/"
+    "bin/",
+    "packages/"
   ],
   "scripts": {
-    "build": "node build.mjs",
-    "init": "node dist/cli.mjs init",
-    "sync": "node dist/cli.mjs sync",
-    "gates": "npx tsx pawGates.ts",
-    "gates:changed": "npx tsx pawGates.ts --changed-only",
-    "gates:staged": "npx tsx pawGates.ts --staged",
-    "typecheck": "tsc --noEmit --project ../../.paw/tsconfig.json",
     "paw": "node bin/paw.mjs",
-    "pawd": "node bin/pawd.mjs",
-    "paw-tui": "node bin/paw-tui.mjs",
+    "pawd": "node bin/paw.mjs __pawd .",
+    "paw-tui": "node --import tsx packages/tui/src/main.ts",
+    "paw-setup": "node bin/paw-setup.mjs",
+    "init": "node bin/paw.mjs init",
+    "sync": "node bin/paw.mjs sync",
+    "gates": "node bin/paw.mjs gates",
+    "gates:changed": "node bin/paw.mjs gates",
+    "gates:staged": "node bin/paw.mjs gates --staged",
+    "typecheck": "tsc --noEmit --project ../../.paw/tsconfig.json",
     "build:console": "npm --prefix packages/gui run build",
-    "demo": "npm run build:console && node bin/paw.mjs ui packages/cli/test/fixtures/ready.config.json packages/cli/test/fixtures/demo.swarm.mjs"
+    "demo": "npm run build:console && node bin/paw.mjs ui packages/cli/test/fixtures/demo.swarm.mjs"
   },
   "dependencies": {
     "@clack/prompts": "^1.1.0",
@@ -35,7 +36,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
-    "esbuild": "^0.25.0",
     "tsx": "^4.21.0",
     "typescript": "^5"
   }
