@@ -290,9 +290,15 @@ function spawnPawd(root: string): void | Promise<void> {
   }
   const commandLine = [process.execPath, ...argv].map((part) => `"${part}"`).join(' ');
   const quote = (value: string): string => value.replace(/'/g, "''");
+  // A WMI-created process gets its own visible console by default; a startup
+  // record with ShowWindow = SW_HIDE (0) suppresses it so no empty window flashes.
+  // (CreateFlags = CREATE_NO_WINDOW is rejected by Win32_Process.Create as invalid.)
   const script =
-    `Invoke-CimMethod -ClassName Win32_Process -MethodName Create ` +
-    `-Arguments @{CommandLine='${quote(commandLine)}'; CurrentDirectory='${quote(root)}'} | Out-Null`;
+    `$s = New-CimInstance -ClientOnly -ClassName Win32_ProcessStartup -Namespace root/cimv2 ` +
+    `-Property @{ ShowWindow = [uint16]0 }; ` +
+    `Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ ` +
+    `CommandLine = '${quote(commandLine)}'; CurrentDirectory = '${quote(root)}'; ` +
+    `ProcessStartupInformation = $s } | Out-Null`;
   // Pass the script base64-encoded (PowerShell wants UTF-16LE): Node's Windows
   // argument escaping mangles the embedded quotes of a plain -Command string,
   // which silently produced a malformed WMI call that spawned nothing.
