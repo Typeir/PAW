@@ -27,7 +27,14 @@ import {
   splitFrames,
 } from '@paw/core';
 
-const DEFAULT_TIMEOUT_MS = 2000;
+/**
+ * Give-up deadline for a daemon round trip. A `tool.post` runs the project's real
+ * gates inside pawd — a first run compiles the gate modules and one may shell out
+ * to `tsc`, so 2s failed open on real repos while the block was still computing.
+ * Sized to sit under the tightest host hook budget (pre-tool, ~10s) so the client
+ * still fails open before the host kills the hook, never after.
+ */
+const DEFAULT_TIMEOUT_MS = 8000;
 
 /**
  * Injectable seams for testing.
