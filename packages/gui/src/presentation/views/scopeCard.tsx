@@ -16,7 +16,7 @@
 
 import { promoteRoute } from '@paw/core';
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import { useScope } from '../../application/context/consoleContext.js';
+import { useLiveStatus, useScope } from '../../application/context/consoleContext.js';
 import { Button } from '../atoms/button.js';
 import { Card } from '../atoms/card.js';
 import { Placeholder } from '../atoms/placeholder.js';
@@ -28,6 +28,8 @@ import { Placeholder } from '../atoms/placeholder.js';
  */
 export function ScopeCard() {
   const { recent: client, grab } = useScope();
+  const { mode } = useLiveStatus();
+  const live = mode === 'live';
   const [routes, setRoutes] = useState<readonly string[]>([]);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export function ScopeCard() {
   };
 
   return (
-    <Card title='Scope' meta='grab a repository'>
+    <Card title='Scope' meta={live ? 'grab a repository' : 'grab needs a live connection'}>
       <div className='pad'>
         {error !== null && <p className='ok crit'>{error}</p>}
         <div className='scope-grab'>
@@ -71,10 +73,11 @@ export function ScopeCard() {
             aria-label='Repository to grab'
             placeholder='path to a repository'
             value={draft}
+            disabled={!live}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={onKeyDown}
           />
-          <Button primary onClick={submit}>
+          <Button primary disabled={!live} onClick={submit}>
             Grab
           </Button>
         </div>
@@ -87,6 +90,7 @@ export function ScopeCard() {
                 <button
                   type='button'
                   className='scope-recent-item'
+                  disabled={!live}
                   onClick={() => grabRoute(route)}
                 >
                   {route}

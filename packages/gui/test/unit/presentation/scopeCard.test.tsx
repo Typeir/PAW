@@ -72,6 +72,18 @@ describe('ScopeCard', () => {
     expect(screen.getByRole('button', { name: '/work/b' })).toBeInTheDocument();
   });
 
+  it('disables grabbing until the console has a live connection', async () => {
+    render(
+      <ConsoleProvider snapshot={makeSnapshot()} recent={recentClient()}>
+        <ScopeCard />
+      </ConsoleProvider>,
+    );
+    expect(await screen.findByRole('button', { name: '/work/a' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Grab' })).toBeDisabled();
+    expect(screen.getByLabelText('Repository to grab')).toBeDisabled();
+    expect(screen.getByText('grab needs a live connection')).toBeInTheDocument();
+  });
+
   it('grabs a typed route as a scope frame', async () => {
     const { sent } = renderLive(recentClient());
     await screen.findByRole('button', { name: '/work/a' });

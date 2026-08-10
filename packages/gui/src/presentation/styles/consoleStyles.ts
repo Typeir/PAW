@@ -288,11 +288,15 @@ dl, dd { margin: 0; }
 .scope-grab { display: flex; gap: 8px; margin-bottom: 12px; }
 .scope-route { flex: 1; font-family: var(--mono); font-size: 11.5px; padding: 5px 10px;
   border-radius: var(--r); border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); }
+.scope-route:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.scope-route:disabled { opacity: .5; cursor: not-allowed; }
 .scope-recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .scope-recent-item { width: 100%; text-align: left; font-family: var(--mono); font-size: 11px;
   padding: 6px 10px; border-radius: var(--r); border: 1px solid var(--line-soft); background: var(--panel-2);
   color: var(--ink-dim); cursor: pointer; }
-.scope-recent-item:hover { color: var(--ink); border-color: var(--line); }
+.scope-recent-item:hover:not([disabled]) { color: var(--ink); border-color: var(--line); }
+.scope-recent-item:active:not([disabled]) { transform: translateY(1px); }
+.scope-recent-item[disabled] { opacity: .5; cursor: not-allowed; }
 
 .btn { font-family: var(--mono); font-size: 11px; padding: 5px 12px; border-radius: var(--r);
   border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-dim); cursor: pointer;
@@ -302,6 +306,7 @@ dl, dd { margin: 0; }
 .btn:hover { color: var(--ink); }
 .btn.pri:hover { background: color-mix(in oklab, var(--accent) 28%, var(--panel)); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:active:not([disabled]) { transform: translateY(1px); }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
 .btn[disabled]:hover { color: var(--ink-dim); }
 
