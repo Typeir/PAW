@@ -37,7 +37,7 @@ export {
 export type { SnapshotParts, VersionedCache } from './domain/cache.js';
 
 export { route } from './domain/router.js';
-export type { HttpResponse, RouterDeps } from './domain/router.js';
+export type { ConfigView, HttpResponse, RouterDeps } from './domain/router.js';
 
 export {
   CONTROL_BODY_CAP,

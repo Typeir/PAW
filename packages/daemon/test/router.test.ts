@@ -41,6 +41,7 @@ const deps: RouterDeps = {
   page: '<html>pawd<script>console.log(1)</script></html>',
   snapshot: async () => snapshot,
   tree: () => tree,
+  config: () => ({ models: ['fast', 'slow'], roles: { 'edit.apply': 'fast' } }),
   token: TOKEN,
   port: PORT,
   scriptHashes: inlineScriptHashes('<html>pawd<script>console.log(1)</script></html>'),
@@ -270,6 +271,17 @@ describe('the routes themselves', () => {
       deps,
     );
     expect(missing.status).toBe(404);
+  });
+
+  it('serves the declared models and role bindings for the config editor', async () => {
+    const res = await route(req('/api/config'), deps);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ models: ['fast', 'slow'], roles: { 'edit.apply': 'fast' } });
+  });
+
+  it('answers 404 for /api/config when the daemon exposes none', async () => {
+    const { config: _omit, ...noConfig } = deps;
+    expect((await route(req('/api/config'), noConfig)).status).toBe(404);
   });
 
   it('rejects a write, wherever it is aimed', async () => {

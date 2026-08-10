@@ -598,6 +598,10 @@ export async function runDaemon(
           page,
           snapshot,
           tree: () => tree,
+          config: () => ({
+            models: Object.keys((config.models as Record<string, unknown> | undefined) ?? {}),
+            roles: (config.roles as Record<string, string> | undefined) ?? {},
+          }),
           token,
           port: boundPort,
           scriptHashes,

@@ -89,6 +89,19 @@ export interface HttpRequest {
 }
 
 /**
+ * The registry slice the config editor reads: the declared models and every
+ * role's binding.
+ *
+ * @interface ConfigView
+ * @property {string[]} models - The declared model ids.
+ * @property {Record<string, string>} roles - Role id → model id bindings.
+ */
+export interface ConfigView {
+  readonly models: readonly string[];
+  readonly roles: Readonly<Record<string, string>>;
+}
+
+/**
  * What the router needs to answer a request.
  *
  * @interface RouterDeps
@@ -100,11 +113,13 @@ export interface HttpRequest {
  * @property {readonly string[]} scriptHashes - CSP sources for the page's own inline scripts.
  * @property {readonly string[]} origins - The origins allowed to call the API.
  * @property {ControlPort} [control] - The writes this daemon exposes; absent leaves it observational.
+ * @property {() => ConfigView} [config] - The declared models and role bindings, for the config editor.
  */
 export interface RouterDeps {
   readonly page: string;
   readonly snapshot: (plan?: string | null) => Promise<PawSnapshot>;
   readonly tree: () => readonly TreeNode[];
+  readonly config?: () => ConfigView;
   readonly token: string;
   readonly port: number;
   readonly scriptHashes: readonly string[];
@@ -309,6 +324,9 @@ export async function route(request: HttpRequest, deps: RouterDeps): Promise<Htt
     }
     if (request.path === '/api/tree') {
       return treeResponse(deps, request.query, cors);
+    }
+    if (request.path === '/api/config' && deps.config !== undefined) {
+      return json(deps.config(), cors);
     }
   }
 

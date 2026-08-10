@@ -510,6 +510,25 @@ describe('runDaemon', () => {
     ]);
   });
 
+  it('serves the declared models and role bindings for the config editor', async () => {
+    const rig = makeRig();
+    await runDaemon({}, rig.runtime);
+    const res = await rig.handler()?.(asConsole('/api/config'));
+    expect(JSON.parse(res?.body ?? '{}')).toEqual({
+      models: ['ds-flash'],
+      roles: { 'edit.apply': 'ds-flash', 'review.graze': 'ds-flash', 'review.judge': 'ds-flash' },
+    });
+  });
+
+  it('serves empty models and bindings for an unconfigured repo', async () => {
+    const rig = makeRig({
+      listFiles: async () => LISTING.filter((entry) => entry.path !== '.paw/config.json'),
+    });
+    await runDaemon({}, rig.runtime);
+    const res = await rig.handler()?.(asConsole('/api/config'));
+    expect(JSON.parse(res?.body ?? '{}')).toEqual({ models: [], roles: {} });
+  });
+
   it('re-reads the process table, tree, and plan list on every poll', async () => {
     let listing = LISTING;
     const rig = makeRig({ listFiles: async () => listing });
