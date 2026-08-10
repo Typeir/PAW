@@ -34,11 +34,14 @@
 
 import { app, BrowserWindow, ipcMain, session } from 'electron';
 import { writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
   chromiumFingerprint,
+  createNodeRecentRoutes,
   identityNotice,
   nodeRuntime,
+  pawHome,
   runDaemon,
   type DaemonHandle,
 } from '@paw/daemon';
@@ -277,7 +280,14 @@ let daemon: DaemonHandle | null = null;
  * Start the daemon, then the window.
  */
 async function start(): Promise<void> {
-  daemon = await runDaemon(readLaunchArgs(process.argv), nodeRuntime(GUI_PAGE));
+  daemon = await runDaemon(
+    {
+      ...readLaunchArgs(process.argv),
+      scopeCeiling: homedir(),
+      recent: createNodeRecentRoutes(pawHome(process.platform, process.env)),
+    },
+    nodeRuntime(GUI_PAGE),
+  );
   process.stdout.write(
     `pawd (in-process) on ${daemon.url} · repo ${daemon.root} · ${daemon.plans.length} plan(s)\n` +
       identityNotice(daemon.identity, new Date())

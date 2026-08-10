@@ -106,6 +106,8 @@ export type { IdentityIo, IdentityIssuer, ServerIdentity } from './infrastructur
 export { identityPaths, pawHome } from './domain/pawHome.js';
 export type { HomeEnv, IdentityPaths } from './domain/pawHome.js';
 
+export { createNodeRecentRoutes } from '@paw/adapters';
+
 export { nodeIdentityIo, nodeServerIdentity } from './infrastructure/nodeIdentity.js';
 
 export { TRUST_NICKNAME, planTrust, trustCommandLine } from './infrastructure/trustStore.js';
