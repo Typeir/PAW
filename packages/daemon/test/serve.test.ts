@@ -156,6 +156,7 @@ interface Rig {
   hooks(): SocketHooks | null;
   tick(): void;
   tickHost(): void;
+  tickIdle(): void;
   advance(ms: number): void;
   readonly state: { closed: boolean; cancelled: boolean; tls: TlsMaterial | null };
   readonly imported: string[];
@@ -258,6 +259,7 @@ function makeRig(over: Partial<DaemonRuntime> = {}): Rig {
     hooks: () => hooks,
     tick: () => scheduled[1]?.(),
     tickHost: () => scheduled[0]?.(),
+    tickIdle: () => scheduled[2]?.(),
     advance: (ms: number) => {
       clockMs += ms;
     },
@@ -1434,5 +1436,57 @@ describe('runDaemon co-hosting enforcement', () => {
 
     await daemon.close();
     rmSync(rootB, { recursive: true, force: true });
+  });
+
+  it('a hook resets the idle timer, keeping the daemon up', async () => {
+    const rig = makeRig();
+    let idled = 0;
+    const daemon = await runDaemon(
+      {
+        root,
+        enforcement: scope(makeDeps(), true),
+        idle: { ms: 1000, onIdle: () => { idled += 1; } },
+      },
+      rig.runtime,
+    );
+    rig.advance(2000);
+    const c = openSocket(endpoint);
+    await c.ready;
+    await c.send(1, 'connect', { token: 'T', protocolVersion: 1 });
+    await c.send(2, 'violations.list', {});
+    c.close();
+
+    rig.tickIdle();
+    expect(idled).toBe(0);
+    await daemon.close();
+  });
+
+  it('an open console session keeps the daemon warm past the idle window', async () => {
+    const rig = makeRig();
+    let idled = 0;
+    const daemon = await runDaemon({ idle: { ms: 1000, onIdle: () => { idled += 1; } } }, rig.runtime);
+    const socket = rig.hooks()?.accept({
+      send: () => undefined,
+      close: () => undefined,
+      bufferedAmount: () => 0,
+    });
+    await socket?.message(authFrame(TOKEN));
+
+    rig.advance(2000);
+    rig.tickIdle();
+    expect(idled).toBe(0);
+    await daemon.close();
+  });
+
+  it('closes and signals after silence on both doors', async () => {
+    const rig = makeRig();
+    let idled = 0;
+    await runDaemon({ idle: { ms: 1000, onIdle: () => { idled += 1; } } }, rig.runtime);
+
+    rig.advance(2000);
+    rig.tickIdle();
+    await settle();
+    expect(idled).toBe(1);
+    expect(rig.state.closed).toBe(true);
   });
 });

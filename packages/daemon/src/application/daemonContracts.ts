@@ -235,6 +235,7 @@ export interface DaemonOptions {
   readonly scopeCeiling?: string;
   readonly control?: ControlPort;
   readonly enforcement?: (root: string) => EnforcementScope;
+  readonly idle?: { ms: number; onIdle: () => void };
   onAttach?(path: string, mode: InitMode): void;
   onRelease?(settings: RunSettings): void;
 }

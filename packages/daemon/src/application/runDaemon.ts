@@ -341,6 +341,16 @@ export async function runDaemon(
   let store: StorePort | undefined;
   let enforcement: SocketServerHandle | undefined;
   let close!: () => Promise<void>;
+  let lastHookAt = 0;
+  let stopIdle: (() => void) | undefined;
+
+  /**
+   * Note hook activity, deferring the idle close. A bare timestamp so the reset
+   * needs nothing but the clock; the idle decision reads the sessions.
+   */
+  const bumpIdle = (): void => {
+    lastHookAt = runtime.clock();
+  };
 
   /**
    * Claim the enforcement socket for a root, open its store, and serve the
@@ -366,7 +376,7 @@ export async function runDaemon(
       };
       const methods = enforcementMethods(configured.deps, {
         projectRoot,
-        resetIdle: () => undefined,
+        resetIdle: bumpIdle,
         close: () => close(),
         ...(scope.control === undefined ? {} : { control: scope.control }),
       });
@@ -615,6 +625,9 @@ export async function runDaemon(
   close = async (): Promise<void> => {
     stopHostTicker();
     stopPolling();
+    if (stopIdle !== undefined) {
+      stopIdle();
+    }
     // Sessions are told why before the socket goes: a console closed with a
     // shutdown code stops retrying, where an abrupt drop reconnects.
     sessions.shutdown();
@@ -623,6 +636,22 @@ export async function runDaemon(
     }
     await server.close();
   };
+
+  // Ephemeral: close after `idle.ms` with no hook and no open console. A live
+  // session keeps it warm; only silence on both doors lets it go.
+  if (options.idle !== undefined) {
+    const idle = options.idle;
+    lastHookAt = runtime.clock();
+    stopIdle = runtime.schedule(() => {
+      if (runtime.clock() - lastHookAt < idle.ms) {
+        return;
+      }
+      if (sessions.live() > 0) {
+        return;
+      }
+      void close().then(idle.onIdle);
+    }, idle.ms);
+  }
 
   // Now, and not a line earlier — see `release`. The rejection is claimed
   // immediately because the caller cannot attach a handler until this function
