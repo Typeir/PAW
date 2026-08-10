@@ -16,17 +16,20 @@ import { dirname, resolve } from 'node:path';
 import type { ConfigDocument, ConfigDocumentPort } from '@paw/core';
 
 /**
- * A config-document port bound to a repository's `.paw/config.json`.
+ * A config-document port bound to a repository's `.paw/config.json`. The root may
+ * be a getter, resolved per read and write, so a console that switches which
+ * consumer it holds edits that consumer's config rather than the boot one.
  *
- * @param {string} root - The repository root.
+ * @param {string | (() => string)} root - The repository root, or a getter for the current one.
  * @returns {ConfigDocumentPort} The port.
  */
-export function createNodeConfigDocument(root: string): ConfigDocumentPort {
-  const file = resolve(root, '.paw', 'config.json');
+export function createNodeConfigDocument(root: string | (() => string)): ConfigDocumentPort {
+  const currentRoot = typeof root === 'function' ? root : (): string => root;
+  const fileFor = (): string => resolve(currentRoot(), '.paw', 'config.json');
   return {
     async read(): Promise<ConfigDocument> {
       try {
-        return JSON.parse(await readFile(file, 'utf8')) as ConfigDocument;
+        return JSON.parse(await readFile(fileFor(), 'utf8')) as ConfigDocument;
       } catch (err: unknown) {
         if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
           return {};
@@ -35,6 +38,7 @@ export function createNodeConfigDocument(root: string): ConfigDocumentPort {
       }
     },
     async write(config: ConfigDocument): Promise<void> {
+      const file = fileFor();
       await mkdir(dirname(file), { recursive: true });
       await writeFile(file, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
     },

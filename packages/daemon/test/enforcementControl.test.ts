@@ -5,9 +5,11 @@
  * a fake `rpc` so both outcomes are pinned: a daemon that answers passes its
  * result through with the verb's status (200 for a prune, 202 for a stop); a
  * daemon that does not answer — a null round trip — becomes a 503 the console can
- * explain. A prune threads the `file` query, or prunes all when none is given. One
- * case omits the seam so the real socket call runs against a dead endpoint and
- * fails open, keeping the default covered. So `enforcementControl.ts` reaches 100%.
+ * explain. A prune threads the `file` query, or prunes all when none is given. The
+ * scope is resolved per call and passed to `rpc`, so a getter that changes between
+ * calls proves the console follows whichever consumer it currently holds. One case
+ * omits the seam so the real socket call runs against a dead endpoint and fails
+ * open, keeping the default covered. So `enforcementControl.ts` reaches 100%.
  *
  * @module @paw/daemon/test/enforcementControl
  * @version 0.0.0
@@ -28,7 +30,7 @@ describe('enforcementControl', () => {
       query: undefined,
       body: {},
     });
-    expect(rpc).toHaveBeenCalledWith('violations.prune', {});
+    expect(rpc).toHaveBeenCalledWith('violations.prune', {}, '/repo');
     expect(res).toEqual({ status: 200, body: { cleared: 9 } });
   });
 
@@ -38,7 +40,7 @@ describe('enforcementControl', () => {
       query: new URLSearchParams('file=src/a.ts'),
       body: {},
     });
-    expect(rpc).toHaveBeenCalledWith('violations.prune', { file: 'src/a.ts' });
+    expect(rpc).toHaveBeenCalledWith('violations.prune', { file: 'src/a.ts' }, '/repo');
     expect(res.status).toBe(200);
   });
 
@@ -48,8 +50,19 @@ describe('enforcementControl', () => {
       query: undefined,
       body: {},
     });
-    expect(rpc).toHaveBeenCalledWith('daemon.stop', {});
+    expect(rpc).toHaveBeenCalledWith('daemon.stop', {}, '/repo');
     expect(res).toEqual({ status: 202, body: { stopping: true } });
+  });
+
+  it('resolves the scope the console currently holds, per call', async () => {
+    const rpc = vi.fn(async () => ({ cleared: 0 }));
+    let held = '/consumer-a';
+    const port = enforcementControl(() => held, { rpc });
+    await port.handlers[prune]({ query: undefined, body: {} });
+    expect(rpc).toHaveBeenLastCalledWith('violations.prune', {}, '/consumer-a');
+    held = '/consumer-b';
+    await port.handlers[stop]({ query: undefined, body: {} });
+    expect(rpc).toHaveBeenLastCalledWith('daemon.stop', {}, '/consumer-b');
   });
 
   it('answers 503 when pawd does not respond, on either verb', async () => {

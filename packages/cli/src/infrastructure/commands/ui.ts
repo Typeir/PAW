@@ -173,10 +173,11 @@ export async function runUi(
   const attached = await resolveContextArg(args.values.get('context'));
   const portValue = args.values.get('port');
   const root = args.values.get('root') ?? '.';
-  const control = args.flags.has('control')
-    ? mergeControl(enforcementControl(root), configControl(createNodeConfigDocument(root)))
-    : undefined;
   let handle: DaemonHandle | null = null;
+  const scope = (): string => handle?.root ?? root;
+  const control = args.flags.has('control')
+    ? mergeControl(enforcementControl(scope), configControl(createNodeConfigDocument(scope)))
+    : undefined;
   const daemon = await runDaemon(
     {
       root,
