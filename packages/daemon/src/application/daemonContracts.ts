@@ -24,6 +24,7 @@ import type {
   InitMode,
   ModelPort,
   PawSnapshot,
+  RecentRoutesPort,
   RunSettings,
   SwarmPlan,
 } from '@paw/core';
@@ -219,6 +220,7 @@ export type Dispatcher = (
  * @property {readonly string[]} [allowOrigins] - Extra origins permitted to call the API.
  * @property {Dispatcher} [dispatch] - Release the opening plan's herd once, and report the run live.
  * @property {string} [scopeCeiling] - Permit consoles to re-scope the daemon, within this directory.
+ * @property {RecentRoutesPort} [recent] - Remember each scope as a recent route and serve the list; omit to keep no history.
  * @property {(path: string, mode: InitMode) => void} [onAttach] - Receive attach requests; the daemon never writes.
  * @property {(settings: RunSettings) => void} [onRelease] - Receive release requests; the daemon never runs them itself.
  */
@@ -233,6 +235,7 @@ export interface DaemonOptions {
   readonly dispatch?: Dispatcher;
   readonly scopeCeiling?: string;
   readonly control?: ControlPort;
+  readonly recent?: RecentRoutesPort;
   onAttach?(path: string, mode: InitMode): void;
   onRelease?(settings: RunSettings): void;
 }

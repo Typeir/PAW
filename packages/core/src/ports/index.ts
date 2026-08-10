@@ -114,6 +114,21 @@ export interface ConfigDocumentPort {
 }
 
 /**
+ * The recently-grabbed consumer routes, persisted for the one console overall. A
+ * route is a repository the console scoped to; this remembers the last few so an
+ * operator can jump back without retyping the path. Bound to `$PAW_HOME` at the
+ * composition root, because the console is global rather than per-repository.
+ *
+ * @interface RecentRoutesPort
+ * @property {() => Promise<string[]>} list - The recent routes, newest first; empty when none has been recorded.
+ * @property {(route: string) => Promise<string[]>} record - Promote a route to the front and persist; returns the new list.
+ */
+export interface RecentRoutesPort {
+  list(): Promise<string[]>;
+  record(route: string): Promise<string[]>;
+}
+
+/**
  * Spawn and manage child processes, cross-platform. Wraps the Windows/POSIX
  * detach divergence so the call sites that hand-roll it collapse to one.
  *

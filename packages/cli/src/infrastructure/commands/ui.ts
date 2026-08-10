@@ -15,8 +15,13 @@
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline';
-import { applyInit, dispatchSwarm, type InitMode } from '@paw/core';
-import { createNodeConfigDocument, createNodeFileReader, createNodeFs } from '@paw/adapters';
+import { applyInit, dispatchSwarm, pawHome, type InitMode } from '@paw/core';
+import {
+  createNodeConfigDocument,
+  createNodeFileReader,
+  createNodeFs,
+  createNodeRecentRoutes,
+} from '@paw/adapters';
 import {
   configControl,
   consolePage,
@@ -185,6 +190,7 @@ export async function runUi(
       planPath,
       port: portValue === undefined ? 0 : Number(portValue),
       scopeCeiling: homedir(),
+      recent: createNodeRecentRoutes(pawHome(process.platform, process.env)),
       onAttach: (path, mode) => {
         void approveAttach(path, mode, () => handle);
       },

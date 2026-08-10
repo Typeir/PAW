@@ -150,6 +150,26 @@ export async function runDaemon(
     bus.publish('log', [log.append(level, message)]);
   };
 
+  const recentRoutes = options.recent;
+  /**
+   * Remember a grabbed route in the recent list, best effort. The list is a
+   * convenience for the operator, so a store that cannot be written is reported
+   * and scoping goes on — a broken `recent.json` never blocks a grab.
+   *
+   * @param {string} path - The route just scoped to.
+   * @returns {Promise<void>} When the attempt has settled.
+   */
+  const rememberRoute = async (path: string): Promise<void> => {
+    if (recentRoutes === undefined) {
+      return;
+    }
+    try {
+      await recentRoutes.record(path);
+    } catch (error: unknown) {
+      report(`could not record recent route ${path}: ${reason(error)}`);
+    }
+  };
+
   let entries = await runtime.listFiles(root);
   let configPath = findConfig(options.configPath, entries);
   let plansSlice: PlansSlice = { plans: discoverPlans(entries), configPath };
@@ -176,6 +196,7 @@ export async function runDaemon(
   const startedAt = runtime.now();
   const runId = startedAt.slice(11, 19).replace(/:/g, '-');
   const port = options.port ?? 0;
+  await rememberRoute(root);
 
   const loaded = new Map<string, LoadedPlan>();
   const planSlices = createVersionedCache<PlanSlice>();
@@ -364,6 +385,7 @@ export async function runDaemon(
     bus.publish('tree', tree);
     bus.publish('doctor', doctor);
     bus.publish('attach', attachState());
+    await rememberRoute(root);
   };
 
   const token = runtime.randomToken();
@@ -524,6 +546,7 @@ export async function runDaemon(
           scriptHashes,
           origins,
           control: options.control,
+          ...(recentRoutes === undefined ? {} : { recent: () => recentRoutes.list() }),
         }),
       hooks,
       port,

@@ -520,6 +520,50 @@ describe('runDaemon', () => {
     expect(JSON.parse(res?.body ?? '{}')).toEqual({ models: [], roles: {} });
   });
 
+  it('records the boot scope as a recent route and serves the list', async () => {
+    const recorded: string[] = [];
+    const recent = {
+      list: async (): Promise<string[]> => [...recorded],
+      record: async (route: string): Promise<string[]> => {
+        recorded.unshift(route);
+        return [...recorded];
+      },
+    };
+    const rig = makeRig();
+    await runDaemon({ root: '/work/repo', recent }, rig.runtime);
+    expect(recorded).toEqual(['/work/repo']);
+    const res = await rig.handler()?.(asConsole('/api/recent'));
+    expect(JSON.parse(res?.body ?? '[]')).toEqual(['/work/repo']);
+  });
+
+  it('records each grabbed scope as the console switches consumers', async () => {
+    const recorded: string[] = [];
+    const recent = {
+      list: async (): Promise<string[]> => [...recorded],
+      record: async (route: string): Promise<string[]> => {
+        recorded.unshift(route);
+        return [...recorded];
+      },
+    };
+    const rig = makeRig();
+    const daemon = await runDaemon({ root: '/work/a', recent }, rig.runtime);
+    await daemon.rescope('/work/b');
+    expect(recorded).toEqual(['/work/b', '/work/a']);
+  });
+
+  it('reports but does not fail a grab when the recent store cannot be written', async () => {
+    const recent = {
+      list: async (): Promise<string[]> => [],
+      record: async (): Promise<string[]> => {
+        throw new Error('disk full');
+      },
+    };
+    const rig = makeRig();
+    const daemon = await runDaemon({ root: '/work/repo', recent }, rig.runtime);
+    expect(daemon.root).toBe('/work/repo');
+    expect(rig.warnings.some((w) => w.includes('could not record recent route'))).toBe(true);
+  });
+
   it('re-reads the process table, tree, and plan list on every poll', async () => {
     let listing = LISTING;
     const rig = makeRig({ listFiles: async () => listing });

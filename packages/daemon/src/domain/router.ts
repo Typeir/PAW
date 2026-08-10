@@ -114,12 +114,14 @@ export interface ConfigView {
  * @property {readonly string[]} origins - The origins allowed to call the API.
  * @property {ControlPort} [control] - The writes this daemon exposes; absent leaves it observational.
  * @property {() => ConfigView} [config] - The declared models and role bindings, for the config editor.
+ * @property {() => Promise<readonly string[]>} [recent] - The recently-grabbed routes, newest first, for the scope picker.
  */
 export interface RouterDeps {
   readonly page: string;
   readonly snapshot: (plan?: string | null) => Promise<PawSnapshot>;
   readonly tree: () => readonly TreeNode[];
   readonly config?: () => ConfigView;
+  readonly recent?: () => Promise<readonly string[]>;
   readonly token: string;
   readonly port: number;
   readonly scriptHashes: readonly string[];
@@ -327,6 +329,9 @@ export async function route(request: HttpRequest, deps: RouterDeps): Promise<Htt
     }
     if (request.path === '/api/config' && deps.config !== undefined) {
       return json(deps.config(), cors);
+    }
+    if (request.path === '/api/recent' && deps.recent !== undefined) {
+      return json(await deps.recent(), cors);
     }
   }
 

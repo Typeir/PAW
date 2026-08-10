@@ -180,6 +180,12 @@ describe('paw ui (e2e)', () => {
     expect(picked.selectedPlan).toBe('demo.swarm.mjs');
     expect(picked.planName).toBe('demo');
     expect(picked.briefs).toHaveLength(2);
+
+    // The boot scope is remembered as a recent route, in PAW home, and served
+    // back for the console's scope picker.
+    const recent = await call(`${url}api/recent`, { authorization: `Bearer ${token}` });
+    expect(recent.status).toBe(200);
+    expect(JSON.parse(recent.body)).toContain('test/fixtures');
   }, 30000);
 
   it('opens on the plan it was given', async () => {

@@ -42,6 +42,7 @@ const deps: RouterDeps = {
   snapshot: async () => snapshot,
   tree: () => tree,
   config: () => ({ models: ['fast', 'slow'], roles: { 'edit.apply': 'fast' } }),
+  recent: async () => ['/repo/a', '/repo/b'],
   token: TOKEN,
   port: PORT,
   scriptHashes: inlineScriptHashes('<html>pawd<script>console.log(1)</script></html>'),
@@ -282,6 +283,17 @@ describe('the routes themselves', () => {
   it('answers 404 for /api/config when the daemon exposes none', async () => {
     const { config: _omit, ...noConfig } = deps;
     expect((await route(req('/api/config'), noConfig)).status).toBe(404);
+  });
+
+  it('serves the recently-grabbed routes for the scope picker', async () => {
+    const res = await route(req('/api/recent'), deps);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual(['/repo/a', '/repo/b']);
+  });
+
+  it('answers 404 for /api/recent when the daemon keeps no history', async () => {
+    const { recent: _omit, ...noRecent } = deps;
+    expect((await route(req('/api/recent'), noRecent)).status).toBe(404);
   });
 
   it('rejects a write, wherever it is aimed', async () => {

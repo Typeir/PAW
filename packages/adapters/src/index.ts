@@ -13,6 +13,7 @@
  */
 
 export { createNodeConfigDocument } from './config/nodeConfigDocument.js';
+export { createNodeRecentRoutes } from './console/nodeRecentRoutes.js';
 export { createNodeFileReader, resolveInRoot } from './file/nodeFileReader.js';
 export { createGateCache } from './gate/gateCache.js';
 export { createNodeGateRunner } from './gate/nodeGateRunner.js';
