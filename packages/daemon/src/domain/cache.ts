@@ -137,6 +137,7 @@ export function buildPlanSlice<Args>(
  * @interface SnapshotParts
  * @property {HostInfo} host - Host facts, read fresh per request.
  * @property {HostProcess[]} processes - The owned process subtree.
+ * @property {string} root - The served repository — the current scope.
  * @property {PlansSlice} plans - What the repository holds.
  * @property {PlanSlice} planDetail - The plan in view, rendered.
  * @property {DoctorReport} doctor - The config and role doctor.
@@ -150,6 +151,7 @@ export function buildPlanSlice<Args>(
 export interface SnapshotParts {
   readonly host: HostInfo;
   readonly processes: readonly HostProcess[];
+  readonly root: string;
   readonly plans: PlansSlice;
   readonly planDetail: PlanSlice;
   readonly doctor: DoctorReport;
@@ -173,6 +175,7 @@ export function composeSnapshot(parts: SnapshotParts): PawSnapshot {
   return {
     host: parts.host,
     processes: parts.processes,
+    root: parts.root,
     configPath: parts.plans.configPath,
     plans: parts.plans.plans,
     selectedPlan: parts.planDetail.selectedPlan,

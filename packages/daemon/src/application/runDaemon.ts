@@ -456,9 +456,11 @@ export async function runDaemon(
   let socket = `${LOOPBACK}:${port}`;
   const snapshot = async (asked: string | null = openedOn): Promise<PawSnapshot> => {
     const selected = selectPlan(asked, plansSlice.plans);
+    const host = runtime.readHost();
     return composeSnapshot({
-      host: runtime.readHost(),
+      host,
       processes,
+      root: root === '.' ? host.cwd : root,
       plans: plansSlice,
       planDetail: selected === null ? emptyPlanSlice() : await planSliceFor(selected),
       doctor,

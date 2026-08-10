@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ConsoleProvider } from '../../../src/application/context/consoleContext.js';
 import { ConsoleWindow } from '../../../src/presentation/chrome/consoleWindow.js';
 import { Rail } from '../../../src/presentation/chrome/rail.js';
-import { TitleBar } from '../../../src/presentation/chrome/titleBar.js';
+import { TitleBar, scopeName } from '../../../src/presentation/chrome/titleBar.js';
 import { makeSnapshot, renderInConsole } from '../../fixtures.js';
 
 describe('TitleBar', () => {
@@ -22,6 +22,18 @@ describe('TitleBar', () => {
     const { container } = renderInConsole(<TitleBar />);
     expect(screen.getByText('pawd live · 2h14m · pid 4242')).toBeInTheDocument();
     expect(container.querySelector('.pulse')).toBeInTheDocument();
+  });
+
+  it('names the scope it is holding in the wordmark', () => {
+    const { container } = renderInConsole(<TitleBar />);
+    const scope = container.querySelector('.wordmark .scope');
+    expect(scope).toHaveTextContent('demo');
+    expect(scope).toHaveAttribute('title', 'C:\\code\\demo');
+  });
+
+  it('shows no scope name when none is served', () => {
+    const { container } = renderInConsole(<TitleBar />, makeSnapshot({ root: '' }));
+    expect(container.querySelector('.wordmark .scope')).toBeNull();
   });
 
   it('draws no window chrome in a browser tab', () => {
@@ -64,6 +76,14 @@ describe('TitleBar', () => {
     await userEvent.click(toggle);
     expect(document.documentElement).toHaveAttribute('data-theme', 'light');
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
+describe('scopeName', () => {
+  it('takes the last path segment, across separators and trailing slashes', () => {
+    expect(scopeName('C:\\Users\\me\\paw-test')).toBe('paw-test');
+    expect(scopeName('/home/me/repo/')).toBe('repo');
+    expect(scopeName('flat')).toBe('flat');
   });
 });
 

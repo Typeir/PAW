@@ -19,6 +19,7 @@ describe('hydrate', () => {
     expect(data).toEqual({
       host: snapshot.host,
       processes: snapshot.processes,
+      root: snapshot.root,
       configPath: '.paw/config.json',
       plans: snapshot.plans,
       selectedPlan: 'plans/demo.swarm.mjs',

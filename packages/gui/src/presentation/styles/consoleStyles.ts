@@ -124,6 +124,8 @@ body {
 .wordmark .mark svg { display: block; }
 .wordmark b { font-size: 13px; letter-spacing: .06em; }
 .wordmark span { color: var(--ink-faint); font-size: 12px; }
+.wordmark .scope { color: var(--ink-dim); max-width: 22ch; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
 [data-shell] > header .daemon {
   margin-left: auto; display: flex; align-items: center; gap: 8px;
   font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim);

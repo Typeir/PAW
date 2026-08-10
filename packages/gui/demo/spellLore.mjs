@@ -194,6 +194,7 @@ export function demoSnapshot() {
       cwd: '(no daemon)',
     },
     processes: [],
+    root: 'C:\\grimoire\\spell-lore',
     configPath: '.paw/config.json',
     plans: ['plans/spell-lore.swarm.mjs'],
     selectedPlan: 'plans/spell-lore.swarm.mjs',

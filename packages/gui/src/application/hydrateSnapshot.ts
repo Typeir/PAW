@@ -46,6 +46,7 @@ export function hydrate(snapshot: PawSnapshot): ConsoleData {
   return {
     host: snapshot.host,
     processes: snapshot.processes,
+    root: snapshot.root,
     configPath: snapshot.configPath,
     plans: snapshot.plans,
     selectedPlan: snapshot.selectedPlan,

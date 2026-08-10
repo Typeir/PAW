@@ -24,6 +24,19 @@ import type { WindowControls } from '../../infrastructure/shell.js';
 import { PawMark } from '../atoms/pawMark.js';
 
 /**
+ * The served repository's short name for the wordmark: the last path segment of
+ * the scope, so `C:\Users\me\paw-test` reads as `paw-test`.
+ *
+ * @param {string} root - The served repository path.
+ * @returns {string} The name to show.
+ */
+export function scopeName(root: string): string {
+  const trimmed = root.replace(/[\\/]+$/, '');
+  const cut = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  return trimmed.slice(cut + 1);
+}
+
+/**
  * The window's own controls — only rendered where they drive a real window.
  *
  * @param {{ controls: WindowControls }} props - The window controls.
@@ -55,7 +68,7 @@ function Lights({ controls }: { readonly controls: WindowControls }) {
  * @returns {JSX.Element} The bar.
  */
 export function TitleBar() {
-  const { daemon } = useConsoleData();
+  const { daemon, root } = useConsoleData();
   const { theme, toggle } = useTheme();
   const { controls } = useShell();
 
@@ -65,6 +78,11 @@ export function TitleBar() {
       <p className='wordmark'>
         <PawMark />
         <b>PAW</b>
+        {root !== '' && (
+          <span className='scope' title={root}>
+            · {scopeName(root)}
+          </span>
+        )}
       </p>
       <p className='daemon'>
         {daemon.live && <span className='pulse' aria-hidden='true' />}

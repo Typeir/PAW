@@ -40,6 +40,7 @@ const BASE: PawSnapshot = {
     { pid: 4242, ppid: 17, name: 'node.exe' },
     { pid: 4310, ppid: 4242, name: 'worker.exe' },
   ],
+  root: 'C:\\code\\demo',
   configPath: '.paw/config.json',
   plans: ['plans/demo.swarm.mjs', 'plans/other.swarm.mjs'],
   selectedPlan: 'plans/demo.swarm.mjs',

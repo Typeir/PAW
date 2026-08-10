@@ -73,6 +73,7 @@ export interface PlanView {
  * @interface ConsoleData
  * @property {HostInfo} host - Real facts about the host the daemon runs on.
  * @property {HostProcess[]} processes - The processes PAW owns.
+ * @property {string} root - The served repository — the scope the console currently holds.
  * @property {string} configPath - Where the served repository's config was found; empty when it has none.
  * @property {string[]} plans - Every plan the served repository holds.
  * @property {string | null} selectedPlan - Which of them `plan` describes; null when none is selected.
@@ -88,6 +89,7 @@ export interface PlanView {
 export interface ConsoleData {
   readonly host: HostInfo;
   readonly processes: readonly HostProcess[];
+  readonly root: string;
   readonly configPath: string;
   readonly plans: readonly string[];
   readonly selectedPlan: string | null;

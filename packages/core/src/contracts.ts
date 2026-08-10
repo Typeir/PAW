@@ -189,6 +189,7 @@ export interface RailChrome {
  * @interface PawSnapshot
  * @property {HostInfo} host - Real host/process facts.
  * @property {HostProcess[]} processes - Real host process list.
+ * @property {string} root - The served repository — the scope the console currently holds.
  * @property {string} configPath - Where the config was found, or empty when the repo has none.
  * @property {string[]} plans - Every `*.swarm.mjs` in the served repository, repo-relative.
  * @property {string | null} selectedPlan - Which of them the plan fields below describe; null when none is selected.
@@ -210,6 +211,7 @@ export interface RailChrome {
 export interface PawSnapshot {
   readonly host: HostInfo;
   readonly processes: readonly HostProcess[];
+  readonly root: string;
   readonly configPath: string;
   readonly plans: readonly string[];
   readonly selectedPlan: string | null;

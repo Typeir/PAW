@@ -168,6 +168,7 @@ describe('composeSnapshot', () => {
   const parts = {
     host: HOST,
     processes: [{ pid: 42, ppid: 7, name: 'node' }],
+    root: 'C:\\served\\repo',
     plans: PLANS,
     planDetail: buildPlanSlice(planOf(2), 'source', 'a.swarm.mjs'),
     doctor: DOCTOR,
@@ -182,6 +183,7 @@ describe('composeSnapshot', () => {
   it('flattens the slices into the shape a console renders', () => {
     const snapshot = composeSnapshot(parts);
 
+    expect(snapshot.root).toBe('C:\\served\\repo');
     expect(snapshot.configPath).toBe('.paw/config.json');
     expect(snapshot.plans).toEqual(['a.swarm.mjs']);
     expect(snapshot.selectedPlan).toBe('a.swarm.mjs');
