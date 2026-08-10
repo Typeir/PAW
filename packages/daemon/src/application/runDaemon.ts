@@ -26,6 +26,7 @@
 import {
   CLOSE_SHUTDOWN,
   LIVE_TOPICS,
+  RPC_PROTOCOL_VERSION,
   buildRegistry,
   runDoctor,
   type AttachState,
@@ -38,6 +39,7 @@ import {
   type PlanSlice,
   type PlansSlice,
   type RunProgress,
+  type StorePort,
   type SwarmPlan,
 } from '@paw/core';
 import {
@@ -81,6 +83,9 @@ import {
   type UpgradeRefusal,
 } from '../infrastructure/security.js';
 import { createSessionRegistry } from './sessionRegistry.js';
+import { createRpcSession } from './rpcSession.js';
+import { enforcementMethods } from './enforcementMethods.js';
+import { bindSocket, serveSessions, type SocketServerHandle } from '../infrastructure/socketServer.js';
 import type { WsSessionPort } from '../domain/session.js';
 import { toRunProgress, trackRun } from './run.js';
 import { buildFileTree, type FileEntry } from '../domain/tree.js';
@@ -432,6 +437,8 @@ export async function runDaemon(
   let run: RunProgress | undefined;
   let budget: BudgetSummary | undefined;
   let socket = `${LOOPBACK}:${port}`;
+  let store: StorePort | undefined;
+  let enforcement: SocketServerHandle | undefined;
   const snapshot = async (asked: string | null = openedOn): Promise<PawSnapshot> => {
     const selected = selectPlan(asked, plansSlice.plans);
     return composeSnapshot({
@@ -442,7 +449,7 @@ export async function runDaemon(
       doctor,
       run: run ?? idleRun(runId, startedAt),
       budget: budget ?? idleBudget(),
-      violations: [],
+      violations: store === undefined ? [] : await store.outstanding(),
       socket,
       gates: 0,
       keys: modelCount(config),
@@ -508,7 +515,39 @@ export async function runDaemon(
   // intervals behind on that path means a daemon that failed to start is still
   // reading the process table every three seconds for the life of the process.
   let server: ServerHandle;
+  let close!: () => Promise<void>;
   try {
+    if (options.enforcement) {
+      const scope = options.enforcement;
+      const claimed = await bindSocket(scope.socketPath);
+      try {
+        const configured = await scope.configure();
+        store = configured.deps.store;
+        const hello = {
+          protocolVersion: RPC_PROTOCOL_VERSION,
+          projectRoot: root,
+          capabilities: ['gates', 'violations'],
+          health: 'ok',
+        };
+        const methods = enforcementMethods(configured.deps, {
+          projectRoot: root,
+          resetIdle: () => undefined,
+          close: () => close(),
+          ...(scope.control === undefined ? {} : { control: scope.control }),
+        });
+        enforcement = serveSessions(claimed, () =>
+          createRpcSession({
+            token: configured.token,
+            protocolVersion: RPC_PROTOCOL_VERSION,
+            hello,
+            methods,
+          }),
+        );
+      } catch (error: unknown) {
+        await new Promise<void>((done) => claimed.close(() => done()));
+        throw error;
+      }
+    }
     server = await runtime.listen(
       async (request) =>
         route(request, {
@@ -530,11 +569,26 @@ export async function runDaemon(
     stopHostTicker();
     stopPolling();
     sessions.shutdown();
+    if (enforcement !== undefined) {
+      await enforcement.close();
+    }
     throw error;
   }
   boundPort = server.port;
   origins = allowedOrigins(server.port, options.allowOrigins);
   socket = `${LOOPBACK}:${server.port}`;
+
+  close = async (): Promise<void> => {
+    stopHostTicker();
+    stopPolling();
+    // Sessions are told why before the socket goes: a console closed with a
+    // shutdown code stops retrying, where an abrupt drop reconnects.
+    sessions.shutdown();
+    if (enforcement !== undefined) {
+      await enforcement.close();
+    }
+    await server.close();
+  };
 
   // Now, and not a line earlier — see `release`. The rejection is claimed
   // immediately because the caller cannot attach a handler until this function
@@ -556,13 +610,6 @@ export async function runDaemon(
     dispatched,
     snapshot,
     rescope,
-    close: async () => {
-      stopHostTicker();
-      stopPolling();
-      // Sessions are told why before the socket goes: a console that is closed
-      // with a shutdown code stops retrying, where an abrupt drop reconnects.
-      sessions.shutdown();
-      await server.close();
-    },
+    close,
   };
 }
