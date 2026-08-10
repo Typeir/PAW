@@ -3,9 +3,10 @@
  *
  * @fileoverview The scope picker rendered over a live console: it lists the
  * routes it fetched, grabs a typed route and a clicked recent one as real scope
- * frames on the wire, ignores a blank route, reports a read failure, and shows a
- * placeholder when nothing has been grabbed. A page with no daemon behind it
- * renders nothing at all. So `scopeCard.tsx` reaches 100%.
+ * frames on the wire, shows a grabbed route in the recent list without a reload,
+ * ignores a blank route, reports a read failure, and shows a placeholder when
+ * nothing has been grabbed. A page with no daemon behind it renders nothing at
+ * all. So `scopeCard.tsx` reaches 100%.
  *
  * @module @paw/gui/test/unit/presentation/scopeCard
  */
@@ -77,6 +78,14 @@ describe('ScopeCard', () => {
     await userEvent.type(screen.getByLabelText('Repository to grab'), '/work/new');
     await userEvent.click(screen.getByRole('button', { name: 'Grab' }));
     expect(lastScope(sent)).toEqual({ v: 1, type: 'scope', path: '/work/new' });
+  });
+
+  it('adds a grabbed route to the recent list without a reload', async () => {
+    renderLive(recentClient());
+    await screen.findByRole('button', { name: '/work/a' });
+    await userEvent.type(screen.getByLabelText('Repository to grab'), '/work/fresh');
+    await userEvent.click(screen.getByRole('button', { name: 'Grab' }));
+    expect(await screen.findByRole('button', { name: '/work/fresh' })).toBeInTheDocument();
   });
 
   it('grabs a recent route when it is clicked', async () => {

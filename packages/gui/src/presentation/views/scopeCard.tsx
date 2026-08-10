@@ -14,6 +14,7 @@
  * @since 5.0.0
  */
 
+import { promoteRoute } from '@paw/core';
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { useScope } from '../../application/context/consoleContext.js';
 import { Button } from '../atoms/button.js';
@@ -41,10 +42,15 @@ export function ScopeCard() {
     return null;
   }
 
+  const grabRoute = (path: string): void => {
+    grab(path);
+    setRoutes((current) => promoteRoute(current, path));
+  };
+
   const submit = (): void => {
     const path = draft.trim();
     if (path !== '') {
-      grab(path);
+      grabRoute(path);
       setDraft('');
     }
   };
@@ -81,7 +87,7 @@ export function ScopeCard() {
                 <button
                   type='button'
                   className='scope-recent-item'
-                  onClick={() => grab(route)}
+                  onClick={() => grabRoute(route)}
                 >
                   {route}
                 </button>
