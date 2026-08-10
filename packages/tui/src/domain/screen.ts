@@ -38,6 +38,7 @@ const TAB_KEY: Record<View, string> = {
   herd: '3',
   gates: 'g',
   daemon: 'd',
+  config: 'c',
 };
 import { INIT_OPTIONS, type InitPromptState } from './initPrompt.js';
 
@@ -144,7 +145,7 @@ export function renderInitPrompt(state: InitPromptState): Screen {
  * @returns {string} The tab line.
  */
 function tabs(view: View): string {
-  const names: View[] = ['doctor', 'plan', 'herd', 'gates', 'daemon'];
+  const names: View[] = ['doctor', 'plan', 'herd', 'gates', 'daemon', 'config'];
   return names
     .map((n) => (n === view ? `▸${TAB_KEY[n]} ${n}◂` : ` ${TAB_KEY[n]} ${n} `))
     .join(' ');
@@ -312,6 +313,30 @@ function daemonBody(state: TuiState): string[] {
 }
 
 /**
+ * Build the config view body: the declared models, then every role and the model
+ * it is bound to, with the selected role marked.
+ *
+ * @param {TuiState} state - The current state.
+ * @returns {string[]} Body lines.
+ */
+function configBody(state: TuiState): string[] {
+  if (state.busy) {
+    return ['Reading bindings…'];
+  }
+  const config = state.config;
+  if (config === null) {
+    return ['No bindings read yet — press c.'];
+  }
+  const models = config.models.length === 0 ? '(none declared)' : config.models.join(', ');
+  const lines = [`models: ${models}`, ''];
+  config.bindings.forEach((binding, index) => {
+    const marker = index === state.role ? '▸' : ' ';
+    lines.push(`${marker} ${binding.role} → ${binding.bound ?? '(unbound)'}`);
+  });
+  return lines;
+}
+
+/**
  * Select the body for the active view.
  *
  * @param {TuiState} state - The current state.
@@ -330,6 +355,9 @@ function viewBody(state: TuiState): string[] {
   if (state.view === 'daemon') {
     return daemonBody(state);
   }
+  if (state.view === 'config') {
+    return configBody(state);
+  }
   return herdBody(state.data.herd);
 }
 
@@ -341,9 +369,13 @@ function viewBody(state: TuiState): string[] {
  * @returns {string[]} Footer lines.
  */
 function footer(state: TuiState): string[] {
-  return state.view === 'daemon'
-    ? ['d refresh · r restart · p prune · s stop · 1/2/3 views · q quit']
-    : ['1/2/3 view · g gates · d daemon · j/k member · q quit'];
+  if (state.view === 'daemon') {
+    return ['d refresh · r restart · p prune · s stop · 1/2/3 views · q quit'];
+  }
+  if (state.view === 'config') {
+    return ['j/k role · b cycle model · c refresh · 1/2/3 views · q quit'];
+  }
+  return ['1/2/3 view · g gates · d daemon · c config · j/k member · q quit'];
 }
 
 /**

@@ -22,6 +22,7 @@ import type {
 } from '@paw/core';
 import {
   initialState,
+  type ConfigSnapshot,
   type DaemonSnapshot,
   type TuiData,
   type TuiState,
@@ -137,6 +138,20 @@ const daemonManyFiles: DaemonSnapshot = {
 
 const stoppedDaemon: DaemonSnapshot = { status: null, violations: [] };
 
+const configBindings: ConfigSnapshot = {
+  models: ['fast', 'slow'],
+  bindings: [
+    { role: 'edit.apply', bound: 'fast' },
+    { role: 'review.graze', bound: null },
+    { role: 'review.judge', bound: 'slow' },
+  ],
+};
+
+const configNoModels: ConfigSnapshot = {
+  models: [],
+  bindings: [{ role: 'edit.apply', bound: null }],
+};
+
 /**
  * Build a state on a given view with the given data pieces.
  *
@@ -216,6 +231,22 @@ describe('render', () => {
 
   it('frames a running daemon, capping the file list', () => {
     expect(render({ ...stateOn('daemon', {}), daemon: daemonManyFiles }).lines).toMatchSnapshot();
+  });
+
+  it('frames the config view while reading', () => {
+    expect(render({ ...stateOn('config', {}), busy: true }).lines).toMatchSnapshot();
+  });
+
+  it('frames the config view before any read', () => {
+    expect(render(stateOn('config', {})).lines).toMatchSnapshot();
+  });
+
+  it('frames the config view with bindings and the selected role marked', () => {
+    expect(render({ ...stateOn('config', {}), config: configBindings, role: 1 }).lines).toMatchSnapshot();
+  });
+
+  it('frames the config view when no models are declared', () => {
+    expect(render({ ...stateOn('config', {}), config: configNoModels }).lines).toMatchSnapshot();
   });
 
   it('truncates an over-long line with an ellipsis and pads a short one', () => {

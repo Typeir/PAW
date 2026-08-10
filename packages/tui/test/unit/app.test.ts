@@ -18,6 +18,7 @@ import type { DispatchResult, DoctorReport, HealthReport, SwarmPlan } from '@paw
 import {
   initialState,
   reduce,
+  type ConfigSnapshot,
   type DaemonSnapshot,
   type TuiData,
   type TuiState,
@@ -49,11 +50,24 @@ const snapshot: DaemonSnapshot = {
   violations: [],
 };
 
+const configSnapshot: ConfigSnapshot = {
+  models: ['fast', 'slow'],
+  bindings: [
+    { role: 'edit.apply', bound: 'fast' },
+    { role: 'review.graze', bound: null },
+    { role: 'review.judge', bound: 'slow' },
+  ],
+};
+
 const key = (state: TuiState, k: string) => reduce(state, { kind: 'key', key: k });
 
 /** The idle daemon view: opened with d, then a snapshot folded to clear busy. */
 const idleDaemon = (): TuiState =>
   reduce(key(initialState(data), 'd').state, { kind: 'daemon', snapshot }).state;
+
+/** The idle config view: opened with c, then a snapshot folded to clear busy. */
+const idleConfig = (over: ConfigSnapshot = configSnapshot): TuiState =>
+  reduce(key(initialState(data), 'c').state, { kind: 'config', snapshot: over }).state;
 
 describe('initialState', () => {
   it('starts on the doctor view, first member, nothing running', () => {
@@ -63,6 +77,8 @@ describe('initialState', () => {
       data,
       gates: null,
       daemon: null,
+      config: null,
+      role: 0,
       busy: false,
       quit: false,
     });
@@ -173,6 +189,70 @@ describe('reduce', () => {
     const busy = key(initialState(data), 'd').state;
     const step = key(busy, 'p');
     expect(step.state).toBe(busy);
+    expect(step.effects).toEqual([]);
+  });
+
+  it('opens the config view on c: busy, one config-refresh effect', () => {
+    const step = key(initialState(data), 'c');
+    expect(step.state.busy).toBe(true);
+    expect(step.state.view).toBe('config');
+    expect(step.effects).toEqual([{ kind: 'config-refresh' }]);
+  });
+
+  it('folds a config snapshot: clears busy, stores it, shows config, clamps the role', () => {
+    const busy = key(initialState(data), 'c').state;
+    const step = reduce(busy, { kind: 'config', snapshot: configSnapshot });
+    expect(step.state.busy).toBe(false);
+    expect(step.state.config).toBe(configSnapshot);
+    expect(step.state.view).toBe('config');
+    expect(step.state.role).toBe(0);
+  });
+
+  it('moves role selection with j/k in the config view, clamped both ends', () => {
+    const c = idleConfig();
+    expect(key(c, 'j').state.role).toBe(1);
+    expect(key({ ...c, role: 2 }, 'j').state.role).toBe(2);
+    expect(key(c, 'k').state.role).toBe(0);
+  });
+
+  it('keeps the role at zero when navigated before a snapshot loads', () => {
+    const opening = { ...key(initialState(data), 'c').state, busy: false };
+    expect(key(opening, 'j').state.role).toBe(0);
+  });
+
+  it('binds the selected role to the first model when it is unbound', () => {
+    const step = key({ ...idleConfig(), role: 1 }, 'b');
+    expect(step.state.busy).toBe(true);
+    expect(step.effects).toEqual([{ kind: 'config-bind', role: 'review.graze', model: 'fast' }]);
+  });
+
+  it('cycles a bound role to the next model', () => {
+    const step = key(idleConfig(), 'b');
+    expect(step.effects).toEqual([{ kind: 'config-bind', role: 'edit.apply', model: 'slow' }]);
+  });
+
+  it('unbinds a role bound to the last model', () => {
+    const step = key({ ...idleConfig(), role: 2 }, 'b');
+    expect(step.effects).toEqual([{ kind: 'config-unbind', role: 'review.judge' }]);
+  });
+
+  it('does nothing on b when no models are declared', () => {
+    const step = key(idleConfig({ models: [], bindings: configSnapshot.bindings }), 'b');
+    expect(step.state.busy).toBe(false);
+    expect(step.effects).toEqual([]);
+  });
+
+  it('ignores b outside the config view and while busy', () => {
+    const s = initialState(data);
+    expect(key(s, 'b').state).toBe(s);
+    const busy = key(initialState(data), 'c').state;
+    expect(key(busy, 'b').state).toBe(busy);
+  });
+
+  it('ignores b in the config view before a snapshot loads', () => {
+    const opening = { ...key(initialState(data), 'c').state, busy: false };
+    const step = key(opening, 'b');
+    expect(step.state).toBe(opening);
     expect(step.effects).toEqual([]);
   });
 });

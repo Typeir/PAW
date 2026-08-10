@@ -24,9 +24,13 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
+  BUILTIN_ROLES,
   buildRegistry,
+  clearBinding,
   dispatchSwarm,
   runDoctor,
+  setBinding,
+  type ConfigDocumentPort,
   type HealthReport,
   type ModelCapabilities,
   type ModelPort,
@@ -34,11 +38,12 @@ import {
   type SwarmPlan,
   type Violation,
 } from '@paw/core';
-import { createNodeFileReader, createNodeGateRunner } from '@paw/adapters';
+import { createNodeConfigDocument, createNodeFileReader, createNodeGateRunner } from '@paw/adapters';
 import { rpcCall, socketPath, tokenPath } from '@paw/daemon';
 import {
   initialState,
   reduce,
+  type ConfigSnapshot,
   type DaemonSnapshot,
   type DaemonStatus,
   type Effect,
@@ -191,9 +196,27 @@ async function daemonSnapshot(root: string): Promise<DaemonSnapshot> {
 }
 
 /**
+ * Read the repo's declared models and every role's binding into a snapshot.
+ *
+ * @param {ConfigDocumentPort} doc - The config document.
+ * @returns {Promise<ConfigSnapshot>} The models and bindings.
+ */
+async function readConfigSnapshot(doc: ConfigDocumentPort): Promise<ConfigSnapshot> {
+  const config = await doc.read();
+  return {
+    models: Object.keys(config.models ?? {}),
+    bindings: BUILTIN_ROLES.map((role) => ({
+      role: role.id,
+      bound: config.roles?.[role.id] ?? null,
+    })),
+  };
+}
+
+/**
  * Run one effect and produce the message that carries its result. Gates run the
  * project's gates on the working-tree changes; the daemon actions go over the
- * socket, each resolving to a fresh {@link DaemonSnapshot}.
+ * socket; the config actions edit the bindings on disk. Each resolves to the
+ * message its view folds.
  *
  * @param {Effect} effect - The effect to run.
  * @param {string} root - The repository root.
@@ -203,6 +226,26 @@ async function runEffect(effect: Effect, root: string): Promise<Msg> {
   if (effect.kind === 'run-gates') {
     const report: HealthReport = await createNodeGateRunner(root).runForFiles(changedFiles(root));
     return { kind: 'gates', report };
+  }
+  if (
+    effect.kind === 'config-refresh' ||
+    effect.kind === 'config-bind' ||
+    effect.kind === 'config-unbind'
+  ) {
+    const doc = createNodeConfigDocument(root);
+    if (effect.kind === 'config-bind') {
+      const edit = setBinding(await doc.read(), effect.role, effect.model);
+      if (edit.ok) {
+        await doc.write(edit.config);
+      }
+    }
+    if (effect.kind === 'config-unbind') {
+      const edit = clearBinding(await doc.read(), effect.role);
+      if (edit.ok) {
+        await doc.write(edit.config);
+      }
+    }
+    return { kind: 'config', snapshot: await readConfigSnapshot(doc) };
   }
   if (effect.kind === 'daemon-restart') {
     try {

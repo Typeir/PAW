@@ -28,7 +28,7 @@ import {
 /**
  * The views the TUI cycles between.
  */
-export type View = 'doctor' | 'plan' | 'herd' | 'gates' | 'daemon';
+export type View = 'doctor' | 'plan' | 'herd' | 'gates' | 'daemon' | 'config';
 
 /**
  * The resident daemon's self-report, as returned by `daemon.status`.
@@ -60,6 +60,31 @@ export interface DaemonSnapshot {
 }
 
 /**
+ * One role and the model it is bound to, or null when unbound.
+ *
+ * @interface ConfigBinding
+ * @property {string} role - The role id.
+ * @property {string | null} bound - The model it is bound to, or null.
+ */
+export interface ConfigBinding {
+  readonly role: string;
+  readonly bound: string | null;
+}
+
+/**
+ * The repo's model bindings as the config view edits them: the declared models
+ * and every role's binding.
+ *
+ * @interface ConfigSnapshot
+ * @property {string[]} models - The declared model ids.
+ * @property {ConfigBinding[]} bindings - One entry per role.
+ */
+export interface ConfigSnapshot {
+  readonly models: readonly string[];
+  readonly bindings: readonly ConfigBinding[];
+}
+
+/**
  * Data loaded once by the shell for the read-only views.
  *
  * @interface TuiData
@@ -82,6 +107,8 @@ export interface TuiData {
  * @property {TuiData} data - The loaded data the read-only views render.
  * @property {HealthReport | null} gates - The last gate run, or null before one.
  * @property {DaemonSnapshot | null} daemon - The last daemon look, or null before one.
+ * @property {ConfigSnapshot | null} config - The loaded bindings, or null before the config view is opened.
+ * @property {number} role - The selected role index in the config view.
  * @property {boolean} busy - True while an action is running.
  * @property {boolean} quit - True once the user has asked to exit.
  */
@@ -91,6 +118,8 @@ export interface TuiState {
   readonly data: TuiData;
   readonly gates: HealthReport | null;
   readonly daemon: DaemonSnapshot | null;
+  readonly config: ConfigSnapshot | null;
+  readonly role: number;
   readonly busy: boolean;
   readonly quit: boolean;
 }
@@ -101,7 +130,8 @@ export interface TuiState {
 export type Msg =
   | { readonly kind: 'key'; readonly key: string }
   | { readonly kind: 'gates'; readonly report: HealthReport }
-  | { readonly kind: 'daemon'; readonly snapshot: DaemonSnapshot };
+  | { readonly kind: 'daemon'; readonly snapshot: DaemonSnapshot }
+  | { readonly kind: 'config'; readonly snapshot: ConfigSnapshot };
 
 /**
  * An action the shell runs, feeding its result back as a {@link Msg}. The daemon
@@ -115,7 +145,10 @@ export type Effect =
   | { readonly kind: 'daemon-refresh' }
   | { readonly kind: 'daemon-prune' }
   | { readonly kind: 'daemon-stop' }
-  | { readonly kind: 'daemon-restart' };
+  | { readonly kind: 'daemon-restart' }
+  | { readonly kind: 'config-refresh' }
+  | { readonly kind: 'config-bind'; readonly role: string; readonly model: string }
+  | { readonly kind: 'config-unbind'; readonly role: string };
 
 /**
  * A reducer step: the next state and any effects to run.
@@ -142,6 +175,8 @@ export function initialState(data: TuiData): TuiState {
     data,
     gates: null,
     daemon: null,
+    config: null,
+    role: 0,
     busy: false,
     quit: false,
   };
@@ -157,6 +192,48 @@ export function initialState(data: TuiData): TuiState {
 function clampMember(state: TuiState, next: number): number {
   const last = Math.max(0, memberCount(state.data.plan) - 1);
   return Math.min(last, Math.max(0, next));
+}
+
+/**
+ * Clamp a role index to the loaded bindings' range.
+ *
+ * @param {TuiState} state - The current state.
+ * @param {number} next - The proposed index.
+ * @returns {number} The clamped index.
+ */
+function clampRole(state: TuiState, next: number): number {
+  const last = Math.max(0, (state.config?.bindings.length ?? 1) - 1);
+  return Math.min(last, Math.max(0, next));
+}
+
+/**
+ * The next model in the cycle for a role: unbound → first → … → last → unbound.
+ *
+ * @param {string | null} current - The role's current binding.
+ * @param {readonly string[]} models - The declared models.
+ * @returns {string | null} The next model, or null to unbind.
+ */
+function nextBinding(current: string | null, models: readonly string[]): string | null {
+  const next = (current === null ? -1 : models.indexOf(current)) + 1;
+  return next >= models.length ? null : models[next];
+}
+
+/**
+ * The effect that cycles the selected role's binding, or null when there is
+ * nothing loaded or no model to bind to.
+ *
+ * @param {TuiState} state - The current state.
+ * @returns {Effect | null} The bind or unbind effect, or null.
+ */
+function bindEffect(state: TuiState): Effect | null {
+  if (state.config === null || state.config.models.length === 0) {
+    return null;
+  }
+  const current = state.config.bindings[state.role];
+  const model = nextBinding(current.bound, state.config.models);
+  return model === null
+    ? { kind: 'config-unbind', role: current.role }
+    : { kind: 'config-bind', role: current.role, model };
 }
 
 /**
@@ -214,19 +291,32 @@ function onKey(state: TuiState, key: string): Step {
     case '3':
       return stay({ ...state, view: 'herd' });
     case 'j':
-      return stay({ ...state, member: clampMember(state, state.member + 1) });
+      return state.view === 'config'
+        ? stay({ ...state, role: clampRole(state, state.role + 1) })
+        : stay({ ...state, member: clampMember(state, state.member + 1) });
     case 'k':
-      return stay({ ...state, member: clampMember(state, state.member - 1) });
+      return state.view === 'config'
+        ? stay({ ...state, role: clampRole(state, state.role - 1) })
+        : stay({ ...state, member: clampMember(state, state.member - 1) });
     case 'g':
       return open(state, 'gates', { kind: 'run-gates' });
     case 'd':
       return open(state, 'daemon', { kind: 'daemon-refresh' });
+    case 'c':
+      return open(state, 'config', { kind: 'config-refresh' });
     case 'p':
       return daemonAction(state, { kind: 'daemon-prune' });
     case 's':
       return daemonAction(state, { kind: 'daemon-stop' });
     case 'r':
       return daemonAction(state, { kind: 'daemon-restart' });
+    case 'b': {
+      if (state.view !== 'config' || state.busy) {
+        return stay(state);
+      }
+      const effect = bindEffect(state);
+      return effect === null ? stay(state) : { state: { ...state, busy: true }, effects: [effect] };
+    }
     case 'q':
       return stay({ ...state, quit: true });
     default:
@@ -248,6 +338,10 @@ export function reduce(state: TuiState, msg: Msg): Step {
   }
   if (msg.kind === 'daemon') {
     return stay({ ...state, daemon: msg.snapshot, busy: false, view: 'daemon' });
+  }
+  if (msg.kind === 'config') {
+    const role = Math.min(state.role, Math.max(0, msg.snapshot.bindings.length - 1));
+    return stay({ ...state, config: msg.snapshot, role, busy: false, view: 'config' });
   }
   return onKey(state, msg.key);
 }
