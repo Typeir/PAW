@@ -16,11 +16,13 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline';
 import { applyInit, dispatchSwarm, type InitMode } from '@paw/core';
-import { createNodeFileReader, createNodeFs } from '@paw/adapters';
+import { createNodeConfigDocument, createNodeFileReader, createNodeFs } from '@paw/adapters';
 import {
+  configControl,
   consolePage,
   enforcementControl,
   identityNotice,
+  mergeControl,
   meterPort,
   nodeRuntime,
   openLiveHerd,
@@ -171,7 +173,9 @@ export async function runUi(
   const attached = await resolveContextArg(args.values.get('context'));
   const portValue = args.values.get('port');
   const root = args.values.get('root') ?? '.';
-  const control = args.flags.has('control');
+  const control = args.flags.has('control')
+    ? mergeControl(enforcementControl(root), configControl(createNodeConfigDocument(root)))
+    : undefined;
   let handle: DaemonHandle | null = null;
   const daemon = await runDaemon(
     {
@@ -183,7 +187,7 @@ export async function runUi(
       onAttach: (path, mode) => {
         void approveAttach(path, mode, () => handle);
       },
-      ...(control ? { control: enforcementControl(root) } : {}),
+      ...(control ? { control } : {}),
       ...(shouldRun
         ? { dispatch: uiDispatcher(live, attached, concurrencyFrom(args), maxTokensFrom(args)) }
         : {}),
@@ -205,7 +209,7 @@ export async function runUi(
       ? `releasing the herd (${live ? 'live' : 'fake'} model) · the console fills in as it lands`
       : 'no run released · pass --run to dispatch',
     control
-      ? 'control enabled · the console may prune violations and stop enforcement'
+      ? 'control enabled · the console may edit bindings, prune violations, and stop enforcement'
       : 'observational · pass --control to let the console write',
     'open that URL for the console · ctrl-c to stop',
   ]);

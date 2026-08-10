@@ -39,7 +39,13 @@ export type { SnapshotParts, VersionedCache } from './domain/cache.js';
 export { route } from './domain/router.js';
 export type { HttpResponse, RouterDeps } from './domain/router.js';
 
-export { CONTROL_BODY_CAP, WRITE_METHODS, isWriteMethod, parseControlBody } from './domain/control.js';
+export {
+  CONTROL_BODY_CAP,
+  WRITE_METHODS,
+  isWriteMethod,
+  mergeControl,
+  parseControlBody,
+} from './domain/control.js';
 export type {
   BodyParse,
   ControlHandler,
@@ -50,6 +56,7 @@ export type {
 
 export { enforcementControl } from './application/enforcementControl.js';
 export type { EnforcementControlSeams } from './application/enforcementControl.js';
+export { configControl } from './application/configControl.js';
 
 export { IGNORED_DIRS, buildFileTree, findSubtree } from './domain/tree.js';
 export type { FileEntry } from './domain/tree.js';

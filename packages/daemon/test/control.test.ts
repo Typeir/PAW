@@ -14,9 +14,22 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { isWriteMethod, parseControlBody } from '../src/domain/control.js';
+import { isWriteMethod, mergeControl, parseControlBody } from '../src/domain/control.js';
+import type { ControlPort, ControlResult } from '../src/domain/control.js';
 
 const JSON_CT = 'application/json';
+
+describe('mergeControl', () => {
+  const ok = (label: string): ControlResult => ({ status: 200, body: label });
+  const a: ControlPort = { handlers: { 'GET /a': async () => ok('a'), 'GET /shared': async () => ok('a') } };
+  const b: ControlPort = { handlers: { 'GET /b': async () => ok('b'), 'GET /shared': async () => ok('b') } };
+
+  it('combines handlers, the later port winning a shared key', async () => {
+    const merged = mergeControl(a, b);
+    expect(Object.keys(merged.handlers).sort()).toEqual(['GET /a', 'GET /b', 'GET /shared']);
+    expect((await merged.handlers['GET /shared']({ query: undefined, body: {} })).body).toBe('b');
+  });
+});
 
 describe('isWriteMethod', () => {
   it('is true for the write verbs and false for reads and preflight', () => {

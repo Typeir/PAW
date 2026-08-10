@@ -101,6 +101,16 @@ export interface ControlPort {
 }
 
 /**
+ * Combine control ports into one, later handlers winning a shared key.
+ *
+ * @param {...ControlPort} ports - The ports to merge.
+ * @returns {ControlPort} The combined port.
+ */
+export function mergeControl(...ports: readonly ControlPort[]): ControlPort {
+  return { handlers: Object.assign({}, ...ports.map((port) => port.handlers)) };
+}
+
+/**
  * The outcome of sanitising a request body: the parsed object, or a refusal with
  * the status and reason the router should answer.
  */
