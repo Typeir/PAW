@@ -18,7 +18,6 @@
 import type {
   BudgetSummary,
   DispatchEvent,
-  DispatchHookDeps,
   DispatchResult,
   HostInfo,
   HostProcess,
@@ -234,27 +233,8 @@ export interface DaemonOptions {
   readonly dispatch?: Dispatcher;
   readonly scopeCeiling?: string;
   readonly control?: ControlPort;
-  readonly enforcement?: (root: string) => EnforcementScope;
-  readonly idle?: { ms: number; onIdle: () => void };
   onAttach?(path: string, mode: InitMode): void;
   onRelease?(settings: RunSettings): void;
-}
-
-/**
- * The enforcement half of a unified daemon for one root: the socket to claim and
- * the deps to serve hooks against, produced only after the claim so a daemon that
- * loses the race opens no store. Built per root by the {@link DaemonOptions}
- * factory so a rescope can serve the new repo and forget the old.
- *
- * @interface EnforcementScope
- * @property {string} socketPath - The enforcement endpoint to claim.
- * @property {() => Promise<{ token: string; deps: DispatchHookDeps }>} configure - Produce the token and dispatch deps, run only after the claim.
- * @property {{ pid: number; now: () => number; onStop: () => void }} [control] - Enables daemon.status/stop over the socket.
- */
-export interface EnforcementScope {
-  readonly socketPath: string;
-  configure(): Promise<{ token: string; deps: DispatchHookDeps }>;
-  readonly control?: { pid: number; now: () => number; onStop: () => void };
 }
 
 /**

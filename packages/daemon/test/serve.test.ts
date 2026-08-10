@@ -22,7 +22,6 @@ import {
   parseEnvelope,
   watchFrame,
   type DispatchEvent,
-  type DispatchHookDeps,
   type HostInfo,
   type HostProcess,
   type LogEntry,
@@ -30,13 +29,7 @@ import {
   type RunProgress,
   type SwarmPlan,
 } from '@paw/core';
-import { connect as netConnect } from 'node:net';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createGateCache, createMemoryStore } from '@paw/adapters';
-import { socketPath } from '../src/infrastructure/endpoint.js';
+import { describe, expect, it, vi } from 'vitest';
 import { CA_DAYS, LEAF_DAYS, META_VERSION, addDays } from '../src/domain/identity.js';
 import type { ServerIdentity } from '../src/infrastructure/identityStore.js';
 import { UnknownPlanError } from '../src/domain/plans.js';
@@ -156,7 +149,6 @@ interface Rig {
   hooks(): SocketHooks | null;
   tick(): void;
   tickHost(): void;
-  tickIdle(): void;
   advance(ms: number): void;
   readonly state: { closed: boolean; cancelled: boolean; tls: TlsMaterial | null };
   readonly imported: string[];
@@ -259,7 +251,6 @@ function makeRig(over: Partial<DaemonRuntime> = {}): Rig {
     hooks: () => hooks,
     tick: () => scheduled[1]?.(),
     tickHost: () => scheduled[0]?.(),
-    tickIdle: () => scheduled[2]?.(),
     advance: (ms: number) => {
       clockMs += ms;
     },
@@ -1258,254 +1249,5 @@ describe('runDaemon', () => {
   it('fails loud when the config is not JSON', async () => {
     const rig = makeRig({ readFile: async () => 'not json' });
     await expect(runDaemon({}, rig.runtime)).rejects.toThrow();
-  });
-});
-
-/** A socket client that sends one frame and resolves with the next line. */
-function openSocket(pathName: string) {
-  const c = netConnect(pathName);
-  c.setEncoding('utf8');
-  let buffer = '';
-  const waiters: ((line: string) => void)[] = [];
-  c.on('data', (chunk: string) => {
-    buffer += chunk;
-    let nl = buffer.indexOf('\n');
-    while (nl !== -1) {
-      waiters.shift()?.(buffer.slice(0, nl));
-      buffer = buffer.slice(nl + 1);
-      nl = buffer.indexOf('\n');
-    }
-  });
-  const ready = new Promise<void>((r) => c.on('connect', () => r()));
-  const send = (id: number, method: string, params: unknown): Promise<Record<string, unknown>> =>
-    new Promise((resolve) => {
-      waiters.push((line) => resolve(JSON.parse(line) as Record<string, unknown>));
-      c.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
-    });
-  return { ready, send, close: () => c.end() };
-}
-
-describe('runDaemon co-hosting enforcement', () => {
-  let root: string;
-  let endpoint: string;
-
-  const makeDeps = (): DispatchHookDeps => ({
-    store: createMemoryStore(),
-    gates: createGateCache(root),
-    exemptTools: new Set<string>(),
-    isIgnored: () => false,
-    connectors: {},
-  });
-
-  const scope = (deps: DispatchHookDeps, control = false) => () => ({
-    socketPath: endpoint,
-    configure: async () => ({ token: 'T', deps }),
-    ...(control ? { control: { pid: 4242, now: () => 1000, onStop: () => undefined } } : {}),
-  });
-
-  beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), 'paw-cohost-'));
-    endpoint = socketPath(root, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: root });
-  });
-
-  afterEach(() => {
-    rmSync(root, { recursive: true, force: true });
-  });
-
-  it('serves the socket and reads outstanding violations into the snapshot', async () => {
-    const rig = makeRig();
-    const deps = makeDeps();
-    await deps.store.raise(
-      [{ id: 1, filePath: 'src/x.ts', rule: 'no-bad', message: 'BADCODE', indirectFix: false }],
-      null,
-    );
-    const daemon = await runDaemon({ enforcement: scope(deps, true) }, rig.runtime);
-
-    const snap = parse(await rig.handler()?.(asConsole('/api/state')));
-    expect(snap.violations.some((v) => v.filePath === 'src/x.ts')).toBe(true);
-
-    const c = openSocket(endpoint);
-    await c.ready;
-    await c.send(1, 'connect', { token: 'T', protocolVersion: 1 });
-    expect((await c.send(2, 'daemon.status', {})).result).toMatchObject({ pid: 4242 });
-    expect(((await c.send(3, 'violations.list', {})).result as { violations: unknown[] }).violations).toHaveLength(1);
-    c.close();
-
-    await daemon.close();
-  });
-
-  it('stops the whole daemon when daemon.stop arrives over the socket', async () => {
-    const rig = makeRig();
-    let stopped = 0;
-    await runDaemon(
-      {
-        enforcement: () => ({
-          socketPath: endpoint,
-          configure: async () => ({ token: 'T', deps: makeDeps() }),
-          control: { pid: 4242, now: () => 1000, onStop: () => { stopped += 1; } },
-        }),
-      },
-      rig.runtime,
-    );
-    const c = openSocket(endpoint);
-    await c.ready;
-    await c.send(1, 'connect', { token: 'T', protocolVersion: 1 });
-    expect((await c.send(2, 'daemon.stop', {})).result).toEqual({ stopping: true });
-    c.close();
-
-    await new Promise((r) => setTimeout(r, 120));
-    expect(rig.state.closed).toBe(true);
-    expect(stopped).toBe(1);
-  });
-
-  it('serves without daemon.status when no control is wired', async () => {
-    const daemon = await runDaemon({ enforcement: scope(makeDeps()) }, makeRig().runtime);
-    const c = openSocket(endpoint);
-    await c.ready;
-    await c.send(1, 'connect', { token: 'T', protocolVersion: 1 });
-    expect((await c.send(2, 'daemon.status', {})).error).toBeDefined();
-    c.close();
-    await daemon.close();
-  });
-
-  it('releases the socket claim and rejects when configure fails', async () => {
-    await expect(
-      runDaemon(
-        {
-          enforcement: () => ({
-            socketPath: endpoint,
-            configure: async () => {
-              throw new Error('store down');
-            },
-          }),
-        },
-        makeRig().runtime,
-      ),
-    ).rejects.toThrow('store down');
-    const again = await runDaemon({ enforcement: scope(makeDeps()) }, makeRig().runtime);
-    await again.close();
-  });
-
-  it('closes the enforcement socket when the http bind fails after it', async () => {
-    const rig = makeRig({
-      listen: async () => {
-        throw new Error('port taken');
-      },
-    });
-    await expect(runDaemon({ enforcement: scope(makeDeps()) }, rig.runtime)).rejects.toThrow('port taken');
-    const again = await runDaemon({ enforcement: scope(makeDeps()) }, makeRig().runtime);
-    await again.close();
-  });
-
-  it('roams: rescope closes the old socket and serves the new repo', async () => {
-    const rootB = mkdtempSync(join(tmpdir(), 'paw-cohost-b-'));
-    const endpointB = socketPath(rootB, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: rootB });
-    const daemon = await runDaemon(
-      {
-        root,
-        enforcement: (r) => ({
-          socketPath: r === rootB ? endpointB : endpoint,
-          configure: async () => ({ token: 'T', deps: makeDeps() }),
-        }),
-      },
-      makeRig().runtime,
-    );
-
-    await daemon.rescope(rootB);
-
-    const c = openSocket(endpointB);
-    await c.ready;
-    expect((await c.send(1, 'connect', { token: 'T', protocolVersion: 1 })).result).toMatchObject({
-      health: 'ok',
-      projectRoot: rootB,
-    });
-    c.close();
-
-    await daemon.close();
-    rmSync(rootB, { recursive: true, force: true });
-  });
-
-  it('fails loud when the new repo cannot be served, leaving the old repo up', async () => {
-    const rootB = mkdtempSync(join(tmpdir(), 'paw-cohost-c-'));
-    const endpointB = socketPath(rootB, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: rootB });
-    const daemon = await runDaemon(
-      {
-        root,
-        enforcement: (r) => ({
-          socketPath: r === rootB ? endpointB : endpoint,
-          configure:
-            r === rootB
-              ? async () => {
-                  throw new Error('B store down');
-                }
-              : async () => ({ token: 'T', deps: makeDeps() }),
-        }),
-      },
-      makeRig().runtime,
-    );
-
-    await expect(daemon.rescope(rootB)).rejects.toThrow('B store down');
-
-    const c = openSocket(endpoint);
-    await c.ready;
-    expect((await c.send(1, 'connect', { token: 'T', protocolVersion: 1 })).result).toMatchObject({
-      health: 'ok',
-    });
-    c.close();
-
-    await daemon.close();
-    rmSync(rootB, { recursive: true, force: true });
-  });
-
-  it('a hook resets the idle timer, keeping the daemon up', async () => {
-    const rig = makeRig();
-    let idled = 0;
-    const daemon = await runDaemon(
-      {
-        root,
-        enforcement: scope(makeDeps(), true),
-        idle: { ms: 1000, onIdle: () => { idled += 1; } },
-      },
-      rig.runtime,
-    );
-    rig.advance(2000);
-    const c = openSocket(endpoint);
-    await c.ready;
-    await c.send(1, 'connect', { token: 'T', protocolVersion: 1 });
-    await c.send(2, 'violations.list', {});
-    c.close();
-
-    rig.tickIdle();
-    expect(idled).toBe(0);
-    await daemon.close();
-  });
-
-  it('an open console session keeps the daemon warm past the idle window', async () => {
-    const rig = makeRig();
-    let idled = 0;
-    const daemon = await runDaemon({ idle: { ms: 1000, onIdle: () => { idled += 1; } } }, rig.runtime);
-    const socket = rig.hooks()?.accept({
-      send: () => undefined,
-      close: () => undefined,
-      bufferedAmount: () => 0,
-    });
-    await socket?.message(authFrame(TOKEN));
-
-    rig.advance(2000);
-    rig.tickIdle();
-    expect(idled).toBe(0);
-    await daemon.close();
-  });
-
-  it('closes and signals after silence on both doors', async () => {
-    const rig = makeRig();
-    let idled = 0;
-    await runDaemon({ idle: { ms: 1000, onIdle: () => { idled += 1; } } }, rig.runtime);
-
-    rig.advance(2000);
-    rig.tickIdle();
-    await settle();
-    expect(idled).toBe(1);
-    expect(rig.state.closed).toBe(true);
   });
 });

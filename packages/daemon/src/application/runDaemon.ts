@@ -26,7 +26,6 @@
 import {
   CLOSE_SHUTDOWN,
   LIVE_TOPICS,
-  RPC_PROTOCOL_VERSION,
   buildRegistry,
   runDoctor,
   type AttachState,
@@ -39,7 +38,6 @@ import {
   type PlanSlice,
   type PlansSlice,
   type RunProgress,
-  type StorePort,
   type SwarmPlan,
 } from '@paw/core';
 import {
@@ -57,7 +55,6 @@ import {
   type DaemonOptions,
   type DaemonRuntime,
   type Dispatcher,
-  type EnforcementScope,
   type RunReport,
   type ServerHandle,
   type SocketHooks,
@@ -84,9 +81,6 @@ import {
   type UpgradeRefusal,
 } from '../infrastructure/security.js';
 import { createSessionRegistry } from './sessionRegistry.js';
-import { createRpcSession } from './rpcSession.js';
-import { enforcementMethods } from './enforcementMethods.js';
-import { bindSocket, serveSessions, type SocketServerHandle } from '../infrastructure/socketServer.js';
 import type { WsSessionPort } from '../domain/session.js';
 import { toRunProgress, trackRun } from './run.js';
 import { buildFileTree, type FileEntry } from '../domain/tree.js';
@@ -338,106 +332,34 @@ export async function runDaemon(
     }
   };
 
-  let store: StorePort | undefined;
-  let enforcement: SocketServerHandle | undefined;
-  let close!: () => Promise<void>;
-  let lastHookAt = 0;
-  let stopIdle: (() => void) | undefined;
-
-  /**
-   * Note hook activity, deferring the idle close. A bare timestamp so the reset
-   * needs nothing but the clock; the idle decision reads the sessions.
-   */
-  const bumpIdle = (): void => {
-    lastHookAt = runtime.clock();
-  };
-
-  /**
-   * Claim the enforcement socket for a root, open its store, and serve the
-   * enforcement methods. Closes the claim and rethrows if configure or serve
-   * fails, so a caller can fail loud with nothing left half-open.
-   *
-   * @param {EnforcementScope} scope - The socket and configure for the root.
-   * @param {string} projectRoot - The root the served methods report.
-   * @returns {Promise<{ handle: SocketServerHandle; store: StorePort }>} The running socket and its store.
-   */
-  const openEnforcement = async (
-    scope: EnforcementScope,
-    projectRoot: string,
-  ): Promise<{ handle: SocketServerHandle; store: StorePort }> => {
-    const claimed = await bindSocket(scope.socketPath);
-    try {
-      const configured = await scope.configure();
-      const hello = {
-        protocolVersion: RPC_PROTOCOL_VERSION,
-        projectRoot,
-        capabilities: ['gates', 'violations'],
-        health: 'ok',
-      };
-      const methods = enforcementMethods(configured.deps, {
-        projectRoot,
-        resetIdle: bumpIdle,
-        close: () => close(),
-        ...(scope.control === undefined ? {} : { control: scope.control }),
-      });
-      const handle = serveSessions(claimed, () =>
-        createRpcSession({
-          token: configured.token,
-          protocolVersion: RPC_PROTOCOL_VERSION,
-          hello,
-          methods,
-        }),
-      );
-      return { handle, store: configured.deps.store };
-    } catch (error: unknown) {
-      await new Promise<void>((done) => claimed.close(() => done()));
-      throw error;
-    }
-  };
-
   /**
    * Point the daemon at another repository and republish everything derived
-   * from it. Enforcement roams with the scope: the old socket and store are
-   * dropped and the new repo's are served, so the daemon holds exactly one repo.
+   * from it.
+   *
+   * A read: it changes what is looked at and writes nothing. Every slice below
+   * is already re-derived when files change, so re-rooting reuses that rather
+   * than restarting — open consoles keep their sockets and are told the new
+   * state, instead of being dropped and made to reconnect.
    *
    * @param {string} next - The repository to serve.
    */
   const rescope = async (next: string): Promise<void> => {
-    // Everything that can fail runs first, against `next`, changing nothing. A
-    // repo that cannot be read, configured, or served rejects here with the
-    // current repo untouched and still served — fail loud, never degrade.
-    const nextEntries = await runtime.listFiles(next);
-    const nextConfigPath = findConfig(options.configPath, nextEntries);
-    const nextConfig =
-      nextConfigPath === ''
+    root = next;
+    entries = await runtime.listFiles(root);
+    configPath = findConfig(options.configPath, entries);
+    config =
+      configPath === ''
         ? {}
-        : (JSON.parse(await runtime.readFile(underRoot(next, nextConfigPath))) as Record<
+        : (JSON.parse(await runtime.readFile(underRoot(root, configPath))) as Record<
             string,
             unknown
           >);
-    const nextConfigVersion =
-      nextConfigPath === '' ? 0 : await runtime.modifiedAt(underRoot(next, nextConfigPath));
-    const nextRegistry = buildRegistry(nextConfig, () => REFUSING_MODEL);
-    const opened = options.enforcement
-      ? await openEnforcement(options.enforcement(next), next)
-      : null;
-
-    root = next;
-    entries = nextEntries;
-    configPath = nextConfigPath;
-    config = nextConfig;
-    configVersion = nextConfigVersion;
-    registry = nextRegistry;
+    configVersion =
+      configPath === '' ? 0 : await runtime.modifiedAt(underRoot(root, configPath));
+    registry = buildRegistry(config, () => REFUSING_MODEL);
     doctor = runDoctor(config, registry, KNOWN_CONNECTORS);
     plansSlice = { plans: discoverPlans(entries), configPath };
     tree = buildFileTree(entries);
-    if (opened !== null) {
-      if (enforcement !== undefined) {
-        await enforcement.close();
-      }
-      enforcement = opened.handle;
-      store = opened.store;
-    }
     bus.publish('plans', plansSlice);
     bus.publish('tree', tree);
     bus.publish('doctor', doctor);
@@ -520,7 +442,7 @@ export async function runDaemon(
       doctor,
       run: run ?? idleRun(runId, startedAt),
       budget: budget ?? idleBudget(),
-      violations: store === undefined ? [] : await store.outstanding(),
+      violations: [],
       socket,
       gates: 0,
       keys: modelCount(config),
@@ -587,11 +509,6 @@ export async function runDaemon(
   // reading the process table every three seconds for the life of the process.
   let server: ServerHandle;
   try {
-    if (options.enforcement) {
-      const opened = await openEnforcement(options.enforcement(root), root);
-      enforcement = opened.handle;
-      store = opened.store;
-    }
     server = await runtime.listen(
       async (request) =>
         route(request, {
@@ -617,45 +534,11 @@ export async function runDaemon(
     stopHostTicker();
     stopPolling();
     sessions.shutdown();
-    if (enforcement !== undefined) {
-      await enforcement.close();
-    }
     throw error;
   }
   boundPort = server.port;
   origins = allowedOrigins(server.port, options.allowOrigins);
   socket = `${LOOPBACK}:${server.port}`;
-
-  close = async (): Promise<void> => {
-    stopHostTicker();
-    stopPolling();
-    if (stopIdle !== undefined) {
-      stopIdle();
-    }
-    // Sessions are told why before the socket goes: a console closed with a
-    // shutdown code stops retrying, where an abrupt drop reconnects.
-    sessions.shutdown();
-    if (enforcement !== undefined) {
-      await enforcement.close();
-    }
-    await server.close();
-  };
-
-  // Ephemeral: close after `idle.ms` with no hook and no open console. A live
-  // session keeps it warm; only silence on both doors lets it go.
-  if (options.idle !== undefined) {
-    const idle = options.idle;
-    lastHookAt = runtime.clock();
-    stopIdle = runtime.schedule(() => {
-      if (runtime.clock() - lastHookAt < idle.ms) {
-        return;
-      }
-      if (sessions.live() > 0) {
-        return;
-      }
-      void close().then(idle.onIdle);
-    }, idle.ms);
-  }
 
   // Now, and not a line earlier — see `release`. The rejection is claimed
   // immediately because the caller cannot attach a handler until this function
@@ -677,6 +560,13 @@ export async function runDaemon(
     dispatched,
     snapshot,
     rescope,
-    close,
+    close: async () => {
+      stopHostTicker();
+      stopPolling();
+      // Sessions are told why before the socket goes: a console that is closed
+      // with a shutdown code stops retrying, where an abrupt drop reconnects.
+      sessions.shutdown();
+      await server.close();
+    },
   };
 }
