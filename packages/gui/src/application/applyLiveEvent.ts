@@ -26,6 +26,7 @@
  */
 
 import type {
+  AttachState,
   BudgetSummary,
   DoctorReport,
   HostInfo,
@@ -60,6 +61,14 @@ export function applyLiveEvent(data: ConsoleData, event: LiveEnvelope): ConsoleD
     case 'plans': {
       const slice = event.data as PlansSlice;
       return { ...data, plans: slice.plans, configPath: slice.configPath };
+    }
+
+    case 'attach': {
+      // A landed (re)scope reports the repository the daemon now serves; a
+      // request in flight, refused, or failed leaves the console where it is.
+      const attach = event.data as AttachState;
+      const scoped = attach.status === 'idle' || attach.status === 'unconfigured';
+      return scoped && attach.path !== null ? { ...data, root: attach.path } : data;
     }
 
     case 'planDetail': {

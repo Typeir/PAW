@@ -107,6 +107,18 @@ describe('applyLiveEvent', () => {
     expect(applyLiveEvent(DATA, frame('budget', budget)).budget).toBe(budget);
   });
 
+  it('takes the served repository from a landed scope, and only from one', () => {
+    expect(
+      applyLiveEvent(DATA, frame('attach', { status: 'idle', path: 'C:\\code\\next' })).root,
+    ).toBe('C:\\code\\next');
+    expect(
+      applyLiveEvent(DATA, frame('attach', { status: 'unconfigured', path: '/work/raw' })).root,
+    ).toBe('/work/raw');
+    // A request in flight or refused, or an idle with no path, changes nothing.
+    expect(applyLiveEvent(DATA, frame('attach', { status: 'failed', path: '/nope' }))).toBe(DATA);
+    expect(applyLiveEvent(DATA, frame('attach', { status: 'idle', path: null }))).toBe(DATA);
+  });
+
   it('changes nothing for a topic the console does not render as data', () => {
     for (const topic of ['tree', 'log', 'error'] as const) {
       // Returning the input identically is what stops a future daemon topic from
