@@ -170,6 +170,14 @@ export { BUILTIN_ROLES } from './application/builtinRoles.js';
 export { buildRegistry } from './application/buildRegistry.js';
 export type { RegistryConfig } from './application/buildRegistry.js';
 
+export {
+  clearBinding,
+  declareModel,
+  parseCapabilities,
+  setBinding,
+} from './application/configBinding.js';
+export type { ConfigDocument, ConfigEdit } from './application/configBinding.js';
+
 export { CONTEXT_HEADING, composeBrief } from './application/composeBrief.js';
 
 export { checkTool } from './application/checkTool.js';
