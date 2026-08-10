@@ -16,22 +16,14 @@
  * @since 5.0.0
  */
 
-import {
-  PAW_EVENT_TYPES,
-  RPC_PROTOCOL_VERSION,
-  dispatchHook,
-  type DispatchHookDeps,
-  type HookDispatch,
-  type PawEventType,
-} from '@paw/core';
+import { RPC_PROTOCOL_VERSION, type DispatchHookDeps } from '@paw/core';
+import { enforcementMethods } from './enforcementMethods.js';
 import { createRpcSession } from './rpcSession.js';
 import {
   bindSocket,
   serveSessions,
   type SocketServerHandle,
 } from '../infrastructure/socketServer.js';
-
-const EVENTS: ReadonlySet<string> = new Set(PAW_EVENT_TYPES);
 
 /**
  * What `configure` yields once the endpoint is claimed.
@@ -61,26 +53,6 @@ export interface EnforcementOptions {
   configure(): Promise<EnforcementConfig>;
   readonly idle?: { ms: number; onIdle: () => void };
   readonly control?: { pid: number; now: () => number; onStop: () => void };
-}
-
-/**
- * Narrow untrusted RPC params into a {@link HookDispatch}, or null when they are
- * not a well-formed dispatch. An allow-list: only host, a known event, and an
- * object payload are taken.
- *
- * @param {unknown} params - The method params off the wire.
- * @returns {HookDispatch | null} The dispatch, or null.
- */
-function toDispatch(params: unknown): HookDispatch | null {
-  const p = (params ?? {}) as { host?: unknown; event?: unknown; payload?: unknown };
-  if (typeof p.host !== 'string' || typeof p.event !== 'string' || !EVENTS.has(p.event)) {
-    return null;
-  }
-  const payload =
-    typeof p.payload === 'object' && p.payload !== null
-      ? (p.payload as Record<string, unknown>)
-      : {};
-  return { host: p.host, event: p.event as PawEventType, payload };
 }
 
 /**
@@ -116,39 +88,12 @@ export async function serveEnforcement(opts: EnforcementOptions): Promise<Socket
       capabilities: ['gates', 'violations'],
       health: 'ok',
     };
-    const methods: Record<string, (params: unknown) => Promise<unknown>> = {
-      'hook.dispatch': async (params: unknown): Promise<unknown> => {
-        resetIdle();
-        const req = toDispatch(params);
-        return req === null ? { continue: true } : dispatchHook(deps, req);
-      },
-      'violations.list': async (): Promise<unknown> => {
-        resetIdle();
-        return { violations: await deps.store.outstanding() };
-      },
-      'violations.prune': async (params: unknown): Promise<unknown> => {
-        resetIdle();
-        const file = (params as { file?: unknown })?.file;
-        return { cleared: await deps.store.prune(typeof file === 'string' ? file : null) };
-      },
-    };
-    const control = opts.control;
-    if (control) {
-      const startedAt = control.now();
-      methods['daemon.status'] = async () => ({
-        pid: control.pid,
-        uptimeMs: control.now() - startedAt,
-        protocolVersion: RPC_PROTOCOL_VERSION,
-        health: 'ok',
-        projectRoot: opts.projectRoot,
-      });
-      methods['daemon.stop'] = async () => {
-        setTimeout(() => {
-          void handle.close().then(control.onStop);
-        }, 50).unref();
-        return { stopping: true };
-      };
-    }
+    const methods = enforcementMethods(deps, {
+      projectRoot: opts.projectRoot,
+      resetIdle,
+      control: opts.control,
+      close: () => handle.close(),
+    });
     handle = serveSessions(server, () =>
       createRpcSession({ token, protocolVersion: RPC_PROTOCOL_VERSION, hello, methods }),
     );
