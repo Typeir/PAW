@@ -19,6 +19,7 @@ import {
   useConsoleState,
   useLiveError,
   useLiveStatus,
+  useScope,
 } from '../../../src/application/context/consoleContext.js';
 import type { SocketHandlers, SocketLike } from '../../../src/infrastructure/liveSocket.js';
 import { makeSnapshot, renderInConsole } from '../../fixtures.js';
@@ -134,5 +135,13 @@ describe('ConsoleProvider', () => {
       return null;
     };
     expect(() => render(<Status />)).toThrow('useLiveStatus() used outside');
+  });
+
+  it('fails loud when the scope picker is read outside the provider', () => {
+    const Scoped = (): null => {
+      useScope();
+      return null;
+    };
+    expect(() => render(<Scoped />)).toThrow('useScope() used outside');
   });
 });

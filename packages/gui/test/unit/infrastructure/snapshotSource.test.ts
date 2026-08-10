@@ -140,6 +140,7 @@ describe('boot', () => {
     expect(result.source).toBeNull();
     expect(result.treeSource).toBeNull();
     expect(result.connect).toBeNull();
+    expect(result.recent).toBeNull();
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
@@ -150,6 +151,7 @@ describe('boot', () => {
     expect(result.source).not.toBeNull();
     expect(result.treeSource).not.toBeNull();
     expect(result.connect).not.toBeNull();
+    expect(result.recent).not.toBeNull();
     expect(result.token).toBeNull();
   });
 

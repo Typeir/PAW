@@ -291,9 +291,11 @@ describe('the routes themselves', () => {
     expect(JSON.parse(res.body)).toEqual(['/repo/a', '/repo/b']);
   });
 
-  it('answers 404 for /api/recent when the daemon keeps no history', async () => {
+  it('serves an empty list for /api/recent when the daemon keeps no history', async () => {
     const { recent: _omit, ...noRecent } = deps;
-    expect((await route(req('/api/recent'), noRecent)).status).toBe(404);
+    const res = await route(req('/api/recent'), noRecent);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual([]);
   });
 
   it('rejects a write, wherever it is aimed', async () => {

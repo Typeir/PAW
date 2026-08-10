@@ -19,6 +19,7 @@ import type { PawSnapshot, TreeNode } from '@paw/core';
 import type { SnapshotSource } from '../application/hooks/useLiveRefresh.js';
 import { adoptToken, type AuthWindow } from './auth.js';
 import { createConfigClient, type ConfigClient } from './configClient.js';
+import { createRecentClient, type RecentClient } from './recentClient.js';
 import {
   createSocketFactory,
   liveUrl,
@@ -157,6 +158,7 @@ export function createTreeSource(fetchFn: FetchLike, root = ''): TreeSource {
  * @property {SocketFactory | null} connect - Opens the live socket, or null when static or not on https.
  * @property {TreeSource | null} treeSource - The tree source, or null when static.
  * @property {ConfigClient | null} config - The binding editor's client, or null when static.
+ * @property {RecentClient | null} recent - The scope picker's recent-routes client, or null when static.
  * @property {string | null} token - The credential this tab adopted, or null.
  */
 export interface Boot {
@@ -165,6 +167,7 @@ export interface Boot {
   readonly connect: SocketFactory | null;
   readonly treeSource: TreeSource | null;
   readonly config: ConfigClient | null;
+  readonly recent: RecentClient | null;
   readonly token: string | null;
 }
 
@@ -184,7 +187,15 @@ export async function boot(
 ): Promise<Boot> {
   const injected = win.__PAW_DATA__;
   if (injected) {
-    return { snapshot: injected, source: null, connect: null, treeSource: null, config: null, token: null };
+    return {
+      snapshot: injected,
+      source: null,
+      connect: null,
+      treeSource: null,
+      config: null,
+      recent: null,
+      token: null,
+    };
   }
   const token = adoptToken(win);
   const authed = authedFetch(fetchFn, token);
@@ -199,6 +210,7 @@ export async function boot(
     connect: url === null || ctor === undefined ? null : createSocketFactory(url, ctor),
     treeSource: createTreeSource(authed),
     config: createConfigClient(authed),
+    recent: createRecentClient(authed),
     token,
   };
 }

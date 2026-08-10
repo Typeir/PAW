@@ -154,6 +154,41 @@ describe('the live wire', () => {
     expect(events[0].topic).toBe('hello');
   });
 
+  it('grabs a repository over the authenticated socket', () => {
+    const socket = scripted();
+    const { result } = renderHook(() =>
+      useLiveWire({ connect: () => socket.socket, token: TOKEN, plan: null, onEvent: () => undefined }),
+    );
+    socket.open();
+    socket.deliver(hello());
+
+    act(() => result.current.scope('/work/other'));
+    expect(parseClientMessage(socket.sent[socket.sent.length - 1])).toEqual({
+      v: 1,
+      type: 'scope',
+      path: '/work/other',
+    });
+  });
+
+  it('does not grab until a socket has authenticated', () => {
+    const socket = scripted();
+    const { result } = renderHook(() =>
+      useLiveWire({ connect: () => socket.socket, token: TOKEN, plan: null, onEvent: () => undefined }),
+    );
+    socket.open();
+
+    act(() => result.current.scope('/work/other'));
+    expect(socket.sent).toHaveLength(1);
+  });
+
+  it('does not grab with no daemon behind the page', () => {
+    const { result } = renderHook(() =>
+      useLiveWire({ connect: null, token: null, plan: null, onEvent: () => undefined }),
+    );
+    act(() => result.current.scope('/work/other'));
+    expect(result.current.mode).toBe('static');
+  });
+
   it('hands every frame to the console once it is live', () => {
     const socket = scripted();
     const events: LiveEnvelope[] = [];

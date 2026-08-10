@@ -330,8 +330,8 @@ export async function route(request: HttpRequest, deps: RouterDeps): Promise<Htt
     if (request.path === '/api/config' && deps.config !== undefined) {
       return json(deps.config(), cors);
     }
-    if (request.path === '/api/recent' && deps.recent !== undefined) {
-      return json(await deps.recent(), cors);
+    if (request.path === '/api/recent') {
+      return json(deps.recent === undefined ? [] : await deps.recent(), cors);
     }
   }
 

@@ -22,6 +22,7 @@ import { DataTable, type Column } from '../atoms/dataTable.js';
 import { KeyValue } from '../atoms/keyValue.js';
 import { Placeholder } from '../atoms/placeholder.js';
 import { Stat } from '../atoms/stat.js';
+import { ScopeCard } from './scopeCard.js';
 
 const PROCESS_COLUMNS: readonly Column[] = [
   { key: 'pid', label: 'pid', right: true },
@@ -50,6 +51,7 @@ export function OverviewView() {
   return (
     <>
       <Crumb title='Overview' sub={`${host.hostname} · ${host.platform} ${host.release}`} />
+      <ScopeCard />
       <dl>
         <Stat label='Uptime' value={daemon.uptimeLabel} />
         <Stat label='Resident' value={formatMb(host.rssBytes)} />

@@ -285,6 +285,15 @@ dl, dd { margin: 0; }
 .role-row .ok.warn { color: var(--warn); }
 .role-row .ok.crit { color: var(--crit); }
 
+.scope-grab { display: flex; gap: 8px; margin-bottom: 12px; }
+.scope-route { flex: 1; font-family: var(--mono); font-size: 11.5px; padding: 5px 10px;
+  border-radius: var(--r); border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); }
+.scope-recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.scope-recent-item { width: 100%; text-align: left; font-family: var(--mono); font-size: 11px;
+  padding: 6px 10px; border-radius: var(--r); border: 1px solid var(--line-soft); background: var(--panel-2);
+  color: var(--ink-dim); cursor: pointer; }
+.scope-recent-item:hover { color: var(--ink); border-color: var(--line); }
+
 .btn { font-family: var(--mono); font-size: 11px; padding: 5px 12px; border-radius: var(--r);
   border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-dim); cursor: pointer;
   display: inline-flex; align-items: center; gap: 6px; }

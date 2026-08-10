@@ -38,6 +38,7 @@ import {
   CLOSE_CAPACITY,
   CLOSE_SHUTDOWN,
   authFrame,
+  encodeScope,
   parseEnvelope,
   watchFrame,
   type LiveEnvelope,
@@ -100,10 +101,12 @@ export interface LiveWireDeps {
  * @interface LiveWire
  * @property {LiveMode} mode - Where the connection is.
  * @property {() => void} retryNow - Try again immediately, for the banner's button.
+ * @property {(path: string) => void} scope - Grab a repository, over the live socket; a no-op until one is authenticated.
  */
 export interface LiveWire {
   readonly mode: LiveMode;
   retryNow(): void;
+  scope(path: string): void;
 }
 
 /**
@@ -150,6 +153,16 @@ export function useLiveWire(deps: LiveWireDeps): LiveWire {
     // nothing while degraded, because there is no socket to close.
     stepRef.current = 0;
     setReconnect((count) => count + 1);
+  }, []);
+
+  const scope = useCallback((path: string): void => {
+    // Sent only over the socket that has authenticated — the guard the watch
+    // effect uses — so a grab is never the first frame on a fresh socket the
+    // daemon would close as talking-before-auth.
+    if (socketRef.current === null || socketRef.current !== liveSocketRef.current) {
+      return;
+    }
+    socketRef.current.send(encodeScope(path));
   }, []);
 
   useEffect(() => {
@@ -299,5 +312,5 @@ export function useLiveWire(deps: LiveWireDeps): LiveWire {
     }
   }, [mode, plan]);
 
-  return { mode, retryNow };
+  return { mode, retryNow, scope };
 }

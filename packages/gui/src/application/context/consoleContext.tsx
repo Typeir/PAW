@@ -39,6 +39,7 @@ import { useLiveWire, type LiveMode } from '../hooks/useLiveWire.js';
 import type { SocketFactory } from '../../infrastructure/liveSocket.js';
 import type { TreeSource } from '../../infrastructure/snapshotSource.js';
 import type { ConfigClient } from '../../infrastructure/configClient.js';
+import type { RecentClient } from '../../infrastructure/recentClient.js';
 import type { Shell, WindowControls } from '../../infrastructure/shell.js';
 
 /**
@@ -94,6 +95,20 @@ export interface ConfigAccess {
 }
 
 /**
+ * The scope picker's surface: the recent-routes client for the list, and the
+ * grab that switches the daemon to a route over the live socket. Both are boxed
+ * so "no provider" (null client) stays distinct from a static page.
+ *
+ * @interface ScopeAccess
+ * @property {RecentClient | null} recent - The recent-routes client, or null when static.
+ * @property {(path: string) => void} grab - Switch the daemon to a route; a no-op until the socket is live.
+ */
+export interface ScopeAccess {
+  readonly recent: RecentClient | null;
+  grab(path: string): void;
+}
+
+/**
  * The shell the console is running in, and the window it may control.
  *
  * @interface ShellAccess
@@ -111,6 +126,7 @@ const ErrorContext = createContext<LiveError | null>(null);
 const LiveContext = createContext<LiveStatus | null>(null);
 const TreeContext = createContext<TreeAccess | null>(null);
 const ConfigContext = createContext<ConfigAccess | null>(null);
+const ScopeContext = createContext<ScopeAccess | null>(null);
 const ShellContext = createContext<ShellAccess | null>(null);
 
 /**
@@ -139,6 +155,7 @@ function useRequired<T>(context: Context<T | null>, hook: string): T {
  * @property {string | null} [token] - The credential this tab adopted.
  * @property {TreeSource | null} [treeSource] - The repository tree source; omit for a static page.
  * @property {ConfigClient | null} [config] - The binding editor's client; omit for a static page.
+ * @property {RecentClient | null} [recent] - The scope picker's recent-routes client; omit for a static page.
  * @property {WindowControls | null} [controls] - The desktop window's controls; omit in a browser.
  * @property {number} [intervalMs] - Poll period in milliseconds, for degraded mode.
  * @property {ReactNode} children - The console tree.
@@ -150,6 +167,7 @@ export interface ConsoleProviderProps {
   readonly token?: string | null;
   readonly treeSource?: TreeSource | null;
   readonly config?: ConfigClient | null;
+  readonly recent?: RecentClient | null;
   readonly controls?: WindowControls | null;
   readonly intervalMs?: number;
   readonly children: ReactNode;
@@ -174,6 +192,7 @@ export function ConsoleProvider({
   token = null,
   treeSource = null,
   config = null,
+  recent = null,
   controls = null,
   intervalMs = DEFAULT_POLL_MS,
   children,
@@ -223,6 +242,10 @@ export function ConsoleProvider({
   );
   const tree = useMemo<TreeAccess>(() => ({ source: treeSource }), [treeSource]);
   const configAccess = useMemo<ConfigAccess>(() => ({ client: config }), [config]);
+  const scopeAccess = useMemo<ScopeAccess>(
+    () => ({ recent, grab: wire.scope }),
+    [recent, wire.scope],
+  );
   const shell = useMemo<ShellAccess>(
     () => ({ shell: controls === null ? 'web' : 'desktop', controls }),
     [controls],
@@ -235,7 +258,9 @@ export function ConsoleProvider({
           <LiveContext.Provider value={live}>
             <TreeContext.Provider value={tree}>
               <ConfigContext.Provider value={configAccess}>
-                <ShellContext.Provider value={shell}>{children}</ShellContext.Provider>
+                <ScopeContext.Provider value={scopeAccess}>
+                  <ShellContext.Provider value={shell}>{children}</ShellContext.Provider>
+                </ScopeContext.Provider>
               </ConfigContext.Provider>
             </TreeContext.Provider>
           </LiveContext.Provider>
@@ -297,6 +322,16 @@ export function useTreeSource(): TreeSource | null {
  */
 export function useConfigClient(): ConfigClient | null {
   return useRequired(ConfigContext, 'useConfigClient').client;
+}
+
+/**
+ * The scope picker's surface: the recent-routes client and the grab that
+ * switches the daemon to a route.
+ *
+ * @returns {ScopeAccess} The recent client and the grab.
+ */
+export function useScope(): ScopeAccess {
+  return useRequired(ScopeContext, 'useScope');
 }
 
 /**
