@@ -45,9 +45,13 @@ export interface ResponseLike {
  * body, and a `GET`-only API needs nothing else.
  *
  * @interface RequestInitLike
+ * @property {string} [method] - The HTTP method; absent means GET.
+ * @property {string} [body] - The request body, for a write.
  * @property {Record<string, string>} [headers] - Headers to send.
  */
 export interface RequestInitLike {
+  readonly method?: string;
+  readonly body?: string;
   readonly headers?: Record<string, string>;
 }
 
