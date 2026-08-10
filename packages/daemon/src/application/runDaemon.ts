@@ -343,29 +343,34 @@ export async function runDaemon(
   let close!: () => Promise<void>;
 
   /**
-   * Claim the enforcement socket for the current root, open its store, and serve
-   * the enforcement methods. Closes the claim if configure or serve throws.
+   * Claim the enforcement socket for a root, open its store, and serve the
+   * enforcement methods. Closes the claim and rethrows if configure or serve
+   * fails, so a caller can fail loud with nothing left half-open.
    *
-   * @param {EnforcementScope} scope - The socket and configure for the current root.
+   * @param {EnforcementScope} scope - The socket and configure for the root.
+   * @param {string} projectRoot - The root the served methods report.
+   * @returns {Promise<{ handle: SocketServerHandle; store: StorePort }>} The running socket and its store.
    */
-  const openEnforcement = async (scope: EnforcementScope): Promise<void> => {
+  const openEnforcement = async (
+    scope: EnforcementScope,
+    projectRoot: string,
+  ): Promise<{ handle: SocketServerHandle; store: StorePort }> => {
     const claimed = await bindSocket(scope.socketPath);
     try {
       const configured = await scope.configure();
-      store = configured.deps.store;
       const hello = {
         protocolVersion: RPC_PROTOCOL_VERSION,
-        projectRoot: root,
+        projectRoot,
         capabilities: ['gates', 'violations'],
         health: 'ok',
       };
       const methods = enforcementMethods(configured.deps, {
-        projectRoot: root,
+        projectRoot,
         resetIdle: () => undefined,
         close: () => close(),
         ...(scope.control === undefined ? {} : { control: scope.control }),
       });
-      enforcement = serveSessions(claimed, () =>
+      const handle = serveSessions(claimed, () =>
         createRpcSession({
           token: configured.token,
           protocolVersion: RPC_PROTOCOL_VERSION,
@@ -373,6 +378,7 @@ export async function runDaemon(
           methods,
         }),
       );
+      return { handle, store: configured.deps.store };
     } catch (error: unknown) {
       await new Promise<void>((done) => claimed.close(() => done()));
       throw error;
@@ -387,33 +393,40 @@ export async function runDaemon(
    * @param {string} next - The repository to serve.
    */
   const rescope = async (next: string): Promise<void> => {
-    root = next;
-    entries = await runtime.listFiles(root);
-    configPath = findConfig(options.configPath, entries);
-    config =
-      configPath === ''
+    // Everything that can fail runs first, against `next`, changing nothing. A
+    // repo that cannot be read, configured, or served rejects here with the
+    // current repo untouched and still served — fail loud, never degrade.
+    const nextEntries = await runtime.listFiles(next);
+    const nextConfigPath = findConfig(options.configPath, nextEntries);
+    const nextConfig =
+      nextConfigPath === ''
         ? {}
-        : (JSON.parse(await runtime.readFile(underRoot(root, configPath))) as Record<
+        : (JSON.parse(await runtime.readFile(underRoot(next, nextConfigPath))) as Record<
             string,
             unknown
           >);
-    configVersion =
-      configPath === '' ? 0 : await runtime.modifiedAt(underRoot(root, configPath));
-    registry = buildRegistry(config, () => REFUSING_MODEL);
+    const nextConfigVersion =
+      nextConfigPath === '' ? 0 : await runtime.modifiedAt(underRoot(next, nextConfigPath));
+    const nextRegistry = buildRegistry(nextConfig, () => REFUSING_MODEL);
+    const opened = options.enforcement
+      ? await openEnforcement(options.enforcement(next), next)
+      : null;
+
+    root = next;
+    entries = nextEntries;
+    configPath = nextConfigPath;
+    config = nextConfig;
+    configVersion = nextConfigVersion;
+    registry = nextRegistry;
     doctor = runDoctor(config, registry, KNOWN_CONNECTORS);
     plansSlice = { plans: discoverPlans(entries), configPath };
     tree = buildFileTree(entries);
-    if (options.enforcement) {
+    if (opened !== null) {
       if (enforcement !== undefined) {
         await enforcement.close();
-        enforcement = undefined;
       }
-      store = undefined;
-      try {
-        await openEnforcement(options.enforcement(next));
-      } catch (error: unknown) {
-        report(`could not serve enforcement for ${next}: ${reason(error)}`, 'error');
-      }
+      enforcement = opened.handle;
+      store = opened.store;
     }
     bus.publish('plans', plansSlice);
     bus.publish('tree', tree);
@@ -565,7 +578,9 @@ export async function runDaemon(
   let server: ServerHandle;
   try {
     if (options.enforcement) {
-      await openEnforcement(options.enforcement(root));
+      const opened = await openEnforcement(options.enforcement(root), root);
+      enforcement = opened.handle;
+      store = opened.store;
     }
     server = await runtime.listen(
       async (request) =>

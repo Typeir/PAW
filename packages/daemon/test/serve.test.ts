@@ -1404,10 +1404,9 @@ describe('runDaemon co-hosting enforcement', () => {
     rmSync(rootB, { recursive: true, force: true });
   });
 
-  it('reports, without crashing, when the new repo cannot be served', async () => {
+  it('fails loud when the new repo cannot be served, leaving the old repo up', async () => {
     const rootB = mkdtempSync(join(tmpdir(), 'paw-cohost-c-'));
     const endpointB = socketPath(rootB, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: rootB });
-    const rig = makeRig();
     const daemon = await runDaemon(
       {
         root,
@@ -1421,11 +1420,17 @@ describe('runDaemon co-hosting enforcement', () => {
               : async () => ({ token: 'T', deps: makeDeps() }),
         }),
       },
-      rig.runtime,
+      makeRig().runtime,
     );
 
-    await daemon.rescope(rootB);
-    expect(rig.warnings.some((w) => w.includes('could not serve enforcement'))).toBe(true);
+    await expect(daemon.rescope(rootB)).rejects.toThrow('B store down');
+
+    const c = openSocket(endpoint);
+    await c.ready;
+    expect((await c.send(1, 'connect', { token: 'T', protocolVersion: 1 })).result).toMatchObject({
+      health: 'ok',
+    });
+    c.close();
 
     await daemon.close();
     rmSync(rootB, { recursive: true, force: true });
