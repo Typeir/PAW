@@ -72,12 +72,14 @@ describe('ScopeCard', () => {
     expect(screen.getByRole('button', { name: '/work/b' })).toBeInTheDocument();
   });
 
-  it('marks the current scope with a live pip on the newest route', async () => {
-    renderLive(recentClient());
-    const current = await screen.findByRole('button', { name: '/work/a' });
-    const older = screen.getByRole('button', { name: '/work/b' });
+  it('pips the route matching the current scope, not the newest', async () => {
+    // The fixture snapshot is scoped to C:\code\demo; listing it second proves
+    // the pip follows the scope rather than the top of the list.
+    renderLive(recentClient({ list: async () => ['/work/other', 'C:\\code\\demo'] }));
+    const current = await screen.findByRole('button', { name: 'C:\\code\\demo' });
+    const other = screen.getByRole('button', { name: '/work/other' });
     expect(current.querySelector('.scope-dot')).toHaveClass('here');
-    expect(older.querySelector('.scope-dot')).not.toHaveClass('here');
+    expect(other.querySelector('.scope-dot')).not.toHaveClass('here');
   });
 
   it('disables grabbing until the console has a live connection', async () => {

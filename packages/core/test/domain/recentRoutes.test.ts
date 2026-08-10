@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { RECENT_ROUTES_CAP, promoteRoute } from '../../src/domain/recentRoutes.js';
+import { RECENT_ROUTES_CAP, promoteRoute, sameRoute } from '../../src/domain/recentRoutes.js';
 
 describe('promoteRoute', () => {
   it('puts a freshly grabbed route at the front', () => {
@@ -46,5 +46,15 @@ describe('promoteRoute', () => {
     const next = promoteRoute(list, '   ');
     expect(next).toEqual(['/a', '/b']);
     expect(next).not.toBe(list);
+  });
+});
+
+describe('sameRoute', () => {
+  it('matches the same repository across case and slash direction', () => {
+    expect(sameRoute('C:\\Repo\\A', 'c:/repo/a')).toBe(true);
+  });
+
+  it('separates different repositories', () => {
+    expect(sameRoute('/work/a', '/work/b')).toBe(false);
   });
 });

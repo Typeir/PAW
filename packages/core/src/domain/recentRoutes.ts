@@ -30,6 +30,19 @@ function routeKey(route: string): string {
 }
 
 /**
+ * Whether two routes name the same repository, by the same case- and
+ * slash-insensitive key the recent list dedups on — so "which route is the
+ * current scope" agrees with how the list was built.
+ *
+ * @param {string} a - One route.
+ * @param {string} b - The other.
+ * @returns {boolean} True when they are the same repository.
+ */
+export function sameRoute(a: string, b: string): boolean {
+  return routeKey(a) === routeKey(b);
+}
+
+/**
  * Put a route at the front of the recent list: drop any earlier entry for the
  * same repository, prepend this one, and keep at most `cap`. A blank route is a
  * no-op, so recording the daemon's boot scope never seeds an empty entry.

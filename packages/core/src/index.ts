@@ -68,7 +68,7 @@ export type {
 export { validateConfig } from './domain/config.js';
 export type { ConfigDocument, ConfigProblem, PawConfig } from './domain/config.js';
 
-export { RECENT_ROUTES_CAP, promoteRoute } from './domain/recentRoutes.js';
+export { RECENT_ROUTES_CAP, promoteRoute, sameRoute } from './domain/recentRoutes.js';
 
 export { toProjectRelative } from './domain/projectPath.js';
 

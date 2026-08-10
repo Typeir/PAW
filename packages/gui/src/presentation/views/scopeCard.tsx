@@ -8,15 +8,20 @@
  * reports no enforcement. The grab is a live-wire frame; a page with no daemon
  * behind it has no client and the card renders nothing.
  *
+ * The list is shown in a stable order, not by recency, and the green pip marks
+ * whichever route matches the scope the snapshot reports — so grabbing one moves
+ * the pip to it rather than reshuffling the list under a pip that never moves.
+ *
  * @module @paw/gui/presentation/views/scopeCard
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
  */
 
-import { promoteRoute } from '@paw/core';
+import { sameRoute } from '@paw/core';
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { useLiveStatus, useScope } from '../../application/context/consoleContext.js';
+import { useConsoleData } from '../../application/hooks/useConsole.js';
 import { Button } from '../atoms/button.js';
 import { Card } from '../atoms/card.js';
 import { Placeholder } from '../atoms/placeholder.js';
@@ -29,6 +34,7 @@ import { Placeholder } from '../atoms/placeholder.js';
 export function ScopeCard() {
   const { recent: client, grab } = useScope();
   const { mode } = useLiveStatus();
+  const { root } = useConsoleData();
   const live = mode === 'live';
   const [routes, setRoutes] = useState<readonly string[]>([]);
   const [draft, setDraft] = useState('');
@@ -46,8 +52,12 @@ export function ScopeCard() {
 
   const grabRoute = (path: string): void => {
     grab(path);
-    setRoutes((current) => promoteRoute(current, path));
+    setRoutes((current) =>
+      current.some((entry) => sameRoute(entry, path)) ? current : [...current, path],
+    );
   };
+
+  const shown = [...routes].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
   const submit = (): void => {
     const path = draft.trim();
@@ -81,27 +91,27 @@ export function ScopeCard() {
             Grab
           </Button>
         </div>
-        {routes.length === 0 ? (
+        {shown.length === 0 ? (
           <Placeholder>— no recent routes —</Placeholder>
         ) : (
           <ul className='scope-recent'>
-            {routes.map((route, index) => (
-              <li key={route}>
-                <button
-                  type='button'
-                  className='scope-recent-item'
-                  disabled={!live}
-                  aria-current={index === 0 ? 'true' : undefined}
-                  onClick={() => grabRoute(route)}
-                >
-                  <span
-                    className={index === 0 ? 'scope-dot here' : 'scope-dot'}
-                    aria-hidden='true'
-                  />
-                  {route}
-                </button>
-              </li>
-            ))}
+            {shown.map((route) => {
+              const here = sameRoute(route, root);
+              return (
+                <li key={route}>
+                  <button
+                    type='button'
+                    className='scope-recent-item'
+                    disabled={!live}
+                    aria-current={here ? 'true' : undefined}
+                    onClick={() => grabRoute(route)}
+                  >
+                    <span className={here ? 'scope-dot here' : 'scope-dot'} aria-hidden='true' />
+                    {route}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
