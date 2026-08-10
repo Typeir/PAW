@@ -285,6 +285,7 @@ dl, dd { margin: 0; }
 .role-row .ok.warn { color: var(--warn); }
 .role-row .ok.crit { color: var(--crit); }
 
+.card.scope { margin-bottom: 2rem; }
 .scope-grab { display: flex; gap: 8px; margin-bottom: 12px; }
 .scope-route { flex: 1; font-family: var(--mono); font-size: 11.5px; padding: 5px 10px;
   border-radius: var(--r); border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); }
@@ -293,10 +294,14 @@ dl, dd { margin: 0; }
 .scope-recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .scope-recent-item { width: 100%; text-align: left; font-family: var(--mono); font-size: 11px;
   padding: 6px 10px; border-radius: var(--r); border: 1px solid var(--line-soft); background: var(--panel-2);
-  color: var(--ink-dim); cursor: pointer; }
+  color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; gap: 8px; }
 .scope-recent-item:hover:not([disabled]) { color: var(--ink); border-color: var(--line); }
 .scope-recent-item:active:not([disabled]) { transform: translateY(1px); }
 .scope-recent-item[disabled] { opacity: .5; cursor: not-allowed; }
+.scope-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--ink-faint); opacity: .4; }
+.scope-dot.here { background: var(--good); opacity: 1;
+  box-shadow: 0 0 6px color-mix(in oklab, var(--good) 80%, transparent); }
 
 .btn { font-family: var(--mono); font-size: 11px; padding: 5px 12px; border-radius: var(--r);
   border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-dim); cursor: pointer;

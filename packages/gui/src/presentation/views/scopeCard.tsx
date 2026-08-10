@@ -64,7 +64,7 @@ export function ScopeCard() {
   };
 
   return (
-    <Card title='Scope' meta={live ? 'grab a repository' : 'grab needs a live connection'}>
+    <Card variant='scope' title='Scope' meta={live ? 'grab a repository' : 'grab needs a live connection'}>
       <div className='pad'>
         {error !== null && <p className='ok crit'>{error}</p>}
         <div className='scope-grab'>
@@ -85,14 +85,19 @@ export function ScopeCard() {
           <Placeholder>— no recent routes —</Placeholder>
         ) : (
           <ul className='scope-recent'>
-            {routes.map((route) => (
+            {routes.map((route, index) => (
               <li key={route}>
                 <button
                   type='button'
                   className='scope-recent-item'
                   disabled={!live}
+                  aria-current={index === 0 ? 'true' : undefined}
                   onClick={() => grabRoute(route)}
                 >
+                  <span
+                    className={index === 0 ? 'scope-dot here' : 'scope-dot'}
+                    aria-hidden='true'
+                  />
                   {route}
                 </button>
               </li>

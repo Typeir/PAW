@@ -65,7 +65,6 @@ export function TitleBar() {
       <p className='wordmark'>
         <PawMark />
         <b>PAW</b>
-        <span>· Ikuisuus</span>
       </p>
       <p className='daemon'>
         {daemon.live && <span className='pulse' aria-hidden='true' />}

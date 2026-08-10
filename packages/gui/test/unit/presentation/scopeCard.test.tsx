@@ -72,6 +72,14 @@ describe('ScopeCard', () => {
     expect(screen.getByRole('button', { name: '/work/b' })).toBeInTheDocument();
   });
 
+  it('marks the current scope with a live pip on the newest route', async () => {
+    renderLive(recentClient());
+    const current = await screen.findByRole('button', { name: '/work/a' });
+    const older = screen.getByRole('button', { name: '/work/b' });
+    expect(current.querySelector('.scope-dot')).toHaveClass('here');
+    expect(older.querySelector('.scope-dot')).not.toHaveClass('here');
+  });
+
   it('disables grabbing until the console has a live connection', async () => {
     render(
       <ConsoleProvider snapshot={makeSnapshot()} recent={recentClient()}>
