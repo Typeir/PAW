@@ -17,7 +17,7 @@
     "@paw/gui": "file:../gui"
   },
   "devDependencies": {
-    "@types/node": "^20.19.39",
+    "@types/node": "^22.20.1",
     "electron": "^33.0.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.6.3"
