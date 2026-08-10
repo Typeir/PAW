@@ -16,8 +16,16 @@
 import type { RoleDoctorRow } from '@paw/core';
 import { Check as CheckIcon, Minus, X as XIcon } from 'lucide-react';
 import { useConsoleData } from '../../application/hooks/useConsole.js';
+import { useConfigClient } from '../../application/context/consoleContext.js';
+import { useBindingEditor } from '../../application/hooks/useBindingEditor.js';
 import { Card } from '../atoms/card.js';
 import { Crumb } from '../atoms/crumb.js';
+import { Select } from '../atoms/select.js';
+
+/**
+ * The value the "(unbound)" option carries in the model select.
+ */
+const UNBOUND = '';
 
 /**
  * The verdict glyph for one role row.
@@ -54,17 +62,35 @@ function Verdict({ row }: { readonly row: RoleDoctorRow }) {
  */
 export function RolesView() {
   const { doctor } = useConsoleData();
+  const editor = useBindingEditor(useConfigClient());
+  const options = [
+    { value: UNBOUND, label: '(unbound)' },
+    ...editor.models.map((model) => ({ value: model, label: model })),
+  ];
   return (
     <>
       <Crumb title='Roles' sub={`${doctor.roles.length} declared`} />
       <Card>
         <div className='pad'>
+          {editor.error !== null && <p className='ok crit'>{editor.error}</p>}
           <ul>
             {doctor.roles.map((row) => (
               <li className='role-row' key={row.role}>
                 <span className='rid'>{row.role}</span>
                 <span className='arr'>→</span>
-                <span className='model'>{row.boundTo ?? '(unbound)'}</span>
+                {editor.editable ? (
+                  <Select
+                    value={row.boundTo ?? UNBOUND}
+                    options={options}
+                    disabled={editor.pending}
+                    ariaLabel={`Model for ${row.role}`}
+                    onChange={(value) =>
+                      value === UNBOUND ? editor.unbind(row.role) : editor.bind(row.role, value)
+                    }
+                  />
+                ) : (
+                  <span className='model'>{row.boundTo ?? '(unbound)'}</span>
+                )}
                 <Verdict row={row} />
               </li>
             ))}

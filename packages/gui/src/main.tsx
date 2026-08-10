@@ -30,7 +30,7 @@ async function mount(): Promise<void> {
   if (!host) {
     throw new Error('PAW console: #app mount point is missing');
   }
-  const { snapshot, source, connect, treeSource, token } = await boot(
+  const { snapshot, source, connect, treeSource, config, token } = await boot(
     window as unknown as PawWindow & AuthWindow & SocketWindow,
     (url, init) => fetch(url, init),
     window.WebSocket,
@@ -42,6 +42,7 @@ async function mount(): Promise<void> {
       connect={connect}
       token={token}
       treeSource={treeSource}
+      config={config}
       controls={windowControls(window as ShellWindow)}
     />,
   );

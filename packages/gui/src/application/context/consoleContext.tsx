@@ -38,6 +38,7 @@ import { useLiveRefresh, type SnapshotSource } from '../hooks/useLiveRefresh.js'
 import { useLiveWire, type LiveMode } from '../hooks/useLiveWire.js';
 import type { SocketFactory } from '../../infrastructure/liveSocket.js';
 import type { TreeSource } from '../../infrastructure/snapshotSource.js';
+import type { ConfigClient } from '../../infrastructure/configClient.js';
 import type { Shell, WindowControls } from '../../infrastructure/shell.js';
 
 /**
@@ -82,6 +83,17 @@ export interface TreeAccess {
 }
 
 /**
+ * The binding editor's client, boxed so "no provider" (null) stays distinct from
+ * "provider present, static page with no daemon to edit" (a box holding null).
+ *
+ * @interface ConfigAccess
+ * @property {ConfigClient | null} client - The config client, or null when static.
+ */
+export interface ConfigAccess {
+  readonly client: ConfigClient | null;
+}
+
+/**
  * The shell the console is running in, and the window it may control.
  *
  * @interface ShellAccess
@@ -98,6 +110,7 @@ const DispatchContext = createContext<ConsoleDispatch | null>(null);
 const ErrorContext = createContext<LiveError | null>(null);
 const LiveContext = createContext<LiveStatus | null>(null);
 const TreeContext = createContext<TreeAccess | null>(null);
+const ConfigContext = createContext<ConfigAccess | null>(null);
 const ShellContext = createContext<ShellAccess | null>(null);
 
 /**
@@ -125,6 +138,7 @@ function useRequired<T>(context: Context<T | null>, hook: string): T {
  * @property {SocketFactory | null} [connect] - Opens the live socket; omit for a static page.
  * @property {string | null} [token] - The credential this tab adopted.
  * @property {TreeSource | null} [treeSource] - The repository tree source; omit for a static page.
+ * @property {ConfigClient | null} [config] - The binding editor's client; omit for a static page.
  * @property {WindowControls | null} [controls] - The desktop window's controls; omit in a browser.
  * @property {number} [intervalMs] - Poll period in milliseconds, for degraded mode.
  * @property {ReactNode} children - The console tree.
@@ -135,6 +149,7 @@ export interface ConsoleProviderProps {
   readonly connect?: SocketFactory | null;
   readonly token?: string | null;
   readonly treeSource?: TreeSource | null;
+  readonly config?: ConfigClient | null;
   readonly controls?: WindowControls | null;
   readonly intervalMs?: number;
   readonly children: ReactNode;
@@ -158,6 +173,7 @@ export function ConsoleProvider({
   connect = null,
   token = null,
   treeSource = null,
+  config = null,
   controls = null,
   intervalMs = DEFAULT_POLL_MS,
   children,
@@ -206,6 +222,7 @@ export function ConsoleProvider({
     [mode, wire.retryNow, message],
   );
   const tree = useMemo<TreeAccess>(() => ({ source: treeSource }), [treeSource]);
+  const configAccess = useMemo<ConfigAccess>(() => ({ client: config }), [config]);
   const shell = useMemo<ShellAccess>(
     () => ({ shell: controls === null ? 'web' : 'desktop', controls }),
     [controls],
@@ -217,7 +234,9 @@ export function ConsoleProvider({
         <ErrorContext.Provider value={{ message }}>
           <LiveContext.Provider value={live}>
             <TreeContext.Provider value={tree}>
-              <ShellContext.Provider value={shell}>{children}</ShellContext.Provider>
+              <ConfigContext.Provider value={configAccess}>
+                <ShellContext.Provider value={shell}>{children}</ShellContext.Provider>
+              </ConfigContext.Provider>
             </TreeContext.Provider>
           </LiveContext.Provider>
         </ErrorContext.Provider>
@@ -269,6 +288,15 @@ export function useLiveStatus(): LiveStatus {
  */
 export function useTreeSource(): TreeSource | null {
   return useRequired(TreeContext, 'useTreeSource').source;
+}
+
+/**
+ * The binding editor's client, or null when the page has no daemon behind it.
+ *
+ * @returns {ConfigClient | null} The config client.
+ */
+export function useConfigClient(): ConfigClient | null {
+  return useRequired(ConfigContext, 'useConfigClient').client;
 }
 
 /**

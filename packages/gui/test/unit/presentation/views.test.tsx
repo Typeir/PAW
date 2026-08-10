@@ -8,9 +8,11 @@
  * @module @paw/gui/test/unit/presentation/views
  */
 
-import { screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { ConsoleProvider } from '../../../src/application/context/consoleContext.js';
+import type { ConfigClient } from '../../../src/infrastructure/configClient.js';
 import { Rail } from '../../../src/presentation/chrome/rail.js';
 import { OverviewView, formatMb } from '../../../src/presentation/views/overviewView.js';
 import { PendingView } from '../../../src/presentation/views/pendingView.js';
@@ -18,6 +20,22 @@ import { RolesView } from '../../../src/presentation/views/rolesView.js';
 import { SectionOutlet } from '../../../src/presentation/views/sectionOutlet.js';
 import { ViolationsView } from '../../../src/presentation/views/violationsView.js';
 import { makeSnapshot, renderInConsole } from '../../fixtures.js';
+
+/** A config client whose declared models and write outcomes are set per test. */
+const configClient = (over: Partial<ConfigClient> = {}): ConfigClient => ({
+  models: async () => ['fast', 'slow'],
+  bind: async () => ({ ok: true }),
+  unbind: async () => ({ ok: true }),
+  ...over,
+});
+
+/** Render the Roles view over a config client, so it is editable. */
+const renderEditable = (client: ConfigClient) =>
+  render(
+    <ConsoleProvider snapshot={makeSnapshot()} config={client}>
+      <RolesView />
+    </ConsoleProvider>,
+  );
 
 describe('OverviewView', () => {
   it('shows the real host facts and the owned process table', () => {
@@ -80,13 +98,41 @@ describe('OverviewView', () => {
 });
 
 describe('RolesView', () => {
-  it('shows each binding with its verdict', () => {
+  it('shows each binding read-only when there is no daemon to edit', () => {
     renderInConsole(<RolesView />);
     expect(screen.getByText('3 declared')).toBeInTheDocument();
     expect(screen.getByText('ok')).toBeInTheDocument();
     expect(screen.getByText('optional')).toBeInTheDocument();
     expect(screen.getByText('blocked')).toBeInTheDocument();
     expect(screen.getByText('(unbound)')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Model for memory.draft' })).toBeNull();
+  });
+
+  it('binds a role to a chosen model over the client', async () => {
+    const bind = vi.fn(async () => ({ ok: true }));
+    renderEditable(configClient({ bind }));
+    await userEvent.click(screen.getByRole('button', { name: 'Model for memory.draft' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'fast' }));
+    expect(bind).toHaveBeenCalledWith('memory.draft', 'fast');
+  });
+
+  it('unbinds a role when (unbound) is chosen', async () => {
+    const unbind = vi.fn(async () => ({ ok: true }));
+    renderEditable(configClient({ unbind }));
+    await userEvent.click(screen.getByRole('button', { name: 'Model for lore.author' }));
+    await userEvent.click(await screen.findByRole('option', { name: '(unbound)' }));
+    expect(unbind).toHaveBeenCalledWith('lore.author');
+  });
+
+  it('surfaces why the declared models could not be read', async () => {
+    renderEditable(
+      configClient({
+        models: async () => {
+          throw new Error('offline');
+        },
+      }),
+    );
+    expect(await screen.findByText('could not read the declared models')).toBeInTheDocument();
   });
 });
 
