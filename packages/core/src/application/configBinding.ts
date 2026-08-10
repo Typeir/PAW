@@ -56,7 +56,8 @@ export function parseCapabilities(
   }
   const numbers = ['contextTokens', 'maxOutputTokens'] as const;
   for (const key of numbers) {
-    if (typeof value[key] !== 'number' || value[key] <= 0) {
+    const n = value[key];
+    if (typeof n !== 'number' || !Number.isFinite(n) || n <= 0) {
       return { ok: false, reason: `${key} must be a positive number` };
     }
   }

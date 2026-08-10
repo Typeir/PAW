@@ -28,6 +28,7 @@ import { readFile } from 'node:fs/promises';
 import { buildRegistry, runDoctor, type ModelPort } from '@paw/core';
 import { formatDoctor } from '../domain/format.js';
 import { runCheck } from './commands/check.js';
+import { runConfig } from './commands/config.js';
 import { runDaemonCommand } from './commands/daemonCommand.js';
 import { runGates } from './commands/gates.js';
 import { runInit } from './commands/init.js';
@@ -94,6 +95,9 @@ async function main(): Promise<number> {
   }
   if (command === 'violations') {
     return runViolations(rest, print);
+  }
+  if (command === 'config') {
+    return runConfig(rest, print);
   }
   if (command === 'doctor') {
     const config = await loadConfig(rest[0]);

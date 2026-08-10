@@ -42,9 +42,11 @@ describe('parseCapabilities', () => {
     expect(parseCapabilities(42).ok).toBe(false);
   });
 
-  it('refuses a non-positive number field', () => {
+  it('refuses a non-positive, non-numeric, or non-finite number field', () => {
     expect(parseCapabilities({ ...caps, contextTokens: 0 })).toMatchObject({ ok: false });
     expect(parseCapabilities({ ...caps, maxOutputTokens: 'x' })).toMatchObject({ ok: false });
+    expect(parseCapabilities({ ...caps, contextTokens: NaN })).toMatchObject({ ok: false });
+    expect(parseCapabilities({ ...caps, maxOutputTokens: Infinity })).toMatchObject({ ok: false });
   });
 
   it('refuses a non-boolean field', () => {
