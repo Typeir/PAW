@@ -66,7 +66,7 @@ export type {
 } from './domain/gate.js';
 
 export { validateConfig } from './domain/config.js';
-export type { ConfigProblem, PawConfig } from './domain/config.js';
+export type { ConfigDocument, ConfigProblem, PawConfig } from './domain/config.js';
 
 export { toProjectRelative } from './domain/projectPath.js';
 
@@ -176,7 +176,7 @@ export {
   parseCapabilities,
   setBinding,
 } from './application/configBinding.js';
-export type { ConfigDocument, ConfigEdit } from './application/configBinding.js';
+export type { ConfigEdit } from './application/configBinding.js';
 
 export { CONTEXT_HEADING, composeBrief } from './application/composeBrief.js';
 
@@ -220,6 +220,7 @@ export type {
 
 export type {
   ClockPort,
+  ConfigDocumentPort,
   ConfigPort,
   FileReaderPort,
   FileSystemPort,

@@ -13,22 +13,9 @@
  * @since 5.0.0
  */
 
+import type { ConfigDocument } from '../domain/config.js';
 import type { CostClass, ModelCapabilities } from '../domain/role.js';
 import { BUILTIN_ROLES } from './builtinRoles.js';
-
-/**
- * A repo's `.paw/config.json`, with the registry slice typed and the rest opaque
- * so an edit preserves fields it does not touch.
- *
- * @interface ConfigDocument
- * @property {Readonly<Record<string, ModelCapabilities>>} [models] - Declared models by id.
- * @property {Readonly<Record<string, string>>} [roles] - Role id → model id bindings.
- */
-export interface ConfigDocument {
-  readonly models?: Readonly<Record<string, ModelCapabilities>>;
-  readonly roles?: Readonly<Record<string, string>>;
-  readonly [key: string]: unknown;
-}
 
 /**
  * The outcome of an edit: the next document, or the reason it was refused.

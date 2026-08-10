@@ -12,13 +12,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import type { ConfigDocument } from '../../src/domain/config.js';
 import type { ModelCapabilities } from '../../src/domain/role.js';
 import {
   clearBinding,
   declareModel,
   parseCapabilities,
   setBinding,
-  type ConfigDocument,
 } from '../../src/application/configBinding.js';
 
 const caps: ModelCapabilities = {

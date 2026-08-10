@@ -15,6 +15,7 @@
  * @since 5.0.0
  */
 
+import type { ConfigDocument } from '../domain/config.js';
 import type { PawEvent, PawEventType, PawResponse } from '../domain/event.js';
 import type { HealthReport } from '../domain/gate.js';
 import type { Violation } from '../domain/violation.js';
@@ -97,6 +98,19 @@ export interface GateRunner {
 export interface ConfigPort {
   getConfig(key: string): Promise<string | null>;
   setConfig(key: string, value: string): Promise<void>;
+}
+
+/**
+ * Reads and writes a repo's `.paw/config.json` document whole. Bound to a repo at
+ * its composition root. The one seam through which a binding edit reaches disk.
+ *
+ * @interface ConfigDocumentPort
+ * @property {() => Promise<ConfigDocument>} read - Parse the current document; a repo with none reads as an empty document.
+ * @property {(config: ConfigDocument) => Promise<void>} write - Replace the document on disk.
+ */
+export interface ConfigDocumentPort {
+  read(): Promise<ConfigDocument>;
+  write(config: ConfigDocument): Promise<void>;
 }
 
 /**

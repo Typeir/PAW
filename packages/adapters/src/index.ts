@@ -12,6 +12,7 @@
  * @since 5.0.0
  */
 
+export { createNodeConfigDocument } from './config/nodeConfigDocument.js';
 export { createNodeFileReader, resolveInRoot } from './file/nodeFileReader.js';
 export { createGateCache } from './gate/gateCache.js';
 export { createNodeGateRunner } from './gate/nodeGateRunner.js';

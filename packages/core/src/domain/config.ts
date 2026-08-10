@@ -14,6 +14,8 @@
  * @since 5.0.0
  */
 
+import type { ModelCapabilities } from './role.js';
+
 /**
  * A repo's PAW configuration.
  *
@@ -32,6 +34,20 @@ export interface PawConfig {
   readonly hostPaths?: Readonly<Record<string, string>>;
   readonly exemptTools?: readonly string[];
   readonly sourceDirectories?: readonly string[];
+}
+
+/**
+ * A repo's `.paw/config.json` as parsed, with the registry slice typed and every
+ * other field passed through so an edit preserves what it does not touch.
+ *
+ * @interface ConfigDocument
+ * @property {Readonly<Record<string, ModelCapabilities>>} [models] - Declared models by id.
+ * @property {Readonly<Record<string, string>>} [roles] - Role id → model id bindings.
+ */
+export interface ConfigDocument {
+  readonly models?: Readonly<Record<string, ModelCapabilities>>;
+  readonly roles?: Readonly<Record<string, string>>;
+  readonly [key: string]: unknown;
 }
 
 /**
