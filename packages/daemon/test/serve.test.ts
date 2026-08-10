@@ -1276,7 +1276,7 @@ describe('runDaemon co-hosting enforcement', () => {
     connectors: {},
   });
 
-  const scope = (deps: DispatchHookDeps, control = false) => ({
+  const scope = (deps: DispatchHookDeps, control = false) => () => ({
     socketPath: endpoint,
     configure: async () => ({ token: 'T', deps }),
     ...(control ? { control: { pid: 4242, now: () => 1000, onStop: () => undefined } } : {}),
@@ -1318,11 +1318,11 @@ describe('runDaemon co-hosting enforcement', () => {
     let stopped = 0;
     await runDaemon(
       {
-        enforcement: {
+        enforcement: () => ({
           socketPath: endpoint,
           configure: async () => ({ token: 'T', deps: makeDeps() }),
           control: { pid: 4242, now: () => 1000, onStop: () => { stopped += 1; } },
-        },
+        }),
       },
       rig.runtime,
     );
@@ -1351,12 +1351,12 @@ describe('runDaemon co-hosting enforcement', () => {
     await expect(
       runDaemon(
         {
-          enforcement: {
+          enforcement: () => ({
             socketPath: endpoint,
             configure: async () => {
               throw new Error('store down');
             },
-          },
+          }),
         },
         makeRig().runtime,
       ),
@@ -1374,5 +1374,60 @@ describe('runDaemon co-hosting enforcement', () => {
     await expect(runDaemon({ enforcement: scope(makeDeps()) }, rig.runtime)).rejects.toThrow('port taken');
     const again = await runDaemon({ enforcement: scope(makeDeps()) }, makeRig().runtime);
     await again.close();
+  });
+
+  it('roams: rescope closes the old socket and serves the new repo', async () => {
+    const rootB = mkdtempSync(join(tmpdir(), 'paw-cohost-b-'));
+    const endpointB = socketPath(rootB, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: rootB });
+    const daemon = await runDaemon(
+      {
+        root,
+        enforcement: (r) => ({
+          socketPath: r === rootB ? endpointB : endpoint,
+          configure: async () => ({ token: 'T', deps: makeDeps() }),
+        }),
+      },
+      makeRig().runtime,
+    );
+
+    await daemon.rescope(rootB);
+
+    const c = openSocket(endpointB);
+    await c.ready;
+    expect((await c.send(1, 'connect', { token: 'T', protocolVersion: 1 })).result).toMatchObject({
+      health: 'ok',
+      projectRoot: rootB,
+    });
+    c.close();
+
+    await daemon.close();
+    rmSync(rootB, { recursive: true, force: true });
+  });
+
+  it('reports, without crashing, when the new repo cannot be served', async () => {
+    const rootB = mkdtempSync(join(tmpdir(), 'paw-cohost-c-'));
+    const endpointB = socketPath(rootB, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: rootB });
+    const rig = makeRig();
+    const daemon = await runDaemon(
+      {
+        root,
+        enforcement: (r) => ({
+          socketPath: r === rootB ? endpointB : endpoint,
+          configure:
+            r === rootB
+              ? async () => {
+                  throw new Error('B store down');
+                }
+              : async () => ({ token: 'T', deps: makeDeps() }),
+        }),
+      },
+      rig.runtime,
+    );
+
+    await daemon.rescope(rootB);
+    expect(rig.warnings.some((w) => w.includes('could not serve enforcement'))).toBe(true);
+
+    await daemon.close();
+    rmSync(rootB, { recursive: true, force: true });
   });
 });

@@ -57,6 +57,7 @@ import {
   type DaemonOptions,
   type DaemonRuntime,
   type Dispatcher,
+  type EnforcementScope,
   type RunReport,
   type ServerHandle,
   type SocketHooks,
@@ -337,14 +338,51 @@ export async function runDaemon(
     }
   };
 
+  let store: StorePort | undefined;
+  let enforcement: SocketServerHandle | undefined;
+  let close!: () => Promise<void>;
+
+  /**
+   * Claim the enforcement socket for the current root, open its store, and serve
+   * the enforcement methods. Closes the claim if configure or serve throws.
+   *
+   * @param {EnforcementScope} scope - The socket and configure for the current root.
+   */
+  const openEnforcement = async (scope: EnforcementScope): Promise<void> => {
+    const claimed = await bindSocket(scope.socketPath);
+    try {
+      const configured = await scope.configure();
+      store = configured.deps.store;
+      const hello = {
+        protocolVersion: RPC_PROTOCOL_VERSION,
+        projectRoot: root,
+        capabilities: ['gates', 'violations'],
+        health: 'ok',
+      };
+      const methods = enforcementMethods(configured.deps, {
+        projectRoot: root,
+        resetIdle: () => undefined,
+        close: () => close(),
+        ...(scope.control === undefined ? {} : { control: scope.control }),
+      });
+      enforcement = serveSessions(claimed, () =>
+        createRpcSession({
+          token: configured.token,
+          protocolVersion: RPC_PROTOCOL_VERSION,
+          hello,
+          methods,
+        }),
+      );
+    } catch (error: unknown) {
+      await new Promise<void>((done) => claimed.close(() => done()));
+      throw error;
+    }
+  };
+
   /**
    * Point the daemon at another repository and republish everything derived
-   * from it.
-   *
-   * A read: it changes what is looked at and writes nothing. Every slice below
-   * is already re-derived when files change, so re-rooting reuses that rather
-   * than restarting — open consoles keep their sockets and are told the new
-   * state, instead of being dropped and made to reconnect.
+   * from it. Enforcement roams with the scope: the old socket and store are
+   * dropped and the new repo's are served, so the daemon holds exactly one repo.
    *
    * @param {string} next - The repository to serve.
    */
@@ -365,6 +403,18 @@ export async function runDaemon(
     doctor = runDoctor(config, registry, KNOWN_CONNECTORS);
     plansSlice = { plans: discoverPlans(entries), configPath };
     tree = buildFileTree(entries);
+    if (options.enforcement) {
+      if (enforcement !== undefined) {
+        await enforcement.close();
+        enforcement = undefined;
+      }
+      store = undefined;
+      try {
+        await openEnforcement(options.enforcement(next));
+      } catch (error: unknown) {
+        report(`could not serve enforcement for ${next}: ${reason(error)}`, 'error');
+      }
+    }
     bus.publish('plans', plansSlice);
     bus.publish('tree', tree);
     bus.publish('doctor', doctor);
@@ -437,8 +487,6 @@ export async function runDaemon(
   let run: RunProgress | undefined;
   let budget: BudgetSummary | undefined;
   let socket = `${LOOPBACK}:${port}`;
-  let store: StorePort | undefined;
-  let enforcement: SocketServerHandle | undefined;
   const snapshot = async (asked: string | null = openedOn): Promise<PawSnapshot> => {
     const selected = selectPlan(asked, plansSlice.plans);
     return composeSnapshot({
@@ -515,38 +563,9 @@ export async function runDaemon(
   // intervals behind on that path means a daemon that failed to start is still
   // reading the process table every three seconds for the life of the process.
   let server: ServerHandle;
-  let close!: () => Promise<void>;
   try {
     if (options.enforcement) {
-      const scope = options.enforcement;
-      const claimed = await bindSocket(scope.socketPath);
-      try {
-        const configured = await scope.configure();
-        store = configured.deps.store;
-        const hello = {
-          protocolVersion: RPC_PROTOCOL_VERSION,
-          projectRoot: root,
-          capabilities: ['gates', 'violations'],
-          health: 'ok',
-        };
-        const methods = enforcementMethods(configured.deps, {
-          projectRoot: root,
-          resetIdle: () => undefined,
-          close: () => close(),
-          ...(scope.control === undefined ? {} : { control: scope.control }),
-        });
-        enforcement = serveSessions(claimed, () =>
-          createRpcSession({
-            token: configured.token,
-            protocolVersion: RPC_PROTOCOL_VERSION,
-            hello,
-            methods,
-          }),
-        );
-      } catch (error: unknown) {
-        await new Promise<void>((done) => claimed.close(() => done()));
-        throw error;
-      }
+      await openEnforcement(options.enforcement(root));
     }
     server = await runtime.listen(
       async (request) =>
