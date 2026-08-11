@@ -1,14 +1,9 @@
 /**
  * PAW Role Registry
  *
- * @fileoverview Resolves a role to a runnable model handle, and validates every
- * binding (`doctor`). This is the seam that keeps the provider swappable: a
- * binding carries a {@link ModelPort} — an interface an adapter implements — so
- * this module, and everything above it, knows only "a model I can call". The
- * Copilot SDK is one such adapter and is never named here; changing herder
- * provider is a change to which adapter a binding holds, one file, not a rewrite
- * that ripples through the codebase. Decoupled today, while the surface is small,
- * rather than at fifty times the size.
+ * @fileoverview Resolve role to runnable model handle. Validate every binding
+ * (`doctor`). Binding carry {@link ModelPort}, interface adapter implement.
+ * Module and all above know only abstract model. Swap provider, swap adapter binding.
  *
  * @module @paw/core/application/roleRegistry
  * @version 0.0.0
@@ -25,14 +20,13 @@ import {
 import type { ModelPort } from '../ports/index.js';
 
 /**
- * A model bound to a role: which model, what it can do, and the port that runs
- * it. The port is the provider boundary — copilot-sdk, openai-compatible,
- * ollama — and nothing outside the adapter knows which.
+ * Model bound to role: model id, capabilities, port that run it. Port be provider
+ * boundary (copilot-sdk, openai-compatible, ollama). Nothing outside adapter know which.
  *
  * @interface ModelBinding
- * @property {string} modelId - Provider-local model id passed to the port.
- * @property {ModelCapabilities} capabilities - Declared capabilities, validated against the role.
- * @property {ModelPort} port - The adapter that runs completions for this binding.
+ * @property {string} modelId - Provider-local model id, passed to port.
+ * @property {ModelCapabilities} capabilities - Declared capabilities, validated against role.
+ * @property {ModelPort} port - Adapter that run completions for this binding.
  */
 export interface ModelBinding {
   readonly modelId: string;
@@ -41,13 +35,12 @@ export interface ModelBinding {
 }
 
 /**
- * A resolved, runnable model. The caller runs `port.complete({ model: modelId, … })`;
- * whichever provider is behind the port is immaterial.
+ * Runnable model, resolved. Caller run `port.complete({ model: modelId, … })`.
  *
  * @interface ModelHandle
- * @property {ModelPort} port - The port to call.
- * @property {string} modelId - The model id to pass.
- * @property {number} maxOutputTokens - The bound model's output ceiling, carried so a caller can spend it. Dropping it here meant every request fell back to whatever default the provider adapter guessed, and long answers were silently cut off mid-sentence.
+ * @property {ModelPort} port - Port to call.
+ * @property {string} modelId - Model id to pass.
+ * @property {number} maxOutputTokens - Bound model output ceiling.
  */
 export interface ModelHandle {
   readonly port: ModelPort;
@@ -56,10 +49,10 @@ export interface ModelHandle {
 }
 
 /**
- * The role declarations and their bindings, as the daemon holds them.
+ * Role declarations and bindings, as daemon hold them.
  *
  * @interface RoleRegistry
- * @property {ReadonlyMap<string, RoleDeclaration>} declarations - Declared roles by id.
+ * @property {ReadonlyMap<string, RoleDeclaration>} declarations - Declared roles, by id.
  * @property {ReadonlyMap<string, ModelBinding>} bindings - Role id → bound model.
  */
 export interface RoleRegistry {
@@ -68,14 +61,14 @@ export interface RoleRegistry {
 }
 
 /**
- * One row of the role doctor.
+ * One row of role doctor.
  *
  * @interface RoleDoctorRow
- * @property {string} role - The role id.
- * @property {boolean} optional - Whether the role is optional.
- * @property {string | null} boundTo - The bound model id, or null when unbound.
- * @property {Satisfaction | null} satisfaction - The satisfaction verdict, or null when unbound.
- * @property {boolean} blocking - True when this row should block a release: a required role that is unbound or unsatisfied.
+ * @property {string} role - Role id.
+ * @property {boolean} optional - Role optional or not.
+ * @property {string | null} boundTo - Bound model id, null when unbound.
+ * @property {Satisfaction | null} satisfaction - Satisfaction verdict, null when unbound.
+ * @property {boolean} blocking - True when row block release: required role unbound or unsatisfied.
  */
 export interface RoleDoctorRow {
   readonly role: string;
@@ -86,7 +79,7 @@ export interface RoleDoctorRow {
 }
 
 /**
- * Validate every declared role against its binding.
+ * Validate every declared role against binding.
  *
  * @param {RoleRegistry} registry - Declarations and bindings.
  * @returns {RoleDoctorRow[]} One row per declared role.
@@ -118,12 +111,12 @@ export function doctorRoles(registry: RoleRegistry): RoleDoctorRow[] {
 }
 
 /**
- * Resolve a role to a runnable model handle.
+ * Resolve role to runnable model handle.
  *
  * @param {RoleRegistry} registry - Declarations and bindings.
- * @param {string} roleId - The role to resolve.
- * @returns {ModelHandle | null} A handle, or null when an OPTIONAL role is unbound or unsatisfied. Per CONSTRAINTS.md Constraint 3 the null is a loud, handled degradation, not a hiding place: the caller MUST surface it (a logged skip / a `role.unavailable` event), never quietly move on.
- * @throws {Error} When the role is unknown, or a REQUIRED role is unbound or unsatisfied — failing loudly rather than shipping a swarm that runs and produces nothing.
+ * @param {string} roleId - Role to resolve.
+ * @returns {ModelHandle | null} Handle, or null when OPTIONAL role unbound or unsatisfied. Per CONSTRAINTS.md Constraint 3, caller MUST surface null (logged skip or `role.unavailable` event).
+ * @throws {Error} When role unknown, or REQUIRED role unbound or unsatisfied.
  */
 export function resolveModel(
   registry: RoleRegistry,

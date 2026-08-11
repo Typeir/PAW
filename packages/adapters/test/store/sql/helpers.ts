@@ -1,10 +1,7 @@
 /**
  * PAW SQL Store Test Helpers
  *
- * @fileoverview Opens real database engines in memory so the store suites run
- * against the SQL they will actually execute. `node:sqlite` is probed rather
- * than imported at module load, because the engine is absent or blocked on some
- * managed machines and its absence must skip a test rather than fail the file.
+ * @fileoverview Open real database engine in memory. Store suite run against SQL engine execute. Probe `node:sqlite` at call time via dynamic import. Absence on managed machine skip test.
  *
  * @module @paw/adapters/test/store/sql/helpers
  * @version 0.0.0
@@ -17,10 +14,9 @@ import { createNodeSqliteDriver } from '../../../src/store/sql/nodeSqliteDriver.
 import { createSqlJsDriver } from '../../../src/store/sql/sqlJsDriver.js';
 
 /**
- * Open an in-memory sql.js driver. Persistence is discarded — the suite is
- * exercising SQL semantics, not the write-back path, which has its own test.
+ * Open in-memory sql.js driver. Persistence discarded.
  *
- * @returns {Promise<SqlDriver>} A driver over a fresh in-memory database.
+ * @returns {Promise<SqlDriver>} Driver over fresh in-memory database.
  */
 export async function openSqlJsMemoryDriver(): Promise<SqlDriver> {
   const initSqlJs = (await import('sql.js')).default;
@@ -29,10 +25,9 @@ export async function openSqlJsMemoryDriver(): Promise<SqlDriver> {
 }
 
 /**
- * Open an in-memory `node:sqlite` driver, or null when the engine is
- * unavailable on this machine.
+ * Open in-memory `node:sqlite` driver, or null when engine unavailable on machine.
  *
- * @returns {Promise<SqlDriver | null>} A driver, or null when unavailable.
+ * @returns {Promise<SqlDriver | null>} Driver, or null when unavailable.
  */
 export async function openNodeSqliteMemoryDriver(): Promise<SqlDriver | null> {
   try {

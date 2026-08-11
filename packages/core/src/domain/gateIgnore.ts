@@ -1,18 +1,17 @@
 /**
  * PAW Gate-Ignore Directives
  *
- * @fileoverview Parses `paw:gate:` suppression directives from source text and
- * decides whether a finding is suppressed. Pure string work with no filesystem
- * access — the gate orchestrator hands it file contents. Ported from the legacy
- * `gateIgnore.ts` and given a testable seam: `parseIgnoreDirectives` builds the
- * directive index once per file, `isSuppressed` queries it per finding.
+ * @fileoverview Parse `paw:gate:` suppression directive from source text, see
+ * if finding suppressed. Pure string work, no filesystem access — gate
+ * orchestrator hands file contents. Port from legacy `gateIgnore.ts`. Split
+ * work into two functions: `parseIgnoreDirectives` build directive index once
+ * per file, `isSuppressed` query it per finding.
  *
- * The directive body is `paw:gate:{id}[:{rule}] (ignore|ignore-nextline)`,
- * wrapped in any comment style: a TypeScript block comment, an MDX JSX comment
- * (`{`-block-`}`), or an HTML comment (`<!-- -->`). `ignore` suppresses the
- * whole file; `ignore-nextline` suppresses only the following line. Both the
- * gate id and the optional rule id are case-insensitive, and `*` is the
- * wildcard for either.
+ * Directive body be `paw:gate:{id}[:{rule}] (ignore|ignore-nextline)`, wrapped
+ * in any comment style: TypeScript block comment, MDX JSX comment
+ * (`{`-block-`}`), or HTML comment (`<!-- -->`). `ignore` suppress whole file;
+ * `ignore-nextline` suppress only next line. Both gate id and optional rule id
+ * be case-insensitive, `*` wildcard for either.
  *
  * @module @paw/core/domain/gateIgnore
  * @version 0.0.0
@@ -24,8 +23,8 @@
  * Parsed suppression directives for one file.
  *
  * @interface IgnoreDirectives
- * @property {Map<string, Set<string>>} fileLevel - Gate id → suppressed rule ids ('*' suppresses all rules for that gate), applied to the whole file.
- * @property {Map<number, Map<string, Set<string>>>} nextLine - 1-based target line → gate id → suppressed rule ids, applied to that line only.
+ * @property {Map<string, Set<string>>} fileLevel - Gate id → suppressed rule ids ('*' suppress all rules for that gate), apply to whole file.
+ * @property {Map<number, Map<string, Set<string>>>} nextLine - 1-based target line → gate id → suppressed rule ids, apply to that line only.
  */
 export interface IgnoreDirectives {
   readonly fileLevel: Map<string, Set<string>>;
@@ -33,23 +32,23 @@ export interface IgnoreDirectives {
 }
 
 /**
- * Build a fresh directive regex. A new instance per parse avoids shared
+ * Build fresh directive regex. New instance per parse avoid shared
  * `lastIndex` state between calls.
  *
- * @returns {RegExp} A global, case-insensitive directive matcher.
+ * @returns {RegExp} Global, case-insensitive directive matcher.
  */
 function directivePattern(): RegExp {
   return /(?:\/\*|\{\/\*|<!--)\s*paw:gate:([\w*-]+)(?::([\w*-]+))?\s+(ignore(?:-nextline)?)\s*(?:\*\/\}|\*\/|-->)/gi;
 }
 
 /**
- * Record one parsed directive into the file-level or next-line index.
+ * Record one parsed directive into file-level or next-line index.
  *
- * @param {IgnoreDirectives} into - The index being built.
- * @param {number} lineIndex - Zero-based index of the line the directive is on.
+ * @param {IgnoreDirectives} into - Index being built.
+ * @param {number} lineIndex - Zero-based index of line directive on.
  * @param {string} gateId - Lower-cased gate id (or '*').
  * @param {string} rule - Lower-cased rule id (or '*').
- * @param {string} mode - Either `ignore` or `ignore-nextline`.
+ * @param {string} mode - `ignore` or `ignore-nextline`.
  */
 function record(
   into: IgnoreDirectives,
@@ -73,10 +72,10 @@ function record(
 }
 
 /**
- * Parse all `paw:gate:` directives from a file's source text.
+ * Parse all `paw:gate:` directives from file source text.
  *
  * @param {string} content - Full file source.
- * @returns {IgnoreDirectives} The parsed directive index.
+ * @returns {IgnoreDirectives} Parsed directive index.
  */
 export function parseIgnoreDirectives(content: string): IgnoreDirectives {
   const result: IgnoreDirectives = {
@@ -93,21 +92,21 @@ export function parseIgnoreDirectives(content: string): IgnoreDirectives {
 }
 
 /**
- * Normalise an id for comparison: dashes stripped, lower-cased. Lets
+ * Normalise id for comparison: strip dashes, lower-case. Make
  * `file-length` and `filelength` match.
  *
- * @param {string} id - A gate or rule id.
- * @returns {string} The normalised form.
+ * @param {string} id - Gate or rule id.
+ * @returns {string} Normalised form.
  */
 function normalizeId(id: string): string {
   return id.replace(/-/g, '').toLowerCase();
 }
 
 /**
- * Whether a suppression gate id matches the finding's gate.
+ * Suppression gate id match finding gate?
  *
- * @param {string} id - A gate id from a directive.
- * @param {string} gateId - The finding's gate id.
+ * @param {string} id - Gate id from directive.
+ * @param {string} gateId - Finding gate id.
  * @returns {boolean} True when they match (including `*`).
  */
 function matchesGate(id: string, gateId: string): boolean {
@@ -115,10 +114,10 @@ function matchesGate(id: string, gateId: string): boolean {
 }
 
 /**
- * Whether a directive's rule set covers the finding's rule.
+ * Directive rule set cover finding rule?
  *
- * @param {Set<string>} rules - Suppressed rule ids for a gate.
- * @param {string} rule - The finding's rule id.
+ * @param {Set<string>} rules - Suppressed rule ids for gate.
+ * @param {string} rule - Finding rule id.
  * @returns {boolean} True when covered (including `*`).
  */
 function matchesRule(rules: Set<string>, rule: string): boolean {
@@ -126,13 +125,13 @@ function matchesRule(rules: Set<string>, rule: string): boolean {
 }
 
 /**
- * Whether a finding is suppressed by the parsed directives.
+ * Finding suppressed by parsed directives?
  *
- * @param {IgnoreDirectives} directives - Parsed directives for the finding's file.
- * @param {string} gateId - Id of the gate producing the finding.
+ * @param {IgnoreDirectives} directives - Parsed directives for finding file.
+ * @param {string} gateId - Id of gate producing finding.
  * @param {string} rule - Rule identifier within that gate.
- * @param {number} [line] - 1-based line number of the finding, if known.
- * @returns {boolean} True when the finding should be removed.
+ * @param {number} [line] - 1-based line number of finding, if known.
+ * @returns {boolean} True when finding should be removed.
  */
 export function isSuppressed(
   directives: IgnoreDirectives,

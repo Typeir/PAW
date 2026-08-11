@@ -1,12 +1,9 @@
 /**
  * PAW Built-in Role Declarations
  *
- * @fileoverview The capability contracts PAW's own subsystems declare, as data.
- * These live in core, not in a consumer, because a subsystem knows what it needs
- * regardless of which face (CLI, TUI, GUI) is driving; a repo binds them to models
- * in its config and {@link buildRegistry} validates the binding. Roles live in
- * code because a subsystem knows what it needs; models live in config because a
- * user knows what they will pay for.
+ * @fileoverview Capability contracts PAW subsystems declare, as data. Live in
+ * core. Repo bind them to models in its config; {@link buildRegistry} validate
+ * binding. Roles be code; models be config.
  *
  * @module @paw/core/application/builtinRoles
  * @version 0.0.0
@@ -17,7 +14,7 @@
 import type { RoleDeclaration } from '../domain/role.js';
 
 /**
- * The roles PAW declares. Optional roles degrade loudly when unbound; required
+ * Roles PAW declare. Optional roles degrade loudly when unbound; required
  * roles block until bound and satisfied.
  *
  * @constant

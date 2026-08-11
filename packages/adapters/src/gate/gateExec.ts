@@ -1,12 +1,12 @@
 /**
  * PAW Gate Execution
  *
- * @fileoverview The gate-running the cold {@link module:@paw/adapters/gate/nodeGateRunner}
- * and the warm {@link module:@paw/adapters/gate/gateCache} share: building the
- * single-file {@link GateContext}, running each gate (containing a throw as a
- * critical `gate-error`), and assembling the {@link HealthReport}. The two differ
- * only in how they load the gate modules — import-per-call vs cache with
- * mtime-invalidation — so that stays with each; everything downstream is here.
+ * @fileoverview Gate-run shared by cold {@link module:@paw/adapters/gate/nodeGateRunner}
+ * and warm {@link module:@paw/adapters/gate/gateCache}. Build single-file
+ * {@link GateContext}, run each gate (catch throw as critical
+ * `gate-error`), assemble {@link HealthReport}. Gate-module loading —
+ * import-per-call vs cache with mtime-invalidation — stay with each loader.
+ * Downstream steps live here.
  *
  * @module @paw/adapters/gate/gateExec
  * @version 0.0.0
@@ -25,16 +25,16 @@ import type {
 } from '@paw/core';
 
 /**
- * The gate file names both loaders accept: import-loadable TS/JS modules.
+ * Gate file names both loaders accept: import-loadable TS/JS modules.
  */
 export const GATE_FILE = /\.gate\.(mts|cts|ts|mjs|cjs|js)$/;
 
 /**
- * Build the single-file context a gate receives, scoped to the edited paths.
+ * Build single-file context gate get, scoped to edited paths.
  *
  * @param {string} rootDir - Absolute project root.
- * @param {readonly string[]} relativePaths - Edited paths relative to the root.
- * @returns {GateContext} The context, in changed-only mode over those paths.
+ * @param {readonly string[]} relativePaths - Edited paths relative to root.
+ * @returns {GateContext} Context, changed-only mode over those paths.
  */
 function singleFileContext(
   rootDir: string,
@@ -57,7 +57,7 @@ function singleFileContext(
           await fs.access(path.join(rootDir, f));
           existing.push(f);
         } catch {
-          /* deleted since the edit — nothing left to check, not a gate error */
+          /* deleted since edit — nothing left to check, not gate error */
         }
       }
       return existing;
@@ -84,12 +84,12 @@ function singleFileContext(
 }
 
 /**
- * Run one gate, deriving `passed` from its findings and containing any throw as a
- * critical `gate-error` so a broken gate surfaces rather than crashing the run.
+ * Run one gate. Derive `passed` from its findings; contain any throw as
+ * critical `gate-error`.
  *
- * @param {QualityGate} gate - The gate to run.
- * @param {GateContext} context - The shared context.
- * @returns {Promise<GateResult>} The gate's result.
+ * @param {QualityGate} gate - Gate to run.
+ * @param {GateContext} context - Shared context.
+ * @returns {Promise<GateResult>} Gate's result.
  */
 async function runGate(
   gate: QualityGate,
@@ -133,11 +133,11 @@ async function runGate(
 }
 
 /**
- * Assemble the report from per-gate results.
+ * Assemble report from per-gate results.
  *
- * @param {GateResult[]} results - The gate results.
- * @param {readonly string[]} relativePaths - The gated paths.
- * @returns {HealthReport} The aggregate report.
+ * @param {GateResult[]} results - Gate results.
+ * @param {readonly string[]} relativePaths - Gated paths.
+ * @returns {HealthReport} Aggregate report.
  */
 function assemble(
   results: GateResult[],
@@ -161,13 +161,13 @@ function assemble(
 }
 
 /**
- * Run a set of already-loaded gates against the edited files and assemble the
- * report — the half both loaders share.
+ * Run already-loaded gates against edited files, assemble report.
+ * Shared by both loaders.
  *
  * @param {string} rootDir - Absolute project root.
- * @param {readonly string[]} relativePaths - Edited paths relative to the root.
- * @param {readonly QualityGate[]} gates - The gates to run.
- * @returns {Promise<HealthReport>} The report.
+ * @param {readonly string[]} relativePaths - Edited paths relative to root.
+ * @param {readonly QualityGate[]} gates - Gates to run.
+ * @returns {Promise<HealthReport>} Report.
  */
 export async function executeGates(
   rootDir: string,

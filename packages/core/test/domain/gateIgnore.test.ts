@@ -1,10 +1,7 @@
 /**
  * PAW Gate-Ignore Tests
  *
- * @fileoverview Exercises every branch of the directive parser and the
- * suppression query — all three comment styles, file-level vs next-line,
- * gate and rule wildcards, dash-insensitive id matching, and the non-match
- * paths — so `gateIgnore.ts` reaches 100%.
+ * @fileoverview Exercise every branch of directive parser and suppression query. Get 100% coverage of `gateIgnore.ts`: all three comment styles, file-level and next-line, gate and rule wildcards, dash-insensitive id matching, non-match paths.
  *
  * @module @paw/core/test/domain/gateIgnore
  * @version 0.0.0

@@ -1,23 +1,21 @@
 /**
  * PAW Console Live Event Application
  *
- * @fileoverview The twin of {@link hydrate}, for the wire that arrives a slice at
- * a time. `hydrate` maps a whole snapshot into {@link ConsoleData}; this maps one
- * topic's new value onto the data already held, and it is the only place a live
- * frame is allowed to change console state.
+ * @fileoverview Twin of {@link hydrate}, for wire come slice by slice.
+ * `hydrate` map whole snapshot into {@link ConsoleData}; this map one topic
+ * new value onto data already hold. Only place live frame can change console
+ * state.
  *
- * Two rules, and both are the anti-corruption layer doing its job.
+ * Two rules. Both be anti-corruption layer do its job.
  *
- * **A slice replaces, never merges.** Every payload on this wire is the full new
- * value of its slice, so there is no patching, no deep merge, and no way to end
- * up holding half of an old plan and half of a new one. `hello` replaces
- * everything by going through `hydrate`, which is also where the producer's
- * per-member arrays are checked against its own member count.
+ * **Slice replace, never merge.** Every payload on this wire be full new value
+ * of its slice. No patching, no deep merge, no way to end up hold half old plan
+ * and half new one. `hello` replace everything by go through `hydrate`, which
+ * also check the producer per-member arrays against own member count.
  *
- * **A topic the console has no arm for changes nothing.** `error` and `log` are
- * carried by the wire and are not console *data*; they are surfaced elsewhere.
- * Returning the input unchanged is the correct answer for them, and it means a
- * future topic added on the daemon side cannot corrupt an older console.
+ * **Topic console have no arm for change nothing.** `error` and `log` carried
+ * by wire, not console *data*; surface elsewhere. Return input unchanged for
+ * them. Future topic on daemon side cannot corrupt older console.
  *
  * @module @paw/gui/application/applyLiveEvent
  * @version 0.0.0
@@ -41,11 +39,11 @@ import type { ConsoleData } from '../domain/console.types.js';
 import { hydrate } from './hydrateSnapshot.js';
 
 /**
- * Fold one live frame into the console's data.
+ * Fold one live frame into console data.
  *
- * @param {ConsoleData} data - What the console currently holds.
+ * @param {ConsoleData} data - Console hold now.
  * @param {LiveEnvelope} event - The frame.
- * @returns {ConsoleData} The new data, or the same object when nothing changed.
+ * @returns {ConsoleData} New data, or same object when nothing change.
  */
 export function applyLiveEvent(data: ConsoleData, event: LiveEnvelope): ConsoleData {
   switch (event.topic) {
@@ -64,8 +62,8 @@ export function applyLiveEvent(data: ConsoleData, event: LiveEnvelope): ConsoleD
     }
 
     case 'attach': {
-      // A landed (re)scope reports the repository the daemon now serves; a
-      // request in flight, refused, or failed leaves the console where it is.
+      // Landed (re)scope report repo daemon now serve. Request in flight,
+      // refused, or failed leave console where it be.
       const attach = event.data as AttachState;
       const scoped = attach.status === 'idle' || attach.status === 'unconfigured';
       return scoped && attach.path !== null ? { ...data, root: attach.path } : data;

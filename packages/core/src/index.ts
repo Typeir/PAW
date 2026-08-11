@@ -1,10 +1,10 @@
 /**
- * PAW Core — Public API
+ * PAW Core — public API
  *
- * @fileoverview The pure library that `cli`, `tui`, `gui`, and `daemon` consume.
- * Re-exports the domain, the application use-cases, and the ports; imports
- * nothing outside `node:*` and its own modules, and is the only surface
- * consumers are permitted to depend on.
+ * @fileoverview Pure library. `cli`, `tui`, `gui`, `daemon` all import from
+ * this package. Re-export domain, app use-cases, and ports. Import nothing
+ * outside `node:*` and own modules. Only surface consumers allowed to depend
+ * on.
  *
  * @module @paw/core
  * @version 0.0.0
@@ -68,7 +68,13 @@ export type {
 export { validateConfig } from './domain/config.js';
 export type { ConfigDocument, ConfigProblem, PawConfig } from './domain/config.js';
 
-export { RECENT_ROUTES_CAP, promoteRoute, sameRoute } from './domain/recentRoutes.js';
+export {
+  RECENT_ROUTES_CAP,
+  isAbsoluteRoute,
+  promoteRoute,
+  removeRoute,
+  sameRoute,
+} from './domain/recentRoutes.js';
 
 export { toProjectRelative } from './domain/projectPath.js';
 
@@ -97,12 +103,14 @@ export {
 export type { IgnoreDirectives } from './domain/gateIgnore.js';
 
 export {
+  composeSystemSections,
   contextOf,
   doctorPlan,
   memberCount,
   planKey,
   renderBrief,
   targetsOf,
+  toolsOf,
 } from './domain/swarm.js';
 export type { DoctorFinding, SwarmPlan } from './domain/swarm.js';
 

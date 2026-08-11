@@ -1,14 +1,11 @@
 /**
  * PAW Project Path
  *
- * @fileoverview A host may hand PAW absolute paths (VS Code Copilot sends
- * `c:\repo\src\a.ts`), but PAW's domain works in project-relative, forward-slash
- * paths — that is what a gate's `readFile` joins to the root, what a violation
- * stores, and what one enforcement decision compares against another. Feeding an
- * absolute path straight in doubled it (`join(root, abs)`), the gate threw
- * ENOENT, and every finding degraded to a `gate-error`. This maps an absolute
- * path under the root back to relative — case-insensitively, because Windows —
- * and leaves an already-relative path, or one outside the root, untouched.
+ * @fileoverview Map path to PAW domain form: project-relative, forward-slashed.
+ * Host send absolute path (VS Code Copilot send `c:\repo\src\a.ts`); gates, violations,
+ * enforcement comparisons work in project-relative path. Map absolute path under root
+ * back to relative, no case care for Windows; leave already-relative path, or path
+ * outside root, untouched.
  *
  * @module @paw/core/domain/projectPath
  * @version 0.0.0
@@ -17,12 +14,12 @@
  */
 
 /**
- * Normalise a possibly-absolute path to project-relative, forward-slashed.
+ * Normalise maybe-absolute path to project-relative, forward-slashed.
  *
- * @param {string} root - The absolute project root.
- * @param {string} path - The path to normalise.
- * @returns {string} The path relative to the root, or unchanged when already
- * relative or outside the root; `.` when it is the root itself.
+ * @param {string} root - Absolute project root.
+ * @param {string} path - Path to normalise.
+ * @returns {string} Path relative to root, or unchanged when already relative
+ * or outside root; `.` when it is root itself.
  */
 export function toProjectRelative(root: string, path: string): string {
   const norm = path.replace(/\\/g, '/');

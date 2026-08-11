@@ -1,27 +1,21 @@
 /**
  * PAW Daemon Control Port
  *
- * @fileoverview The write half of the daemon's HTTP surface. Reads are safe by
- * construction — idempotent, cacheable, no side effect — so they need no gate
- * beyond the token; a write changes state, spends, or stops something, so it gets
- * a narrower door. This module is that door as pure functions: which methods are
- * writes, how a request body is sanitised before any handler sees it, and the
- * shape of the {@link ControlPort} a handler registers against.
+ * @fileoverview Write half of daemon HTTP surface. Write change state, so it pass
+ * gate beyond token. Give pure functions: what methods be writes, how request body
+ * get sanitised before handler see it, and shape of {@link ControlPort} handler
+ * register against.
  *
- * The port is injected, and optional: a daemon composed without one answers 405
- * to every write and stays observational, which is the default a read-only
- * deployment keeps. Handlers are keyed by `"<METHOD> <path>"` so adding a verb is
- * adding a table entry, and every write flows through the one audited pipeline in
- * the router rather than growing a parallel path per verb.
+ * Port injected and optional. Daemon with no port answer 405 to every write and
+ * stay observational, default read-only. Handler keyed by `"<METHOD> <path>"`;
+ * add verb, add table entry. Every write flow through router's one audited
+ * pipeline.
  *
- * Body sanitisation is deliberately strict. A write must declare
- * `application/json`: `PUT` and `DELETE` are not CORS-safelisted so a browser
- * always preflights them, and requiring JSON forces the same preflight on `POST`,
- * the one write a page could otherwise send cross-origin as a "simple" request.
- * The token still gates every write regardless — this is the belt behind that
- * brace. An empty body is the empty object; anything that is not a JSON object
- * (a primitive, an array, `null`, malformed text) is refused before dispatch, so
- * a handler only ever receives a bag of named parameters.
+ * Body sanitisation strict. Write must declare `application/json`. `PUT` and
+ * `DELETE` no CORS-safelist, so browser always preflight them; require JSON force
+ * same preflight on `POST`. Token gate every write. Empty body be empty object;
+ * anything no JSON object — primitive, array, `null`, malformed text — refused
+ * before dispatch. Handler get only bag of named parameters.
  *
  * @module @paw/daemon/control
  * @version 0.0.0
@@ -30,21 +24,19 @@
  */
 
 /**
- * The HTTP methods this daemon treats as writes: they pass through the control
- * pipeline rather than the read routes, and the server reads a body for them.
+ * HTTP methods daemon treat as writes. They pass through control pipeline, not
+ * read routes. Server read body for them.
  */
 export const WRITE_METHODS: readonly string[] = ['POST', 'PUT', 'DELETE'];
 
 /**
- * The largest control body the server will buffer, in bytes. Control commands are
- * a method name and a few parameters; 64 KiB is already orders of magnitude more
- * than any of them needs, and the cap is what stops a peer from making the daemon
- * hold an unbounded body in memory.
+ * Largest control body server buffer, in bytes. Control command be method name
+ * and few parameters. Cap stop peer make daemon hold unbounded body in memory.
  */
 export const CONTROL_BODY_CAP = 64 * 1024;
 
 /**
- * Whether a method is a write, and so flows through the control pipeline.
+ * Whether method be write, so flow through control pipeline.
  *
  * @param {string} method - The HTTP method.
  * @returns {boolean} True for POST, PUT, or DELETE.
@@ -54,8 +46,8 @@ export function isWriteMethod(method: string): boolean {
 }
 
 /**
- * What a control handler is handed: the request's query parameters and its
- * sanitised body, already proven to be a JSON object.
+ * What control handler get handed: request query parameters and sanitised body,
+ * already proven to be JSON object.
  *
  * @interface ControlRequest
  * @property {URLSearchParams | undefined} query - The parsed query string.
@@ -67,9 +59,9 @@ export interface ControlRequest {
 }
 
 /**
- * What a control handler returns: an HTTP status and a JSON-serialisable body.
- * A handler reports its own refusals here — a 422 for a bad parameter — while the
- * transport-level refusals (auth, content type, unknown route) are the router's.
+ * What control handler return: HTTP status and JSON-serialisable body. Handler
+ * report own refusal here — 422 for bad parameter — while transport-level refusal
+ * (auth, content type, unknown route) be router's.
  *
  * @interface ControlResult
  * @property {number} status - The HTTP status to answer with.
@@ -81,8 +73,7 @@ export interface ControlResult {
 }
 
 /**
- * One registered write. Pure from the router's view — any effect it performs
- * lives inside it, exactly as the snapshot and tree thunks do for reads.
+ * One registered write. Pure from router view — any effect live inside it.
  *
  * @callback ControlHandler
  * @param {ControlRequest} request - The query and sanitised body.
@@ -91,7 +82,7 @@ export interface ControlResult {
 export type ControlHandler = (request: ControlRequest) => Promise<ControlResult>;
 
 /**
- * The set of writes a daemon exposes, keyed by `"<METHOD> <path>"`.
+ * Set of write daemon expose, keyed by `"<METHOD> <path>"`.
  *
  * @interface ControlPort
  * @property {Readonly<Record<string, ControlHandler>>} handlers - The registered writes.
@@ -101,7 +92,7 @@ export interface ControlPort {
 }
 
 /**
- * Combine control ports into one, later handlers winning a shared key.
+ * Combine control port into one, later handler win shared key.
  *
  * @param {...ControlPort} ports - The ports to merge.
  * @returns {ControlPort} The combined port.
@@ -111,16 +102,16 @@ export function mergeControl(...ports: readonly ControlPort[]): ControlPort {
 }
 
 /**
- * The outcome of sanitising a request body: the parsed object, or a refusal with
- * the status and reason the router should answer.
+ * Outcome of sanitising request body: parsed object, or refusal with status and
+ * reason router should answer.
  */
 export type BodyParse =
   | { readonly ok: true; readonly body: Record<string, unknown> }
   | { readonly ok: false; readonly status: number; readonly message: string };
 
 /**
- * Whether a `Content-Type` names JSON, tolerating a charset or other parameter
- * after it (`application/json; charset=utf-8`) but nothing else.
+ * Whether `Content-Type` name JSON, tolerate charset or other parameter after it
+ * (`application/json; charset=utf-8`) but nothing else.
  *
  * @param {string | undefined} contentType - The request's `Content-Type`.
  * @returns {boolean} True when the type is `application/json`.
@@ -133,14 +124,13 @@ function isJsonContentType(contentType: string | undefined): boolean {
 }
 
 /**
- * Sanitise a write's raw body into a bag of named parameters, or a refusal. An
- * empty body is the empty object — a `DELETE` that carries its parameters in the
- * query sends no body and no content type, and must not be refused for it. A
- * *non-empty* body must declare JSON (415), which is what forces a preflight on a
- * cross-origin `POST` that tries to smuggle one in; text that does not parse is
- * refused (400); a value that parses but is not a JSON object — a primitive, an
- * array, `null` — is refused (422). A handler downstream never has to defend
- * against anything but an object.
+ * Sanitise write raw body into bag of named parameter, or refusal. Empty body be
+ * empty object — `DELETE` that carry parameter in query send no body and no
+ * content type, must not get refused for it. *Non-empty* body must declare JSON
+ * (415), which forces a preflight on cross-origin `POST` that sends a body;
+ * text that no parse get refused (400); value that parse but no JSON object
+ * — primitive, array, `null` — get refused (422). Handler downstream never got
+ * defend against anything but object.
  *
  * @param {string} raw - The raw request body.
  * @param {string | undefined} contentType - The request's `Content-Type`.

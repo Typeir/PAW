@@ -1,13 +1,10 @@
 /**
  * PAW Hook Dispatch
  *
- * @fileoverview The per-hook handler the resident daemon runs — the domain that
- * doc 10 §11 moves out of the cold hook process and into `pawd`, "moved, not
- * rewritten". Given the host, the canonical event, and the raw payload, it picks
- * the host connector, translates the payload to a canonical event, runs it
- * through {@link handleEvent} against the daemon's owned store and gate cache,
- * and translates the response back to the host's native output. The daemon owns
- * the dependencies once; this is the pure composition over them.
+ * @fileoverview Per-hook handler resident daemon run. Take host, canonical event,
+ * raw payload: pick host connector, translate payload to canonical event, run it
+ * through {@link handleEvent} against daemon owned store and gate cache, translate
+ * response back to host native output. Daemon own deps; this compose over them.
  *
  * @module @paw/core/application/dispatchHook
  * @version 0.0.0
@@ -20,12 +17,12 @@ import type { HostConnector } from '../ports/index.js';
 import { handleEvent, type HandleDeps } from './handleEvent.js';
 
 /**
- * A hook invocation to dispatch.
+ * Hook invocation to dispatch.
  *
  * @interface HookDispatch
- * @property {string} host - The host key (e.g. `copilot`), selecting a connector.
- * @property {PawEventType} event - The canonical event the command named.
- * @property {Record<string, unknown>} payload - The host's raw hook payload.
+ * @property {string} host - Host key (e.g. `copilot`), pick connector.
+ * @property {PawEventType} event - Canonical event command name.
+ * @property {Record<string, unknown>} payload - Host raw hook payload.
  */
 export interface HookDispatch {
   readonly host: string;
@@ -34,8 +31,7 @@ export interface HookDispatch {
 }
 
 /**
- * Everything the dispatch needs: the loop dependencies the daemon owns, plus the
- * connector registry.
+ * Dispatch deps: loop deps daemon own, plus connector registry.
  *
  * @interface DispatchHookDeps
  * @property {Record<string, HostConnector>} connectors - Host key → connector.
@@ -45,12 +41,12 @@ export interface DispatchHookDeps extends HandleDeps {
 }
 
 /**
- * Handle one hook invocation and return the host's native output object.
+ * Handle one hook invocation, return host native output object.
  *
- * @param {DispatchHookDeps} deps - The owned dependencies and connector registry.
- * @param {HookDispatch} req - The host, event, and payload.
- * @returns {Promise<unknown>} The host's output; a bare `{ continue: true }` when
- * the host is unknown or the payload does not resolve to an event.
+ * @param {DispatchHookDeps} deps - Owned deps and connector registry.
+ * @param {HookDispatch} req - Host, event, payload.
+ * @returns {Promise<unknown>} Host output; bare `{ continue: true }` when host
+ * unknown or payload no resolve to event.
  */
 export async function dispatchHook(
   deps: DispatchHookDeps,

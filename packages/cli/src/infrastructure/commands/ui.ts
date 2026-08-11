@@ -1,10 +1,10 @@
 /**
  * PAW CLI — ui command
  *
- * @fileoverview `paw ui [plan.swarm.mjs]`: start pawd in this process and serve
- * the console for a repository until the operator interrupts it. Holds the
- * `--run` dispatcher that meters a real herd release, and the out-of-band attach
- * approval the console requests over the socket and the operator answers here.
+ * @fileoverview `paw ui [plan.swarm.mjs]`: start pawd in this process, serve
+ * console for repository till operator interrupt. Run `--run` dispatcher that
+ * meters a real swarm release; attach approval: console request over socket,
+ * operator answer here.
  *
  * @module @paw/cli/infrastructure/commands/ui
  * @version 0.0.0
@@ -12,10 +12,19 @@
  * @since 5.0.0
  */
 
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
-import { applyInit, dispatchSwarm, pawHome, type InitMode } from '@paw/core';
+import {
+  applyInit,
+  dispatchSwarm,
+  pawHome,
+  type InitMode,
+  type RunSettings,
+  type SwarmPlan,
+} from '@paw/core';
 import {
   createNodeConfigDocument,
   createNodeFileReader,
@@ -25,6 +34,8 @@ import {
 import {
   configControl,
   consolePage,
+  COPILOT_SLIM_SECTIONS,
+  dispatcherFor,
   enforcementControl,
   identityNotice,
   mergeControl,
@@ -45,19 +56,20 @@ import { concurrencyFrom, maxTokensFrom, parseArgs, withContext } from '../../do
 import { fakeRegistryFor, resolveContextArg } from './swarm.js';
 
 /**
- * Build the dispatcher `paw ui --run` hands the daemon: it releases the herd once
- * against a real model — the deterministic fake, or the live provider under
- * `--live` — through a metered port, so the console's herd and spend meter carry
- * a real run's outcomes and a real token count rather than zeros.
+ * Build dispatcher for `paw ui --run`. Release the swarm once against the real
+ * model — deterministic fake, or live provider under `--live` — through metered
+ * port. Console and meter record run outcomes and token count.
  *
- * @param {boolean} live - Whether to dispatch against the live provider.
- * @param {readonly string[]} attached - Files attached to every brief.
+ * @param {boolean} live - Dispatch against live provider or not.
+ * @param {boolean} full - Live only: keep model stock persona, not slim baseline.
+ * @param {readonly string[]} attached - Files attach to every brief.
  * @param {number | undefined} concurrency - Max members in flight.
  * @param {number | undefined} maxOutputTokens - Per-member output cap.
  * @returns {Dispatcher} The dispatcher.
  */
 function uiDispatcher(
   live: boolean,
+  full: boolean,
   attached: readonly string[],
   concurrency: number | undefined,
   maxOutputTokens: number | undefined,
@@ -74,18 +86,19 @@ function uiDispatcher(
       const metered = meterPort(binding.port);
       const bindings = new Map(base.bindings);
       bindings.set(plan.role, { ...binding, port: metered.port });
-      const writer = createHerdWriter(plan, createNodeFs(), existsSync);
+      const writer = live ? null : createHerdWriter(plan, createNodeFs(), existsSync);
       const result = await dispatchSwarm(withContext(plan, attached), {
         registry: { declarations: base.declarations, bindings },
         files: createNodeFileReader(process.cwd()),
         concurrency,
         maxOutputTokens,
+        systemBaseline: live && !full ? COPILOT_SLIM_SECTIONS : undefined,
         onProgress: async (event) => {
           onProgress(event);
-          await writer.onProgress(event);
+          await writer?.onProgress(event);
         },
       });
-      const wrote = writer.written();
+      const wrote = writer?.written() ?? [];
       if (wrote.length > 0) {
         process.stdout.write(`herd wrote ${wrote.length} file(s)\n`);
       }
@@ -97,16 +110,106 @@ function uiDispatcher(
 }
 
 /**
- * Ask the operator's terminal to approve a console's attach request, and act on
- * the answer. This is the out-of-band half of the request pattern: the request
- * arrived over the socket; the answer arrives from the keyboard of whoever
- * started the daemon, and the write happens here — in the process that holds
- * filesystem authority — rather than in the daemon, which holds none.
+ * Launch default browser at console URL — the OS opener per platform, detached
+ * so the daemon never wait on it.
  *
- * @param {string} path - The repository the console named.
- * @param {InitMode} mode - How it asked for an existing config to be resolved.
- * @param {() => DaemonHandle | null} daemonOf - The running daemon, once it exists.
- * @returns {Promise<void>} Settles when the request has been resolved either way.
+ * @param {string} url - Console URL, token included.
+ */
+function openBrowser(url: string): void {
+  const [cmd, cmdArgs]: [string, string[]] =
+    process.platform === 'win32'
+      ? ['cmd', ['/c', 'start', '', url]]
+      : process.platform === 'darwin'
+        ? ['open', [url]]
+        : ['xdg-open', [url]];
+  spawn(cmd, cmdArgs, { stdio: 'ignore', detached: true }).unref();
+}
+
+/**
+ * Build dispatcher for approved console release: live registry or fake, slim
+ * persona on live, herd writer on fake only (live members edit in place),
+ * context globs resolved against the repo the CLI runs in.
+ *
+ * @param {RunSettings} settings - What console asked to run.
+ * @returns {Dispatcher} Dispatcher the daemon run and meter.
+ */
+function releaseDispatcher(settings: RunSettings): Dispatcher {
+  return dispatcherFor(settings, {
+    openLive: (plan: SwarmPlan<unknown>) => openLiveHerd(plan),
+    fakeRegistry: fakeRegistryFor,
+    withContext,
+    resolveContext: (globs) => resolveContextArg(globs.join(',')),
+    files: createNodeFileReader(process.cwd()),
+    makeWriter: (plan) =>
+      settings.live
+        ? { onProgress: async () => undefined, written: () => [] }
+        : createHerdWriter(plan, createNodeFs(), existsSync),
+    dispatch: (plan, deps) =>
+      dispatchSwarm(plan, {
+        ...deps,
+        ...(settings.live ? { systemBaseline: COPILOT_SLIM_SECTIONS } : {}),
+      }),
+  });
+}
+
+/**
+ * Ask operator terminal to approve console release request; approved one run
+ * through the daemon so console shows the result. Out-of-band half of the
+ * request,
+ * same pattern as attach: request over socket, answer from keyboard of whoever
+ * run pawd. A live release spends real tokens; release only after the operator
+ * answers yes.
+ *
+ * @param {RunSettings} settings - What console asked to run.
+ * @param {() => DaemonHandle | null} daemonOf - Running daemon, once exist.
+ * @returns {Promise<void>} Settle once request resolve.
+ */
+async function approveRelease(
+  settings: RunSettings,
+  daemonOf: () => DaemonHandle | null,
+): Promise<void> {
+  const daemon = daemonOf();
+  if (daemon === null) {
+    return;
+  }
+  const globs = settings.context?.length ?? 0;
+  process.stdout.write(
+    `\nconsole asks to release ${settings.plan} · ${
+      settings.live ? 'LIVE model — this spends' : 'fake model'
+    }${globs > 0 ? ` · ${globs} context glob(s)` : ''}\ntype y to release · anything else refuses\n`,
+  );
+  const answer = await new Promise<string>((resolveAnswer) => {
+    const rl = createInterface({ input: process.stdin });
+    rl.once('line', (line) => {
+      resolveAnswer(line);
+      rl.close();
+    });
+    rl.once('close', () => resolveAnswer(''));
+  });
+  if (answer.trim().toLowerCase() !== 'y') {
+    process.stdout.write(`release of ${settings.plan} refused\n`);
+    return;
+  }
+  try {
+    await daemon.release(settings);
+    process.stdout.write(`release of ${settings.plan} finished\n`);
+  } catch (err: unknown) {
+    process.stderr.write(
+      `release of ${settings.plan} failed: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
+}
+
+/**
+ * Ask operator terminal to approve console attach request and act on answer.
+ * Out-of-band half of request pattern: request come over socket; answer come
+ * from keyboard of whoever start daemon. Write happen here, in process that own
+ * filesystem access.
+ *
+ * @param {string} path - Repository console name.
+ * @param {InitMode} mode - How existing config resolve.
+ * @param {() => DaemonHandle | null} daemonOf - Running daemon, once exist.
+ * @returns {Promise<void>} Settle once request resolve.
  */
 async function approveAttach(
   path: string,
@@ -157,12 +260,12 @@ async function approveAttach(
 }
 
 /**
- * Run the `ui` subcommand: start pawd in this process and serve the console for a
- * repository until the operator interrupts it.
+ * Run `ui` subcommand. Start pawd in this process, serve console for repository
+ * till operator interrupt.
  *
- * @param {string[]} rest - The words after `ui`.
+ * @param {string[]} rest - Words after `ui`.
  * @param {(lines: string[]) => void} print - Line printer.
- * @returns {Promise<never>} Never resolves; the command serves until interrupted.
+ * @returns {Promise<never>} Never resolve; command serve till interrupt.
  */
 export async function runUi(
   rest: string[],
@@ -171,13 +274,14 @@ export async function runUi(
   const args = parseArgs(rest, ['context', 'port', 'root', 'config', 'concurrency', 'max-tokens']);
   const [planPath] = args.positional;
   const live = args.flags.has('live');
+  const full = args.flags.has('full');
   const shouldRun = args.flags.has('run');
   if (shouldRun && planPath === undefined) {
     throw new Error('paw ui --run needs the plan to release: paw ui <plan.swarm.mjs> --run');
   }
   const attached = await resolveContextArg(args.values.get('context'));
   const portValue = args.values.get('port');
-  const root = args.values.get('root') ?? '.';
+  const root = resolve(args.values.get('root') ?? '.');
   let handle: DaemonHandle | null = null;
   const scope = (): string => handle?.root ?? root;
   const control = args.flags.has('control')
@@ -194,9 +298,13 @@ export async function runUi(
       onAttach: (path, mode) => {
         void approveAttach(path, mode, () => handle);
       },
+      onRelease: (settings) => {
+        void approveRelease(settings, () => handle);
+      },
+      dispatcherFor: releaseDispatcher,
       ...(control ? { control } : {}),
       ...(shouldRun
-        ? { dispatch: uiDispatcher(live, attached, concurrencyFrom(args), maxTokensFrom(args)) }
+        ? { dispatch: uiDispatcher(live, full, attached, concurrencyFrom(args), maxTokensFrom(args)) }
         : {}),
     },
     nodeRuntime(consolePage()),
@@ -218,8 +326,13 @@ export async function runUi(
     control
       ? 'control enabled · the console may edit bindings, prune violations, and stop enforcement'
       : 'observational · pass --control to let the console write',
-    'open that URL for the console · ctrl-c to stop',
+    args.flags.has('open')
+      ? 'opening the console in your browser'
+      : 'open that URL for the console · ctrl-c to stop · pass --open to launch it',
   ]);
+  if (args.flags.has('open')) {
+    openBrowser(`${daemon.url}#t=${daemon.token}`);
+  }
   daemon.dispatched?.catch((err: unknown) => {
     process.stderr.write(
       `run failed: ${err instanceof Error ? err.message : String(err)}\n`,

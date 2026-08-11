@@ -1,11 +1,9 @@
 /**
  * PAW Node File Reader Tests
  *
- * @fileoverview Drives the reader against a real temporary directory: a file it
- * may read, a nested one, a missing one, an environment file, and two ways out
- * of the root — a `..` traversal and an absolute path elsewhere on the disk.
- * Every refusal is asserted, because this adapter is the boundary between a
- * selected path and the machine's filesystem.
+ * @fileoverview Run reader against real temp directory. One readable file, one
+ * nested file, one missing file, one env file, two ways out of root — `..`
+ * traversal and absolute path elsewhere on disk. Assert every refusal.
  *
  * @module @paw/adapters/test/file/nodeFileReader
  * @version 0.0.0

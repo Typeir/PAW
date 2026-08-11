@@ -1,10 +1,7 @@
 /**
  * PAW Console Actions
  *
- * @fileoverview The verbs a panel may perform, bound once to the reducer. A
- * button calls `goto('roles')` rather than assembling an action object, so the
- * action union stays an implementation detail of the state module and the
- * callbacks keep a stable identity across renders.
+ * @fileoverview Verbs panel do. Bind once to reducer. Button call `goto('roles')`, caller builds no action object. State module encapsulates the action union type. Callbacks hold stable identity across renders.
  *
  * @module @paw/gui/application/hooks/useConsoleActions
  * @version 0.0.0
@@ -17,18 +14,18 @@ import type { Section, Tab } from '../../domain/console.types.js';
 import { useConsoleDispatch } from '../context/consoleContext.js';
 
 /**
- * The console's verbs.
+ * Console verbs.
  *
  * @interface ConsoleActions
- * @property {(section: Section) => void} goto - Select a rail subsystem.
- * @property {(tab: Tab) => void} showTab - Select a tab within the Swarm view.
- * @property {(member: number) => void} select - Scrub to a member.
- * @property {(delta: number) => void} step - Scrub by a relative amount.
- * @property {(text: string) => void} edit - Replace the brief draft.
- * @property {() => void} reset - Drop the brief draft.
- * @property {(paths: readonly string[]) => void} toggleContext - Attach or detach a group of files.
- * @property {() => void} clearContext - Detach everything.
- * @property {(plan: string | null) => void} selectPlan - Look at another of the repository's plans.
+ * @property {(section: Section) => void} goto - Choose rail subsystem.
+ * @property {(tab: Tab) => void} showTab - Choose tab in Swarm view.
+ * @property {(member: number) => void} select - Scrub to member.
+ * @property {(delta: number) => void} step - Scrub relative amount.
+ * @property {(text: string) => void} edit - Swap brief draft.
+ * @property {() => void} reset - Throw away brief draft.
+ * @property {(paths: readonly string[]) => void} toggleContext - Attach or detach group of files.
+ * @property {() => void} clearContext - Detach all files.
+ * @property {(plan: string | null) => void} selectPlan - Look at other plan of repo.
  */
 export interface ConsoleActions {
   readonly goto: (section: Section) => void;
@@ -43,9 +40,9 @@ export interface ConsoleActions {
 }
 
 /**
- * Bind the console's verbs to the reducer.
+ * Tie console verbs to reducer.
  *
- * @returns {ConsoleActions} The bound actions.
+ * @returns {ConsoleActions} Bound actions.
  */
 export function useConsoleActions(): ConsoleActions {
   const dispatch = useConsoleDispatch();

@@ -1,8 +1,8 @@
 /**
- * PAW Installer Repo Tests
+ * PAW Installer Repo Tests.
  *
- * @fileoverview Covers `findRepoRoot` finding `.git` up the tree and returning null
- * at the filesystem root, so `repo.ts` reaches 100%.
+ * @fileoverview Cover `findRepoRoot` find `.git` up tree and return null at
+ * filesystem root. Make `repo.ts` reach 100%.
  *
  * @module @paw/installer/test/repo
  * @version 0.0.0

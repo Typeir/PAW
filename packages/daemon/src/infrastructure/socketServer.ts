@@ -1,14 +1,13 @@
 /**
  * PAW Daemon Socket Server
  *
- * @fileoverview The `node:net` transport under the RPC session (doc 10 §4), and
- * the claim that guarantees a single resident daemon. Binding the endpoint IS the
- * claim: two processes cannot both hold one pipe/socket, so the OS — not a
- * removable lockfile — is what enforces one daemon. {@link bindSocket} binds
- * first and, on an in-use endpoint, PROBES before doing anything: a live daemon
- * means abort (never disturb it), only a stale POSIX socket with nothing behind
- * it is reaped and rebound (doc 10 §9b). Wiring the session and any writes to
- * `.paw` happen only after the claim succeeds, so a losing daemon touches nothing.
+ * @fileoverview `node:net` transport under RPC session (doc 10 §4), enforcing
+ * single resident daemon via the endpoint claim. One process alone can bind a
+ * pipe/socket; the OS enforces it — no removable lockfile. {@link bindSocket}
+ * binds first and, on an in-use endpoint, PROBEs before anything: a live daemon
+ * makes it abort; a stale POSIX socket with nothing behind it is reaped and
+ * rebound (doc 10 §9b). Session wiring and any writes to `.paw` happen only
+ * after claim succeeds, so a lost daemon writes nothing.
  *
  * @module @paw/daemon/infrastructure/socketServer
  * @version 0.0.0
@@ -21,23 +20,23 @@ import { connect, createServer, type Server, type Socket } from 'node:net';
 import type { RpcSession } from '../application/rpcSession.js';
 
 /**
- * A running socket server.
+ * Running socket server.
  *
  * @interface SocketServerHandle
- * @property {() => Promise<void>} close - Stop accepting and release the endpoint.
+ * @property {() => Promise<void>} close - Stop accepting, release endpoint.
  */
 export interface SocketServerHandle {
   close(): Promise<void>;
 }
 
 /**
- * The minimal socket surface {@link attachSession} drives.
+ * Minimal socket surface {@link attachSession} drive.
  *
  * @interface ConnSocket
  * @property {(encoding: 'utf8') => void} setEncoding - Decode incoming chunks as text.
- * @property {(event: 'data' | 'error', listener: (arg: never) => void) => void} on - Subscribe to a socket event.
- * @property {(data: string) => void} write - Send a line.
- * @property {() => void} end - Half-close after flushing.
+ * @property {(event: 'data' | 'error', listener: (arg: never) => void) => void} on - Subscribe to socket event.
+ * @property {(data: string) => void} write - Send line.
+ * @property {() => void} end - Half-close after flush.
  */
 export interface ConnSocket {
   setEncoding(encoding: 'utf8'): void;
@@ -48,12 +47,12 @@ export interface ConnSocket {
 }
 
 /**
- * Injectable seams for {@link bindSocket}, so its claim logic tests without a real
+ * Injectable seams for {@link bindSocket}, so claim logic tests without a
  * pipe.
  *
  * @interface BindSeams
- * @property {(path: string) => Promise<Server>} [listen] - Bind a bare server, rejecting if in use.
- * @property {(path: string) => Promise<boolean>} [probe] - Whether a live server answers the endpoint.
+ * @property {(path: string) => Promise<Server>} [listen] - Bind bare server, reject if in use.
+ * @property {(path: string) => Promise<boolean>} [probe] - Whether live server answer endpoint.
  */
 export interface BindSeams {
   listen?(path: string): Promise<Server>;
@@ -61,25 +60,25 @@ export interface BindSeams {
 }
 
 /**
- * Remove a socket path, tolerating its absence — the reap for a stale POSIX
- * socket a crashed daemon left behind.
+ * Remove socket path, ignoring error when it does not exist — reap a
+ * stale POSIX socket a crashed daemon left behind.
  *
- * @param {string} path - The socket path to remove.
+ * @param {string} path - Socket path to remove.
  */
 export function reapSocket(path: string): void {
   try {
     unlinkSync(path);
   } catch {
-    /* already gone */
+    /* gone already */
   }
 }
 
 /**
- * Wire one connection to a session: chunks in, framed lines out, closed on the
- * session's say-so. Pushes are serialised so the session sees chunks in order.
+ * Wire one connection to session: chunks in, framed lines out, closed when
+ * session closes it. Pushes serialised so session sees chunks in order.
  *
- * @param {ConnSocket} socket - The connection.
- * @param {RpcSession} session - Its fresh session.
+ * @param {ConnSocket} socket - Connection.
+ * @param {RpcSession} session - Fresh session.
  */
 export function attachSession(socket: ConnSocket, session: RpcSession): void {
   socket.setEncoding('utf8');
@@ -99,10 +98,10 @@ export function attachSession(socket: ConnSocket, session: RpcSession): void {
 }
 
 /**
- * Bind a bare server on a path, rejecting rather than serving.
+ * Bind bare server on path; a failure rejects instead of serving.
  *
- * @param {string} path - The endpoint to bind.
- * @returns {Promise<Server>} The bound server.
+ * @param {string} path - Endpoint to bind.
+ * @returns {Promise<Server>} Bound server.
  */
 function rawListen(path: string): Promise<Server> {
   const server = createServer();
@@ -113,10 +112,10 @@ function rawListen(path: string): Promise<Server> {
 }
 
 /**
- * Whether a live server answers a connection at the endpoint.
+ * Whether live server answer connection at endpoint.
  *
- * @param {string} path - The endpoint to probe.
- * @returns {Promise<boolean>} True when something accepts and does not error.
+ * @param {string} path - Endpoint to probe.
+ * @returns {Promise<boolean>} True when something accept and no error.
  */
 function probeLive(path: string): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
@@ -132,13 +131,13 @@ function probeLive(path: string): Promise<boolean> {
 }
 
 /**
- * Claim the endpoint by binding it. If it is already in use, probe first: a live
- * daemon is left untouched and this rejects; only a stale socket with nothing
- * behind it is reaped and rebound. The bind is the single-daemon guarantee.
+ * Bind endpoint, claiming single-daemon ownership. If already in use, probe
+ * first: a live daemon makes this reject and stays untouched; only a stale
+ * socket with nothing behind it is reaped and rebound.
  *
- * @param {string} path - The endpoint to claim.
+ * @param {string} path - Endpoint to claim.
  * @param {BindSeams} [seams] - Injectable listen/probe/unlink.
- * @returns {Promise<Server>} The bound server; rejects when a live daemon holds it.
+ * @returns {Promise<Server>} Bound server; reject when live daemon holds it.
  */
 export async function bindSocket(path: string, seams: BindSeams = {}): Promise<Server> {
   const listen = seams.listen ?? rawListen;
@@ -158,11 +157,11 @@ export async function bindSocket(path: string, seams: BindSeams = {}): Promise<S
 }
 
 /**
- * Serve a fresh session per connection on an already-bound server.
+ * Serve fresh session per connection on already-bound server.
  *
- * @param {Server} server - A server from {@link bindSocket}.
- * @param {() => RpcSession} makeSession - Produces a session per connection.
- * @returns {SocketServerHandle} The running server.
+ * @param {Server} server - Server from {@link bindSocket}.
+ * @param {() => RpcSession} makeSession - Produce session per connection.
+ * @returns {SocketServerHandle} Running server.
  */
 export function serveSessions(server: Server, makeSession: () => RpcSession): SocketServerHandle {
   server.on('connection', (socket: Socket) => attachSession(socket, makeSession()));
@@ -170,12 +169,12 @@ export function serveSessions(server: Server, makeSession: () => RpcSession): So
 }
 
 /**
- * Claim the endpoint and serve sessions on it.
+ * Claim endpoint and serve sessions on it.
  *
- * @param {string} path - The endpoint to bind.
- * @param {() => RpcSession} makeSession - Produces a session per connection.
+ * @param {string} path - Endpoint to bind.
+ * @param {() => RpcSession} makeSession - Produce session per connection.
  * @param {BindSeams} [seams] - Injectable bind seams.
- * @returns {Promise<SocketServerHandle>} The running server; rejects if a live daemon holds the endpoint.
+ * @returns {Promise<SocketServerHandle>} Running server; reject if live daemon holds endpoint.
  */
 export async function listenSocket(
   path: string,

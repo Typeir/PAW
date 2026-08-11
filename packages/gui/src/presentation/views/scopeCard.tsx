@@ -1,16 +1,15 @@
 /**
  * Scope Card
  *
- * @fileoverview Grab a repository for the one console to look at: type a route
- * and grab it, or pick one the console grabbed before. A route is a place PAW may
- * be installed, not a daemon that is running, so the recent list carries no
- * liveness — grabbing one with no resident pawd still shows its files and simply
- * reports no enforcement. The grab is a live-wire frame; a page with no daemon
- * behind it has no client and the card renders nothing.
+ * @fileoverview Console entry to grab a repository by route and pick a route
+ * grabbed before. A route names where PAW may live, not a running daemon, so the
+ * recent list carries no liveness; grabbing a route with no resident pawd still
+ * shows files and reports no enforcement. Grabbing requires a live connection; a
+ * page with no daemon behind it has no client and the card renders null.
  *
- * The list is shown in a stable order, not by recency, and the green pip marks
- * whichever route matches the scope the snapshot reports — so grabbing one moves
- * the pip to it rather than reshuffling the list under a pip that never moves.
+ * The list displays sorted by route, independent of recency. The green pip marks
+ * whichever route matches the scope snapshot report; grabbing a route moves the
+ * pip there without changing the list order.
  *
  * @module @paw/gui/presentation/views/scopeCard
  * @version 0.0.0
@@ -18,7 +17,7 @@
  * @since 5.0.0
  */
 
-import { sameRoute } from '@paw/core';
+import { isAbsoluteRoute, sameRoute } from '@paw/core';
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { useLiveStatus, useScope } from '../../application/context/consoleContext.js';
 import { useConsoleData } from '../../application/hooks/useConsole.js';
@@ -27,9 +26,9 @@ import { Card } from '../atoms/card.js';
 import { Placeholder } from '../atoms/placeholder.js';
 
 /**
- * The scope picker: a route input and the recently-grabbed routes.
+ * Scope picker: route input and recently-grabbed routes.
  *
- * @returns {JSX.Element | null} The card, or null on a static page with no daemon.
+ * @returns {JSX.Element | null} The card, or null on static page with no daemon.
  */
 export function ScopeCard() {
   const { recent: client, grab } = useScope();
@@ -57,14 +56,26 @@ export function ScopeCard() {
     );
   };
 
+  const forget = (path: string): void => {
+    void client
+      .remove(path)
+      .then(setRoutes, () => setError('could not remove the route'));
+  };
+
   const shown = [...routes].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
   const submit = (): void => {
     const path = draft.trim();
-    if (path !== '') {
-      grabRoute(path);
-      setDraft('');
+    if (path === '') {
+      return;
     }
+    if (!isAbsoluteRoute(path)) {
+      setError('route must be an absolute path');
+      return;
+    }
+    setError(null);
+    grabRoute(path);
+    setDraft('');
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
@@ -108,6 +119,14 @@ export function ScopeCard() {
                   >
                     <span className={here ? 'scope-dot here' : 'scope-dot'} aria-hidden='true' />
                     {route}
+                  </button>
+                  <button
+                    type='button'
+                    className='scope-remove'
+                    aria-label={`Remove ${route} from recent routes`}
+                    onClick={() => forget(route)}
+                  >
+                    ✕
                   </button>
                 </li>
               );

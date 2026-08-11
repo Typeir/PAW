@@ -1,15 +1,14 @@
 /**
  * PAW Enforcement Control Bridge Tests
  *
- * @fileoverview The console's write verbs as round trips to pawd, driven through
- * a fake `rpc` so both outcomes are pinned: a daemon that answers passes its
- * result through with the verb's status (200 for a prune, 202 for a stop); a
- * daemon that does not answer — a null round trip — becomes a 503 the console can
- * explain. A prune threads the `file` query, or prunes all when none is given. The
- * scope is resolved per call and passed to `rpc`, so a getter that changes between
- * calls proves the console follows whichever consumer it currently holds. One case
- * omits the seam so the real socket call runs against a dead endpoint and fails
- * open, keeping the default covered. So `enforcementControl.ts` reaches 100%.
+ * @fileoverview Test console write verb. Round trip to pawd through fake `rpc`.
+ * Daemon answer pass result through with verb status (200 for prune, 202 for
+ * stop). Daemon return null become 503. Prune thread `file` query, or prune all
+ * when none given. Scope resolve per call and pass to `rpc`; getter change
+ * between calls confirm console follow current consumer. One case omits the fake
+ * `rpc` so a real socket call runs against a dead endpoint and returns 503,
+ * covering the default path.
+ * Cover `enforcementControl.ts` to 100%.
  *
  * @module @paw/daemon/test/enforcementControl
  * @version 0.0.0

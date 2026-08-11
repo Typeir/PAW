@@ -1,16 +1,9 @@
 /**
  * PAW Installer Apply
  *
- * @fileoverview The application layer for what is genuinely the installer's:
- * putting PAW's bin directory on PATH. It gathers the current state through the
- * ports, calls the pure planner to decide, and performs the decided edit,
- * returning the plan so a caller (or a `--dry-run`) can report exactly what
- * changed.
+ * @fileoverview App layer. Puts PAW bin dir on PATH. Gathers current state through ports, calls pure planner to decide, does decided edit, hands back plan so caller (or `--dry-run`) reports exact change.
  *
- * Attaching a repository is deliberately not here. It moved to
- * `@paw/core`'s {@link applyInit}, because a terminal, a console and a desktop
- * dialog all attach repositories and three copies of that sequence would be
- * three chances to drift.
+ * Repository attach lives in `@paw/core`'s {@link applyInit}. Terminal, console and desktop dialog all attach repository; one shared sequence avoids three copies drifting apart.
  *
  * @module @paw/installer/apply
  * @version 0.0.0
@@ -19,18 +12,19 @@
  */
 
 import { planPathEdit, type PathEdit } from './path.js';
+import { planShims, type Launcher, type ShimWrite } from './shims.js';
 import { detectShell, profileTarget } from './shell.js';
 import type { EnvironmentPort, FileSystemPort } from './ports.js';
 
 /**
- * What PATH activation needs from the environment.
+ * What PATH activation need from environment.
  *
  * @interface ActivateInput
  * @property {string} platform - `process.platform`.
  * @property {string | undefined} shellEnv - `process.env.SHELL`.
- * @property {string} home - The user's home directory.
- * @property {string} binDir - PAW's bin directory to put on PATH.
- * @property {boolean} [dryRun] - When true, compute the edit but perform no write.
+ * @property {string} home - User home dir.
+ * @property {string} binDir - PAW bin dir to put on PATH.
+ * @property {boolean} [dryRun] - When true, compute edit but write nothing.
  */
 export interface ActivateInput {
   readonly platform: string;
@@ -41,13 +35,12 @@ export interface ActivateInput {
 }
 
 /**
- * Put PAW's bin directory on PATH for the detected shell, and return the edit
- * performed (which may be a no-op when already present).
+ * Put PAW bin dir on PATH for detected shell, return edit done (no-op when already present).
  *
- * @param {ActivateInput} input - Platform, shell, home, and bin directory.
+ * @param {ActivateInput} input - Platform, shell, home, and bin dir.
  * @param {FileSystemPort} fs - Filesystem port (POSIX profile).
  * @param {EnvironmentPort} env - Environment port (Windows user PATH).
- * @returns {Promise<PathEdit>} The edit that was applied.
+ * @returns {Promise<PathEdit>} Edit get applied.
  */
 export async function activatePath(
   input: ActivateInput,
@@ -77,5 +70,46 @@ export async function activatePath(
     await fs.appendText(edit.target, edit.block as string);
   }
   return edit;
+}
+
+/**
+ * What shim install need from environment.
+ *
+ * @interface InstallShimsInput
+ * @property {string} platform - `process.platform`.
+ * @property {string} binDir - Dir shims go in; created when absent.
+ * @property {readonly Launcher[]} launchers - Commands to shim.
+ * @property {boolean} [dryRun] - When true, compute the writes but perform none.
+ */
+export interface InstallShimsInput {
+  readonly platform: string;
+  readonly binDir: string;
+  readonly launchers: readonly Launcher[];
+  readonly dryRun?: boolean;
+}
+
+/**
+ * Writes the launcher shims into bin dir so PATH entry activates the dir holding `paw`. Ensures dir, writes each planned shim, sets executable bit on sh ones. Returns plan for reporting.
+ *
+ * @param {InstallShimsInput} input - Platform, bin dir, launchers.
+ * @param {FileSystemPort} fs - Filesystem port.
+ * @returns {Promise<ShimWrite[]>} Shims written (or planned, under dry-run).
+ */
+export async function installShims(
+  input: InstallShimsInput,
+  fs: FileSystemPort,
+): Promise<ShimWrite[]> {
+  const writes = planShims(input.platform, input.binDir, input.launchers);
+  if (input.dryRun === true) {
+    return writes;
+  }
+  await fs.ensureDir(input.binDir);
+  for (const shim of writes) {
+    await fs.writeText(shim.path, shim.content);
+    if (shim.executable) {
+      await fs.setExecutable(shim.path);
+    }
+  }
+  return writes;
 }
 

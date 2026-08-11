@@ -1,12 +1,9 @@
 /**
  * PAW Dispatch Concurrency Tests
  *
- * @fileoverview Pins that a herd is dispatched in batches rather than one member
- * at a time, and that batching changes only how fast the run goes — never what
- * it returns. A run of four hundred members against a real provider is minutes
- * of wall clock spent waiting on a network that was happy to take the next
- * request, so the concurrency is the point; the ordering guarantees below are
- * what make it safe to have.
+ * @fileoverview Pin batched dispatch of swarm members. Batching changes run
+ * speed; return values and ordering are unchanged. Ordering guarantees below
+ * hold at every batch size.
  *
  * @module @paw/core/test/application/dispatchConcurrency
  * @version 0.0.0
@@ -27,10 +24,10 @@ import type { SwarmPlan } from '../../src/domain/swarm.js';
 const FILES: FileReaderPort = { read: async () => 'context' };
 
 /**
- * A plan of `n` members whose brief names the member.
+ * Plan of `n` members. Brief name each member.
  *
  * @param {number} n - How many members.
- * @returns {SwarmPlan<{ n: number }>} The plan.
+ * @returns {SwarmPlan<{ n: number }>} Plan.
  */
 function planOf(n: number): SwarmPlan<{ n: number }> {
   return {
@@ -71,10 +68,10 @@ const editRole: RoleDeclaration = {
 };
 
 /**
- * A registry binding `edit.apply` to the given model.
+ * Registry bind `edit.apply` to given model.
  *
  * @param {ModelPort} port - The model to bind.
- * @returns {RoleRegistry} The registry.
+ * @returns {RoleRegistry} Registry.
  */
 function registryFor(port: ModelPort): RoleRegistry {
   return {
@@ -84,10 +81,9 @@ function registryFor(port: ModelPort): RoleRegistry {
 }
 
 /**
- * A model that holds each call open until released, recording how many were in
- * flight at once.
+ * Model hold each call open until released. Record how many in flight at once.
  *
- * @returns {object} The port, its peak overlap, and a release trigger.
+ * @returns {object} Port, peak overlap, release trigger.
  */
 function trackingModel() {
   let inFlight = 0;

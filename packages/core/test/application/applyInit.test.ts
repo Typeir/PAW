@@ -1,10 +1,9 @@
 /**
  * PAW Apply Init Tests
  *
- * @fileoverview Covers what `init` does when `.paw/config.json` already exists.
- * What these pin is that the use-case honours the rule — that a refusal still plans the git hook, that
- * it is reported rather than swallowed, and that `--merge` and `--override`
- * reach the planner.
+ * @fileoverview Cover `init` when `.paw/config.json` already exist. Pin that
+ * refusal still plan git hook and get reported, and that `--merge` and
+ * `--override` reach planner.
  *
  * @module @paw/core/test/application/applyInit
  * @version 0.0.0
@@ -22,10 +21,10 @@ const ROOT = '/repo';
 const EXISTING = '{"surface":"all","runners":{".gate.ts":"tsx"}}';
 
 /**
- * A filesystem fake whose `readText` serves a fixed config and which records writes.
+ * Filesystem fake. `readText` serve fixed config. Records writes.
  *
- * @param configText - What `readText` returns for any path.
- * @returns The port and its write spy.
+ * @param configText - What `readText` return for any path.
+ * @returns The port and write spy.
  */
 function fakeFs(configText: string) {
   const writeText = vi.fn(async () => {});

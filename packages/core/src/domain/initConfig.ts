@@ -1,20 +1,17 @@
 /**
  * PAW Init Config
  *
- * @fileoverview Deciding what happens when PAW is attached to a repo that
- * already has a config. Writing over it unconditionally is the one behaviour
- * ruled out: `.paw/config.json` is repo-authored and tracked, so a silent
- * replacement destroys work no backup covers.
+ * @fileoverview Decide what happen when PAW attach to repo already have
+ * config. One rule out: no unconditional overwrite. `.paw/config.json`
+ * repo-authored and tracked, silent replacement destroy work no backup covers.
  *
- * PAW stamps what it writes with a version and a content hash, which lets a
- * later `init` tell three situations apart — nothing there, a config PAW wrote,
- * and a config it did not — and say which one it found rather than guessing.
+ * PAW stamps config with version and content hash. Later `init` classify into
+ * three cases — nothing there, config PAW wrote, config PAW not write — and
+ * report which it finds.
  *
- * The outcome is returned as data, not thrown and not printed, because every
- * consumer has to be able to act on it: the CLI turns a refusal into a loud
- * error and offers `--merge` / `--override`, a TUI offers the same two as a
- * choice, and the console raises a dialog. Same call, same answer, three
- * presentations — no surface re-derives the rule.
+ * Result returned as data. Each consumer acts on it: CLI raises error and
+ * offers `--merge` / `--override`, TUI offers same two as choices, console
+ * raises dialog. All call same resolveInit; difference only in presentation.
  *
  * @module @paw/core/domain/initConfig
  * @version 0.0.0
@@ -23,14 +20,13 @@
  */
 
 /**
- * Hash a string to sixty-four bits, rendered as hex.
+ * Hash string to sixty-four bits, hex.
  *
- * Two FNV-1a lanes with different offsets rather than SHA-256, because core is
- * compiled into a browser bundle by `@paw/gui` and cannot import `node:crypto`.
- * That trade is safe here: this hash answers "has anyone edited the file since
- * PAW wrote it", a question about accident rather than malice. Nothing decides
- * trust on it, and a config that fails the check is refused rather than
- * accepted, so a collision costs a needless prompt and never a silent overwrite.
+ * Two FNV-1a lanes with different offsets, not SHA-256. Core compiles into
+ * browser bundle via `@paw/gui`, so cannot import `node:crypto`. Hash
+ * detects whether file changed since PAW wrote it; detects accidental edits,
+ * not adversarial tampering. Config failing check refused. Collision costs
+ * an extra prompt, never a silent overwrite.
  *
  * @param {string} text - The text to hash.
  * @returns {string} Sixteen lowercase hex characters.
@@ -47,23 +43,22 @@ function hash64(text: string): string {
 }
 
 /**
- * The config schema version PAW writes today. Stamped into every config so a
- * later run knows which shape it is looking at.
+ * Config schema version PAW writes today. Stamped into every config so later
+ * runs know which schema version to read.
  */
 export const PAW_CONFIG_VERSION = '5.0.0';
 
 /**
- * The key PAW's own metadata occupies. Namespaced so it cannot collide with a
- * key the repo declares.
+ * Key PAW own metadata occupy. Namespaced so it no collide with key repo declare.
  */
 export const PAW_STAMP_KEY = '$paw';
 
 /**
- * PAW's marker inside a config it wrote.
+ * PAW marker inside config it wrote.
  *
  * @interface PawStamp
- * @property {string} version - The config schema version written.
- * @property {string} hash - Content hash of the config as written, excluding the stamp.
+ * @property {string} version - Config schema version written.
+ * @property {string} hash - Content hash of config as written, exclude stamp.
  */
 export interface PawStamp {
   readonly version: string;
@@ -71,11 +66,11 @@ export interface PawStamp {
 }
 
 /**
- * What `init` found where the config goes.
+ * What `init` find where config go.
  *
- * @property absent - No config, or an empty one.
- * @property unstamped - A config exists that PAW did not write.
- * @property stamped - A config PAW wrote, with whether it changed since.
+ * @property absent - No config, or empty one.
+ * @property unstamped - Config exist, PAW not write.
+ * @property stamped - Config PAW write, and whether changed since.
  */
 export type InitConflict =
   | { readonly kind: 'absent' }
@@ -87,17 +82,17 @@ export type InitConflict =
     };
 
 /**
- * How the operator resolved a conflict.
+ * How operator resolve conflict.
  *
- * `create` is the default and refuses when anything is already there.
+ * `create` default, refuse when anything already there.
  */
 export type InitMode = 'create' | 'merge' | 'override';
 
 /**
- * What `init` should do about the config.
+ * What `init` should do about config.
  *
  * @property write - Write `content`.
- * @property refuse - Do nothing; `conflict` says what was found and `reason` says it in words.
+ * @property refuse - Do nothing; `conflict` reports what was found, `reason` explains why.
  */
 export type InitOutcome =
   | { readonly kind: 'write'; readonly content: string }
@@ -108,10 +103,10 @@ export type InitOutcome =
     };
 
 /**
- * Serialise an object with its keys in a fixed order, so a hash describes the
- * content rather than the order a particular writer happened to emit.
+ * Serialize object with keys in fixed sorted order; hash reflects content,
+ * independent of key insertion order.
  *
- * @param {Record<string, unknown>} config - The config.
+ * @param {Record<string, unknown>} config - Config.
  * @returns {string} Canonical JSON.
  */
 function canonical(config: Record<string, unknown>): string {
@@ -125,20 +120,20 @@ function canonical(config: Record<string, unknown>): string {
 }
 
 /**
- * Content hash of a config, ignoring PAW's own stamp.
+ * Content hash of config, ignore PAW own stamp.
  *
- * @param {Record<string, unknown>} config - The config.
- * @returns {string} A twelve-character hex digest.
+ * @param {Record<string, unknown>} config - Config.
+ * @returns {string} Twelve-character hex digest.
  */
 export function hashConfig(config: Record<string, unknown>): string {
   return hash64(canonical(config)).slice(0, 12);
 }
 
 /**
- * Render a config as the file PAW writes, stamped with its version and hash.
+ * Render config as file PAW write, stamp with version and hash.
  *
- * @param {Record<string, unknown>} config - The config to write.
- * @returns {string} The file contents.
+ * @param {Record<string, unknown>} config - Config to write.
+ * @returns {string} File contents.
  */
 export function stampConfig(config: Record<string, unknown>): string {
   const stamp: PawStamp = {
@@ -149,13 +144,12 @@ export function stampConfig(config: Record<string, unknown>): string {
 }
 
 /**
- * Parse a config file, failing loud on anything that is present but unreadable
- * — an unparseable config is a problem to report, and treating it as absent
- * would licence overwriting it.
+ * Parse config file; throws on present-but-unparseable text. Unparseable
+ * config still exists on disk; treating it as absent could allow overwrite.
  *
- * @param {string} text - The file contents.
- * @returns {Record<string, unknown>} The parsed config.
- * @throws {Error} When the text is not a JSON object.
+ * @param {string} text - File contents.
+ * @returns {Record<string, unknown>} Parsed config.
+ * @throws {Error} Text not JSON object.
  */
 function parse(text: string): Record<string, unknown> {
   let parsed: unknown;
@@ -171,10 +165,10 @@ function parse(text: string): Record<string, unknown> {
 }
 
 /**
- * Read a stamp out of a parsed config, if it carries a well-formed one.
+ * Read stamp out of parsed config, if it carry well-formed one.
  *
- * @param {Record<string, unknown>} config - The parsed config.
- * @returns {PawStamp | null} The stamp, or null when absent or malformed.
+ * @param {Record<string, unknown>} config - Parsed config.
+ * @returns {PawStamp | null} Stamp, or null when absent or malformed.
  */
 function readStamp(config: Record<string, unknown>): PawStamp | null {
   const raw = config[PAW_STAMP_KEY];
@@ -188,11 +182,11 @@ function readStamp(config: Record<string, unknown>): PawStamp | null {
 }
 
 /**
- * Classify what is already at the config path.
+ * Classify what already at config path.
  *
  * @param {string | null} text - Existing file contents, or null when absent.
  * @returns {InitConflict} What was found.
- * @throws {Error} When a config is present but unreadable.
+ * @throws {Error} Config present but unreadable.
  */
 export function inspectConfig(text: string | null): InitConflict {
   if (text === null || text.trim() === '') {
@@ -207,15 +201,14 @@ export function inspectConfig(text: string | null): InitConflict {
 }
 
 /**
- * Combine an existing config with the keys PAW needs, existing values winning.
+ * Combine existing config with keys PAW needs; existing value wins.
  *
- * A merge never removes and never rewrites: whatever the repo declared is what
- * it keeps, and PAW only fills in keys that are missing. The stale stamp is
- * dropped so the result can be stamped afresh.
+ * Merge never removes or rewrites existing keys; PAW only fills in missing
+ * keys. Drops old stamp so result gets re-stamped with fresh hash.
  *
- * @param {Record<string, unknown>} existing - The config already on disk.
- * @param {Record<string, unknown>} incoming - The keys PAW wants present.
- * @returns {Record<string, unknown>} The merged config.
+ * @param {Record<string, unknown>} existing - Config already on disk.
+ * @param {Record<string, unknown>} incoming - Keys PAW want present.
+ * @returns {Record<string, unknown>} Merged config.
  */
 export function mergeConfig(
   existing: Record<string, unknown>,
@@ -227,10 +220,10 @@ export function mergeConfig(
 }
 
 /**
- * Say what a refusal is about, in the words the operator needs to act.
+ * Return refusal reason with actions operator can take (`--merge` / `--override`).
  *
  * @param {InitConflict} conflict - What was found.
- * @returns {string} The reason.
+ * @returns {string} Reason.
  */
 function refusal(conflict: InitConflict): string {
   const detail =
@@ -241,13 +234,13 @@ function refusal(conflict: InitConflict): string {
 }
 
 /**
- * Decide what `init` does about the config.
+ * Decide what `init` do about config.
  *
  * @param {string | null} existingText - Existing file contents, or null when absent.
- * @param {Record<string, unknown>} incoming - The keys PAW wants present.
- * @param {InitMode} mode - How the operator resolved a conflict.
- * @returns {InitOutcome} The decision.
- * @throws {Error} When a config is present but unreadable.
+ * @param {Record<string, unknown>} incoming - Keys PAW want present.
+ * @param {InitMode} mode - How operator resolve conflict.
+ * @returns {InitOutcome} Decision.
+ * @throws {Error} Config present but unreadable.
  */
 export function resolveInit(
   existingText: string | null,

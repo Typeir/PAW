@@ -1,23 +1,15 @@
 /**
  * Trust Store Plans
  *
- * @fileoverview What it takes to make this machine's PAW CA trusted, per
- * platform, as a plan the operator can read before any of it runs. Pure: this
- * file decides *which* commands, never runs them, so the decision is unit-tested
- * on every platform from any platform and `paw trust --dry-run` prints exactly
- * what `paw trust` would do.
- *
- * Two rules shape every plan here.
- *
- * **Prefer the per-user store.** `certutil -user` on Windows and the login
- * keychain on macOS both install a root for one account without elevation.
- * Asking for administrator to install a CA is asking for a habit nobody should
- * have, and a machine-wide root is a larger blast radius than the problem needs.
- *
- * **Say what cannot be automated.** Linux has no single trust store — the system
- * bundle needs root, Firefox keeps its own NSS database, and a container may have
- * neither. The plan carries those as `manual` lines rather than pretending, so
- * the operator is never told a job is done that was not done.
+ * @fileoverview Build per-platform plan to make this machine PAW CA
+ * trusted. Data operator read before any run. Pure: decide which
+ * commands, never run. Unit-test every platform from any
+ * platform. `paw trust --dry-run` print what `paw trust` run. Every plan
+ * follows two rules. Prefer per-user store: `certutil -user` on Windows and
+ * login keychain on macOS install root for one account, no
+ * elevation. State what no automate: Linux got no single trust store —
+ * system bundle need root, Firefox keep own NSS database, container
+ * maybe have neither. Plan carry those as `manual` line.
  *
  * @module @paw/daemon/trustStore
  * @version 0.0.0
@@ -26,19 +18,18 @@
  */
 
 /**
- * The name the CA is filed under in a trust store, so an operator can find and
- * remove it later without guessing.
+ * Name CA filed under in trust store. Find and remove by it.
  */
 export const TRUST_NICKNAME = 'PAW Local CA';
 
 /**
- * One command in a trust plan.
+ * One command in trust plan.
  *
  * @interface TrustStep
- * @property {string} command - The program to run.
+ * @property {string} command - The program run.
  * @property {readonly string[]} args - Its arguments, unquoted and unshelled.
- * @property {string} describe - What it does, for the operator.
- * @property {boolean} elevated - Whether it needs administrator or root.
+ * @property {string} describe - What it do, for operator.
+ * @property {boolean} elevated - Whether need administrator or root.
  */
 export interface TrustStep {
   readonly command: string;
@@ -48,11 +39,11 @@ export interface TrustStep {
 }
 
 /**
- * How to trust the CA on one platform.
+ * How to trust CA on one platform.
  *
  * @interface TrustPlan
- * @property {readonly TrustStep[]} steps - What `paw trust` will run, in order.
- * @property {readonly string[]} manual - What it cannot do, stated plainly.
+ * @property {readonly TrustStep[]} steps - What `paw trust` run, in order.
+ * @property {readonly string[]} manual - What it no do.
  */
 export interface TrustPlan {
   readonly steps: readonly TrustStep[];
@@ -60,9 +51,8 @@ export interface TrustPlan {
 }
 
 /**
- * A step as a single readable line, for `--dry-run` and for the error message
- * when a step fails — an operator who is told which command failed can run it
- * themselves, and one who is told "trust failed" cannot.
+ * Render step as single line. For `--dry-run` and for error message
+ * when step fail.
  *
  * @param {TrustStep} step - The step.
  * @returns {string} The command line.
@@ -73,11 +63,11 @@ export function trustCommandLine(step: TrustStep): string {
 }
 
 /**
- * How to trust this machine's PAW CA.
+ * Build plan to trust this machine PAW CA.
  *
- * @param {string} platform - The platform, as `os.platform()` reports it.
- * @param {string} caPath - Where the CA certificate sits.
- * @param {string} home - The operator's home directory.
+ * @param {string} platform - The platform, as `os.platform()` report it.
+ * @param {string} caPath - Where CA certificate sit.
+ * @param {string} home - Operator home directory.
  * @returns {TrustPlan} The plan.
  */
 export function planTrust(platform: string, caPath: string, home: string): TrustPlan {
@@ -109,10 +99,9 @@ export function planTrust(platform: string, caPath: string, home: string): Trust
             'add-trusted-cert',
             '-r',
             'trustRoot',
-            // Scoped to SSL. Without `-p`, Security.framework treats the trust
-            // setting as unrestricted and the CA becomes trusted for code
-            // signing, S/MIME and timestamping too — which is a far larger
-            // grant than "my console should not warn".
+            // Scoped to SSL. Without `-p`, Security.framework treats the
+            // trust setting as unrestricted, and the CA becomes trusted
+            // for code signing, S/MIME and timestamping as well.
             '-p',
             'ssl',
             '-k',

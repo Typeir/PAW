@@ -1,17 +1,11 @@
 /**
  * Herd Dispatcher
  *
- * @fileoverview The one place a run is built from settings — the engine both the
- * CLI's `paw ui` and the daemon's release handler share, so a run behaves the same
- * whichever face configured it. Given {@link RunSettings} and injected
- * collaborators, it returns a dispatcher that opens the right registry (a live
- * provider or the deterministic fake), meters the bound port so the console's
- * spend is a count and not an estimate, attaches the run's context to the plan,
- * forwards its output ceiling and concurrency to dispatch, writes each member as
- * it lands, and always closes the live client. The collaborators are injected
- * because they live in different packages — `openLive` and the writer differ
- * between a CLI process and the daemon — but the orchestration is one, and it is
- * covered here once rather than hand-rolled per surface.
+ * @fileoverview Build run from settings. Engine both CLI `paw ui` and daemon
+ * release handler share. With {@link RunSettings} plus injected collaborators,
+ * return dispatcher that open registry (live provider or deterministic fake),
+ * meter bound port, attach run context to plan, forward output ceiling and
+ * concurrency to dispatch, write each member when it land, close live client.
  *
  * @module @paw/daemon/application/herdDispatcher
  * @version 0.0.0
@@ -32,8 +26,7 @@ import type {
 import { meterPort } from './run.js';
 
 /**
- * The slice of a herd writer the engine drives — each settled member is written
- * as it lands, so the output exists whether or not the run finishes.
+ * Slice of herd writer engine drive. Write each settle member when it land.
  *
  * @interface HerdWriterLike
  * @property {(event: DispatchEvent) => Promise<void>} onProgress - Write on each settle.
@@ -45,17 +38,16 @@ export interface HerdWriterLike {
 }
 
 /**
- * The collaborators {@link dispatcherFor} needs, injected so the engine is pure
- * and package-agnostic.
+ * Collaborators {@link dispatcherFor} want.
  *
  * @interface HerdDeps
- * @property {(plan: SwarmPlan<unknown>) => Promise<{ registry: RoleRegistry; close: () => Promise<void> }>} openLive - Open a live registry and a hook that stops its client.
- * @property {(plan: SwarmPlan<unknown>) => RoleRegistry} fakeRegistry - The deterministic registry for a non-live run.
+ * @property {(plan: SwarmPlan<unknown>) => Promise<{ registry: RoleRegistry; close: () => Promise<void> }>} openLive - Open live registry plus hook that stop its client.
+ * @property {(plan: SwarmPlan<unknown>) => RoleRegistry} fakeRegistry - Deterministic registry for non-live run.
  * @property {(plan: SwarmPlan<unknown>, paths: readonly string[]) => SwarmPlan<unknown>} withContext - Attach resolved context files to every brief.
- * @property {(globs: readonly string[]) => Promise<readonly string[]>} resolveContext - Resolve the run's context globs to file contents.
- * @property {FileReaderPort} files - Reads the files a member attaches.
- * @property {(plan: SwarmPlan<unknown>) => HerdWriterLike} makeWriter - Build the writer for this plan's output.
- * @property {(plan: SwarmPlan<unknown>, deps: DispatchDeps<unknown>) => Promise<DispatchResult>} dispatch - The dispatch use-case, injected so this stays a unit.
+ * @property {(globs: readonly string[]) => Promise<readonly string[]>} resolveContext - Turn run context globs to file contents.
+ * @property {FileReaderPort} files - Read files member attach.
+ * @property {(plan: SwarmPlan<unknown>) => HerdWriterLike} makeWriter - Build writer for this plan output.
+ * @property {(plan: SwarmPlan<unknown>, deps: DispatchDeps<unknown>) => Promise<DispatchResult>} dispatch - Dispatch use-case.
  */
 export interface HerdDeps {
   openLive: (plan: SwarmPlan<unknown>) => Promise<{ registry: RoleRegistry; close: () => Promise<void> }>;
@@ -68,9 +60,8 @@ export interface HerdDeps {
 }
 
 /**
- * A run, reported live: the dispatch result and the metered usage. Structurally a
- * daemon `Dispatcher`, so it slots into the existing release path without either
- * knowing the other.
+ * Run, report live: dispatch result plus metered usage. Structurally daemon
+ * `Dispatcher`.
  */
 export type HerdDispatcher = (
   plan: SwarmPlan<unknown>,
@@ -78,11 +69,11 @@ export type HerdDispatcher = (
 ) => Promise<{ result: DispatchResult; usage: BudgetSummary }>;
 
 /**
- * Build the dispatcher a run's settings describe.
+ * Build dispatcher run settings describe.
  *
  * @param {RunSettings} settings - What to run and how.
- * @param {HerdDeps} deps - The injected collaborators.
- * @returns {HerdDispatcher} The dispatcher, ready for the release path to run and report.
+ * @param {HerdDeps} deps - Injected collaborators.
+ * @returns {HerdDispatcher} Dispatcher, ready for release path to run and report.
  */
 export function dispatcherFor(settings: RunSettings, deps: HerdDeps): HerdDispatcher {
   return async (plan, onProgress) => {

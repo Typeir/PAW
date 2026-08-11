@@ -1,11 +1,9 @@
 /**
  * Brief Composition Tests
  *
- * @fileoverview What a member is actually sent: a brief alone when the plan
- * attaches nothing, and a brief followed by each attached file's contents when
- * it does — in the order the plan declared them, fenced under their own paths.
- * A file that cannot be read fails the composition rather than dropping out of
- * the prompt.
+ * @fileoverview Test what member get sent. Get brief alone when plan attach
+ * nothing. Get brief then each attached file content when plan attach, in
+ * plan-declared order, fenced under own path. Unreadable file fail composition.
  *
  * @module @paw/core/test/application/composeBrief
  * @version 0.0.0

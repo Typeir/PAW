@@ -1,12 +1,9 @@
 /**
- * Live Socket Tests
+ * Live Socket Tests.
  *
- * @fileoverview The URL rule and the adapter's four callbacks.
+ * @fileoverview URL rule and adapter's four callbacks.
  *
- * The URL rule is the security-relevant half: this module will build a `wss:`
- * URL or none at all. A `ws:` fallback would carry the session's credential over
- * a connection anything on the machine can read, and the way that ships is as a
- * convenience for "it should also work on http".
+ * URL rule governs transport security. Module builds a `wss:` URL or none. A `ws:` fallback would carry the session credential over a connection any machine on the wire can read.
  *
  * @module @paw/gui/test/unit/infrastructure/liveSocket
  * @version 0.0.0
@@ -35,8 +32,7 @@ describe('liveUrl', () => {
   });
 
   it('refuses to build a URL for a page that is not on https', () => {
-    // No ws: fallback exists, at any scheme, for any reason. The console polls
-    // instead — slower, and it never puts the credential on a readable wire.
+    // No ws: fallback at any scheme. Console poll instead — slower, but never puts the credential on a readable wire.
     expect(liveUrl({ location: { host: '127.0.0.1:8971', protocol: 'http:' } })).toBeNull();
     expect(liveUrl({ location: { host: '', protocol: 'file:' } })).toBeNull();
     expect(liveUrl({ location: { host: 'x', protocol: 'file:' } })).toBeNull();
@@ -46,9 +42,9 @@ describe('liveUrl', () => {
 
 describe('createSocketFactory', () => {
   /**
-   * A constructor that records what it was asked to open.
+   * Constructor record what asked to open.
    *
-   * @returns {object} The constructor and the socket it made.
+   * @returns {object} Constructor and socket it made.
    */
   const spyCtor = (): {
     ctor: WebSocketConstructor;

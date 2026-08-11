@@ -1,17 +1,9 @@
 /**
- * PAW Hook-Command Merge
+ * PAW hook-command merge.
  *
- * @fileoverview The rule that installs PAW into a host's hook command without
- * ever clobbering the user's own. It is HOST-AGNOSTIC: the domain — a connector
- * for Copilot's `hooks.json`, Claude's `settings.json`, or any other surface —
- * supplies a {@link HookMergeSpec} carrying its canonical invocation, the extra
- * forms that also count as PAW, and how PAW chains on. This module only knows the
- * shape of the operation, never a particular host.
+ * @fileoverview Rule put PAW into host hook command, but no clobber user own. HOST-AGNOSTIC: domain — connector for Copilot `hooks.json`, Claude `settings.json`, any surface — give {@link HookMergeSpec} with canonical invocation, extra forms count as PAW, and how PAW chain on. Module know only shape of operation, never particular host.
  *
- * Detection is fuzzy on purpose: a hand-edited hook accretes typos and stale
- * forms, and PAW must recognise itself through them rather than duplicate itself.
- * Distance is Optimal String Alignment (restricted Damerau–Levenshtein) so an
- * adjacent transposition — the commonest human slip — costs one, not two.
+ * Hand-edited hooks accumulate typos and stale forms, so detection is fuzzy: a run within edit distance of the canonical form is recognised as PAW and rewritten to it. Distance is Optimal String Alignment (restricted Damerau–Levenshtein), so adjacent transposition — commonest human slip — cost one, not two.
  *
  * @module @paw/core/domain/hookMerge
  * @version 0.0.0
@@ -20,16 +12,16 @@
  */
 
 /**
- * What the merge did to the command.
+ * What merge do to command.
  */
 export type MergeAction = 'created' | 'noop' | 'corrected' | 'appended';
 
 /**
- * The merged command and the action taken to reach it.
+ * Merged command and action reach it.
  *
  * @interface HookMerge
- * @property {string} command - The command to write back for the hook event.
- * @property {MergeAction} action - Which branch produced it.
+ * @property {string} command - Command write back for hook event.
+ * @property {MergeAction} action - Which branch produce it.
  */
 export interface HookMerge {
   readonly command: string;
@@ -37,12 +29,12 @@ export interface HookMerge {
 }
 
 /**
- * The host-specific inputs the merge is parameterised over.
+ * Host-specific inputs merge parameterise over.
  *
  * @interface HookMergeSpec
- * @property {string} invocation - This host's canonical PAW invocation (e.g. `paw check`); drives both detection and correction.
- * @property {readonly RegExp[]} [aliases] - Extra forms that count as PAW for this host (e.g. the legacy `.mjs` launcher); each must be non-global.
- * @property {(existing: string) => string} append - The domain's own strategy for chaining PAW onto a foreign command.
+ * @property {string} invocation - This host canonical PAW invocation (e.g. `paw check`); drive both detection and correction.
+ * @property {readonly RegExp[]} [aliases] - Extra forms count as PAW for this host (e.g. legacy `.mjs` launcher); each must be non-global.
+ * @property {(existing: string) => string} append - Domain own strategy for chaining PAW onto foreign command.
  */
 export interface HookMergeSpec {
   readonly invocation: string;
@@ -51,7 +43,7 @@ export interface HookMergeSpec {
 }
 
 /**
- * The shells a connector may target when composing its {@link HookMergeSpec.append}.
+ * Shells connector may target when compose its {@link HookMergeSpec.append}.
  */
 export type HookShell = 'posix' | 'cmd' | 'pwsh' | 'pwsh5';
 
@@ -62,7 +54,7 @@ const SEPARATOR = /(\s*(?:&&|\|\||;)\s*)/;
  *
  * @param a - First string.
  * @param b - Second string.
- * @returns The edit distance, counting an adjacent transposition as one.
+ * @returns Edit distance, count adjacent transposition as one.
  */
 function osa(a: string, b: string): number {
   const rows = a.length;
@@ -85,10 +77,10 @@ function osa(a: string, b: string): number {
 }
 
 /**
- * The whitespace-delimited tokens of a segment, with their offsets.
+ * Whitespace-delimited tokens of segment, with offsets.
  *
  * @param segment - One command segment (between chain operators).
- * @returns Each token's text and start index within the segment.
+ * @returns Each token text and start index within segment.
  */
 function tokensOf(segment: string): { text: string; start: number }[] {
   const out: { text: string; start: number }[] = [];
@@ -99,15 +91,15 @@ function tokensOf(segment: string): { text: string; start: number }[] {
 }
 
 /**
- * Rewrite a segment so any PAW run it holds becomes the canonical invocation,
- * reporting whether the segment was PAW at all. A fuzzy `binary + subcommand`
- * run is spliced in place; a host alias replaces the segment's trimmed content.
+ * Rewrite segment. Any PAW run it hold become canonical invocation.
+ * Report whether segment be PAW at all. Fuzzy `binary + subcommand`
+ * run splice in place; host alias replace segment trimmed content.
  *
- * @param segment - The segment to inspect.
- * @param spec - The host spec.
- * @param binary - The invocation's leading token.
- * @param sub - The invocation's subcommand token.
- * @returns The (possibly rewritten) segment and whether it was recognised as PAW.
+ * @param segment - Segment to inspect.
+ * @param spec - Host spec.
+ * @param binary - Invocation leading token.
+ * @param sub - Invocation subcommand token.
+ * @returns (Possibly rewritten) segment and whether recognised as PAW.
  */
 function rewriteSegment(
   segment: string,
@@ -137,17 +129,17 @@ function rewriteSegment(
 }
 
 /**
- * Merge PAW into a host's existing hook command, non-destructively.
+ * Merge PAW into host existing hook command, non-destructively.
  *
- * @param existing - The command already configured for the hook event.
- * @param spec - The host-specific invocation, aliases, and append strategy.
- * @returns The merged command and the action taken.
+ * @param existing - Command already configured for hook event.
+ * @param spec - Host invocation, aliases, append strategy.
+ * @returns Merged command and action taken.
  *
  * @description
- * Empty → write the bare invocation (`created`). Otherwise scan the operator-
- * delimited segments for PAW: the first recognised one is normalised in place
- * (`corrected`, or `noop` when it was already right). If none is PAW, the user's
- * command is left whole and the domain's `append` chains PAW on (`appended`).
+ * Empty → write bare invocation (`created`). Else scan operator-
+ * delimited segments for PAW: first recognised normalise in place
+ * (`corrected`, or `noop` when already right). If none be PAW, user
+ * command stay whole and domain `append` chain PAW on (`appended`).
  */
 export function mergeHookCommand(existing: string, spec: HookMergeSpec): HookMerge {
   if (existing.trim() === '') {
@@ -167,14 +159,14 @@ export function mergeHookCommand(existing: string, spec: HookMergeSpec): HookMer
 }
 
 /**
- * Join PAW onto a foreign command with the operator the shell supports — the
- * building block a connector composes into its {@link HookMergeSpec.append}.
+ * Join PAW onto foreign command with operator shell support — the
+ * building block connector compose into its {@link HookMergeSpec.append}.
  *
- * @param existing - The user's command.
- * @param invocation - PAW's canonical invocation.
- * @param shell - The shell that will run the merged command.
- * @returns The chained command. Windows PowerShell 5.1 lacks `&&`, so it is
- * guarded with `; if ($?) { … }`; every other shell uses `&&`.
+ * @param existing - User command.
+ * @param invocation - PAW canonical invocation.
+ * @param shell - Shell run merged command.
+ * @returns Chained command. Windows PowerShell 5.1 lack `&&`, so guard
+ * with `; if ($?) { … }`; every other shell use `&&`.
  */
 export function chainCommand(
   existing: string,

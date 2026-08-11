@@ -1,11 +1,10 @@
 /**
- * @fileoverview Covers {@link dispatcherFor}, the shared run-engine both the CLI's
- * `paw ui` and the daemon's release handler build a run from: given RunSettings and
- * injected collaborators, it returns a dispatcher that opens the right registry
- * (live vs fake), meters the bound port, forwards the run's ceiling and concurrency
- * to dispatch, attaches context to the plan, writes each member, and always closes
- * the live client. Proven with fakes — no SDK, no dispatchSwarm internals — so the
- * one behaviour every surface shares is covered here once.
+ * @fileoverview Cover {@link dispatcherFor}, shared run-engine both CLI's
+ * `paw ui` and daemon's release handler build run from: give RunSettings and
+ * injected collaborators, return dispatcher that open right registry
+ * (live vs fake), meter bound port, forward run's ceiling and concurrency
+ * to dispatch, attach context to plan, write each member, always close
+ * live client. Prove with fakes — no SDK, no dispatchSwarm internals.
  *
  * @module @paw/daemon/test/application/herdDispatcher
  */
@@ -52,8 +51,8 @@ const noWriter = { onProgress: async () => undefined, written: () => [] };
 const files = {} as FileReaderPort;
 
 /**
- * Build deps whose dispatch records what it was handed and drives one member so
- * the metered port is exercised.
+ * Build deps whose dispatch record what it get handed and drive one member so
+ * metered port get exercised.
  *
  * @param over - Overrides.
  */

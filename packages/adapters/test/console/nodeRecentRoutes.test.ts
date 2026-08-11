@@ -1,11 +1,10 @@
 /**
  * PAW Node Recent Routes Adapter Tests
  *
- * @fileoverview A round trip through a real `recent.json` in a temp home: an
- * absent file lists as no routes, a record creates it and round-trips, a repeated
- * route is promoted rather than duplicated, an explicit cap is honoured, and a
- * file that is not a JSON array of strings fails loud rather than reading empty.
- * So `nodeRecentRoutes.ts` reaches 100%.
+ * @fileoverview Round-trip `recent.json` in temp home. Absent file list
+ * no routes. Record create file, round-trip. Repeated route promote to front.
+ * Explicit cap applied. File not JSON array of strings throws. Cover
+ * `nodeRecentRoutes.ts` to 100%.
  *
  * @module @paw/adapters/test/console/nodeRecentRoutes
  * @version 0.0.0
@@ -52,6 +51,20 @@ describe('createNodeRecentRoutes', () => {
     await port.record('/a');
     await port.record('/b');
     expect(await port.record('/c')).toEqual(['/c', '/b']);
+  });
+
+  it('removes a route and persists the shrunken list', async () => {
+    const port = createNodeRecentRoutes(home);
+    await port.record('/repo/a');
+    await port.record('/repo/b');
+    expect(await port.remove('/repo/a')).toEqual(['/repo/b']);
+    expect(await createNodeRecentRoutes(home).list()).toEqual(['/repo/b']);
+  });
+
+  it('refuses a relative route at record — the list holds absolute paths only', async () => {
+    const port = createNodeRecentRoutes(home);
+    await port.record('/repo/a');
+    expect(await port.record('.')).toEqual(['/repo/a']);
   });
 
   it('fails loud when the file is not an array', async () => {

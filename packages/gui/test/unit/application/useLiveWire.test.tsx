@@ -1,16 +1,14 @@
 /**
- * Live Wire State Machine Tests
+ * Tests for Live Wire state machine.
  *
- * @fileoverview Every transition, driven against a scripted fake socket. This is
- * the reason `liveSocket.ts` exists as a seam: a real `WebSocket` would make
- * these tests about whether a connection happened to succeed, where what matters
- * is what the console does when it does not.
+ * @fileoverview Drive every transition against scripted fake socket.
+ * `liveSocket.ts` abstracts the socket so tests control connection outcomes; a
+ * real `WebSocket` makes tests depend on whether connection happens to succeed.
  *
- * The transition worth naming is `locked-out`. A daemon that refuses the
- * credential will refuse the polling request for the same reason, so retrying is
- * pointless — the console has to stop and say so. Getting this wrong produces
- * either an endless reconnect loop against a daemon that will never accept it,
- * or a spinner that spins forever.
+ * Transition named `locked-out`. Daemon that refuses a credential refuses
+ * polling requests for the same reason, so retry is pointless; console stops
+ * and reports it. Getting this wrong produces an endless reconnect loop against
+ * a daemon that never accepts it, or a spinner that spins forever.
  *
  * @module @paw/gui/test/unit/application/useLiveWire
  * @version 0.0.0
@@ -42,9 +40,9 @@ import { makeSnapshot } from '../../fixtures.js';
 const TOKEN = 'a-printed-credential';
 
 /**
- * A socket a test drives by hand.
+ * Socket test drive by hand.
  *
- * @returns {object} The socket and the levers to drive it.
+ * @returns {object} Socket and controls to drive it.
  */
 const scripted = (): {
   socket: SocketLike;
@@ -80,9 +78,9 @@ const scripted = (): {
 };
 
 /**
- * A `hello` frame carrying a snapshot.
+ * `hello` frame carry snapshot.
  *
- * @returns {string} The frame.
+ * @returns {string} Frame.
  */
 const hello = (): string => encodeEnvelope('hello', makeSnapshot(), 1);
 
@@ -102,8 +100,8 @@ describe('retryDelay', () => {
   });
 
   it('applies full jitter, so consoles do not reconnect in lockstep', () => {
-    // Several consoles restarted together would otherwise arrive at the daemon
-    // in one wave, at exactly the moment it is coming back up.
+    // Without jitter, several restarted consoles reconnect at the exact
+    // moment the daemon comes back up.
     expect(retryDelay(5, 0)).toBe(0);
     expect(retryDelay(5, 0.5)).toBeLessThan(retryDelay(5, 0.9));
   });
@@ -124,8 +122,8 @@ describe('the live wire', () => {
       useLiveWire({ connect, token: null, plan: null, onEvent: () => undefined }),
     );
 
-    // Opening a socket we cannot authenticate would burn one of the daemon's
-    // four pre-auth slots and end in a 4401 either way.
+    // Opening a socket we cannot authenticate costs one of daemon's four
+    // pre-auth slots and ends in 4401 either way.
     expect(result.current.mode).toBe('locked-out');
     expect(connect).not.toHaveBeenCalled();
   });
@@ -189,6 +187,33 @@ describe('the live wire', () => {
     expect(result.current.mode).toBe('static');
   });
 
+  it('asks a release over the authenticated socket', () => {
+    const socket = scripted();
+    const { result } = renderHook(() =>
+      useLiveWire({ connect: () => socket.socket, token: TOKEN, plan: null, onEvent: () => undefined }),
+    );
+    socket.open();
+    socket.deliver(hello());
+
+    act(() => result.current.release({ plan: 'plans/demo.swarm.mjs', live: false }));
+    expect(parseClientMessage(socket.sent[socket.sent.length - 1])).toEqual({
+      v: 1,
+      type: 'release',
+      settings: { plan: 'plans/demo.swarm.mjs', live: false },
+    });
+  });
+
+  it('does not ask a release until a socket has authenticated', () => {
+    const socket = scripted();
+    const { result } = renderHook(() =>
+      useLiveWire({ connect: () => socket.socket, token: TOKEN, plan: null, onEvent: () => undefined }),
+    );
+    socket.open();
+
+    act(() => result.current.release({ plan: 'plans/demo.swarm.mjs', live: false }));
+    expect(socket.sent).toHaveLength(1);
+  });
+
   it('hands every frame to the console once it is live', () => {
     const socket = scripted();
     const events: LiveEnvelope[] = [];
@@ -242,7 +267,7 @@ describe('the live wire', () => {
     act(() => {
       vi.advanceTimersByTime(RETRY_CAP_MS * 4);
     });
-    // One attempt, and no more. Polling would be refused for the same reason.
+    // One attempt, no more. Polling refused for same reason.
     expect(connect).toHaveBeenCalledTimes(1);
   });
 
@@ -294,8 +319,8 @@ describe('the live wire', () => {
       vi.advanceTimersByTime(RETRY_BASE_MS);
     });
 
-    // A restarting daemon is coming back; hammering it from a deep backoff would
-    // mean the console reconnects long after the daemon was ready.
+    // Daemon restarts and comes back, but reconnecting from deep backoff
+    // means the console reconnects long after the daemon is ready.
     expect(connect).toHaveBeenCalledTimes(2);
   });
 
@@ -307,8 +332,8 @@ describe('the live wire', () => {
     );
     socket.open();
 
-    // A socket error is always followed by a close. Acting on both would open two
-    // sockets for one failure and double the daemon's connection rate.
+    // Socket error always followed by close. Act on both open two
+    // sockets for one failure, double daemon connection rate.
     socket.fail();
     socket.end(1006);
     act(() => {
@@ -325,7 +350,7 @@ describe('the live wire', () => {
       useLiveWire({ connect, token: TOKEN, plan: null, onEvent: () => undefined, random: () => 0 }),
     );
 
-    // One failure, then a successful reconnect.
+    // One failure, successful reconnect coming.
     socket.open();
     socket.end(1006);
     act(() => {
@@ -336,9 +361,9 @@ describe('the live wire', () => {
     socket.open();
     socket.deliver(hello());
 
-    // Recording the success must not re-run the connection effect. If it did,
-    // every reconnect would cost two sockets, two auth round trips and two full
-    // snapshots, and the console would flicker live -> connecting -> live.
+    // Recording success no re-run connection effect. If did,
+    // every reconnect cost two sockets, two auth round trips and two full
+    // snapshots, console flicker live -> connecting -> live.
     expect(result.current.mode).toBe('live');
     expect(connect).toHaveBeenCalledTimes(2);
     act(() => {
@@ -358,8 +383,8 @@ describe('the live wire', () => {
     socket.end(CLOSE_CAPACITY);
     expect(result.current.mode).toBe('degraded');
 
-    // Degraded means the socket is already gone, so closing it would do nothing
-    // — the button has to drive the reconnect itself.
+    // Degraded state means the socket is already gone, so closing it does
+    // nothing; the button initiates the reconnect.
     act(() => result.current.retryNow());
 
     expect(connect).toHaveBeenCalledTimes(2);
@@ -394,8 +419,8 @@ describe('the live wire', () => {
     socket.open();
     socket.deliver(hello());
 
-    // The host slice ticks every second. A wire that has said nothing for several
-    // ticks is dead in a way no close event is going to report.
+    // Host slice ticks every second. A wire silent for several ticks is
+    // treated as dead even though no close event reports it.
     clock = CLIENT_SILENCE_MS + 1;
     act(() => {
       vi.advanceTimersByTime(CLIENT_SILENCE_MS);
@@ -434,8 +459,8 @@ describe('the live wire', () => {
     const { rerender } = renderHook(
       ({ plan }: { plan: string | null }) =>
         useLiveWire({ connect, token: TOKEN, plan, onEvent: () => undefined }),
-      // The fixture's snapshot is already on this plan, so the console and the
-      // daemon agree on connect and no corrective watch is sent.
+      // Fixture snapshot already on this plan, console and
+      // daemon agree on connect, no corrective watch send.
       { initialProps: { plan: 'plans/demo.swarm.mjs' as string | null } },
     );
     socket.open();
@@ -464,9 +489,9 @@ describe('the live wire', () => {
     );
     socket.open();
 
-    // A reconnected session starts on whatever the daemon opened on, so the
-    // console must say what it is actually looking at. Without this it silently
-    // renders another plan's briefs and reports itself live.
+    // A reconnected session starts on whichever plan the daemon opened on;
+    // the console must re-assert the plan it actually selects. Without this
+    // it renders other plans' briefs and reports itself live.
     socket.deliver(hello());
 
     expect(parseClientMessage(socket.sent[1])).toEqual({
@@ -487,9 +512,9 @@ describe('the live wire', () => {
     socket.deliver(hello());
     const afterHello = socket.sent.length;
 
-    // The socket dropped and a fresh one is opening. A `watch` as its first
-    // frame is talking before authenticating, which the daemon closes — and the
-    // console would have bricked itself on a reconnect that had just succeeded.
+    // Socket dropped while a fresh one is opening. Sending `watch` as the
+    // first frame before authenticating makes the daemon close the socket,
+    // and the console breaks on a reconnect that just succeeded.
     socket.end(1006);
     rerender({ plan: 'plans/other.swarm.mjs' });
 
@@ -510,10 +535,10 @@ describe('the live wire', () => {
       vi.advanceTimersByTime(RETRY_BASE_MS);
     });
 
-    // Every other close resets the attempt counter on the preceding hello, so
-    // without a 4429 branch a rate-limited console reconnects in under half a
-    // second and is rate-limited again — a hot loop against the exact condition
-    // the daemon asked it to relieve.
+    // Every other close resets the attempt counter on the preceding hello,
+    // so without the 4429 branch a rate-limited console reconnects under
+    // half a second and gets rate-limited again — a loop against the exact
+    // capacity condition the daemon signals.
     expect(connect).toHaveBeenCalledTimes(1);
   });
 
@@ -546,8 +571,9 @@ describe('the live wire', () => {
     unmount();
 
     expect(socket.closes).toBeGreaterThan(0);
-    // Nothing after unmount: a frame delivered to a dead hook would update state
-    // on an unmounted component, and a surviving timer would reconnect forever.
+    // Nothing after unmount. Delivering a frame to an unmounted hook would
+    // update state on an unmounted component; a surviving timer would
+    // reconnect forever.
     expect(() => socket.deliver(hello())).not.toThrow();
     expect(() => socket.end(1006)).not.toThrow();
   });
@@ -566,8 +592,8 @@ describe('the live wire', () => {
     unmount();
     socket.open();
 
-    // The socket completed its handshake after the console was gone. Sending the
-    // token to it would hand the credential to a connection nobody is holding.
+    // Socket completes its handshake after the console is gone; sending the
+    // token to it gives a credential to a connection nobody holds.
     expect(socket.sent).toEqual([]);
   });
 });

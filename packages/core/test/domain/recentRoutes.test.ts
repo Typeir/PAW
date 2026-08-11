@@ -1,11 +1,7 @@
 /**
  * PAW Recent Routes Tests
  *
- * @fileoverview The recent-routes list operation: a grab goes to the front, the
- * same repository never appears twice (matched case-insensitively and regardless
- * of slash direction, so a Windows path typed two ways is one entry), the list is
- * capped with the oldest falling off, and a blank route changes nothing. So
- * `recentRoutes.ts` reaches 100%.
+ * @fileoverview Test recent-routes list. New grab go front. Same repository never appear twice, match case-insensitive, ignore slash direction. List cap, oldest fall off. Blank route change nothing.
  *
  * @module @paw/core/test/domain/recentRoutes
  * @version 0.0.0
@@ -14,7 +10,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { RECENT_ROUTES_CAP, promoteRoute, sameRoute } from '../../src/domain/recentRoutes.js';
+import {
+  RECENT_ROUTES_CAP,
+  isAbsoluteRoute,
+  promoteRoute,
+  removeRoute,
+  sameRoute,
+} from '../../src/domain/recentRoutes.js';
 
 describe('promoteRoute', () => {
   it('puts a freshly grabbed route at the front', () => {
@@ -46,6 +48,37 @@ describe('promoteRoute', () => {
     const next = promoteRoute(list, '   ');
     expect(next).toEqual(['/a', '/b']);
     expect(next).not.toBe(list);
+  });
+
+  it('is a no-op for a relative route — only absolute paths enter the list', () => {
+    expect(promoteRoute(['/a'], '.')).toEqual(['/a']);
+    expect(promoteRoute(['/a'], 'repo/sub')).toEqual(['/a']);
+  });
+});
+
+describe('isAbsoluteRoute', () => {
+  it('accepts POSIX, drive, and UNC absolute paths', () => {
+    expect(isAbsoluteRoute('/work/a')).toBe(true);
+    expect(isAbsoluteRoute('C:\\Users\\x')).toBe(true);
+    expect(isAbsoluteRoute('c:/users/x')).toBe(true);
+    expect(isAbsoluteRoute('\\\\share\\repo')).toBe(true);
+  });
+
+  it('rejects relative routes', () => {
+    expect(isAbsoluteRoute('.')).toBe(false);
+    expect(isAbsoluteRoute('repo')).toBe(false);
+    expect(isAbsoluteRoute('..\\up')).toBe(false);
+    expect(isAbsoluteRoute('')).toBe(false);
+  });
+});
+
+describe('removeRoute', () => {
+  it('drops the route however it was spelled, keeping order', () => {
+    expect(removeRoute(['/a', 'C:\\Repo\\A', '/b'], 'c:/repo/a')).toEqual(['/a', '/b']);
+  });
+
+  it('is a no-op for an unknown route', () => {
+    expect(removeRoute(['/a'], '/zzz')).toEqual(['/a']);
   });
 });
 

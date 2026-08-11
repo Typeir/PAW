@@ -1,10 +1,9 @@
 /**
  * Placeholder Atom
  *
- * @fileoverview What a panel shows when there is genuinely nothing to show — no
- * open violations, or a subsystem a live control API has yet to back. It reads
- * as an empty state rather than as data, which is the point: the console never
- * fills a gap with a plausible number.
+ * @fileoverview Panel show when no genuine content exist — no open violations,
+ * no subsystem for live control API yet. Read as empty state, not data. Point:
+ * console never fill gap with fake number.
  *
  * @module @paw/gui/presentation/atoms/placeholder
  * @version 0.0.0
@@ -18,17 +17,17 @@ import type { ReactNode } from 'react';
  * Props for {@link Placeholder}.
  *
  * @interface PlaceholderProps
- * @property {ReactNode} children - The empty-state message.
+ * @property {ReactNode} children - Empty-state message.
  */
 export interface PlaceholderProps {
   readonly children: ReactNode;
 }
 
 /**
- * An empty state.
+ * Empty state.
  *
- * @param {PlaceholderProps} props - The placeholder props.
- * @returns {JSX.Element} The empty state.
+ * @param {PlaceholderProps} props - Placeholder props.
+ * @returns {JSX.Element} Empty state.
  */
 export function Placeholder({ children }: PlaceholderProps) {
   return <p className='placeholder'>{children}</p>;

@@ -1,13 +1,12 @@
 /**
  * PAW Copilot-Hooks Connector
  *
- * @fileoverview A {@link HostConnector} that bolts PAW onto GitHub Copilot's
- * hooks surface (the CLI/VS Code `hooks.json` stdin/stdout protocol) — through
- * translation, not through PAW's core knowing anything about Copilot. It maps a
- * hook payload to a canonical {@link PawEvent} and a canonical {@link PawResponse}
- * back to the hook output shape Copilot expects. This is the reference connector:
- * a new host (an Anthropic runtime, a Codex runtime) is a sibling of this file,
- * selected by `PawConfig.connector`, with PAW's loop untouched.
+ * @fileoverview {@link HostConnector} adapts PAW to GitHub Copilot hooks
+ * surface (CLI/VS Code `hooks.json` stdin/stdout protocol) by translation; core
+ * stay unaware of Copilot. Map hook payload to canonical {@link PawEvent}, and
+ * canonical {@link PawResponse} back to hook output shape Copilot expect.
+ * Reference connector: new host (Anthropic runtime, Codex runtime) be sibling
+ * file, selected by `PawConfig.connector`, with PAW loop untouched.
  *
  * @module @paw/connectors/copilotHooks
  * @version 0.0.0
@@ -18,8 +17,8 @@
 import type { HostConnector, PawEvent, PawEventType, PawResponse } from '@paw/core';
 
 /**
- * This host's native name for each canonical event, the forward of what
- * {@link copilotHooksConnector.toEvent} keys on.
+ * Host native name for each canonical event. {@link copilotHooksConnector.toEvent}
+ * uses this map to translate a canonical type to its hook name.
  */
 const COPILOT_EVENT_NAME: Record<PawEventType, string> = {
   'session.start': 'SessionStart',
@@ -30,9 +29,9 @@ const COPILOT_EVENT_NAME: Record<PawEventType, string> = {
 };
 
 /**
- * Coerce a value to a non-empty string, or null.
+ * Coerce value to non-empty string, or null.
  *
- * @param {unknown} v - The value.
+ * @param {unknown} v - Value.
  * @returns {string | null} The string, or null.
  */
 function str(v: unknown): string | null {
@@ -40,12 +39,11 @@ function str(v: unknown): string | null {
 }
 
 /**
- * Parse a tool-args source that may be an object or a JSON string. Malformed
- * input yields null — a handled, expected case (the host sent non-JSON), not a
- * swallowed error: the caller treats null as "no arguments here".
+ * Parse tool-args source, object or JSON string. Malformed input yield null;
+ * caller treat null as "no arguments here".
  *
- * @param {unknown} src - The source value.
- * @returns {Record<string, unknown> | null} The parsed record, or null.
+ * @param {unknown} src - Source value.
+ * @returns {Record<string, unknown> | null} Parsed record, or null.
  */
 function asArgs(src: unknown): Record<string, unknown> | null {
   if (typeof src === 'string') {
@@ -62,8 +60,8 @@ function asArgs(src: unknown): Record<string, unknown> | null {
 }
 
 /**
- * Extract the file paths a hook payload references, normalised to forward
- * slashes. Covers the `toolInput` object and the `toolArgs` string/object forms.
+ * Extract file paths hook payload reference, normalise to forward slashes.
+ * Cover `toolInput` object and `toolArgs` string/object forms.
  *
  * @param {Record<string, unknown>} raw - The hook payload.
  * @returns {string[]} The referenced paths.
@@ -86,9 +84,8 @@ function extractPaths(raw: Record<string, unknown>): string[] {
 }
 
 /**
- * The first path that is an environment file, or null. Env files must never
- * reach the model context, so their presence is surfaced to the enforcement
- * decision.
+ * First path that be environment file, or null. Callers use the returned path
+ * to make an enforcement decision.
  *
  * @param {string[]} paths - Candidate paths.
  * @returns {string | null} The matching path, or null.
@@ -99,7 +96,7 @@ function envMatch(paths: string[]): string | null {
 }
 
 /**
- * The session id from either casing.
+ * Session id from either casing.
  *
  * @param {Record<string, unknown>} raw - The hook payload.
  * @returns {string | null} The session id, or null.
@@ -109,7 +106,7 @@ function sessionId(raw: Record<string, unknown>): string | null {
 }
 
 /**
- * The tool name from either casing.
+ * Tool name from either casing.
  *
  * @param {Record<string, unknown>} raw - The hook payload.
  * @returns {string} The tool name, or empty string.
@@ -119,7 +116,7 @@ function toolName(raw: Record<string, unknown>): string {
 }
 
 /**
- * The Copilot-hooks connector.
+ * Copilot-hooks connector.
  */
 export const copilotHooksConnector: HostConnector = {
   name: 'copilot-hooks',

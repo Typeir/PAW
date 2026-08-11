@@ -1,10 +1,9 @@
 /**
- * @fileoverview Covers the Select atom exhaustively: the closed trigger (selected
- * label vs placeholder), open/close by click and by keyboard, option selection by
- * click and by Enter, every navigation key (Arrow/Home/End/Escape/Tab and an
- * ignored key), the disabled short-circuit, the searchable filter with its empty
- * state, and outside-click close — so `select.tsx` reaches 100% in jsdom without
- * real layout or timers.
+ * @fileoverview Cover Select atom full. Test closed trigger (selected label vs
+ * placeholder), open and close by click and by keyboard, pick option by click
+ * and by Enter, every nav key (Arrow/Home/End/Escape/Tab and one ignored key),
+ * disabled short-circuit, searchable filter with empty state, and outside-click
+ * close — so `select.tsx` reach 100% in jsdom without real layout or timers.
  *
  * @module @paw/gui/test/unit/presentation/select
  */
@@ -20,7 +19,7 @@ const OPTIONS: SelectOption[] = [
 ];
 
 /**
- * Render a Select and return its onChange spy, root, and the trigger.
+ * Render a Select. Return its onChange spy, root, and trigger.
  *
  * @param props - Overrides for the Select.
  */

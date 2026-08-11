@@ -1,18 +1,15 @@
 /**
  * PAW Live Session
  *
- * @fileoverview One authenticated WebSocket, as a state machine over a seam. The
- * socket lives in `infrastructure`; everything that decides *what happens* lives
- * here, pure over {@link WsSessionPort}, which is what makes the security-relevant
- * behaviour testable by driving the machine rather than racing a socket.
+ * @fileoverview One authenticated WebSocket be state machine. Socket I/O live
+ * in `infrastructure`; decision logic live here, interacting with the socket
+ * only through {@link WsSessionPort}.
  *
- * The rules: nothing is sent before the first frame authenticates — not a hello,
- * not an error body, not a topic name. The credential is compared in constant
- * time over SHA-256 digests. A failed authentication is counted and reported but
- * never turned into a lockout, because on loopback that would let any local
- * process lock the operator out of their own console. A client that stops reading
- * is dropped, not queued for: events are skipped past a threshold and it gets a
- * fresh hello when its buffer drains — there is no replay buffer anywhere.
+ * Rules: nothing go out before first frame authenticate — no hello, no error
+ * body, no topic name. Credential compare in constant time over SHA-256
+ * digests. Failed authentication be counted and reported, never turn into
+ * lockout. Client that stop reading get dropped: events skip past threshold,
+ * and it get fresh hello when buffer drain. No replay buffer.
  *
  * @module @paw/daemon/application/session
  * @version 0.0.0
@@ -50,12 +47,12 @@ import type {
 import { dispatchAttach, dispatchRelease, dispatchScope } from './sessionRouter.js';
 
 /**
- * Build one live session over a socket.
+ * Build one live session over socket.
  *
  * @param {WsSessionPort} port - The socket.
- * @param {SessionDeps} deps - What the daemon supplies.
- * @param {SessionWatcher} watcher - Told of auth and close, for the registry's counts.
- * @param {string | null} openedOn - The plan it starts watching, if any.
+ * @param {SessionDeps} deps - What daemon supply.
+ * @param {SessionWatcher} watcher - Receives auth and close callbacks, used for registry count.
+ * @param {string | null} openedOn - The plan it start watch, if any.
  * @returns {LiveSession} The session machine.
  */
 export function createSession(
@@ -68,8 +65,8 @@ export function createSession(
   let watched: string | null = openedOn;
   let stale = false;
   let staleSince = 0;
-  // One snapshot in flight at a time; `pending` remembers that another was
-  // asked for while it was building.
+  // One snapshot in flight at a time; `pending` records another was requested
+  // while one builds.
   let sending = false;
   let pending = false;
   let windowStartedAt = deps.clock();
@@ -77,8 +74,7 @@ export function createSession(
   const openedAt = deps.clock();
 
   /**
-   * Close and stop, once. Every path out of this session goes through here so
-   * the registry's count cannot drift from the sockets that are actually open.
+   * Close and stop, once. All other paths out of the session call this.
    *
    * @param {number} code - The close code.
    * @param {string} reason - The close reason.
@@ -93,7 +89,7 @@ export function createSession(
   };
 
   /**
-   * Write one frame, unless the client has stopped reading it.
+   * Write one frame, unless client stop reading it.
    *
    * @param {LiveTopic} topic - The slice.
    * @param {unknown} data - Its value.
@@ -103,21 +99,16 @@ export function createSession(
   };
 
   /**
-   * Send the whole state for the watched plan. Every resync — after auth, after a
-   * watch, after a drained buffer — is this and nothing cleverer.
+   * Send whole state for watched plan. Every resync — after auth, after watch,
+   * after drained buffer — be this. A snapshot that cannot build become `error`
+   * frame and session stay open.
    *
-   * A snapshot that cannot be built is the daemon's problem, not the client's, so
-   * it becomes an `error` frame and the session stays open: a plan module that
-   * stopped parsing is something the operator fixes in their editor, and dropping
-   * the console every time they save a broken file would make the tool useless
-   * exactly when it is most needed.
-   *
-   * @returns {Promise<void>} Resolves once sent, or once the failure is reported.
+   * @returns {Promise<void>} Resolve once sent, or once failure be reported.
    */
   const sendHello = async (): Promise<void> => {
-    // Serialised, because `receive` is async and nothing upstream serialises it:
-    // a client can write thirty `watch` frames in one TCP segment and every one
-    // reaches this before the first snapshot resolves. One in flight, last wins.
+    // Serialised, because `receive` be async and nothing upstream serialise it:
+    // client can write thirty `watch` frame in one TCP segment and every one
+    // reach this before first snapshot resolve. One in flight, last win.
     if (sending) {
       pending = true;
       return;
@@ -135,8 +126,9 @@ export function createSession(
       snapshot = await deps.snapshot(watched);
     } catch (error: unknown) {
       sending = false;
-      // Cleared, not carried: a request that arrived while this build was failing
-      // would otherwise sit set until a later success sent a redundant snapshot.
+      // `pending` resets on failure: otherwise a `watch` received while this
+      // build failed would stay set and a later successful build would send a
+      // redundant snapshot.
       pending = false;
       deps.warn(
         `snapshot failed for ${watched ?? '(no plan)'}: ` +
@@ -155,8 +147,8 @@ export function createSession(
       pending = false;
       return;
     }
-    // Re-checked after the await: the buffer this snapshot joins is the one that
-    // exists now, and building it took time.
+    // Checked again after await: the buffer this snapshot joins is the one at
+    // send time, and building the snapshot took time.
     if (port.bufferedAmount() >= BACKPRESSURE_SKIP_BYTES) {
       pending = false;
       if (!stale) {
@@ -167,15 +159,16 @@ export function createSession(
     }
     write('hello', snapshot);
     if (pending) {
-      // A `watch` arrived while this one was building, so `watched` moved on and
-      // the snapshot just sent describes the wrong plan. One more pass settles it.
+      // A `watch` arrived while this snapshot built, so `watched` changed and
+      // the snapshot just sent is for the previous plan. One more pass sends
+      // the current plan.
       pending = false;
       await sendHello();
     }
   };
 
   /**
-   * Whether this frame is inside the session's message allowance.
+   * Whether this frame be inside session message allowance.
    *
    * @returns {boolean} True when it may be handled.
    */
@@ -198,7 +191,9 @@ export function createSession(
         return;
       }
       if (!withinRate()) {
-        // Capacity, not malformity: back off and come back rather than give up.
+        // Rate limit exceeded: close with the capacity code so the client
+        // backs off and reconnects instead of being told its frame is
+        // malformed.
         shut(CLOSE_CAPACITY, 'too many messages');
         return;
       }
@@ -210,8 +205,9 @@ export function createSession(
 
       if (state === 'pre-auth') {
         if (message.type !== 'auth') {
-          // A protocol-order violation, not an authentication one: it presented no
-          // credential, so 4401 would be a lie and would latch a console locked-out.
+          // Protocol-order violation, not a failed credential: no credential
+          // was offered, so the auth-fail code 4401 would falsely report one
+          // and make the console show a lockout.
           shut(CLOSE_MALFORMED, 'authenticate first');
           return;
         }
@@ -250,8 +246,8 @@ export function createSession(
       }
 
       if (message.plan !== null && !deps.plans().includes(message.plan)) {
-        // A plan outside the repository is refused without being opened, and the
-        // session keeps whatever it was already watching.
+        // A plan outside repository be refused without being opened, and session
+        // keep whatever it already watch.
         write('error', {
           code: 'unknown-plan',
           message: 'no such plan in this repository',
@@ -282,16 +278,16 @@ export function createSession(
         if (buffered > BACKPRESSURE_RESUME_BYTES) {
           return;
         }
-        // Drained. It missed events and there is no replay, so it gets the whole
-        // state back rather than a stream it cannot reassemble.
+        // Drained. The client missed events and there is no replay buffer, so
+        // it receives the whole state to resynchronise.
         stale = false;
         void sendHello();
         return;
       }
       if (topic === 'planDetail' && (data as PlanSlice).selectedPlan !== watched) {
-        // The bus carries one plan's detail to every session, and sessions watch
-        // different plans. Sending this on would show a console another plan's
-        // briefs — wrong data, rendered as though it were right.
+        // `planDetail` events broadcast to every session, and sessions may
+        // watch different plans. Forwarding one would show this session a brief
+        // for a different plan — stale data rendered as current.
         return;
       }
       write(topic, data);
@@ -299,8 +295,9 @@ export function createSession(
 
     tick: (nowMs: number): void => {
       if (state === 'pre-auth' && nowMs - openedAt >= AUTH_TIMEOUT_MS) {
-        // A protocol failure, not an authentication one: it made no guess, so it
-        // is not counted, and 4401 would wrongly stop a slow socket from retrying.
+        // Auth timeout is a protocol failure, not a credential failure:
+        // daemon received no credential, so not counted as an auth failure;
+        // sending 4401 would wrongly make a slow client stop retrying.
         shut(CLOSE_MALFORMED, 'no credential offered in time');
         return;
       }

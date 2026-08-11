@@ -1,12 +1,11 @@
 /**
- * Demo Page E2E
+ * Demo page E2E.
  *
- * @fileoverview The dataset the self-contained build injects, driven through the
- * real console. It proves two things the build itself cannot: that the demo
- * satisfies the same {@link PawSnapshot} contract the daemon serves — a
- * mismatch between its member count and its pre-rendered briefs would throw at
- * hydration — and that the static page tells the truth about being static, with
- * an idle daemon and no host to report.
+ * @fileoverview Inject self-contained snapshot, render through console. Tests
+ * verify what the build itself cannot. Demo must satisfy the same
+ * {@link PawSnapshot} contract the daemon serves. Throw when member count and
+ * pre-rendered briefs mismatch at hydration. Static page renders idle daemon
+ * and no host to report.
  *
  * @module @paw/gui/test/e2e/demoPage.e2e
  */

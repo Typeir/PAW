@@ -1,11 +1,10 @@
 /**
  * PAW GUI Test Setup
  *
- * @fileoverview Unmounts every rendered tree between tests. Testing Library
- * registers its own cleanup only when a test runner exposes globals, and this
- * suite imports what it uses, so the teardown is wired explicitly — a leaked
- * tree would leave document-level key listeners from one test firing in the
- * next.
+ * @fileoverview Unmount every rendered tree between tests. Testing Library
+ * register own cleanup only when test runner expose globals. This suite import
+ * what it use, so teardown wire explicit. Leaked tree leave document-level key
+ * listener from one test fire in next.
  *
  * @module @paw/gui/test/setup
  */

@@ -1,19 +1,18 @@
 /**
- * @fileoverview Unit tests for the non-destructive hook-command merge — the rule
- * that lets PAW install itself into a host's hook without ever clobbering the
- * user's own command. Written test-first: these assertions define the surface of
- * `mergeHookCommand` and `chainCommand` before they exist, and exercise every
- * branch (created / noop / corrected / appended) so the module reaches 100%.
+ * @fileoverview Unit tests for the non-destructive hook-command merge. Puts PAW
+ * in host's hook, no clobber user's command. Define surface of
+ * `mergeHookCommand` and `chainCommand`, exercise every branch
+ * (created / noop / corrected / appended) for 100% coverage.
  *
- * The merge is HOST-AGNOSTIC: it never hardcodes an invocation or a chain
- * operator. The domain (a connector — Copilot's `hooks.json`, Claude's
- * `settings.json`, …) supplies a spec: its canonical invocation, the extra forms
- * that also count as PAW, and — crucially — how PAW chains on. `chainCommand` is
- * the shell helper a connector composes into that append strategy.
+ * Merge host-agnostic: hardcode no invocation or chain operator. Domain
+ * (a connector — Copilot's `hooks.json`, Claude's `settings.json`, …)
+ * supply spec: canonical invocation, extra forms that also count as
+ * PAW, and how PAW chains on. `chainCommand` be shell helper a connector
+ * composes into that append strategy.
  *
- * The contract, one line: find PAW inside whatever is there (fuzzily, tolerating
- * typos and host-specific legacy forms); present → normalise just PAW's run;
- * absent → defer to the domain's `append` and leave the user's command untouched.
+ * Contract: find PAW in existing command (fuzzily, tolerate typos and
+ * host-specific legacy forms); present → normalise PAW's run; absent → defer to
+ * domain's `append`, leave user's command untouched.
  *
  * @module @paw/core/test/domain/hookMerge
  */
@@ -26,10 +25,10 @@ import {
 } from '../../src/index.js';
 
 /**
- * A Copilot-flavoured spec: `paw check`, the legacy `.mjs` form as an alias, and
- * a posix `&&` append. Override only the axis a case cares about.
+ * Copilot-flavoured spec: `paw check`, legacy `.mjs` form as alias, and
+ * a posix `&&` append. Override axis under test.
  *
- * @param over - Fields to override on the default spec.
+ * @param over - Fields to override on default spec.
  */
 const spec = (over: Partial<HookMergeSpec> = {}): HookMergeSpec => ({
   invocation: 'paw check',
@@ -39,9 +38,9 @@ const spec = (over: Partial<HookMergeSpec> = {}): HookMergeSpec => ({
 });
 
 /**
- * Merge `existing` against the default spec, optionally overridden.
+ * Merge `existing` against default spec, optionally overridden.
  *
- * @param existing - The command already configured for the hook event.
+ * @param existing - Command already configured for hook event.
  * @param over - Spec overrides for this case.
  */
 const m = (existing: string, over: Partial<HookMergeSpec> = {}) =>

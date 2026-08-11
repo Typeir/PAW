@@ -1,10 +1,8 @@
 /**
  * PAW Init Config Tests
  *
- * @fileoverview Pins the rule that attaching PAW to a repo never silently
- * replaces a config someone already owns, and that every surface gets the same
- * answer about why — the conflict is data, so a CLI can print it, a TUI can
- * offer a choice, and the console can raise a dialog from the same call.
+ * @fileoverview Pin rule. Attach PAW to repo, never replace existing config.
+ * Return conflict as data. Every surface (CLI, TUI, console) resolve from same call.
  *
  * @module @paw/core/test/domain/initConfig
  * @version 0.0.0
@@ -78,7 +76,7 @@ describe('inspectConfig', () => {
     expect(found.edited).toBe(true);
   });
 
-  it('reads a hand-edited or future-shaped stamp as unstamped, which refuses rather than replaces', () => {
+  it('reads a hand-edited or unexpected-shape stamp as unstamped and refuses it', () => {
     expect(inspectConfig('{"$paw":null}').kind).toBe('unstamped');
     expect(inspectConfig('{"$paw":"5.0.0"}').kind).toBe('unstamped');
     expect(inspectConfig('{"$paw":{}}').kind).toBe('unstamped');
@@ -86,11 +84,11 @@ describe('inspectConfig', () => {
     expect(inspectConfig('{"$paw":{"version":"5.0.0"}}').kind).toBe('unstamped');
   });
 
-  it('fails loud on a config that is not JSON rather than treating it as absent', () => {
+  it('throws on a config that is not JSON rather than reporting it as absent', () => {
     expect(() => inspectConfig('{broken')).toThrow(/not valid JSON/i);
   });
 
-  it('fails loud when the config is not an object', () => {
+  it('throws when the config is not an object', () => {
     expect(() => inspectConfig('[]')).toThrow(/object/i);
   });
 });
@@ -109,7 +107,7 @@ describe('mergeConfig', () => {
     expect(merged.domains).toEqual(['a']);
   });
 
-  it('drops a stale stamp so the result restamps cleanly', () => {
+  it('drops a stale stamp so the result can be restamped', () => {
     const existing = JSON.parse(stampConfig({ root: 'custom' })) as Record<string, unknown>;
     expect(mergeConfig(existing, FRESH)[PAW_STAMP_KEY]).toBeUndefined();
   });

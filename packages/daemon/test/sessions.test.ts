@@ -1,13 +1,11 @@
 /**
- * Live Session Tests
+ * Live session tests.
  *
- * @fileoverview The security properties of the socket, driven as a machine.
+ * @fileoverview Socket security: nothing is written before a client authenticates.
  *
- * The one this suite exists for is the first group: **nothing is written before
- * the client authenticates**. It is asserted on every pre-auth path — a wrong
- * token, a `watch` sent first, a malformed frame, a timeout — by checking that
- * `send` was never called at all, rather than by checking what was sent. A test
- * that inspects the frame has already accepted that a frame went out.
+ * The first group covers the pre-auth paths — wrong token, `watch` first,
+ * malformed frame, timeout. Each asserts `send` is never called. Other tests
+ * inspect the frame a session does send once it accepts one.
  *
  * @module @paw/daemon/test/sessions
  * @version 0.0.0
@@ -43,20 +41,20 @@ const TOKEN = 'a-token-worth-256-bits-or-so-really';
 const PLANS = ['plans/lore.swarm.mjs', 'plans/edit.swarm.mjs'];
 
 /**
- * A snapshot that names the plan it was built for, so a `hello` proves which
- * plan the session is watching.
+ * The snapshot names the plan it was built for, so the `hello` frame shows
+ * which plan the session is watching.
  *
- * @param {string | null} plan - The watched plan.
- * @returns {PawSnapshot} The snapshot.
+ * @param {string | null} plan - Watched plan.
+ * @returns {PawSnapshot} Snapshot.
  */
 const snapshotFor = (plan: string | null): PawSnapshot =>
   ({ selectedPlan: plan, planName: plan === null ? '' : 'lore' }) as PawSnapshot;
 
 /**
- * A fake socket that records everything written to it.
+ * A fake socket record every write.
  *
- * @param {number} [buffered] - What `bufferedAmount` reports.
- * @returns {WsSessionPort & { sent: string[]; closed: Array<[number, string]>; buffered: number }} The port.
+ * @param {number} [buffered] - What `bufferedAmount` report.
+ * @returns {WsSessionPort & { sent: string[]; closed: Array<[number, string]>; buffered: number }} Port.
  */
 const fakePort = (
   buffered = 0,
@@ -77,10 +75,10 @@ const fakePort = (
 };
 
 /**
- * Session dependencies over a controllable clock.
+ * Session deps over controllable clock.
  *
  * @param {Partial<SessionDeps>} [over] - Overrides.
- * @returns {SessionDeps & { at: number; warnings: string[] }} The deps.
+ * @returns {SessionDeps & { at: number; warnings: string[] }} Deps.
  */
 const fakeDeps = (
   over: Partial<SessionDeps> = {},
@@ -106,9 +104,9 @@ const fakeDeps = (
 };
 
 /**
- * The counters a session reports to.
+ * Counters session report to.
  *
- * @returns {object} The watcher and what it recorded.
+ * @returns {object} Watcher and what it recorded.
  */
 const fakeWatcher = (): {
   onAuthenticated: () => void;
@@ -136,19 +134,19 @@ const fakeWatcher = (): {
 };
 
 /**
- * The topics a port was sent, in order.
+ * Topics port sent, in order.
  *
- * @param {{ sent: string[] }} port - The fake port.
- * @returns {string[]} The topics.
+ * @param {{ sent: string[] }} port - Fake port.
+ * @returns {string[]} Topics.
  */
 const topicsOf = (port: { sent: string[] }): string[] =>
   port.sent.map((frame) => parseEnvelope(frame)?.topic ?? '(unparseable)');
 
 /**
- * Let queued microtasks finish, so a follow-up snapshot the session queued for
- * itself has been sent before the assertions read the socket.
+ * Let queued microtasks finish, so a follow-up snapshot the session queued
+ * during its own processing is sent before assertions read the socket.
  *
- * @returns {Promise<void>} Resolves once the queue is drained.
+ * @returns {Promise<void>} Resolve once queue drained.
  */
 const settle = (): Promise<void> => new Promise((done) => setTimeout(done, 0));
 
@@ -171,8 +169,8 @@ describe('a session before it has authenticated', () => {
     await session.receive(watchFrame('plans/lore.swarm.mjs'));
 
     expect(port.sent).toEqual([]);
-    // A protocol-order violation, not a refused credential: 4401 would tell the
-    // console its token is bad and stop it retrying for the life of the page.
+    // Protocol-order fail, no refused credential: 4401 tell console token bad
+    // and stop retry for life of page.
     expect(port.closed).toEqual([[CLOSE_MALFORMED, 'authenticate first']]);
   });
 
@@ -204,17 +202,17 @@ describe('a session before it has authenticated', () => {
     await createSession(fakePort(), fakeDeps(), wrong, null).receive(authFrame('nope'));
     expect(wrong.failed).toBe(1);
 
-    // A socket that said nothing tried nothing. Counting it would let any local
-    // process inflate the failure count without ever touching the credential.
+    // A socket that sent nothing tried nothing. Counting it would let any
+    // local process inflate the failure count without touching the credential.
     const quiet = fakeWatcher();
     createSession(fakePort(), fakeDeps(), quiet, null).tick(AUTH_TIMEOUT_MS);
     expect(quiet.failed).toBe(0);
   });
 
   it('compares the credential without leaking its length through a throw', async () => {
-    // A near-miss, a prefix, a suffix, and an empty guess all end identically.
-    // The comparison hashes both sides first, so a length mismatch cannot throw
-    // where an equal-length one would not — the throw would be the oracle.
+    // Near-miss, prefix, suffix, and empty guess all close the same way. The
+    // comparison hashes both sides first, so a length mismatch cannot throw
+    // where an equal-length guess would not — a throw would reveal token length.
     for (const guess of ['x', TOKEN.slice(0, -1), `${TOKEN}x`, 'y'.repeat(512)]) {
       const port = fakePort();
       await createSession(port, fakeDeps(), fakeWatcher(), null).receive(
@@ -230,7 +228,7 @@ describe('a session before it has authenticated', () => {
       const port = fakePort();
       await createSession(port, fakeDeps(), fakeWatcher(), null).receive(authFrame(token));
 
-      // Refused on shape alone: a client cannot make the daemon hash five
+      // Refuse on shape alone: the client cannot make the daemon hash five
       // kilobytes per attempt, and neither frame reaches the comparison. The
       // distinction is safe to expose — it says nothing about the real token.
       expect(port.sent).toEqual([]);
@@ -306,7 +304,7 @@ describe('a session that authenticated', () => {
       code: 'unknown-plan',
       message: 'no such plan in this repository',
     });
-    // It keeps watching what it had; a refused switch is not a switch to nothing.
+    // It keep watching what it had; refused switch not switch to nothing.
     expect(session.watching()).toBe('plans/lore.swarm.mjs');
     expect(session.state()).toBe('live');
   });
@@ -328,15 +326,15 @@ describe('a session that authenticated', () => {
     broken = true;
     await session.receive(watchFrame('plans/lore.swarm.mjs'));
 
-    // The operator is mid-edit. Dropping their console every time they save a
-    // half-written plan would make the tool useless exactly when it is needed.
+    // The operator is mid-edit. Dropping the connection on every save of a
+    // half-written plan would close the console at the moment it is in use.
     expect(session.state()).toBe('live');
     expect(topicsOf(port)).toEqual(['hello', 'error']);
     expect(parseEnvelope(port.sent[1])?.data).toEqual({
       code: 'snapshot-failed',
       message: 'the daemon could not read that plan — see its terminal',
     });
-    // The client is told what happened; where it happened stays in the terminal.
+    // Client told what happened; where it happened stay in terminal.
     expect(port.sent[1]).not.toContain('SyntaxError');
     expect(deps.warnings[0]).toContain('SyntaxError');
   });
@@ -372,8 +370,8 @@ describe('a session that authenticated', () => {
     session.close(CLOSE_SHUTDOWN, 'bye again');
     session.close(CLOSE_BACKPRESSURE, 'and again');
 
-    // A second close that reached the registry would decrement a count that was
-    // already decremented, and the capacity gate would then refuse real clients.
+    // Second close reach registry would decrement count already decremented,
+    // then capacity gate refuse real clients.
     expect(port.closed).toEqual([[CLOSE_SHUTDOWN, 'bye']]);
     expect(watcher.closed).toBe(1);
   });
@@ -411,8 +409,8 @@ describe('a session that authenticated', () => {
     release();
     await pending;
 
-    // The snapshot came back to a socket nobody is holding. Writing it would be
-    // a write after close, which is the classic source of a crashed shutdown.
+    // Snapshot come back to socket nobody hold. Write it be write after close,
+    // classic source of crashed shutdown.
     expect(port.sent).toEqual([]);
   });
 });
@@ -556,12 +554,11 @@ describe('a session that stopped reading', () => {
     const session = createSession(port, deps, fakeWatcher(), null);
     await session.receive(authFrame(TOKEN));
 
-    // A burst in one TCP segment — every `receive` reaches the buffer check
-    // before the first snapshot resolves. Without serialisation the daemon
-    // builds one full snapshot per frame for a socket it is not reading, which
-    // is a message rate limit with no limit on the memory those messages cost.
-    // Sized just under the allowance, so this measures the serialisation rather
-    // than the rate limit that would otherwise close the session first.
+    // Burst in one TCP segment — every `receive` hit buffer check before first
+    // snapshot resolve. No serialisation and daemon build one full snapshot per
+    // frame on socket it not reading, a message rate limit with no limit on
+    // memory those messages cost. Sized just under allowance, so this measure
+    // serialisation, not rate limit that close session first.
     await Promise.all(
       Array.from({ length: MAX_MESSAGES_PER_WINDOW - 1 }, () =>
         session.receive(watchFrame('plans/lore.swarm.mjs')),
@@ -593,8 +590,8 @@ describe('a session that stopped reading', () => {
     const port = fakePort();
     const deps = fakeDeps({
       snapshot: async (plan) => {
-        // The client stopped reading during the build. Checking the buffer only
-        // before the await measures a buffer that no longer exists.
+        // Client stop reading during build. Check only before await measure
+        // buffer no longer exist.
         port.buffered = BACKPRESSURE_SKIP_BYTES;
         return snapshotFor(plan);
       },
@@ -622,8 +619,8 @@ describe('a session that stopped reading', () => {
     await session.receive(authFrame(TOKEN));
     expect(topicsOf(port)).toEqual(['error']);
 
-    // A second request arrived while the failing build was in flight. Carrying
-    // it would make the next success send two snapshots instead of one.
+    // Second request arrive while failing build in flight. Carry it and next
+    // success send two snapshots, no one.
     fail = false;
     await session.receive(watchFrame('plans/lore.swarm.mjs'));
     await settle();
@@ -636,8 +633,8 @@ describe('a session that stopped reading', () => {
     let stall = true;
     const deps = fakeDeps({
       snapshot: async (plan) => {
-        // The client stops reading while the first snapshot is being built, so
-        // that frame is dropped — and the request queued behind it must be too.
+        // Client stops reading while first snapshot build, so that frame drop
+        // — and request queued behind it must drop too.
         if (stall) {
           port.buffered = BACKPRESSURE_SKIP_BYTES;
           stall = false;
@@ -653,8 +650,8 @@ describe('a session that stopped reading', () => {
     session.emit('processes', []);
     await settle();
 
-    // Exactly one resync on drain. A carried request would send a second full
-    // snapshot to a client that had only just caught up.
+    // Exactly one resync on drain. Carried request would send second full
+    // snapshot to client just caught up.
     expect(topicsOf(port)).toEqual(['hello']);
   });
 
@@ -667,9 +664,9 @@ describe('a session that stopped reading', () => {
     await session.receive(watchFrame('plans/lore.swarm.mjs'));
     await session.receive(watchFrame('plans/edit.swarm.mjs'));
 
-    // A snapshot is the largest frame this protocol sends and a client can ask
-    // for one per `watch`. Without this check the message rate limit bounds the
-    // number of requests while the memory they cost stays unbounded.
+    // Snapshot largest frame this protocol send, client ask one per `watch`.
+    // No check and message rate limit bound request count while memory cost
+    // stay unbounded.
     expect(topicsOf(port)).toEqual(['hello']);
     expect(session.state()).toBe('live');
   });
@@ -742,8 +739,8 @@ describe('the session registry', () => {
 
     // On loopback the daemon cannot tell one local peer from another, so a
     // global cooldown would let any local process lock the operator out of
-    // their own console — worse than the guessing it would prevent, against a
-    // 256-bit credential behind a four-socket pre-auth cap.
+    // their own console against a 256-bit credential, behind a four-socket
+    // pre-auth cap.
     for (let attempt = 0; attempt < MAX_AUTH_FAILURES * 3; attempt += 1) {
       await registry.open(fakePort(), null).receive(authFrame('guess'));
     }
@@ -761,8 +758,8 @@ describe('the session registry', () => {
 
     registry.tick(AUTH_TIMEOUT_MS);
 
-    // Silence is a protocol failure, not an attempt at the credential — and the
-    // close code must be one the console retries, not one that locks it out.
+    // Silence protocol fail, not attempt at credential — and close code must
+    // be one console retry, not one that lock it out.
     expect(registry.failedAuths()).toBe(0);
     expect(port.closed).toEqual([[CLOSE_MALFORMED, 'no credential offered in time']]);
   });

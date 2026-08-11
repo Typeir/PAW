@@ -1,16 +1,15 @@
 /**
  * PAW Installer Ports
  *
- * @fileoverview The side-effect boundaries the installer depends on. The Windows
- * per-user environment store is the installer's own — nothing else in PAW edits
- * a registry — so it is defined here. The filesystem is not: `@paw/core` owns
- * that port, because attaching a repository is a core use-case and a port with
- * two definitions is a port that drifts. It is re-exported for the installer's
- * own consumers.
+ * @fileoverview Side-effect boundaries installer need. Windows per-user
+ * environment store belongs to installer — nothing else in PAW touches the
+ * registry — so define it here. Filesystem port stays in `@paw/core`; attaching
+ * a directory to a repo is a core use-case, and defining the port once avoids
+ * drift between `@paw/core` and installer. Re-export for installer's own
+ * consumers.
  *
- * The pure planners never touch either; the application layer drives them, and
- * `main.ts` binds the real adapters (`@paw/adapters` and a PowerShell
- * `[Environment]` call).
+ * Pure planners do not touch either; the application layer drives them, and
+ * `main.ts` binds adapters (`@paw/adapters` and PowerShell `[Environment]` call).
  *
  * @module @paw/installer/ports
  * @version 0.0.0
@@ -21,12 +20,12 @@
 export type { FileSystemPort } from '@paw/core';
 
 /**
- * The Windows per-user environment store, edited via the OS API so the change is
- * persisted and broadcast without `setx` and without admin.
+ * Windows per-user environment store, edited via OS registry API so changes
+ * persist and broadcast without `setx` and without admin.
  *
  * @interface EnvironmentPort
- * @property {() => Promise<string>} getUserPath - Read the current user `Path`.
- * @property {(value: string) => Promise<void>} setUserPath - Persist a new user `Path` and broadcast the change.
+ * @property {() => Promise<string>} getUserPath - Read current user `Path`.
+ * @property {(value: string) => Promise<void>} setUserPath - Persist new user `Path` and broadcast change.
  */
 export interface EnvironmentPort {
   getUserPath(): Promise<string>;

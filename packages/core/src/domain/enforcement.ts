@@ -1,15 +1,14 @@
 /**
  * PAW Enforcement Decision
  *
- * @fileoverview The pre-tool-use enforcement decision — the pure heart of PAW.
- * Given the outstanding violations for a session and the tool a caller is about
- * to run, decide whether to allow or deny it. This is the domain rule the legacy
- * `preToolUse.ts` hook implemented inline against SQLite and a tangle of payload
- * parsing; here it is a pure function over already-resolved data, delegating the
- * violation-set operations to {@link module:@paw/core/domain/violation}. The
- * messy work — extracting file paths from a tool payload, detecting `.env`
- * access, querying unresolved violations, testing paths against `.pawignore` —
- * belongs to adapters. The domain receives clean inputs and holds only the rule.
+ * @fileoverview The pre-tool-use enforcement decision. Given the outstanding
+ * violations for a session and the tool a caller is about to run, decide whether
+ * to allow or deny it. Legacy `preToolUse.ts` hook do this rule inline against SQLite
+ * and payload parsing; here pure function over already-resolved data, delegate
+ * violation-set operations to {@link module:@paw/core/domain/violation}. Pulling file
+ * paths from tool payload, smelling `.env` access, querying unresolved violations,
+ * and testing paths against `.pawignore` belong to adapters. Domain get resolved
+ * inputs and hold rule.
  *
  * @module @paw/core/domain/enforcement
  * @version 0.0.0
@@ -26,23 +25,23 @@ import {
 } from './violation.js';
 
 /**
- * The outcome of an enforcement decision. `allow` may carry `additionalContext`
- * — hidden guidance injected for the model (the indirect-fix nudge). `deny`
- * always carries a reason shown to the agent.
+ * Outcome of enforcement decision. `allow` may carry `additionalContext` —
+ * hidden guidance dropped in for model (the indirect-fix nudge). `deny` always
+ * carry reason shown to agent.
  */
 export type Decision =
   | { readonly kind: 'allow'; readonly additionalContext?: string }
   | { readonly kind: 'deny'; readonly reason: string };
 
 /**
- * Everything the decision needs, all pre-resolved by adapters.
+ * Everything decision need, all pre-resolved by adapters.
  *
  * @interface PreToolInput
- * @property {string} toolName - The tool about to run.
- * @property {readonly string[]} targetPaths - Project-relative paths the tool would touch (may be empty).
- * @property {string | null} envMatch - A detected secret/`.env` path or command snippet, or null when clean.
+ * @property {string} toolName - Tool about to run.
+ * @property {readonly string[]} targetPaths - Project-relative paths tool would touch (may be empty).
+ * @property {string | null} envMatch - Detected secret/`.env` path or command snippet, or null when clean.
  * @property {ReadonlySet<string>} exemptTools - Read-only tools never blocked by violations.
- * @property {ReadonlySet<string>} ignoredPaths - The subset of targetPaths that `.pawignore` covers.
+ * @property {ReadonlySet<string>} ignoredPaths - The subset of targetPaths that `.pawignore` cover.
  * @property {readonly Violation[]} violations - Unresolved violations in scope for this session.
  */
 export interface PreToolInput {
@@ -55,22 +54,21 @@ export interface PreToolInput {
 }
 
 /**
- * Decide whether a tool may run, given outstanding violations.
+ * Decide whether tool may run, given outstanding violations.
  *
  * @param {PreToolInput} i - The pre-resolved decision input.
  * @returns {Decision} The allow/deny decision.
  *
  * @description
- * The order is load-bearing and mirrors the legacy hook exactly:
- * 1. Secrets first — a tool touching `.env` is denied even if it is read-only,
- *    because credentials must never enter the model context.
- * 2. Exempt (read-only) tools are otherwise always allowed.
+ * Order mirror legacy hook:
+ * 1. Secrets first: tool touching `.env` denied even when read-only;
+ *    credentials must never enter model context.
+ * 2. Exempt (read-only) tools otherwise always allowed.
  * 3. No unresolved violations → allow.
- * 4. Every targeted path is pawignored → allow.
- * 5. The fix path — touching a file with a direct violation is always allowed.
- * 6. Only indirect-fix violations remain → allow with a nudge (the fix needs a
- *    new file, so blocking would deadlock).
- * 7. Otherwise a direct violation exists elsewhere → deny, naming the files.
+ * 4. Every targeted path pawignored → allow.
+ * 5. Fix path: touching file with direct violation always allowed.
+ * 6. Only indirect-fix violations remain → allow with nudge (fix need new file).
+ * 7. Otherwise direct violation exist elsewhere → deny, name files.
  */
 export function decidePreToolUse(i: PreToolInput): Decision {
   if (i.envMatch !== null) {

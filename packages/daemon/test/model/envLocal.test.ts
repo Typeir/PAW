@@ -1,9 +1,8 @@
 /**
- * @fileoverview Covers {@link parseDeepseekEnv}: the pure parse of a `.env.local`
- * body into the `DEEPSEEK_*` name/value pairs a live herd's egress reads. Quotes
- * are stripped, non-matching and blank lines are ignored, and CRLF is handled —
- * the fs walk and the `process.env` write stay in the excluded shell, so only
- * this parsing carries logic worth testing.
+ * @fileoverview Cover {@link parseDeepseekEnv}: pure parse of `.env.local`
+ * body into `DEEPSEEK_*` name/value pairs read at launch. Strip quotes, ignore
+ * non-matching and blank lines, handle CRLF — file walk and `process.env` write
+ * run outside this module, so only the parse logic is tested here.
  *
  * @module @paw/daemon/test/model/envLocal
  */

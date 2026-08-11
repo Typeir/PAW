@@ -1,11 +1,9 @@
 /**
  * PAW Fake Model Adapter
  *
- * @fileoverview A {@link ModelPort} that records every request and returns a
- * caller-supplied reply. It is the model a swarm test drives — deterministic,
- * offline, free — and it is how any consumer of `ModelPort` is tested without a
- * real provider or a key. Token counts are derived from string lengths so budget
- * accounting has something plausible to meter.
+ * @fileoverview {@link ModelPort}. Record every request, return caller reply.
+ * Swarm tests use it. Deterministic, runs offline. Test any `ModelPort`
+ * consumer without a provider or key. Token count comes from string length.
  *
  * @module @paw/adapters/model/fakeModel
  * @version 0.0.0
@@ -16,21 +14,21 @@
 import type { ModelPort, ModelRequest, ModelResponse } from '@paw/core';
 
 /**
- * A fake model port that also exposes the requests it received.
+ * Fake model port. Also show request it got.
  *
  * @interface FakeModel
  * @property {ModelRequest[]} requests - Every request `complete` was called with, in order.
- * @property {(request: ModelRequest) => Promise<ModelResponse>} complete - Run a completion, recording the request.
+ * @property {(request: ModelRequest) => Promise<ModelResponse>} complete - Run completion, record request.
  */
 export interface FakeModel extends ModelPort {
   readonly requests: ModelRequest[];
 }
 
 /**
- * Create a fake model port.
+ * Make fake model port.
  *
- * @param {(request: ModelRequest) => string} reply - Produces the content for a given request.
- * @returns {FakeModel} A recording fake model port.
+ * @param {(request: ModelRequest) => string} reply - Produce content for given request.
+ * @returns {FakeModel} Recording fake model port.
  */
 export function createFakeModel(
   reply: (request: ModelRequest) => string,

@@ -1,10 +1,9 @@
 /**
  * File Tree Tests
  *
- * @fileoverview The pure half of `/api/tree`: nesting a flat directory listing,
- * dropping the paths nobody wants to browse, ordering folders before files, and
- * narrowing to a subtree. Also the loud refusals — a listing entry with no path
- * is a producer defect, not something to quietly drop.
+ * @fileoverview Unit tests for `/api/tree`: nested flat directory listing, drop
+ * ignored and unlisted paths, order folder before file, narrow to subtree. A
+ * listing entry with no path throws an error.
  *
  * @module @paw/daemon/test/tree
  */

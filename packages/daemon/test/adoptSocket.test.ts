@@ -1,15 +1,13 @@
 /**
  * Socket Adoption Tests
  *
- * @fileoverview The heartbeat, and the failure paths a real socket only takes
- * when something has already gone wrong.
+ * @fileoverview Heartbeat, and failure paths a real socket only
+ * exercises when something already goes wrong.
  *
- * These are unit tests over a stub socket because the alternative is not a
- * better test, it is a slower one: the ping interval is fifteen seconds and the
- * pong deadline ten, so an integration test would either sleep for half a minute
- * or assert nothing. Fake timers make the deadline exact — the assertion is that
- * a silent client is terminated at ten seconds, not that it is terminated
- * eventually.
+ * Unit tests over a stub socket. The alternative — an integration test — is
+ * slower: ping interval is fifteen seconds, pong deadline ten, so it sleeps
+ * half a minute or asserts nothing. Fake timers make the deadline exact:
+ * assert a silent client is terminated at ten seconds, not eventually.
  *
  * @module @paw/daemon/test/adoptSocket
  * @version 0.0.0
@@ -27,9 +25,9 @@ import type { SocketHooks } from '../src/application/daemonContracts.js';
 import type { WsSessionPort } from '../src/domain/session.js';
 
 /**
- * A stub socket that records what was done to it and lets a test fire its events.
+ * Stub socket. Records what is done to it. Test can fire its events.
  *
- * @returns {object} The stub and its recordings.
+ * @returns {object} Stub and its recordings.
  */
 const stubSocket = (): {
   ws: WebSocket;
@@ -68,16 +66,16 @@ const stubSocket = (): {
       }
     },
   };
-  // Object.assign so the returned handle IS the stub. Spreading would hand the
-  // test a snapshot of the counters taken before a single ping was sent.
+  // Object.assign returns the same handle as `ws`, with the counter snapshot
+  // taken before the single ping is sent.
   return Object.assign(stub, { ws: stub as unknown as WebSocket }) as never;
 };
 
 /**
- * Hooks that hand back a session recording what it was told.
+ * Hooks record what they were told.
  *
  * @param {(raw: string) => Promise<void>} [onMessage] - What `message` does.
- * @returns {object} The hooks and their recordings.
+ * @returns {object} Hooks and their recordings.
  */
 const stubHooks = (
   onMessage: (raw: string) => Promise<void> = async () => undefined,
@@ -135,9 +133,9 @@ describe('offeredProtocols', () => {
 
 describe('refuseUpgrade', () => {
   /**
-   * A socket that records what was written to it before being destroyed.
+   * Socket records what written to it before destroyed.
    *
-   * @returns {object} The socket and its recordings.
+   * @returns {object} Socket and its recordings.
    */
   const rawSocket = (): { socket: Duplex; written: string[]; destroyed: number } => {
     const state = { written: [] as string[], destroyed: 0 };
@@ -163,8 +161,8 @@ describe('refuseUpgrade', () => {
     const [response] = raw.written;
 
     expect(response).toContain('HTTP/1.1 403 Forbidden');
-    // Without a content-length and connection:close the client waits for a body
-    // that never arrives, and "the daemon hung" is a far worse report than 403.
+    // Without content-length and connection:close the client waits for a body
+    // that never arrives, and "daemon hung" reads worse than a 403.
     expect(response).toContain('content-length: 18');
     expect(response).toContain('connection: close');
     expect(response.endsWith('\r\n\r\norigin not allowed')).toBe(true);
@@ -193,8 +191,8 @@ describe('the heartbeat on an adopted socket', () => {
     expect(socket.terminated).toBe(0);
 
     vi.advanceTimersByTime(1);
-    // Terminated, not closed: a client that stopped answering pings is not going
-    // to complete a closing handshake either, and waiting leaks the session.
+    // Terminated, not closed: a client that stops answering pings never finishes
+    // the closing handshake either, and waiting would leak the session.
     expect(socket.terminated).toBe(1);
   });
 
@@ -219,8 +217,8 @@ describe('the heartbeat on an adopted socket', () => {
     vi.advanceTimersByTime(PONG_TIMEOUT_MS);
     expect(socket.terminated).toBe(1);
 
-    // The interval is still running until `close` arrives. Pinging a socket that
-    // was terminated for not answering is bytes at a client that is gone.
+    // The interval keeps running until `close` arrives. Pinging a socket
+    // terminated for not answering sends bytes to a client that is gone.
     vi.advanceTimersByTime(PING_MS * 3);
     expect(socket.pings).toBe(1);
   });
@@ -242,8 +240,8 @@ describe('the heartbeat on an adopted socket', () => {
     socket.fire('close');
 
     vi.advanceTimersByTime(PING_MS * 10);
-    // A timer that outlives its socket is a leak that terminates a socket
-    // belonging to nobody, and pins the session in the registry forever.
+    // A timer that outlives its socket leaks: it terminates a socket that
+    // belongs to nobody and pins the session in the registry forever.
     expect(socket.pings).toBe(1);
     expect(socket.terminated).toBe(0);
     expect(hooks.closes).toBe(1);
@@ -311,8 +309,8 @@ describe('an adopted socket’s frames', () => {
     const warnings: string[] = [];
     adoptSocket(socket.ws, stubHooks().hooks, (message) => warnings.push(message));
 
-    // An `error` with no listener is a thrown exception in Node. On a socket
-    // that means one bad client kills the daemon for everyone.
+    // `error` with no listener throw exception in Node. On socket that mean
+    // one bad client kill daemon for everyone.
     expect(() => socket.fire('error', new Error('ECONNRESET'))).not.toThrow();
     expect(warnings).toEqual(['live socket error: ECONNRESET']);
   });

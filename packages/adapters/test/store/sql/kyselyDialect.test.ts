@@ -1,11 +1,11 @@
 /**
- * PAW Kysely Dialect Tests
+ * PAW Kysely dialect test.
  *
- * @fileoverview Exercises the dialect that runs Kysely over PAW's `SqlDriver`
- * beyond what the store's own queries reach: a committed and a rolled-back
- * transaction (begin/commit/rollback over the single connection), introspection
- * (the SQLite introspector reading through the select path), the refusal to
- * stream, and destroy — so `kyselyDialect.ts` reaches 100%.
+ * @fileoverview Exercise dialect that run Kysely over PAW's `SqlDriver`
+ * beyond what store own queries reach: committed and rolled-back
+ * transaction (begin/commit/rollback over single connection), introspection
+ * (SQLite introspector read through select path), refusal to
+ * stream, and destroy. Cover `kyselyDialect.ts` to 100%.
  *
  * @module @paw/adapters/test/store/sql/kyselyDialect
  * @version 0.0.0
@@ -18,13 +18,14 @@ import { createKysely } from '../../../src/store/sql/kyselyDialect.js';
 import { STORE_SCHEMA_SQL } from '../../../src/store/sql/schema.js';
 import { openSqlJsMemoryDriver } from './helpers.js';
 
-/** A Kysely over a fresh in-memory engine with the schema applied. */
+/** Kysely over fresh in-memory engine with schema applied. */
 async function freshDb(): Promise<ReturnType<typeof createKysely>> {
   const driver = await openSqlJsMemoryDriver();
   driver.exec(STORE_SCHEMA_SQL);
   return createKysely(driver);
 }
 
+// row data for insert.
 const row = { file_path: 'src/a.ts', rule: 'r', message: 'm', indirect_fix: 0, session_id: null };
 
 describe('sqlDriverDialect', () => {

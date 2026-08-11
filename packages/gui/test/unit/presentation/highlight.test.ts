@@ -1,10 +1,9 @@
 /**
  * Highlighter Tests
  *
- * @fileoverview Every token class the plan view can show, and every way a plan's
- * source can be malformed while an author is still typing it — an unterminated
- * string, an unclosed template — because the console renders the file as it is
- * on disk, not as it will be when it parses.
+ * @fileoverview Shows every token class the plan view can render, plus every
+ * way incomplete source breaks it — unterminated string, unclosed template.
+ * Console renders the file bytes as stored on disk.
  *
  * @module @paw/gui/test/unit/presentation/highlight
  */

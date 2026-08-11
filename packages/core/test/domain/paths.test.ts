@@ -1,10 +1,9 @@
 /**
- * PAW Path Text Tests
+ * PAW path text tests
  *
- * @fileoverview Pins the string handling core does instead of importing
- * `node:path`, which it cannot: `@paw/gui` compiles core for the browser, where
- * a `node:` import fails the build. These are the cases that stopped it being a
- * one-liner — a bare filename, a path at the root, and both separators.
+ * @fileoverview Pin core string path handling. Core omit `node:path`;
+ * `@paw/gui` compile core for browser, `node:` import fail build there.
+ * Cases: bare filename, path at root, both separators.
  *
  * @module @paw/core/test/domain/paths
  * @version 0.0.0
@@ -20,7 +19,7 @@ describe('joinPath', () => {
     expect(joinPath(['/repo', '.paw', 'config.json'])).toBe('/repo/.paw/config.json');
   });
 
-  it('normalises backslashes so a Windows root joins cleanly', () => {
+  it('normalises backslashes to forward slashes', () => {
     expect(joinPath(['C:\\Users\\x', '.paw'])).toBe('C:/Users/x/.paw');
   });
 
@@ -43,7 +42,7 @@ describe('dirNameOf', () => {
     expect(dirNameOf('config.json')).toBe('');
   });
 
-  it('gives nothing at the root, rather than a stray separator', () => {
+  it('gives nothing at the root', () => {
     expect(dirNameOf('/config.json')).toBe('');
   });
 });

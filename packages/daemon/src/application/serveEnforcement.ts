@@ -1,14 +1,13 @@
 /**
- * PAW Enforcement Service
+ * PAW enforcement service.
  *
- * @fileoverview The composition that makes the resident daemon serve enforcement,
- * and the order that keeps a single daemon honest: it CLAIMS the endpoint first
- * (the OS lets exactly one process bind it), and only then runs `configure` to
- * open the store and write the token. A daemon that loses the race never reaches
- * `configure`, so it never clobbers the winner's token or store — no reliance on
- * a removable lockfile for that guarantee. Once claimed, the store and warm gate
- * cache it owns are exposed as `hook.dispatch`, which runs {@link dispatchHook}
- * (doc 10 §2, §8). A losing bind releases nothing because it wrote nothing.
+ * @fileoverview Composition make resident daemon serve enforcement. Order: it
+ * CLAIM endpoint first (OS let exactly one process bind it), then run
+ * `configure` to open store and write token. Daemon lose race
+ * never reach `configure`, so never clobber winner token or store — no rely on
+ * removable lockfile for that guarantee. Once claimed, store and warm gate cache
+ * it own expose as `hook.dispatch`, which run {@link dispatchHook}
+ * (doc 10 §2, §8). Losing bind release nothing because write nothing.
  *
  * @module @paw/daemon/application/serveEnforcement
  * @version 0.0.0
@@ -26,11 +25,11 @@ import {
 } from '../infrastructure/socketServer.js';
 
 /**
- * What `configure` yields once the endpoint is claimed.
+ * What `configure` yield once endpoint claimed.
  *
  * @interface EnforcementConfig
- * @property {string} token - The handshake token clients must present.
- * @property {DispatchHookDeps} deps - The store, gates, connectors, and policy the loop runs against.
+ * @property {string} token - Handshake token client must present.
+ * @property {DispatchHookDeps} deps - Store, gates, connectors, policy loop run against.
  */
 export interface EnforcementConfig {
   readonly token: string;
@@ -38,14 +37,14 @@ export interface EnforcementConfig {
 }
 
 /**
- * What the enforcement service needs.
+ * What enforcement service need.
  *
  * @interface EnforcementOptions
- * @property {string} socketPath - The endpoint to claim.
- * @property {string} projectRoot - The root pawd serves, reported at handshake.
- * @property {() => Promise<EnforcementConfig>} configure - Produces the token and deps, run ONLY after the claim — the place any writes to `.paw` belong.
- * @property {{ ms: number; onIdle: () => void }} [idle] - Close and signal after this many ms with no hook call; omit to stay resident. Doc 10 §9c — industrial is not leaking a process per repo forever.
- * @property {{ pid: number; now: () => number; onStop: () => void }} [control] - Enables `daemon.status`/`daemon.stop`; the pid and clock they report, and the shutdown they trigger. Doc 10 §12.
+ * @property {string} socketPath - Endpoint to claim.
+ * @property {string} projectRoot - Root pawd serve, report at handshake.
+ * @property {() => Promise<EnforcementConfig>} configure - Produce token and deps, run ONLY after claim — place any write to `.paw` belong.
+ * @property {{ ms: number; onIdle: () => void }} [idle] - Close and signal after this many ms with no hook call; omit to stay resident. Doc 10 §9c — prevents one leaked process lingering per repo.
+ * @property {{ pid: number; now: () => number; onStop: () => void }} [control] - Enable `daemon.status`/`daemon.stop`; pid and clock they report, shutdown they trigger. Doc 10 §12.
  */
 export interface EnforcementOptions {
   readonly socketPath: string;
@@ -56,10 +55,10 @@ export interface EnforcementOptions {
 }
 
 /**
- * Claim the endpoint and serve enforcement, returning the running server.
+ * Claim endpoint and serve enforcement, return running server.
  *
- * @param {EnforcementOptions} opts - The endpoint, root, and post-claim configure.
- * @returns {Promise<SocketServerHandle>} The running server; rejects when a live daemon already holds the endpoint (having written nothing).
+ * @param {EnforcementOptions} opts - Endpoint, root, post-claim configure.
+ * @returns {Promise<SocketServerHandle>} Running server; reject when live daemon already hold endpoint (wrote nothing).
  */
 export async function serveEnforcement(opts: EnforcementOptions): Promise<SocketServerHandle> {
   const server = await bindSocket(opts.socketPath);

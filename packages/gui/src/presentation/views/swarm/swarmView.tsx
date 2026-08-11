@@ -1,10 +1,8 @@
 /**
- * Swarm View
+ * Swarm view.
  *
- * @fileoverview The Work subsystem and the console's reason to exist: a plan,
- * the briefs it renders, the herd it dispatched, and the doctor's verdict on all
- * of it. The tab body is a real ARIA tab panel labelled by the active tab, so
- * the three views read as one instrument rather than three pages.
+ * @fileoverview Swarm subsystem. Renders plan, briefs, dispatched herd, and
+ * doctor verdict. Tab body is an ARIA panel labelled by active tab.
  *
  * @module @paw/gui/presentation/views/swarm/swarmView
  * @version 0.0.0
@@ -28,9 +26,9 @@ import { StatStrip } from './statStrip.js';
 import { SwarmTabs } from './swarmTabs.js';
 
 /**
- * The Plan tab: the author grid over the doctor and command bars.
+ * Plan tab. Author grid top, doctor and command bar below.
  *
- * @returns {JSX.Element} The tab body.
+ * @returns {JSX.Element} Tab body.
  */
 function PlanTab() {
   return (
@@ -49,9 +47,9 @@ function PlanTab() {
 }
 
 /**
- * The Logs tab.
+ * Logs tab.
  *
- * @returns {JSX.Element} The tab body.
+ * @returns {JSX.Element} Tab body.
  */
 function LogsTab() {
   return (
@@ -62,9 +60,9 @@ function LogsTab() {
 }
 
 /**
- * The active tab's body.
+ * Active tab body.
  *
- * @returns {JSX.Element} The tab body.
+ * @returns {JSX.Element} Tab body.
  */
 function TabBody() {
   const tab = useTab();
@@ -78,9 +76,9 @@ function TabBody() {
 }
 
 /**
- * The Swarm subsystem.
+ * Swarm subsystem.
  *
- * @returns {JSX.Element} The view.
+ * @returns {JSX.Element} View.
  */
 export function SwarmView() {
   const { run, selectedPlan, plans } = useConsoleData();

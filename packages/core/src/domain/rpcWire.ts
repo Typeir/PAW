@@ -2,16 +2,13 @@
  * PAW Enforcement RPC Wire
  *
  * @fileoverview The `pawd` local-socket contract: JSON-RPC 2.0 over
- * newline-delimited JSON, the transport hooks and the CLI use to reach the one
- * resident daemon. NDJSON, not `Content-Length` framing — the frames are small
- * and a log line stays greppable (doc 10 §5).
+ * newline-delimited JSON, the transport hooks and the CLI use to reach the
+ * resident daemon. Frames are NDJSON (doc 10 §5).
  *
- * Like {@link module:@paw/core/domain/liveWire}, the parser is an ALLOW-LIST, not
- * a validator: {@link parseFrame} builds a new frame out of the envelope fields
- * it recognises and returns null for anything else. It never hands a caller's
- * parsed object onward — pawd holds decrypted credentials, so nothing crosses
- * this boundary that was not named here. Method params stay opaque and are the
- * connector's to allow-list downstream.
+ * Parser be allow-list, like {@link module:@paw/core/domain/liveWire}.
+ * {@link parseFrame} build new frame from the envelope fields it recognise
+ * and return null otherwise. It never return caller parsed object. Method
+ * params stay opaque; connector allow-list them downstream.
  *
  * @module @paw/core/domain/rpcWire
  * @version 0.0.0
@@ -20,12 +17,12 @@
  */
 
 /**
- * The single integer bumped on any breaking change to the method catalogue.
+ * The one integer bump on any breaking change to method catalogue.
  */
 export const RPC_PROTOCOL_VERSION = 1;
 
 /**
- * The error codes pawd returns: the standard JSON-RPC set plus PAW's own, each
+ * The error codes pawd return: the standard JSON-RPC set plus PAW own, each
  * with a defined client action in the failure matrix (doc 10 §5, §10).
  */
 export const RPC_ERROR = {
@@ -41,11 +38,11 @@ export const RPC_ERROR = {
 } as const;
 
 /**
- * A method call awaiting a result.
+ * Method call await result.
  *
  * @interface RpcRequest
  * @property {'2.0'} jsonrpc - Protocol tag.
- * @property {number} id - Correlates the response.
+ * @property {number} id - Correlate response.
  * @property {string} method - Namespaced method name.
  * @property {unknown} [params] - Opaque method parameters.
  */
@@ -57,7 +54,7 @@ export interface RpcRequest {
 }
 
 /**
- * A one-way event with no response (the daemon's `daemon.subscribe` stream).
+ * One-way event, no response (the daemon `daemon.subscribe` stream).
  *
  * @interface RpcNotification
  * @property {'2.0'} jsonrpc - Protocol tag.
@@ -71,11 +68,11 @@ export interface RpcNotification {
 }
 
 /**
- * A successful result for a request id.
+ * Successful result for request id.
  *
  * @interface RpcSuccess
  * @property {'2.0'} jsonrpc - Protocol tag.
- * @property {number} id - The request this answers.
+ * @property {number} id - Request this answers.
  * @property {unknown} result - Opaque result value.
  */
 export interface RpcSuccess {
@@ -85,7 +82,7 @@ export interface RpcSuccess {
 }
 
 /**
- * A failure body.
+ * Failure body.
  *
  * @interface RpcErrorBody
  * @property {number} code - A {@link RPC_ERROR} code.
@@ -99,12 +96,12 @@ export interface RpcErrorBody {
 }
 
 /**
- * A failure for a request id.
+ * Failure for request id.
  *
  * @interface RpcFailure
  * @property {'2.0'} jsonrpc - Protocol tag.
- * @property {number} id - The request this answers.
- * @property {RpcErrorBody} error - The failure body.
+ * @property {number} id - Request this answers.
+ * @property {RpcErrorBody} error - Failure body.
  */
 export interface RpcFailure {
   readonly jsonrpc: '2.0';
@@ -113,26 +110,26 @@ export interface RpcFailure {
 }
 
 /**
- * Any frame that can cross the wire.
+ * Any frame can cross wire.
  */
 export type RpcFrame = RpcRequest | RpcNotification | RpcSuccess | RpcFailure;
 
 /**
- * Serialise a frame to a single NDJSON line, newline included.
+ * Serialise frame to single NDJSON line, newline included.
  *
- * @param {RpcFrame} frame - The frame to send.
- * @returns {string} The line to write to the socket.
+ * @param {RpcFrame} frame - Frame to send.
+ * @returns {string} Line to write to socket.
  */
 export function encodeFrame(frame: RpcFrame): string {
   return `${JSON.stringify(frame)}\n`;
 }
 
 /**
- * Split accumulated socket bytes into complete lines and the trailing partial.
- * The caller keeps `rest` and prepends the next chunk to it.
+ * Split accumulated socket bytes into complete lines and trailing partial.
+ * Caller keep `rest` and prepend next chunk to it.
  *
  * @param {string} buffer - Bytes received so far.
- * @returns {{ lines: string[]; rest: string }} Complete lines and the remainder.
+ * @returns {{ lines: string[]; rest: string }} Complete lines and remainder.
  */
 export function splitFrames(buffer: string): { lines: string[]; rest: string } {
   const lines: string[] = [];
@@ -147,12 +144,11 @@ export function splitFrames(buffer: string): { lines: string[]; rest: string } {
 }
 
 /**
- * Parse one NDJSON line into a recognised frame, or null. An allow-list: only
- * the envelope fields are copied onto a fresh object; the caller's parsed JSON is
- * never returned.
+ * Parse one NDJSON line into recognised frame, or null. Allow-list: only
+ * envelope fields copied onto fresh object; caller parsed JSON never returned.
  *
- * @param {string} line - One NDJSON line, without the terminator.
- * @returns {RpcFrame | null} The frame, or null when unrecognised or malformed.
+ * @param {string} line - One NDJSON line, without terminator.
+ * @returns {RpcFrame | null} Frame, or null when unrecognised or malformed.
  */
 export function parseFrame(line: string): RpcFrame | null {
   let raw: unknown;
@@ -191,36 +187,36 @@ export function parseFrame(line: string): RpcFrame | null {
 }
 
 /**
- * Build a request frame.
+ * Build request frame.
  *
  * @param {number} id - Correlation id.
  * @param {string} method - Namespaced method.
  * @param {unknown} [params] - Method parameters.
- * @returns {RpcRequest} The frame.
+ * @returns {RpcRequest} Frame.
  */
 export function rpcRequest(id: number, method: string, params?: unknown): RpcRequest {
   return { jsonrpc: '2.0', id, method, params };
 }
 
 /**
- * Build a success frame.
+ * Build success frame.
  *
- * @param {number} id - The request answered.
- * @param {unknown} result - The result value.
- * @returns {RpcSuccess} The frame.
+ * @param {number} id - Request answered.
+ * @param {unknown} result - Result value.
+ * @returns {RpcSuccess} Frame.
  */
 export function rpcSuccess(id: number, result: unknown): RpcSuccess {
   return { jsonrpc: '2.0', id, result };
 }
 
 /**
- * Build a failure frame.
+ * Build failure frame.
  *
- * @param {number} id - The request answered.
+ * @param {number} id - Request answered.
  * @param {number} code - A {@link RPC_ERROR} code.
- * @param {string} message - The reason.
+ * @param {string} message - Reason.
  * @param {unknown} [data] - Optional detail.
- * @returns {RpcFailure} The frame.
+ * @returns {RpcFailure} Frame.
  */
 export function rpcFailure(id: number, code: number, message: string, data?: unknown): RpcFailure {
   return {
@@ -231,11 +227,11 @@ export function rpcFailure(id: number, code: number, message: string, data?: unk
 }
 
 /**
- * Build a notification (event) frame.
+ * Build notification (event) frame.
  *
  * @param {string} method - Namespaced event name.
  * @param {unknown} [params] - Event payload.
- * @returns {RpcNotification} The frame.
+ * @returns {RpcNotification} Frame.
  */
 export function rpcNotification(method: string, params?: unknown): RpcNotification {
   return { jsonrpc: '2.0', method, params };

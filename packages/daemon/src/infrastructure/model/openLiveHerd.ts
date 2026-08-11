@@ -1,17 +1,17 @@
 /**
  * PAW Live Herd Opener
  *
- * @fileoverview The I/O shell a face calls to run a live herd through the SDK
- * egress: it loads `DEEPSEEK_*` from the nearest `.env.local`, opens a temporary
- * runtime home, and builds a live SDK-backed {@link RoleRegistry} for the plan —
- * returning it with a `close` that stops the shared client and removes the home.
- * This is the one call the CLI needs; the lifecycle (start once, dispatch the
- * concurrent pool, stop once) lives here rather than smeared across the faces.
- * Excluded from unit coverage in `vitest.config.ts`: it reads the environment,
- * walks the filesystem, and spawns the 159 MB Copilot runtime via
- * {@link openSdkModel}. Its collaborators — {@link parseDeepseekEnv},
- * {@link liveSdkRegistryFor}, and the egress cores — are unit-covered to 100%,
- * and a live run is the integration proof.
+ * @fileoverview Entry point that runs a live herd through the SDK. Loads
+ * `DEEPSEEK_*` from nearest `.env.local`, creates a temporary runtime home, and
+ * builds a live SDK-backed {@link RoleRegistry} for the plan. Returns the
+ * registry with a `close` that stops the shared client and removes the home.
+ * Single-call CLI entry. Lifecycle (start once, dispatch a concurrent pool,
+ * stop once) is handled here.
+ * Excluded from unit coverage in `vitest.config.ts`: reads environment, walks
+ * the filesystem, and spawns the 159 MB Copilot runtime via
+ * {@link openSdkModel}.
+ * Collaborators — {@link parseDeepseekEnv}, {@link liveSdkRegistryFor}, and
+ * egress cores — unit-covered to 100%. Live run verifies integration.
  *
  * @module @paw/daemon/model/openLiveHerd
  * @version 0.0.0
@@ -29,12 +29,12 @@ import { liveSdkRegistryFor, type LiveSdkRegistry } from './liveSdkRegistry.js';
 import { openSdkModel } from './sdkModel.js';
 
 /**
- * Lift `DEEPSEEK_*` from the nearest `.env.local` into the process environment,
- * walking up from a starting directory. Existing values are never overwritten,
- * and nothing is logged — the key lives only in `process.env`, read at egress.
+ * Loads `DEEPSEEK_*` from nearest `.env.local` into process environment, searching
+ * upward from starting directory. Never overwrites an existing value. Logs
+ * nothing — the value lives only in `process.env`, read at egress.
  *
- * @param {string} startDir - Directory to begin the upward search from.
- * @returns {Promise<void>} Resolves once the file is found and applied, or the root is reached.
+ * @param {string} startDir - Directory where upward search begin.
+ * @returns {Promise<void>} Resolve once find and apply file, or reach root.
  */
 async function loadEnvLocal(startDir: string): Promise<void> {
   let dir = startDir;
@@ -57,19 +57,27 @@ async function loadEnvLocal(startDir: string): Promise<void> {
 }
 
 /**
- * Open a live SDK-backed registry for a plan, ready to dispatch.
+ * Open live SDK-backed registry for plan, ready to dispatch. Members run SDK
+ * built-in tools in place, rooted at `cwd` — served repository.
  *
- * @param {SwarmPlan<unknown>} plan - The plan being run.
- * @param {string} [cwd] - Where to look for `.env.local`; defaults to the process cwd.
- * @returns {Promise<LiveSdkRegistry>} The registry and a close hook that stops the client and cleans the runtime home.
+ * @param {SwarmPlan<unknown>} plan - Plan being run.
+ * @param {string} [cwd] - Where look for `.env.local` and root members' tools operate within; default to process cwd.
+ * @param {object} [opts] - Agentic surface.
+ * @param {boolean} [opts.safemode] - When true, deny members the shell — option-A surface. Default false, full built-in set.
+ * @returns {Promise<LiveSdkRegistry>} Registry and close hook that stop client and clean runtime home.
  */
 export async function openLiveHerd(
   plan: SwarmPlan<unknown>,
   cwd: string = process.cwd(),
+  opts: { safemode?: boolean } = {},
 ): Promise<LiveSdkRegistry> {
   await loadEnvLocal(cwd);
   const baseDirectory = await mkdtemp(join(tmpdir(), 'paw-herd-'));
-  const { registry, close } = await liveSdkRegistryFor(plan, openSdkModel, { baseDirectory });
+  const { registry, close } = await liveSdkRegistryFor(plan, openSdkModel, {
+    baseDirectory,
+    workingDirectory: cwd,
+    safemode: opts.safemode ?? false,
+  });
   return {
     registry,
     close: async () => {

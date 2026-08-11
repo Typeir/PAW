@@ -1,22 +1,17 @@
 /**
- * PAW Local Identity Policy
+ * PAW local identity policy.
  *
- * @fileoverview What PAW's local certificate authority is allowed to be, and
- * when it must be replaced. Pure decisions only — issuing keys and writing files
- * happens in `nodeIdentity`, which reads its every constant from here.
+ * @fileoverview What PAW's local certificate authority may be, and when it must
+ * be replaced. `nodeIdentity` make key, write file, read every
+ * constant from here.
  *
- * The design point worth defending: PAW asks an operator to trust a CA in their
- * OS store, and a CA that could mint a certificate for `mail.google.com` would
- * be an unforgivable thing to leave on a developer's machine. So the CA carries
- * a **critical X.509 Name Constraints extension permitting loopback names only**
- * — `localhost`, `127.0.0.0/8`, `::1/128`. If its private key is stolen, the
- * strongest thing the thief can forge is a certificate for the victim's own
- * loopback interface. `pathLen: 0` stops it minting sub-CAs, which name
- * constraints alone would not.
+ * CA carry critical X.509 Name Constraints extension, loopback names only —
+ * `localhost`, `127.0.0.0/8`, `::1/128`. Steal private key, forge cert only for
+ * victim's own loopback interface. `pathLen: 0` stop mint sub-CA; name
+ * constraints alone no stop that.
  *
- * The CA signs a short-lived leaf rather than being trusted directly, so
- * rotating the server certificate never asks the operator to touch their trust
- * store again.
+ * CA sign short-lived leaf, so rotate server cert never make operator touch
+ * trust store again.
  *
  * @module @paw/daemon/identity
  * @version 0.0.0
@@ -25,73 +20,71 @@
  */
 
 /**
- * The names the leaf certificate is valid for, and the only names the CA is
- * permitted to sign for. Inside a Name Constraints extension an IP **must**
- * carry a CIDR prefix — RFC 5280 encodes the subtree as address plus mask — so
- * these are the exact strings the issuer passes through.
+ * Names leaf cert valid for, only names CA may sign for. In Name Constraints
+ * extension IP must carry CIDR prefix — RFC 5280 encode subtree as address plus
+ * mask — so these exact strings issuer pass through.
  */
 export const LOOPBACK_DNS = 'localhost';
 
 /**
- * The IPv4 loopback subtree the CA may sign for.
+ * IPv4 loopback subtree CA may sign for.
  */
 export const LOOPBACK_V4_SUBTREE = '127.0.0.0/8';
 
 /**
- * The IPv6 loopback subtree the CA may sign for.
+ * IPv6 loopback subtree CA may sign for.
  */
 export const LOOPBACK_V6_SUBTREE = '::1/128';
 
 /**
- * The addresses the server certificate itself carries, as SAN entries.
+ * Addresses server cert itself carry, as SAN entries.
  */
 export const LEAF_IPS: readonly string[] = ['127.0.0.1', '::1'];
 
 /**
- * How long a freshly issued CA is good for. Long, because replacing it means
- * asking the operator to approve a trust-store change again.
+ * How long fresh CA stay good. Long, cause replace mean ask operator approve
+ * trust-store change again.
  */
 export const CA_DAYS = 3650;
 
 /**
- * How long a server certificate is good for.
+ * How long server cert stay good.
  */
 export const LEAF_DAYS = 90;
 
 /**
- * How much life must remain on the leaf before it is reissued. A daemon that
- * starts inside this window quietly gets a new certificate from the CA the
- * operator already trusts.
+ * How much life must stay on leaf before reissue. Daemon start in this window,
+ * quietly get new cert from CA operator already trust.
  */
 export const LEAF_RENEW_DAYS = 30;
 
 /**
- * How much life must remain on the CA before the operator is warned. Replacing
- * it needs their consent, so the warning has to come early enough to act on.
+ * How much life must stay on CA before warn operator. Replace need consent,
+ * so warning must come early enough to act on.
  */
 export const CA_WARN_DAYS = 90;
 
 /**
- * The schema version of the metadata sidecar, so a future format change is
- * detected rather than misread.
+ * Schema version of metadata sidecar, so future format change detected, no
+ * misread.
  */
 export const META_VERSION = 1;
 
 /**
- * A day, in milliseconds.
+ * Day, in milliseconds.
  */
 const DAY_MS = 86_400_000;
 
 /**
- * What the daemon remembers about the identity it issued.
+ * Metadata daemon stores for identity it issued.
  *
  * @interface IdentityMeta
- * @property {number} version - The sidecar schema version.
- * @property {string} caFingerprint - SHA-256 of the CA certificate, colon-separated hex.
- * @property {string} caNotAfter - When the CA expires, ISO-8601.
- * @property {string} leafFingerprint - SHA-256 of the server certificate.
- * @property {string} leafNotAfter - When the server certificate expires, ISO-8601.
- * @property {boolean} trusted - Whether an installer reported the CA into a trust store.
+ * @property {number} version - Sidecar schema version.
+ * @property {string} caFingerprint - SHA-256 of CA cert, colon-separated hex.
+ * @property {string} caNotAfter - When CA expire, ISO-8601.
+ * @property {string} leafFingerprint - SHA-256 of server cert.
+ * @property {string} leafNotAfter - When server cert expire, ISO-8601.
+ * @property {boolean} trusted - Whether installer report CA into trust store.
  */
 export interface IdentityMeta {
   readonly version: number;
@@ -103,20 +96,20 @@ export interface IdentityMeta {
 }
 
 /**
- * What the daemon must do before it can serve TLS.
+ * What daemon must do before serve TLS.
  *
  * @typedef {'issue-ca' | 'issue-leaf' | 'reuse'} IdentityAction
  */
 export type IdentityAction = 'issue-ca' | 'issue-leaf' | 'reuse';
 
 /**
- * The subject name of a PAW local CA, identifying whose machine it belongs to
- * so an operator can recognise it in a trust store years later.
+ * Subject name of PAW local CA, say whose machine it belong to, so operator
+ * recognize it in trust store years later.
  *
- * @param {string} user - The operator's username.
- * @param {string} host - The machine's hostname.
- * @param {Date} now - The issuing date.
- * @returns {string} The distinguished name.
+ * @param {string} user - Operator's username.
+ * @param {string} host - Machine's hostname.
+ * @param {Date} now - Issuing date.
+ * @returns {string} Distinguished name.
  */
 export function caSubject(user: string, host: string, now: Date): string {
   const month = now.toISOString().slice(0, 7);
@@ -124,22 +117,21 @@ export function caSubject(user: string, host: string, now: Date): string {
 }
 
 /**
- * Add days to a date.
+ * Add days to date.
  *
- * @param {Date} from - The starting point.
+ * @param {Date} from - Starting point.
  * @param {number} days - How many days to add.
- * @returns {Date} The later date.
+ * @returns {Date} Later date.
  */
 export function addDays(from: Date, days: number): Date {
   return new Date(from.getTime() + days * DAY_MS);
 }
 
 /**
- * Format a certificate digest the way an operator will see it in a trust-store
- * dialog, so the fingerprint PAW prints can be compared by eye against the one
- * the OS shows.
+ * Format cert digest the way operator see it in trust-store dialog, so
+ * fingerprint PAW print compare by eye against one OS show.
  *
- * @param {Uint8Array} digest - The raw SHA-256 digest.
+ * @param {Uint8Array} digest - Raw SHA-256 digest.
  * @returns {string} `SHA256:AA:BB:…`.
  */
 export function formatFingerprint(digest: Uint8Array): string {
@@ -148,19 +140,16 @@ export function formatFingerprint(digest: Uint8Array): string {
 }
 
 /**
- * The same digest in the form Chromium reports a peer certificate in, so a
- * desktop shell can pin the exact certificate its own daemon just loaded from
- * disk rather than trusting a CA and hoping.
+ * Same digest in form Chromium report peer cert, so desktop shell pin exact
+ * cert its daemon load from disk.
  *
- * Pinning is the stronger claim: CA trust says "someone this machine trusts
- * vouched for this name", pinning says "this is the certificate my daemon is
- * holding". A malformed digest throws rather than producing a value that would
- * silently never match — a pin that always fails is a shell that cannot connect,
- * and a pin that always matches would be no pin at all.
+ * Pinning compare hash of presented cert against exact digest; CA trust
+ * validate presented cert against CA-signed chain. Bad digest throw. Pin
+ * always fail mean shell cannot connect; pin always match mean no pinning.
  *
- * @param {string} fingerprint - The digest as {@link formatFingerprint} writes it.
- * @returns {string} The `sha256/<base64>` form Electron compares against.
- * @throws {Error} When the digest is not a formatted SHA-256.
+ * @param {string} fingerprint - Digest as {@link formatFingerprint} write it.
+ * @returns {string} `sha256/<base64>` form Electron compare against.
+ * @throws {Error} When digest no formatted SHA-256.
  */
 export function chromiumFingerprint(fingerprint: string): string {
   if (!/^SHA256(:[0-9A-F]{2}){32}$/.test(fingerprint)) {
@@ -174,10 +163,10 @@ export function chromiumFingerprint(fingerprint: string): string {
 }
 
 /**
- * Whether stored metadata is one this daemon can read.
+ * Whether stored metadata one daemon can read.
  *
- * @param {unknown} value - The parsed sidecar.
- * @returns {value is IdentityMeta} True when it is usable.
+ * @param {unknown} value - Parsed sidecar.
+ * @returns {value is IdentityMeta} True when usable.
  */
 export function isUsableMeta(value: unknown): value is IdentityMeta {
   if (value === null || typeof value !== 'object') {
@@ -195,16 +184,15 @@ export function isUsableMeta(value: unknown): value is IdentityMeta {
 }
 
 /**
- * What the daemon must do to have a usable identity right now.
+ * What daemon must do to have usable identity right now.
  *
- * A missing or unreadable CA means starting over. A CA that is present but
- * whose leaf is missing, expired, or inside its renewal window means a new leaf
- * — which costs the operator nothing, because the CA they trusted still signs
- * it.
+ * Missing or unreadable CA mean start over. CA present but leaf missing, expired,
+ * or in renewal window mean new leaf — cost operator nothing, cause CA they
+ * trust still sign it.
  *
- * @param {IdentityMeta | null} meta - The stored metadata, or null when absent or unreadable.
- * @param {boolean} filesPresent - Whether every identity file exists on disk.
- * @param {Date} now - The current time.
+ * @param {IdentityMeta | null} meta - Stored metadata, or null when absent or unreadable.
+ * @param {boolean} filesPresent - Whether every identity file exist on disk.
+ * @param {Date} now - Current time.
  * @returns {IdentityAction} What to do.
  */
 export function decideIdentity(
@@ -225,26 +213,25 @@ export function decideIdentity(
 }
 
 /**
- * Whether the CA is close enough to expiry that the operator should be told
- * now, while there is still time to approve its replacement.
+ * Whether CA close enough to expiry that tell operator now, while still time
+ * to approve replacement.
  *
- * @param {IdentityMeta} meta - The stored metadata.
- * @param {Date} now - The current time.
- * @returns {boolean} True when the operator should be warned.
+ * @param {IdentityMeta} meta - Stored metadata.
+ * @param {Date} now - Current time.
+ * @returns {boolean} True when operator should be warned.
  */
 export function caExpiringSoon(meta: IdentityMeta, now: Date): boolean {
   return new Date(meta.caNotAfter).getTime() <= addDays(now, CA_WARN_DAYS).getTime();
 }
 
 /**
- * What to tell the operator about trusting the CA, or null when there is
- * nothing to say. Serving continues either way — an untrusted CA produces a
- * browser warning, which is the operator's decision to make, not something the
- * daemon may paper over by falling back to plaintext.
+ * What to tell operator about trusting CA, or null when nothing to say.
+ * Daemon serve TLS regardless of CA trust. Untrusted CA make browser warning;
+ * operator handle it. Daemon does not fall back to plaintext.
  *
- * @param {IdentityMeta} meta - The stored metadata.
- * @param {string} caPath - Where the CA certificate sits.
- * @returns {string | null} The advice, or null when the CA is already trusted.
+ * @param {IdentityMeta} meta - Stored metadata.
+ * @param {string} caPath - Where CA cert sit.
+ * @returns {string | null} Advice, or null when CA already trusted.
  */
 export function trustAdvice(meta: IdentityMeta, caPath: string): string | null {
   if (meta.trusted) {

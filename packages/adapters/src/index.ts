@@ -1,10 +1,7 @@
 /**
  * PAW Adapters — Public API
  *
- * @fileoverview The driven adapters that implement `@paw/core`'s ports. Each
- * imports `@paw/core` for the interface it fulfils; none is imported by `core`.
- * Consumers pick the adapters they want and wire them to ports at their
- * composition root.
+ * @fileoverview Driven adapters implement `@paw/core` ports. Each import `@paw/core` for interface it fulfil. None import by `core`. Consumer pick adapters and wire to ports at composition root.
  *
  * @module @paw/adapters
  * @version 0.0.0

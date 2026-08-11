@@ -1,11 +1,9 @@
 /**
  * PAW CLI Stdin
  *
- * @fileoverview Reads all of stdin as text — the one process-shell primitive the
- * `check` and `hook` commands share. Kept apart so both import it without a cycle
- * through the composition root, and excluded from unit coverage for the same
- * reason `main.ts` is: raw process I/O, exercised by the E2E suites that spawn
- * the CLI.
+ * @fileoverview Read all stdin as text. Shared process-shell primitive for
+ * `check` and `hook` commands. Raw process I/O. Skip unit coverage like
+ * `main.ts`; cover by E2E suites that spawn CLI.
  *
  * @module @paw/cli/infrastructure/stdin
  * @version 0.0.0
@@ -14,9 +12,9 @@
  */
 
 /**
- * Read all of stdin as text.
+ * Read all stdin as text.
  *
- * @returns {Promise<string>} The full stdin contents, UTF-8 decoded.
+ * @returns {Promise<string>} Full stdin contents, UTF-8 decoded.
  */
 export async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];

@@ -1,8 +1,8 @@
 /**
- * Snapshot Formatting Tests
+ * Snapshot formatting test.
  *
- * @fileoverview The three arms of the uptime label. The snapshot's assembly is
- * tested in `cache.test.ts`, which is where it now happens.
+ * @fileoverview Three arms of uptime label. Snapshot assembly tested in
+ * `cache.test.ts`, where it now happen.
  *
  * @module @paw/daemon/test/snapshot
  * @version 0.0.0

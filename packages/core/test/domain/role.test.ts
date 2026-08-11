@@ -1,9 +1,8 @@
 /**
- * PAW Role Domain Tests
+ * Paw role domain tests.
  *
- * @fileoverview Covers `satisfies` across every shortfall — context, output,
- * each boolean capability, and cost tier — plus the fully-satisfied case, so
- * `role.ts` reaches 100%.
+ * @fileoverview Cover `satisfies` across every shortfall — context, output,
+ * each boolean capability, cost tier — plus fully-satisfied case.
  *
  * @module @paw/core/test/domain/role
  * @version 0.0.0
@@ -19,10 +18,10 @@ import {
 } from '../../src/domain/role.js';
 
 /**
- * A modest requirement; override to probe one dimension.
+ * Build modest requirement. Override probe one dimension.
  *
- * @param {Partial<RoleRequirements>} over - Fields to override.
- * @returns {RoleRequirements} A requirement.
+ * @param {Partial<RoleRequirements>} over - Override field.
+ * @returns {RoleRequirements} Requirement.
  */
 const req = (over: Partial<RoleRequirements> = {}): RoleRequirements => ({
   minContextTokens: 32_000,
@@ -37,10 +36,10 @@ const req = (over: Partial<RoleRequirements> = {}): RoleRequirements => ({
 });
 
 /**
- * A model that comfortably meets the modest requirement; override to break it.
+ * Build model that meets modest requirement. Override break it.
  *
- * @param {Partial<ModelCapabilities>} over - Fields to override.
- * @returns {ModelCapabilities} A capability set.
+ * @param {Partial<ModelCapabilities>} over - Override field.
+ * @returns {ModelCapabilities} Capability set.
  */
 const cap = (over: Partial<ModelCapabilities> = {}): ModelCapabilities => ({
   contextTokens: 128_000,

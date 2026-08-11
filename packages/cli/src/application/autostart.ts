@@ -1,16 +1,15 @@
 /**
- * PAW Daemon Autostart
+ * PAW daemon autostart.
  *
- * @fileoverview The thundering-herd guard (doc 10 §9a). When a hook finds no
- * daemon, many hooks may arrive at once but only one may spawn it: an exclusive
- * lock file decides the winner, which spawns pawd detached and waits for the
- * socket; everyone else just waits for the same socket, and if it never comes
- * they fail open on this one event. A lock older than the stale ceiling is
- * treated as a crashed starter and cleared. Best-effort: this only tries to bring
- * the daemon up — the caller's RPC then fails open on its own if it is still down.
+ * @fileoverview Guarantees at most one daemon spawn per project (doc 10 §9a).
+ * When daemon is absent, hooks race for the exclusive lock file; the winner
+ * spawns pawd detached and waits for the socket, all others wait on the same
+ * socket and fail open if it never appears. A lock older than the stale
+ * ceiling counts as a crashed starter and is released. Best-effort: bring
+ * daemon up; caller RPC fails open on its own if still down.
  *
- * The filesystem, spawn, connect, and clock are injected, so the whole decision
- * tree tests without a process or a real socket.
+ * Filesystem, spawn, connect, clock all injected. Decision tree test without
+ * process or real socket.
  *
  * @module @paw/cli/application/autostart
  * @version 0.0.0
@@ -23,14 +22,14 @@ const MAX_WAIT_MS = 3000;
 const STALE_MS = 30_000;
 
 /**
- * The effects autostart needs, injected for testing.
+ * Effects autostart need, injected for testing.
  *
  * @interface AutostartSeams
- * @property {(socketPath: string) => Promise<boolean>} probe - Whether the daemon answers a connection.
- * @property {(lockPath: string) => number | null} lockAgeMs - Age of the lock in ms, or null when absent.
- * @property {(lockPath: string) => boolean} acquire - Exclusively create the lock; true when this caller won.
- * @property {(lockPath: string) => void} release - Remove the lock, tolerating its absence.
- * @property {() => void | Promise<void>} spawn - Spawn pawd off the caller's tree; may resolve once the spawn has been handed off.
+ * @property {(socketPath: string) => Promise<boolean>} probe - Whether daemon answer connection.
+ * @property {(lockPath: string) => number | null} lockAgeMs - Age of lock in ms, or null when absent.
+ * @property {(lockPath: string) => boolean} acquire - Exclusively create lock; true when this caller win.
+ * @property {(lockPath: string) => void} release - Remove lock, tolerate its absence.
+ * @property {() => void | Promise<void>} spawn - Spawn pawd off caller's tree; may resolve once spawn handed off.
  * @property {(ms: number) => Promise<void>} wait - Sleep.
  */
 export interface AutostartSeams {
@@ -43,11 +42,11 @@ export interface AutostartSeams {
 }
 
 /**
- * Poll the socket until it answers or the deadline passes.
+ * Poll socket until it answer or deadline pass.
  *
  * @param {string} socketPath - The endpoint to probe.
  * @param {AutostartSeams} seams - The injected effects.
- * @returns {Promise<void>} Resolves once up, or after the deadline.
+ * @returns {Promise<void>} Resolve once up, or after deadline.
  */
 async function waitForSocket(socketPath: string, seams: AutostartSeams): Promise<void> {
   const tries = Math.floor(MAX_WAIT_MS / POLL_MS);
@@ -60,13 +59,12 @@ async function waitForSocket(socketPath: string, seams: AutostartSeams): Promise
 }
 
 /**
- * Ensure a daemon is (being) brought up for a project, without racing a herd of
- * hooks into spawning several.
+ * Ensure daemon comes up for project; concurrent hooks spawn at most one daemon.
  *
  * @param {string} socketPath - The daemon endpoint.
  * @param {string} lockPath - The autostart lock file.
  * @param {AutostartSeams} seams - The injected effects.
- * @returns {Promise<void>} Best-effort; resolves whether or not the daemon came up.
+ * @returns {Promise<void>} Best-effort; resolve whether or not daemon came up.
  */
 export async function ensureDaemon(
   socketPath: string,

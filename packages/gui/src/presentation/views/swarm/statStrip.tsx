@@ -1,10 +1,10 @@
 /**
  * Swarm Stat Strip
  *
- * @fileoverview The four figures that summarise a run: how many members the plan
- * has, how many were dispatched against how many the plan's own `skip` filter
- * spared, how many came back confirmed, and what it cost. Before a run these
- * read zero, which is the truth about a plan that has not been released.
+ * @fileoverview Four figures describing a run: total members in the plan,
+ * dispatched count against the plan's `skip` filter allowance, confirmed
+ * returns, and spend. Before a run these read zero, indicating the plan
+ * has not been released yet.
  *
  * @module @paw/gui/presentation/views/swarm/statStrip
  * @version 0.0.0
@@ -17,9 +17,9 @@ import { dispatchedCount } from '../../../domain/consoleState.js';
 import { Stat } from '../../atoms/stat.js';
 
 /**
- * The Swarm view's stat strip.
+ * Swarm view stat strip.
  *
- * @returns {JSX.Element} The strip.
+ * @returns {JSX.Element} The strip with four figures laid out.
  */
 export function StatStrip() {
   const { plan, run, budget } = useConsoleData();

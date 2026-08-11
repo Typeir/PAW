@@ -1,21 +1,18 @@
 /**
- * PAW Daemon Service
+ * PAW daemon service.
  *
- * @fileoverview `pawd` as a function, and the thing it serves is a **repository**
- * — not one plan. It discovers every `*.swarm.mjs` the repo holds and finds its
- * config; which plan is in view is a selection carried on the request
- * (`/api/state?plan=…`), so one console covers a workspace with twenty plans
- * instead of one console per swarm. A selected plan is imported once and cached
- * against its mtime, so polling costs nothing and editing the file reloads it on
- * the next poll. A path the repository does not hold is refused rather than
- * imported.
+ * @fileoverview Serve `pawd` as function. Serve repository, no one plan.
+ * Find every `*.swarm.mjs` repo hold, find set config. Which plan in view be
+ * selection carried on request (`/api/state?plan=…`), so one console cover
+ * workspace with twenty plan, no one console per swarm. Selected plan import
+ * once, cache against mtime. Poll cost nothing, edit file reload next poll.
+ * Path repository no hold refuse, no import.
  *
- * Every effect it needs — reading a file, importing a plan module, listing
- * processes and files, reading the host, binding a socket, scheduling a poll —
- * arrives through {@link DaemonRuntime}, so the whole sequence is unit-tested
- * against fakes while `nodeRuntime` supplies the real ones. That is also what
- * lets `paw ui` and the Electron shell run the daemon in their own process
- * rather than spawning a second one.
+ * Every effect thing need — read file, import plan module, list process and
+ * file, read host, bind socket, schedule poll — come through
+ * {@link DaemonRuntime}, so whole sequence unit-test against fakes while
+ * `nodeRuntime` supply real one. Same let `paw ui` and Electron shell run
+ * daemon in own process, no spawn second one.
  *
  * @module @paw/daemon/serve
  * @version 0.0.0
@@ -38,6 +35,7 @@ import {
   type PlanSlice,
   type PlansSlice,
   type RunProgress,
+  type RunSettings,
   type SwarmPlan,
 } from '@paw/core';
 import {
@@ -86,17 +84,17 @@ import { toRunProgress, trackRun } from './run.js';
 import { buildFileTree, type FileEntry } from '../domain/tree.js';
 
 /**
- * Connectors this repo can resolve, for the config doctor.
+ * Connector repo can resolve, for config doctor.
  */
 const KNOWN_CONNECTORS = ['copilot-hooks'];
 
 /**
- * A plan loaded from disk, with what it was loaded from.
+ * Plan loaded from disk, with load source.
  *
  * @interface LoadedPlan
- * @property {SwarmPlan<unknown>} plan - The plan itself.
- * @property {string} source - The module's source text.
- * @property {number} modifiedAt - The mtime the load was made against.
+ * @property {SwarmPlan<unknown>} plan - Plan itself.
+ * @property {string} source - Module source text.
+ * @property {number} modifiedAt - Mtime load made against.
  */
 interface LoadedPlan {
   readonly plan: SwarmPlan<unknown>;
@@ -105,11 +103,11 @@ interface LoadedPlan {
 }
 
 /**
- * Start the daemon.
+ * Start daemon.
  *
  * @param {DaemonOptions} options - What to serve.
- * @param {DaemonRuntime} runtime - The effects to serve it with.
- * @returns {Promise<DaemonHandle>} The running daemon.
+ * @param {DaemonRuntime} runtime - Effects to serve it with.
+ * @returns {Promise<DaemonHandle>} Running daemon.
  */
 export async function runDaemon(
   options: DaemonOptions,
@@ -119,11 +117,11 @@ export async function runDaemon(
   const log = createLogRing(() => runtime.now());
 
   /**
-   * How the current root stands: a repository with no PAW config is the state a
-   * console turns into "pick a project", so it is reported rather than inferred
-   * from an empty plan list.
+   * Current root attach state. A repo without PAW config makes the state
+   * console show "pick a project"; report that directly, do not infer it from
+   * an empty plan list.
    *
-   * @returns {AttachState} The current attach state.
+   * @returns {AttachState} Current attach state.
    */
   const attachState = (): AttachState => ({
     status: configPath === '' ? 'unconfigured' : 'idle',
@@ -131,19 +129,19 @@ export async function runDaemon(
   });
 
   const bus = createBus((topic, error) => {
-    // Reported straight to the terminal rather than through `report`: a listener
-    // that threw is very often a session, and publishing to the bus from inside
-    // its own fan-out is how one broken session becomes a loop.
+    // Report straight to terminal, no through `report`. Listener that threw
+    // often be a session, and publish to bus from inside own fan-out make one
+    // broken session a loop.
     runtime.warn(`a "${topic}" listener failed: ${reason(error)}`);
   });
 
   /**
-   * Tell the operator's terminal and every open console the same thing. A
-   * console cannot read stderr, so a daemon that reported a failing source only
-   * to a terminal nobody is watching has reported it to nobody.
+   * Write message to operator terminal and publish it to every open console. A
+   * console cannot read stderr, so a failing-source report written only to the
+   * terminal would go unseen.
    *
-   * @param {string} message - What happened.
-   * @param {LogEntry['level']} [level] - How loud it is.
+   * @param {string} message - What happen.
+   * @param {LogEntry['level']} [level] - How loud.
    */
   const report = (message: string, level: LogEntry['level'] = 'warn'): void => {
     runtime.warn(message);
@@ -152,12 +150,12 @@ export async function runDaemon(
 
   const recentRoutes = options.recent;
   /**
-   * Remember a grabbed route in the recent list, best effort. The list is a
-   * convenience for the operator, so a store that cannot be written is reported
-   * and scoping goes on — a broken `recent.json` never blocks a grab.
+   * Remember grabbed route in recent list, best effort. A recent-store write
+   * failure is reported and scoping still proceeds — a broken `recent.json`
+   * never blocks a grab.
    *
-   * @param {string} path - The route just scoped to.
-   * @returns {Promise<void>} When the attempt has settled.
+   * @param {string} path - Route just scoped to.
+   * @returns {Promise<void>} When attempt settle.
    */
   const rememberRoute = async (path: string): Promise<void> => {
     if (recentRoutes === undefined) {
@@ -184,12 +182,11 @@ export async function runDaemon(
         >);
 
   const page = await runtime.readPage();
-  // Hashed once, at boot: the console is a self-contained artifact whose inline
-  // bundle cannot change while the daemon runs, so the CSP can name it exactly
-  // instead of permitting inline scripts in general.
+  // Hash once, at boot. Console be self-contained artifact, inline bundle cannot
+  // change while daemon run, so CSP can name exact, no permit all inline script.
   const scriptHashes = inlineScriptHashes(page);
-  // Before anything is scheduled or bound: a daemon with no usable identity has
-  // nothing to serve, and failing here leaves no poller and no socket behind.
+  // Before anything schedule or bind. Daemon with no usable identity got
+  // nothing to serve, and fail here leave no poller and no socket behind.
   const identity = await runtime.identity();
   let registry = buildRegistry(config, () => REFUSING_MODEL);
   let doctor = runDoctor(config, registry, KNOWN_CONNECTORS);
@@ -202,10 +199,10 @@ export async function runDaemon(
   const planSlices = createVersionedCache<PlanSlice>();
 
   /**
-   * Load a plan, reusing the cached module while the file has not changed.
+   * Load plan, reuse cached module while file no change.
    *
-   * @param {string} path - The repo-relative plan path.
-   * @returns {Promise<LoadedPlan>} The loaded plan.
+   * @param {string} path - Repo-relative plan path.
+   * @returns {Promise<LoadedPlan>} Loaded plan.
    */
   const loadPlan = async (path: string): Promise<LoadedPlan> => {
     const full = underRoot(root, path);
@@ -224,11 +221,11 @@ export async function runDaemon(
   };
 
   /**
-   * The rendered slice for a plan, built once per version of its file. The load
-   * above avoids re-importing an unchanged module; this avoids re-rendering
-   * every brief in it, which is the expensive half.
+   * Rendered slice for a plan, built once per file version. Load above no
+   * re-import unchanged module; this no re-render every brief in it, which be
+   * expensive half.
    *
-   * @param {string} path - The repo-relative plan path.
+   * @param {string} path - Repo-relative plan path.
    * @returns {Promise<PlanSlice>} The slice.
    */
   const planSliceFor = async (path: string): Promise<PlanSlice> => {
@@ -241,16 +238,16 @@ export async function runDaemon(
   const openedOn = selectPlan(options.planPath ?? null, plansSlice.plans);
   let processes = await runtime.listProcesses();
   let configVersion = configPath === '' ? 0 : await runtime.modifiedAt(underRoot(root, configPath));
-  // The last slice published per plan, so a plan is only announced when its
-  // file actually changed. Keyed by path because sessions watch different plans.
+  // Last slice published per plan, so announce plan only when file actually
+  // change. Key by path because sessions watch different plan.
   const published = new Map<string, PlanSlice>();
 
   /**
-   * Run a source, reporting a failure rather than leaving a rejected promise
-   * loose. A poll that throws — a file deleted mid-read, a plan that stopped
-   * parsing — must not take the daemon down and must not pass unnoticed.
+   * Run a source, report failure, no leave rejected promise loose. Poll that
+   * throw — file deleted mid-read, plan stop parsing — must no take daemon
+   * down and must no pass unnoticed.
    *
-   * @param {string} what - The source's name, for the report.
+   * @param {string} what - Source name, for report.
    * @param {() => Promise<void>} read - The source.
    */
   const runSource = (what: string, read: () => Promise<void>): void => {
@@ -260,7 +257,7 @@ export async function runDaemon(
   };
 
   /**
-   * Re-read the owned process table and publish only a real change.
+   * Re-read owned process table, publish only when the table changed.
    */
   const readProcesses = async (): Promise<void> => {
     const next = await runtime.listProcesses();
@@ -271,9 +268,9 @@ export async function runDaemon(
   };
 
   /**
-   * Re-read the repository listing, republishing the plan list and the tree
-   * independently — a new source file changes the tree without changing the
-   * plans, and the console should not be told the picker moved when it did not.
+   * Re-read repository listing, republish plan list and tree separately — a
+   * new source file changes tree but not plan list, so console is not told the
+   * picker moved when it did not.
    */
   const readListing = async (): Promise<void> => {
     entries = await runtime.listFiles(root);
@@ -290,8 +287,8 @@ export async function runDaemon(
   };
 
   /**
-   * Re-read the config when its file changes, so an edited config re-runs the
-   * doctor instead of reporting the state of the machine at boot forever.
+   * Re-read config when file change, so edited config re-run doctor, no report
+   * machine state at boot forever.
    */
   const readConfig = async (): Promise<void> => {
     if (configPath === '') {
@@ -310,16 +307,14 @@ export async function runDaemon(
   };
 
   /**
-   * Re-render every plan somebody is watching when its file changes. The cache
-   * returns the identical object while the version holds, so identity is the
-   * change test and no deep comparison of several hundred briefs is needed.
+   * Re-render every watched plan when file change. The cache returns the
+   * identical object while version is unchanged, so identity equality is the
+   * change test instead of a deep compare of several hundred entries.
    *
-   * The set is the **union of what the sessions watch**, plus whatever the
-   * daemon opened on, because sessions choose their own plan and a session
-   * receives only the slice for the plan it chose. Re-rendering just `openedOn`
-   * would leave every other console rendering briefs that never update again,
-   * with no error and no visible degradation — silently stale, which is worse
-   * than visibly broken.
+   * Wanted set is the union of sessions.watched() plus the path daemon opened
+   * on, because each session picks its own plan and receives only that plan's
+   * slice. Rendering only `openedOn` leaves every other console showing a
+   * brief that never updates again — stale without error or visible sign.
    */
   const readWatchedPlan = async (): Promise<void> => {
     const wanted = new Set(sessions.watched());
@@ -337,15 +332,15 @@ export async function runDaemon(
           bus.publish('planDetail', slice);
         }
       } catch (error: unknown) {
-        // Per plan, so one broken module does not starve the others. A plan
-        // that stopped parsing is an ordinary thing — the operator is editing
-        // it — and letting it abort the loop would freeze plan updates for
-        // every console watching a different, perfectly healthy plan.
+        // Guarded per plan, so one broken module does not block others. A plan
+        // that stops parsing is a normal case — an operator editing it — and
+        // letting it abort the loop would freeze plan updates for every
+        // console watching a different, healthy plan.
         report(`plan "${path}" could not be read: ${reason(error)}`, 'error');
       }
     }
-    // A plan nobody watches any more is forgotten, so the map cannot grow with
-    // every plan an operator has ever clicked on during a long-lived daemon.
+    // Plan nobody watch any more get forgotten, so map cannot grow with every
+    // plan an operator ever clicked during long-lived daemon.
     for (const path of [...published.keys()]) {
       if (!wanted.has(path)) {
         published.delete(path);
@@ -354,13 +349,12 @@ export async function runDaemon(
   };
 
   /**
-   * Point the daemon at another repository and republish everything derived
-   * from it.
+   * Point daemon at another repository and republish everything derived from
+   * it.
    *
-   * A read: it changes what is looked at and writes nothing. Every slice below
-   * is already re-derived when files change, so re-rooting reuses that rather
-   * than restarting — open consoles keep their sockets and are told the new
-   * state, instead of being dropped and made to reconnect.
+   * A read: change what looked at, write nothing. Every slice below already
+   * re-derived when files change, so re-rooting reuse that, no restart — open
+   * console keep sockets and get told new state, no drop and no reconnect.
    *
    * @param {string} next - The repository to serve.
    */
@@ -414,9 +408,9 @@ export async function runDaemon(
     ...(options.onRelease === undefined ? {} : { onRelease: options.onRelease }),
   });
 
-  // One subscription per topic, forwarding to every live session. The sources
-  // publish once and know nothing about sockets; the sessions receive without
-  // knowing what produced the slice.
+  // One subscription per topic, forward to every live session. Sources publish
+  // once and know nothing about socket; sessions receive without know what
+  // produce the slice.
   for (const topic of LIVE_TOPICS) {
     bus.subscribe(topic, (data) => {
       sessions.broadcast(topic, data);
@@ -424,23 +418,23 @@ export async function runDaemon(
   }
 
   const stopHostTicker = runtime.schedule(() => {
-    // Published every tick rather than on change: this is the console's liveness
-    // signal, so silence has to mean "the daemon stopped", not "nothing moved".
+    // Publish every tick even when unchanged. This is the console liveness
+    // signal, so silence must mean "daemon stopped", not "nothing moved".
     bus.publish('host', runtime.readHost());
-    // The same tick advances session timers, so an unauthenticated socket is
-    // closed on schedule without a second timer to keep in step with this one.
+    // Same tick advance session timers, so unauthenticated socket close on
+    // schedule, no need second timer to keep in step with this one.
     sessions.tick(runtime.clock());
   }, options.hostMs ?? HOST_TICK_MS);
 
   const stopPolling = runtime.schedule(() => {
     runSource('process', readProcesses);
     runSource('config', readConfig);
-    // Chained, not raced: the plan reader decides what still exists by asking
-    // `plansSlice`, so running it beside the listing reader would let it judge
-    // against last tick's answer and re-render a plan that has just been
-    // deleted. A listing that fails is reported and the plan read still runs
-    // against the last good listing — otherwise one unreadable directory would
-    // freeze every console's plan updates for as long as it stayed unreadable.
+    // Chained, no raced. Plan reader decide what still exist by ask
+    // `plansSlice`, so run it beside listing reader would let it judge against
+    // last tick answer and re-render a plan that just been deleted. Listing that
+    // fail get reported and plan read still run against last good listing —
+    // else one unreadable directory would freeze every console plan update for
+    // as long it stay unreadable.
     runSource('listing', async () => {
       try {
         await readListing();
@@ -474,31 +468,33 @@ export async function runDaemon(
   };
 
   /**
-   * Release the opening plan's herd, reporting progress as it lands.
+   * Run the opening plan and report progress as it completes.
    *
-   * Deliberately **not** started until the socket is bound. A run releases real
-   * members against a real provider and spends real tokens; starting it before
-   * the bind means a daemon that fails on `EADDRINUSE` — an everyday outcome
-   * when the operator names a port — leaves a live run going with nobody
-   * holding it, no console to watch it, and no handle to stop it. The operator
-   * reads "address already in use", reasonably concludes nothing started, and
-   * the provider bill says otherwise.
+   * Does not start until the socket is bound. A run reaches a real provider
+   * and incurs real cost; starting before bind means a daemon that fails on
+   * `EADDRINUSE` — a common outcome when an operator names a port — would
+   * leave a live run going with no session watching it and no handle able to
+   * stop it. The operator reads "address already in use", concludes nothing
+   * started, and the provider bill says otherwise.
    *
    * @param {Dispatcher} dispatch - The consumer's dispatcher.
-   * @returns {Promise<void>} Settles when the herd finishes.
+   * @param {string | null} planPath - Plan to release; null throw.
+   * @returns {Promise<void>} Settles when the run completes.
    */
-  const release = async (dispatch: Dispatcher): Promise<void> => {
-    if (openedOn === null) {
+  const release = async (dispatch: Dispatcher, planPath: string | null): Promise<void> => {
+    if (planPath === null) {
       throw new Error('cannot release a herd: no plan was named to run');
     }
-    const tracker = trackRun(runId, startedAt);
-    const report = await dispatch((await loadPlan(openedOn)).plan, (event) => {
+    const at = runtime.now();
+    const id = at.slice(11, 19).replace(/:/g, '-');
+    const tracker = trackRun(id, at);
+    const report = await dispatch((await loadPlan(planPath)).plan, (event) => {
       run = tracker.apply(event);
       bus.publish('run', run);
     });
-    // The finished result is authoritative: the tracker reports what it was
-    // told, and a dispatcher that reported nothing must still end correct.
-    run = toRunProgress(report.result, runId, startedAt);
+    // Finished result is authoritative. The tracker reports only what it was
+    // told, and a dispatcher that reports nothing must still end correctly.
+    run = toRunProgress(report.result, id, at);
     budget = report.usage;
     bus.publish('run', run);
     bus.publish('budget', budget);
@@ -527,10 +523,10 @@ export async function runDaemon(
     },
   };
 
-  // The pollers are already running by the time the socket is bound, and a bind
-  // can fail — a port the operator named is often already taken. Leaving two
-  // intervals behind on that path means a daemon that failed to start is still
-  // reading the process table every three seconds for the life of the process.
+  // Pollers already run by the time socket bound, and bind can fail — a port
+  // operator named often already taken. Leave two intervals behind on that path
+  // mean daemon that fail to start still read the process table every three
+  // seconds for the life of process.
   let server: ServerHandle;
   try {
     server = await runtime.listen(
@@ -548,7 +544,12 @@ export async function runDaemon(
           scriptHashes,
           origins,
           control: options.control,
-          ...(recentRoutes === undefined ? {} : { recent: () => recentRoutes.list() }),
+          ...(recentRoutes === undefined
+            ? {}
+            : {
+                recent: () => recentRoutes.list(),
+                forgetRecent: (route: string) => recentRoutes.remove(route),
+              }),
         }),
       hooks,
       port,
@@ -565,10 +566,10 @@ export async function runDaemon(
   origins = allowedOrigins(server.port, options.allowOrigins);
   socket = `${LOOPBACK}:${server.port}`;
 
-  // Now, and not a line earlier — see `release`. The rejection is claimed
-  // immediately because the caller cannot attach a handler until this function
-  // returns, and an unclaimed rejection exits the process.
-  const dispatched = options.dispatch ? release(options.dispatch) : null;
+  // Now, no line earlier — see `release`. Grab the rejection immediately
+  // because caller cannot attach a handler until this function return, and
+  // unclaimed rejection exit the process.
+  const dispatched = options.dispatch ? release(options.dispatch, openedOn) : null;
   dispatched?.catch(() => undefined);
 
   return {
@@ -583,13 +584,19 @@ export async function runDaemon(
     plans: plansSlice.plans,
     openedOn,
     dispatched,
+    release: async (settings: RunSettings): Promise<void> => {
+      if (options.dispatcherFor === undefined) {
+        throw new Error('this daemon cannot build a release dispatcher');
+      }
+      await release(options.dispatcherFor(settings), settings.plan);
+    },
     snapshot,
     rescope,
     close: async () => {
       stopHostTicker();
       stopPolling();
-      // Sessions are told why before the socket goes: a console that is closed
-      // with a shutdown code stops retrying, where an abrupt drop reconnects.
+      // Sessions are told why before the socket closes. A console closed with
+      // the shutdown code stops retrying, whereas an abrupt drop reconnects.
       sessions.shutdown();
       await server.close();
     },

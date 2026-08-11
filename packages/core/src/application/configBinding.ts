@@ -1,11 +1,7 @@
 /**
  * PAW Config Binding Edits
  *
- * @fileoverview Pure transforms over a repo's config document that add a model,
- * bind a role to one, or clear a binding. Each returns a new document or a reason
- * it was refused; no I/O, so the authority that owns the file applies the result.
- * Validation matches {@link buildRegistry}: a role must be one PAW declares, and a
- * binding's model must already be declared.
+ * @fileoverview Pure transform over repo config document. Add model, bind role to one, or clear binding. Each return new document or reason refuse; no I/O; file owner apply result. Validation match {@link buildRegistry}: role must be one PAW declare, and binding model must already declare.
  *
  * @module @paw/core/application/configBinding
  * @version 0.0.0
@@ -18,7 +14,7 @@ import type { CostClass, ModelCapabilities } from '../domain/role.js';
 import { BUILTIN_ROLES } from './builtinRoles.js';
 
 /**
- * The outcome of an edit: the next document, or the reason it was refused.
+ * Outcome of edit: next document, or reason why not allowed.
  */
 export type ConfigEdit =
   | { readonly ok: true; readonly config: ConfigDocument }
@@ -33,20 +29,20 @@ const COST_CLASSES: ReadonlySet<string> = new Set<CostClass>([
 ]);
 
 /**
- * Whether a value is a plain object.
+ * Whether value be plain object.
  *
- * @param {unknown} value - The value.
- * @returns {boolean} True for a non-null, non-array object.
+ * @param {unknown} value - Value.
+ * @returns {boolean} True for non-null, non-array object.
  */
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
- * Validate a value as model capabilities, or say why it is not.
+ * Validate value as model capabilities, or say why it not.
  *
- * @param {unknown} value - The candidate capabilities.
- * @returns {{ ok: true; capabilities: ModelCapabilities } | { ok: false; reason: string }} The parse.
+ * @param {unknown} value - Candidate capabilities.
+ * @returns {{ ok: true; capabilities: ModelCapabilities } | { ok: false; reason: string }} Parse.
  */
 export function parseCapabilities(
   value: unknown,
@@ -85,12 +81,12 @@ export function parseCapabilities(
 }
 
 /**
- * Declare a model, or replace an existing declaration of the same id.
+ * Declare model, or replace existing declaration of same id.
  *
- * @param {ConfigDocument} config - The current document.
- * @param {string} id - The model id.
- * @param {ModelCapabilities} capabilities - Its capabilities.
- * @returns {ConfigEdit} The next document, or a refusal.
+ * @param {ConfigDocument} config - Current document.
+ * @param {string} id - Model id.
+ * @param {ModelCapabilities} capabilities - Capabilities.
+ * @returns {ConfigEdit} Next document, or refusal.
  */
 export function declareModel(
   config: ConfigDocument,
@@ -104,12 +100,12 @@ export function declareModel(
 }
 
 /**
- * Bind a role to a declared model.
+ * Bind role to declared model.
  *
- * @param {ConfigDocument} config - The current document.
- * @param {string} roleId - The role to bind.
- * @param {string} modelId - The model to bind it to.
- * @returns {ConfigEdit} The next document, or a refusal.
+ * @param {ConfigDocument} config - Current document.
+ * @param {string} roleId - Role to bind.
+ * @param {string} modelId - Model to bind it to.
+ * @returns {ConfigEdit} Next document, or refusal.
  */
 export function setBinding(config: ConfigDocument, roleId: string, modelId: string): ConfigEdit {
   if (!ROLE_IDS.has(roleId)) {
@@ -122,11 +118,11 @@ export function setBinding(config: ConfigDocument, roleId: string, modelId: stri
 }
 
 /**
- * Clear a role's binding, leaving it unbound.
+ * Clear role binding, leave it unbound.
  *
- * @param {ConfigDocument} config - The current document.
- * @param {string} roleId - The role to unbind.
- * @returns {ConfigEdit} The next document, or a refusal.
+ * @param {ConfigDocument} config - Current document.
+ * @param {string} roleId - Role to unbind.
+ * @returns {ConfigEdit} Next document, or refusal.
  */
 export function clearBinding(config: ConfigDocument, roleId: string): ConfigEdit {
   if (!ROLE_IDS.has(roleId)) {

@@ -1,16 +1,10 @@
 /**
  * PAW Path Text
  *
- * @fileoverview Joining and trimming paths, as string work.
- *
- * `node:path` would do this, and core may not use it: `@paw/gui` compiles core
- * into a browser bundle, where a `node:` import is a build failure rather than a
- * runtime one. Core is therefore free of Node builtins entirely, and this is
- * what pays for that — a few lines of string handling in exchange for a library
- * that runs wherever it is asked to.
- *
- * Forward slashes throughout. Every platform's filesystem API accepts them,
- * including Windows, and one separator keeps a path comparable in a test.
+ * @fileoverview Join and trim path with string work. Replace `node:path`.
+ * Core import no Node builtin; `@paw/gui` bundle for browser. Use
+ * forward slash all way. Every platform filesystem API, Windows too,
+ * accept them.
  *
  * @module @paw/core/domain/paths
  * @version 0.0.0
@@ -19,10 +13,10 @@
  */
 
 /**
- * Join path segments, dropping empties and any trailing separator.
+ * Join path segment. Drop empty and trailing separator.
  *
- * @param {readonly string[]} parts - The segments.
- * @returns {string} The joined path.
+ * @param {readonly string[]} parts - Segment.
+ * @returns {string} Joined path.
  */
 export function joinPath(parts: readonly string[]): string {
   return parts
@@ -32,10 +26,10 @@ export function joinPath(parts: readonly string[]): string {
 }
 
 /**
- * The directory a path sits in, or `''` when it names no directory.
+ * Directory path sit in, or `''` when no directory.
  *
- * @param {string} path - The path.
- * @returns {string} The directory.
+ * @param {string} path - Path.
+ * @returns {string} Directory.
  */
 export function dirNameOf(path: string): string {
   const normalised = path.replace(/\\/g, '/');

@@ -1,9 +1,5 @@
 /**
- * @fileoverview Real-socket coverage for the bind/accept/close path: a client
- * connects over the platform's pipe or unix socket, completes the handshake, and
- * calls a method; a second bind on the same path is refused. The per-connection
- * branches are unit-tested against a fake; this proves the transport actually
- * carries a session end to end.
+ * @fileoverview Real-socket test for bind/accept/close path. Client connect over platform pipe or unix socket, do handshake, call method. Second bind on same path refused. Per-connection branch unit-test with fake; this prove transport carry session end to end.
  *
  * @module @paw/daemon/test/socketServer.integration
  */
@@ -29,7 +25,7 @@ const line = (obj: unknown): string => `${JSON.stringify(obj)}\n`;
 const CONNECT = line({ jsonrpc: '2.0', id: 1, method: 'connect', params: { token: 'T', protocolVersion: 1 } });
 const ECHO = line({ jsonrpc: '2.0', id: 2, method: 'echo', params: { hi: 1 } });
 
-/** A fresh temp root and its platform-appropriate socket path. */
+/** Fresh temp root and socket path right for platform. */
 function tempEndpoint() {
   const root = mkdtempSync(join(tmpdir(), 'paw-sock-'));
   const path = socketPath(root, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: root });
@@ -37,11 +33,10 @@ function tempEndpoint() {
 }
 
 /**
- * Send frames one at a time over a real client, awaiting each response line, and
- * resolve with every line received.
+ * Send frames one at time over real client. Wait each response line. Resolve with every line received.
  *
- * @param path - The socket path to connect to.
- * @param frames - The frames to send in order.
+ * @param path - Socket path to connect to.
+ * @param frames - Frames to send in order.
  */
 function roundtrip(path: string, frames: string[]): Promise<string[]> {
   return new Promise((resolve, reject) => {

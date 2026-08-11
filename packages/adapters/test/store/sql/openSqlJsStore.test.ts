@@ -1,8 +1,7 @@
 /**
- * @fileoverview The test that matters for enforcement: violations survive a
- * restart. It opens a disk-backed store, raises a violation, opens a SECOND store
- * from the same file (a reopen, as pawd would after a restart) and finds it still
- * there, then resolves it and confirms a third open sees it gone. Covers both the
+ * @fileoverview Test violations survive restart. Open disk-backed store, raise
+ * violation, open second store from same file (reopen, like pawd after restart),
+ * find violation still there, resolve it, then third open see it gone. Cover
  * fresh-create and read-existing branches of `openSqlJsStore`.
  *
  * @module @paw/adapters/test/store/sql/openSqlJsStore

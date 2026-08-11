@@ -1,12 +1,11 @@
 /**
  * Daemon Service Tests
  *
- * @fileoverview The daemon's whole sequence against a fake runtime: what it
- * discovers, what it binds, what it serves for a selected plan, what it re-reads
- * on a poll, what it refuses, and what it tears down on close. No socket is
- * opened here and no file is touched — that is the point of taking the runtime
- * as a seam. The plan-selection tests are the heart of it: one daemon serves a
- * repository of plans, and the console picks between them per request.
+ * @fileoverview Daemon test full path against fake runtime: what discover, what
+ * bind, what serve for chosen plan, what re-read on poll, what refuse, what tear
+ * down on close. Tests open no socket and touch no file; the runtime interface
+ * supplies the I/O boundary. The daemon serves one plan repository, and the
+ * console chooses between plans per request.
  *
  * @module @paw/daemon/test/serve
  */
@@ -27,6 +26,7 @@ import {
   type LogEntry,
   type PawSnapshot,
   type RunProgress,
+  type RunSettings,
   type SwarmPlan,
 } from '@paw/core';
 import { describe, expect, it, vi } from 'vitest';
@@ -52,8 +52,8 @@ const TOKEN = 'test-token-value-0123456789abcdef';
 const ISSUED_AT = new Date('2026-08-05T15:40:02.000Z');
 
 /**
- * A stand-in for the machine's TLS identity. The daemon must present it and
- * never invent one, so the fake is recognisable on sight.
+ * Stand-in for machine TLS identity. Daemon presents this identity and
+ * generates no cert of its own. Literal values let tests assert the pass-through.
  */
 const IDENTITY: ServerIdentity = {
   cert: 'LEAF-CERT',
@@ -85,10 +85,10 @@ const HOST: HostInfo = {
 };
 
 /**
- * Build a plan whose briefs name it, so a snapshot proves which plan was loaded.
+ * Build plan whose briefs name it, so snapshot prove which plan load.
  *
- * @param {string} name - The plan's name.
- * @returns {SwarmPlan<{ files: string[] }>} The plan.
+ * @param {string} name - Plan name.
+ * @returns {SwarmPlan<{ files: string[] }>} Built plan.
  */
 const planNamed = (name: string): SwarmPlan<{ files: string[] }> => ({
   name,
@@ -132,16 +132,16 @@ const LISTING: FileEntry[] = [
 ];
 
 /**
- * What a fake run recorded, so a test can drive the daemon after it started.
+ * Fake run record, so test drive daemon after it start.
  *
  * @interface Rig
- * @property {DaemonRuntime} runtime - The fake runtime.
- * @property {() => Handler | null} handler - The bound handler.
- * @property {() => void} tick - Fire the scheduled source poll once.
- * @property {() => void} tickHost - Fire the host/liveness ticker once.
- * @property {{ closed: boolean; cancelled: boolean; tls: TlsMaterial | null }} state - Teardown flags and the certificate the daemon bound with.
- * @property {string[]} imported - Every module path the daemon imported, in order.
- * @property {string[]} warnings - Everything the daemon reported without dying of it.
+ * @property {DaemonRuntime} runtime - Fake runtime.
+ * @property {() => Handler | null} handler - Bound handler.
+ * @property {() => void} tick - Fire scheduled source poll once.
+ * @property {() => void} tickHost - Fire host/liveness ticker once.
+ * @property {{ closed: boolean; cancelled: boolean; tls: TlsMaterial | null }} state - Teardown flag plus cert daemon bind with.
+ * @property {string[]} imported - Every module path daemon import, in order.
+ * @property {string[]} warnings - Everything daemon report without die of it.
  */
 interface Rig {
   readonly runtime: DaemonRuntime;
@@ -156,17 +156,17 @@ interface Rig {
 }
 
 /**
- * The request handler the daemon binds.
+ * Request handler daemon bind.
  */
 type Handler = (request: HttpRequest) => Promise<HttpResponse>;
 
 /**
- * Issue a request the way a browser on the console's own origin would.
+ * Issue request like browser on console own origin would.
  *
- * @param {string} path - The request path.
- * @param {URLSearchParams} [query] - The query string.
- * @param {Partial<HttpRequest>} [over] - Overrides, e.g. a different method or headers.
- * @returns {HttpRequest} The request.
+ * @param {string} path - Request path.
+ * @param {URLSearchParams} [query] - Query string.
+ * @param {Partial<HttpRequest>} [over] - Overrides, e.g. different method or headers.
+ * @returns {HttpRequest} Built request.
  */
 const asConsole = (
   path: string,
@@ -181,11 +181,11 @@ const asConsole = (
 });
 
 /**
- * Build a fake runtime over a two-plan repository whose process table changes
+ * Build fake runtime over two-plan repository whose process table change
  * between polls.
  *
  * @param {Partial<DaemonRuntime>} [over] - Runtime overrides.
- * @returns {Rig} The rig.
+ * @returns {Rig} Built rig.
  */
 function makeRig(over: Partial<DaemonRuntime> = {}): Rig {
   const tables: HostProcess[][] = [
@@ -199,8 +199,8 @@ function makeRig(over: Partial<DaemonRuntime> = {}): Rig {
   let clockMs = 0;
   let handler: Handler | null = null;
   let hooks: SocketHooks | null = null;
-  // The daemon schedules the host ticker first and the source poll second, so
-  // the two are driven independently here rather than fired as one.
+  // Daemon schedule host ticker first, source poll second. Drive each
+  // independently.
   const scheduled: Array<() => void> = [];
   const state = { closed: false, cancelled: false, tls: null as TlsMaterial | null };
   const imported: string[] = [];
@@ -261,18 +261,18 @@ function makeRig(over: Partial<DaemonRuntime> = {}): Rig {
 }
 
 /**
- * Let every queued microtask settle, so a source the daemon fired off without
- * awaiting has finished before the assertions read what it published.
+ * Let every queued microtask run, so the daemon's sources complete their async
+ * work before assertions read what was published.
  *
- * @returns {Promise<void>} Resolves once the queue is drained.
+ * @returns {Promise<void>} Resolve once queue drain.
  */
 const settle = (): Promise<void> => new Promise((done) => setTimeout(done, 0));
 
 /**
- * Read a routed JSON body.
+ * Read routed JSON body.
  *
- * @param {HttpResponse | undefined} res - The response.
- * @returns {PawSnapshot} The parsed snapshot.
+ * @param {HttpResponse | undefined} res - Response.
+ * @returns {PawSnapshot} Parsed snapshot.
  */
 const parse = (res: HttpResponse | undefined): PawSnapshot =>
   JSON.parse(res?.body ?? '{}') as PawSnapshot;
@@ -330,8 +330,8 @@ describe('runDaemon', () => {
     const rig = makeRig();
     const daemon = await runDaemon({}, rig.runtime);
 
-    // A daemon that generated a certificate inline would serve a new one every
-    // boot, and the operator's trust decision would never stick.
+    // Daemon generates a fresh cert on each boot; the trust decision is not
+    // persisted.
     expect(rig.state.tls).toEqual({ cert: 'LEAF-CERT', key: 'LEAF-KEY' });
     expect(daemon.identity).toBe(IDENTITY);
     expect(daemon.url.startsWith('https://')).toBe(true);
@@ -343,8 +343,8 @@ describe('runDaemon', () => {
         throw new Error('refusing to serve: ca.key landed as mode 644');
       },
     });
-    // Falling back to plaintext here would be the one weasel that undoes the
-    // whole design, so the failure must reach the operator untouched.
+    // A plaintext fallback is not implemented; the identity failure is thrown
+    // to the caller and no server starts.
     await expect(runDaemon({}, rig.runtime)).rejects.toThrow('landed as mode 644');
   });
 
@@ -528,12 +528,40 @@ describe('runDaemon', () => {
         recorded.unshift(route);
         return [...recorded];
       },
+      remove: async (route: string): Promise<string[]> => {
+        recorded.splice(recorded.indexOf(route), 1);
+        return [...recorded];
+      },
     };
     const rig = makeRig();
     await runDaemon({ root: '/work/repo', recent }, rig.runtime);
     expect(recorded).toEqual(['/work/repo']);
     const res = await rig.handler()?.(asConsole('/api/recent'));
     expect(JSON.parse(res?.body ?? '[]')).toEqual(['/work/repo']);
+  });
+
+  it('forgets a recent route on DELETE and serves the shrunken list back', async () => {
+    const recorded: string[] = ['/work/stale', '/work/kept'];
+    const recent = {
+      list: async (): Promise<string[]> => [...recorded],
+      record: async (route: string): Promise<string[]> => {
+        recorded.unshift(route);
+        return [...recorded];
+      },
+      remove: async (route: string): Promise<string[]> => {
+        recorded.splice(recorded.indexOf(route), 1);
+        return [...recorded];
+      },
+    };
+    const rig = makeRig();
+    await runDaemon({ root: '/work/kept', recent }, rig.runtime);
+    const res = await rig
+      .handler()?.(
+        asConsole('/api/recent', new URLSearchParams('route=/work/stale'), { method: 'DELETE' }),
+      );
+    expect(res?.status).toBe(200);
+    expect(JSON.parse(res?.body ?? '[]')).not.toContain('/work/stale');
+    expect(recorded).not.toContain('/work/stale');
   });
 
   it('records each grabbed scope as the console switches consumers', async () => {
@@ -544,6 +572,7 @@ describe('runDaemon', () => {
         recorded.unshift(route);
         return [...recorded];
       },
+      remove: async (): Promise<string[]> => [...recorded],
     };
     const rig = makeRig();
     const daemon = await runDaemon({ root: '/work/a', recent }, rig.runtime);
@@ -557,6 +586,7 @@ describe('runDaemon', () => {
       record: async (): Promise<string[]> => {
         throw new Error('disk full');
       },
+      remove: async (): Promise<string[]> => [],
     };
     const rig = makeRig();
     const daemon = await runDaemon({ root: '/work/repo', recent }, rig.runtime);
@@ -590,8 +620,8 @@ describe('runDaemon', () => {
     rig.tickHost();
     rig.tickHost();
 
-    // Unchanged host facts still publish: a client that hears nothing must be
-    // able to conclude the daemon is gone rather than merely idle.
+    // Unchanged host facts still publish: client hear nothing conclude daemon
+    // gone, not merely idle.
     expect(heard).toEqual([HOST, HOST]);
   });
 
@@ -612,7 +642,7 @@ describe('runDaemon', () => {
     await settle();
     expect(heard).toHaveLength(1);
 
-    // A fresh array of identical rows is not news.
+    // A fresh array holding identical rows is not a change; nothing is published.
     current = [...current];
     rig.tick();
     await settle();
@@ -628,7 +658,7 @@ describe('runDaemon', () => {
     daemon.bus.subscribe('plans', (next) => plans.push(next));
     daemon.bus.subscribe('tree', (next) => trees.push(next));
 
-    // A new source file moves the tree and leaves the picker alone.
+    // A new source file changes the tree but not the plan list.
     listing = [...LISTING, { path: 'src/added.ts', isFile: true }];
     rig.tick();
     await settle();
@@ -663,8 +693,8 @@ describe('runDaemon', () => {
     await settle();
 
     expect(doctors).toHaveLength(1);
-    // The served snapshot reflects the edit rather than the config as it was at
-    // boot — a daemon that reports yesterday's doctor is worse than none.
+    // The served snapshot reflects the edited config, so the doctor reports the
+    // failure.
     expect((await daemon.snapshot()).doctor.ok).toBe(false);
   });
 
@@ -715,9 +745,9 @@ describe('runDaemon', () => {
     const details: string[] = [];
     daemon.bus.subscribe('planDetail', (slice) => details.push(slice.selectedPlan ?? '(none)'));
 
-    // A second console picks the other plan. Re-rendering only `openedOn` would
-    // leave it showing briefs that never update again — silently stale, which is
-    // worse than visibly broken, because nothing says so.
+    // A second console watches a different plan. If the daemon re-rendered only
+    // the initial `openedOn` plan, that console would keep stale briefs with no
+    // signal, so every watched plan is refreshed on change.
     const socket = rig.hooks()?.accept({
       send: () => undefined,
       close: () => undefined,
@@ -752,9 +782,9 @@ describe('runDaemon', () => {
     await settle();
     expect(details).toEqual(['plans/edit.swarm.mjs']);
 
-    // The console goes away. Nothing should be rendered for its plan again, and
-    // the per-plan map must not keep an entry for it on a daemon that runs for
-    // days while an operator clicks through every plan in the repository.
+    // After the socket closes the daemon forgets the plan, so the per-plan map
+    // does not accumulate an entry for every plan an operator opens over the
+    // daemon's lifetime.
     await socket?.closed();
     mtime = 2000;
     rig.tick();
@@ -787,10 +817,9 @@ describe('runDaemon', () => {
     await socket?.message(authFrame(TOKEN));
     await socket?.message(watchFrame('plans/edit.swarm.mjs'));
 
-    // The operator is mid-edit on the plan the daemon opened on. A second
-    // console is watching a different, perfectly healthy plan — and must keep
-    // receiving updates for it rather than being frozen by someone else's
-    // half-written file.
+    // One console is mid-edit on the plan the daemon opened. A second console
+    // watching a different plan must keep receiving its updates even while the
+    // first plan fails to parse.
     broken = true;
     mtime = 2000;
     rig.tick();
@@ -816,8 +845,8 @@ describe('runDaemon', () => {
     const details: unknown[] = [];
     daemon.bus.subscribe('planDetail', (slice) => details.push(slice));
 
-    // One unreadable directory must not freeze every console's plan updates for
-    // as long as it stays unreadable — the last good listing is still usable.
+    // A failed listing does not stop plan updates; the last good listing is
+    // reused while the directory stays unreadable.
     listingFails = true;
     mtime = 2000;
     rig.tick();
@@ -838,9 +867,9 @@ describe('runDaemon', () => {
     await settle();
     expect(details).toHaveLength(1);
 
-    // The operator deleted the plan the daemon opened on. Importing it anyway
-    // would throw on every poll for the life of the daemon, and the reader must
-    // judge against the listing this same tick produced rather than last tick's.
+    // A plan the daemon opened on is deleted. If it were imported regardless,
+    // every poll would throw for the daemon's lifetime. The reader filters
+    // against the listing produced this tick, not a previous tick.
     listing = LISTING.filter((entry) => !entry.path.includes('lore'));
     rig.tick();
     await settle();
@@ -875,8 +904,8 @@ describe('runDaemon', () => {
     await daemon.snapshot('plans/lore.swarm.mjs');
     await daemon.snapshot('plans/lore.swarm.mjs');
 
-    // The console polls; the plan does not change. Re-rendering every brief on
-    // every read is the cost this cache exists to remove.
+    // The plan file has not changed; cached briefs are not re-rendered on every
+    // read.
     expect(brief).not.toHaveBeenCalled();
   });
 
@@ -889,8 +918,8 @@ describe('runDaemon', () => {
     const daemon = await runDaemon({}, rig.runtime).catch(() => null);
     expect(daemon).toBeNull();
 
-    // The boot read fails loudly. A later poll failing must not: the daemon is
-    // already serving, and one bad read is not a reason to take it down.
+    // A source failure during boot aborts startup. A failure during a later poll
+    // is logged and the daemon keeps serving.
     let fail = false;
     const survivor = makeRig({
       listProcesses: async () => {
@@ -933,8 +962,8 @@ describe('runDaemon', () => {
       level: 'error',
       message: 'process source failed: ps-list exploded',
     });
-    // The terminal still gets it too — the operator watching the process should
-    // not have to open a browser to see that a source is failing.
+    // The same failure is also written to the terminal, in addition to the log
+    // frames published over the bus.
     expect(rig.warnings).toContain('process source failed: ps-list exploded');
   });
 
@@ -951,8 +980,8 @@ describe('runDaemon', () => {
 
     rig.tickHost();
 
-    // Publishing a listener failure onto the same bus is how one broken session
-    // becomes a loop: the log frame fans out, breaks again, and logs again.
+    // Publishing a listener failure back onto the same bus would loop on a
+    // broken listener: a log frame fans out, throws, and logs again.
     expect(logs).toBe(0);
     expect(rig.warnings.some((line) => line.includes('listener failed'))).toBe(true);
   });
@@ -1003,8 +1032,8 @@ describe('runDaemon', () => {
         protocols: [LIVE_SUBPROTOCOL],
       })?.status,
     ).toBe(403);
-    // The gate is judged against the port that was actually bound, not the 0 the
-    // daemon asked for — otherwise every upgrade fails on an ephemeral port.
+    // The origin gate checks the request against the port actually bound, not
+    // the ephemeral port 0 the daemon requested.
     expect(hooks?.check({ host: '127.0.0.1:0', origin: undefined, protocols: [] })?.status).toBe(
       400,
     );
@@ -1047,7 +1076,8 @@ describe('runDaemon', () => {
     });
     await socket?.message(authFrame(TOKEN));
 
-    // Go stale, then drain: the resync reloads the plan, which now fails.
+    // Build up the socket buffer, then drain it: the resync reloads the plan,
+    // which now fails to parse.
     buffered = 2_000_000;
     daemon.bus.publish('processes', []);
     broken = true;
@@ -1141,16 +1171,16 @@ describe('runDaemon', () => {
 
     const runs: RunProgress[] = [];
     daemon.bus.subscribe('run', (progress) => runs.push(progress));
-    // The dispatch loads the plan before it calls the dispatcher, so the
-    // progress sink is not wired until those awaits have settled.
+    // Dispatch load plan before it call dispatcher, so progress sink wire not
+    // until those awaits settle.
     await settle();
 
     report({ phase: 'started', member: 0, key: 'a.mdx', total: 1 });
     expect(runs).toHaveLength(1);
     expect(runs[0].running).toBe(1);
-    // The console shows a member working before it finishes. A four-hundred
-    // member run against a real provider is otherwise blank for minutes, which
-    // is indistinguishable from a console that has hung.
+    // The console shows a member as working before it finishes; without this, a
+    // large run against a real provider stays blank for minutes, looking like a
+    // hung console.
     expect((await daemon.snapshot('plans/lore.swarm.mjs')).run.running).toBe(1);
 
     report({
@@ -1166,11 +1196,50 @@ describe('runDaemon', () => {
     finish();
     await daemon.dispatched;
 
-    // The finished result is authoritative and must agree with what was shown.
+    // The finished dispatch result provides the final snapshot.
     const final = await daemon.snapshot('plans/lore.swarm.mjs');
     expect(final.run.done).toBe(1);
     expect(final.run.running).toBe(0);
     expect(final.budget.tokensIn).toBe(10);
+  });
+
+  it('releases from settings through the injected factory, publishing progress', async () => {
+    const seen: RunSettings[] = [];
+    const rig = makeRig();
+    const daemon = await runDaemon(
+      {
+        dispatcherFor: (settings) => {
+          seen.push(settings);
+          return async (_plan, onProgress) => {
+            await onProgress({ phase: 'started', member: 0, key: 'a.mdx', total: 1 });
+            return {
+              result: {
+                released: true,
+                findings: [],
+                outcomes: [{ member: 0, key: 'a.mdx', state: 'done', content: 'out' }],
+              },
+              usage: { spendUsd: 0, tokensIn: 5, tokensOut: 7 },
+            };
+          };
+        },
+      },
+      rig.runtime,
+    );
+    const runs: RunProgress[] = [];
+    daemon.bus.subscribe('run', (progress) => runs.push(progress));
+    await daemon.release({ plan: 'plans/lore.swarm.mjs', live: false, context: ['docs/*.mdx'] });
+    expect(seen).toEqual([{ plan: 'plans/lore.swarm.mjs', live: false, context: ['docs/*.mdx'] }]);
+    expect(runs.some((r) => r.running === 1)).toBe(true);
+    expect((await daemon.snapshot('plans/lore.swarm.mjs')).run.done).toBe(1);
+    expect((await daemon.snapshot()).budget.tokensOut).toBe(7);
+  });
+
+  it('refuses a settings release when no dispatcher factory was injected', async () => {
+    const rig = makeRig();
+    const daemon = await runDaemon({}, rig.runtime);
+    await expect(daemon.release({ plan: 'plans/lore.swarm.mjs', live: false })).rejects.toThrow(
+      /cannot build a release dispatcher/,
+    );
   });
 
   it('still reports a run correctly when the dispatcher says nothing as it goes', async () => {
@@ -1203,9 +1272,9 @@ describe('runDaemon', () => {
 
     await expect(runDaemon({ port: 8971 }, rig.runtime)).rejects.toThrow('EADDRINUSE');
 
-    // The sources start before the bind. A daemon that failed to start must not
-    // keep reading the process table every three seconds for the life of the
-    // process — which is what happens without a teardown on this path.
+    // Sources start before bind. When startup fails, the scheduled pollers are
+    // cancelled; otherwise they would keep reading the process table for the
+    // life of the process.
     expect(rig.state.cancelled).toBe(true);
   });
 
@@ -1221,8 +1290,8 @@ describe('runDaemon', () => {
       rig.runtime,
     );
 
-    // Nothing attached a handler until now — one socket bind after the promise
-    // was created. Unclaimed, Node would have exited on the rejection.
+    // Nothing attach handler until now — one socket bind after promise created.
+    // Unclaimed, Node exit on rejection.
     await expect(daemon.dispatched).rejects.toThrow('the herd bolted');
   });
 

@@ -1,11 +1,11 @@
 /**
- * @fileoverview End-to-end tests for the TUI. These spawn `main.ts` as a real
- * process against fixtures, pipe a keystroke sequence on stdin, and assert the
- * final rendered frame — proving the whole path: load config + plan → doctor +
- * herd → reduce over keys → render. This is the E2E tier from CONSTRAINTS.md
- * Constraint 1; it, not a unit test, covers the process shell, the loaders, and
- * the batch input path in `main.ts`. Fails loud is asserted: missing args and a
- * plan-less module both exit non-zero.
+ * @fileoverview E2E tests for TUI. Spawn `main.ts` as an actual process
+ * against fixtures, pipe keystroke sequence on stdin, assert final rendered
+ * frame. Exercises full pipeline: load config + plan → doctor + herd →
+ * reduce over keys → render. This is the E2E tier from CONSTRAINTS.md
+ * Constraint 1; covers process shell, loaders, and batch input path in
+ * `main.ts`. Asserts failure exits: missing args and plan-less module both
+ * exit non-zero.
  *
  * @module @paw/tui/test/e2e/tui
  */
@@ -24,10 +24,10 @@ const CONFIG = join(FIX, 'ready.config.json');
 const PLAN = join(FIX, 'demo.swarm.mjs');
 
 /**
- * Spawn the TUI with argv and piped keystrokes, resolving with the final frame.
+ * Spawn TUI with argv and piped keystrokes, resolve with final frame.
  *
- * @param keys - The keystrokes to pipe.
- * @param args - The argv (config and plan paths by default).
+ * @param keys - Keystrokes to pipe.
+ * @param args - argv (config and plan paths by default).
  */
 function runTui(
   keys: string,

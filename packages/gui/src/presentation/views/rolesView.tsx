@@ -1,11 +1,10 @@
 /**
  * Roles View
  *
- * @fileoverview The role bindings as the doctor reports them: what each declared
- * role is bound to, and whether that binding satisfies the role's requirements.
- * A required role that is unbound or bound to a model that cannot do the job is
- * blocking and shows as such; an optional role left unbound is merely optional,
- * and the two are never conflated.
+ * @fileoverview Render role bindings as doctor reports them: what each declared
+ * role binds to, and whether the binding meets the role's requirements. A
+ * required role that is unbound, or bound to a model lacking the role's
+ * capability, blocks the view. Optional role left unbound renders optional.
  *
  * @module @paw/gui/presentation/views/rolesView
  * @version 0.0.0
@@ -23,15 +22,15 @@ import { Crumb } from '../atoms/crumb.js';
 import { Select } from '../atoms/select.js';
 
 /**
- * The value the "(unbound)" option carries in the model select.
+ * Value the "(unbound)" option carry in model select.
  */
 const UNBOUND = '';
 
 /**
- * The verdict glyph for one role row.
+ * Verdict glyph for one role row.
  *
- * @param {RoleDoctorRow} row - The role row.
- * @returns {JSX.Element} The verdict.
+ * @param {RoleDoctorRow} row - Role row.
+ * @returns {JSX.Element} Verdict.
  */
 function Verdict({ row }: { readonly row: RoleDoctorRow }) {
   if (row.blocking) {
@@ -56,7 +55,7 @@ function Verdict({ row }: { readonly row: RoleDoctorRow }) {
 }
 
 /**
- * The Roles subsystem.
+ * Roles subsystem.
  *
  * @returns {JSX.Element} The view.
  */

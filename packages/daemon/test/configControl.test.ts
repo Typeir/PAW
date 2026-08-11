@@ -1,11 +1,9 @@
 /**
  * PAW Config Control Port Tests
  *
- * @fileoverview Each config verb against a fake document: a bind that writes and
- * returns the new roles, a declare that writes the new models, a clear that takes
- * its role from body or query, and every refusal — a non-string parameter, a
- * missing one, an engine rejection, and malformed capabilities. So
- * `configControl.ts` reaches 100%.
+ * @fileoverview Test each config verb against fake document. Bind write doc and
+ * return new roles. Declare write new models. Clear take role from body or query.
+ * Refusals cover non-string param, missing one, engine rejection, malformed caps.
  *
  * @module @paw/daemon/test/configControl
  * @version 0.0.0
@@ -28,7 +26,7 @@ const caps: ModelCapabilities = {
   costClass: 'standard',
 };
 
-/** An in-memory document port that records what it was told to write. */
+/** In-memory doc port. Record each write. */
 function fakeDoc(initial: ConfigDocument = {}): { port: ConfigDocumentPort; get: () => ConfigDocument } {
   let doc = initial;
   return {

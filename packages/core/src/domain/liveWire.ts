@@ -1,30 +1,23 @@
 /**
  * PAW Live Wire Protocol
  *
- * @fileoverview The `paw.live.v1` contract: what the daemon and the console
- * agree a frame is, what the close codes mean, and — the part that carries the
- * weight — how a received frame is parsed.
+ * @fileoverview The `paw.live.v1` contract: what daemon and console agree frame
+ * is, what close codes mean, and how received frame parse.
  *
- * This lives in `@paw/core` because it is the one thing both sides must agree
- * on exactly, and the GUI may only import from core. A copy on each side would
- * be a protocol that drifts, and a protocol that drifts on a security boundary
- * drifts in the direction of accepting more than it should.
+ * This live in `@paw/core` because both sides must agree exactly, and GUI only
+ * import from core. Two copied implementations on each side diverge; a wire
+ * protocol that drifts on a security boundary can accept more than intended.
  *
- * The parsers are **allow-lists, not validators**. `parseClientMessage` builds a
- * new object out of the two or three fields it recognises and returns null for
- * everything else; it never returns the caller's parsed JSON. That is deliberate:
- * a validator that checks some fields and passes the object through carries
- * whatever else was in it — prototype keys, extra properties a later refactor
- * starts trusting — into the daemon. Nothing crosses this boundary that was not
- * named here.
+ * Parsers are **allow-lists**. `parseClientMessage` build new
+ * object out of two or three field it recognise and return null for everything
+ * else; it never return caller's parsed JSON. A validator that checks some
+ * field and passes the object through would carry whatever else is in it —
+ * prototype keys, extra properties later refactor start trusting — into daemon.
+ * Nothing crosses this boundary that is not named here.
  *
- * The wire form is **atomic**: one-character keys and two-character topic codes.
- * The host slice ticks once a second per open console, so the envelope's own
- * overhead is paid several thousand times an hour for as long as a console is
- * open; `{"v":1,"t":"ho","a":1786060800000,...}` costs 28 bytes of framing where
- * the spelled-out form costs 63. This file is the **only** place the compact
- * form exists — everything above it reads `topic: 'host'`, because a codebase
- * that speaks in two-letter codes is a codebase nobody can grep.
+ * Wire form be **atomic**: one-character key and two-character topic code.
+ * Host slice tick once a second per open console, so envelope's own overhead
+ * paid several thousand time an hour while console open; `{"v":1,"t":"ho","a":1786060800000,...}` cost 28 byte of framing where spelled-out form cost 63. This file be **only** place compact form exist — everything above read `topic: 'host'`; two-letter codes cannot be grepped.
  *
  * @module @paw/core/domain/liveWire
  * @version 0.0.0
@@ -36,21 +29,19 @@ import type { ClientMessage, LiveEnvelope, LiveTopic, LiveTopicMap, RunSettings 
 import type { InitMode } from './initConfig.js';
 
 /**
- * The WebSocket subprotocol the daemon requires. A client that does not offer it
- * is refused before the upgrade: it is either a different version or something
- * that found the port and started talking, and neither should reach the socket.
+ * WebSocket subprotocol daemon require. Client no offer it get refused before
+ * upgrade: either different version or an unauthenticated peer, and neither should reach socket.
  */
 export const LIVE_SUBPROTOCOL = 'paw.live.v1';
 
 /**
- * The protocol version carried in every frame.
+ * Protocol version carried in every frame.
  */
 export const LIVE_VERSION = 1;
 
 /**
- * Every topic and the two characters it travels as. One table, read in both
- * directions, so a topic cannot be added to the wire without being added here
- * and cannot be encoded as one thing and decoded as another.
+ * Every topic and the two character it travel as. One table, read in both
+ * direction, so topic cannot be added to wire without added here and cannot be encoded one thing and decoded another.
  */
 export const TOPIC_CODES: Readonly<Record<LiveTopic, string>> = {
   hello: 'he',
@@ -68,78 +59,75 @@ export const TOPIC_CODES: Readonly<Record<LiveTopic, string>> = {
 };
 
 /**
- * Every topic, as a value — the guard needs a list, not just a type.
+ * Every topic, as value — guard need list, not just type.
  */
 export const LIVE_TOPICS: readonly LiveTopic[] = Object.keys(TOPIC_CODES) as LiveTopic[];
 
 /**
- * The reverse of {@link TOPIC_CODES}, built from it rather than written twice.
+ * Reverse of {@link TOPIC_CODES}, derived from the same table.
  */
 const TOPIC_BY_CODE = new Map<string, LiveTopic>(
   LIVE_TOPICS.map((topic) => [TOPIC_CODES[topic], topic]),
 );
 
 /**
- * The wire code for an `auth` message.
+ * Wire code for `auth` message.
  */
 export const AUTH_CODE = 'a';
 
 /**
- * The wire code for a `watch` message.
+ * Wire code for `watch` message.
  */
 export const WATCH_CODE = 'w';
 
 /**
- * The message code an attach request travels as.
+ * Message code attach request travel as.
  */
 export const ATTACH_CODE = 't';
 
 /**
- * The message code a scope request travels as. Scoping is a read — see
- * {@link withinRoot} for the ceiling it is held to.
+ * Message code scope request travel as. Scoping be read — see
+ * {@link withinRoot} for ceiling it held to.
  */
 export const SCOPE_CODE = 'r';
 
 /**
- * The message code a release request travels as. Like {@link ATTACH_CODE}, it
- * only asks: the operator approves it in the terminal before a live herd runs.
+ * Message code release request travel as. Like {@link ATTACH_CODE}, it
+ * only ask: operator approve it in terminal before live herd run.
  */
 export const RELEASE_CODE = 'x';
 
 /**
- * The init modes an attach request may name. Listed here so the wire refuses a
- * mode the domain does not have, rather than passing an unknown string inward
- * for something further in to reject — or not.
+ * Init modes attach request may name. Listed here so the wire refuses a
+ * mode the domain does not have and never passes an unknown string inward.
  */
 const ATTACH_MODES: readonly InitMode[] = ['create', 'merge', 'override'];
 
 /**
- * Whether a value is one of the init modes.
+ * Whether value be one of init modes.
  *
  * @param {unknown} value - The candidate.
- * @returns {boolean} True when it names a mode.
+ * @returns {boolean} True when it name a mode.
  */
 function isInitMode(value: unknown): value is InitMode {
   return ATTACH_MODES.some((mode) => mode === value);
 }
 
 /**
- * Whether a value is an optional count — omitted, or a whole number of one or
- * more. Used for the release settings a console cannot be trusted to have
- * validated.
+ * Whether value be optional count — omitted, or whole number of one or
+ * more. Used for release settings console cannot be trusted to have validated.
  *
  * @param {unknown} value - The candidate.
- * @returns {boolean} True when absent or a valid count.
+ * @returns {boolean} True when absent or valid count.
  */
 function isOptionalCount(value: unknown): value is number | undefined {
   return value === undefined || (typeof value === 'number' && Number.isInteger(value) && value >= 1);
 }
 
 /**
- * Rebuild {@link RunSettings} from a wire value, field by field, or null when any
- * field is missing or malformed. An allow-list like the rest of this module: a
- * frame naming an unknown-shaped setting is refused whole rather than passed
- * inward half-trusted.
+ * Rebuild {@link RunSettings} from wire value, field by field, or null when any
+ * field missing or malformed. Like the rest of the module it is an allow-list:
+ * a frame naming an unknown-shaped setting is refused whole.
  *
  * @param {unknown} value - The candidate settings object.
  * @returns {RunSettings | null} The settings, or null.
@@ -171,140 +159,138 @@ function parseRunSettings(value: unknown): RunSettings | null {
 }
 
 /**
- * Close codes. The 4000–4999 range is reserved for applications, so these are
- * ours to define; `1001` and `1013` are the standard ones and keep their
- * standard meanings.
+ * Close codes. 4000–4999 range reserved for application, so these ours to
+ * define; `1001` and `1013` standard and keep standard meanings.
  *
- * They are distinct on purpose. A console that is told `4401` knows the token is
- * wrong and must stop retrying; one told `4429` knows to back off and try later.
- * Collapsing them into a generic failure is what produces a client that
- * reconnects forever against a daemon that will never accept it.
+ * The codes are distinct. A console told `4401` knows the token is wrong
+ * and must stop retrying; one told `4429` knows to back off and try later.
+ * Collapsing them into a generic failure produces a client that reconnects
+ * forever against a daemon that never accepts it.
  */
 export const CLOSE_MALFORMED = 4400;
 
 /**
- * Authentication failed, or no `auth` frame arrived in time.
+ * Authentication fail, or no `auth` frame arrive in time.
  */
 export const CLOSE_AUTH = 4401;
 
 /**
- * The `Origin` is not allowed to talk to this daemon.
+ * The `Origin` not allowed to talk to this daemon.
  */
 export const CLOSE_ORIGIN = 4403;
 
 /**
- * Too many sessions, or too many attempts.
+ * Too many session, or too many attempt.
  */
 export const CLOSE_CAPACITY = 4429;
 
 /**
- * The client stopped reading and its buffer grew past what the daemon will hold.
+ * Client stop reading and buffer grow past what daemon hold.
  */
 export const CLOSE_BACKPRESSURE = 1013;
 
 /**
- * The daemon is going away.
+ * Daemon go away.
  */
 export const CLOSE_SHUTDOWN = 1001;
 
 /**
- * The largest frame the daemon will accept from a client. An `auth` frame is a
- * token and a `watch` frame is a path; nothing legitimate approaches this, so
- * the limit costs nothing and removes memory exhaustion as an option.
+ * Largest frame daemon accept from client. `auth` frame be token and `watch`
+ * frame be path; nothing legitimate approach this, so limit cost nothing and
+ * remove memory exhaustion as option.
  */
 export const MAX_FRAME_BYTES = 4096;
 
 /**
- * How long a freshly upgraded socket has to present its credential before it is
- * closed. No byte of data is sent before it does.
+ * How long freshly upgraded socket have to present credential before close.
+ * No byte of data send before it do.
  */
 export const AUTH_TIMEOUT_MS = 2000;
 
 /**
- * How often the daemon pings a live session.
+ * How often daemon ping live session.
  */
 export const PING_MS = 15_000;
 
 /**
- * How long the daemon waits for a pong before dropping the session.
+ * How long daemon wait for pong before drop session.
  */
 export const PONG_TIMEOUT_MS = 10_000;
 
 /**
- * How long a client should tolerate hearing nothing at all before it assumes the
- * wire is dead. The host topic ticks every second, so this is five missed ticks.
+ * How long client tolerate hearing nothing before assume wire dead. Host
+ * topic tick every second, so this be five missed tick.
  */
 export const CLIENT_SILENCE_MS = 5000;
 
 /**
- * How many authenticated sessions the daemon will hold at once.
+ * How many authenticated session daemon hold at once.
  */
 export const MAX_SESSIONS = 16;
 
 /**
- * How many sockets may sit un-authenticated at once. Lower than the session
- * limit because an unauthenticated socket costs the daemon a timer and a buffer
- * and has proved nothing.
+ * How many socket may sit un-authenticated at once. Lower than session
+ * limit because unauthenticated socket cost daemon timer and buffer and prove
+ * nothing.
  */
 export const MAX_PREAUTH_SESSIONS = 4;
 
 /**
- * How many messages one session may send per {@link MESSAGE_WINDOW_MS}.
+ * How many message one session send per {@link MESSAGE_WINDOW_MS}.
  */
 export const MAX_MESSAGES_PER_WINDOW = 30;
 
 /**
- * The rate-limit window.
+ * Rate-limit window.
  */
 export const MESSAGE_WINDOW_MS = 10_000;
 
 /**
- * How many refused credentials the daemon lets pass before it says so on the
- * operator's terminal.
+ * How many refused credential daemon let pass before log them on operator's
+ * terminal.
  *
- * This is a **reporting** threshold, not a lockout. On loopback the daemon
- * cannot attribute a socket to a peer, so refusing service after N failures
- * would let any local process lock the operator out of their own console — a
- * denial of service strictly worse than the guessing it would prevent, against
- * a 256-bit credential behind a four-socket pre-auth cap.
+ * This is a **reporting** threshold; it never locks out. On loopback daemon
+ * cannot attribute socket to peer, so refusing service after N failures would
+ * let any local process lock the operator out — a denial of service worse than
+ * the guessed credential it would prevent, against a 256-bit credential behind
+ * a four-socket pre-auth cap.
  */
 export const MAX_AUTH_FAILURES = 10;
 
 /**
- * Buffered bytes at which the daemon stops sending a session events and marks it
- * stale, rather than queueing more for a client that is not reading.
+ * Buffered bytes at which daemon stop sending session event and mark it
+ * stale. No more frames queue for a client that does not read.
  */
 export const BACKPRESSURE_SKIP_BYTES = 1_048_576;
 
 /**
- * Buffered bytes at which a stale session is closed outright.
+ * Buffered bytes at which stale session close outright.
  */
 export const BACKPRESSURE_CLOSE_BYTES = 5_242_880;
 
 /**
- * Buffered bytes below which a stale session is considered drained and is sent a
+ * Buffered bytes below which stale session considered drained and send
  * fresh `hello` to resynchronise.
  */
 export const BACKPRESSURE_RESUME_BYTES = 65_536;
 
 /**
- * How long a session may stay stale before it is closed even if its buffer never
- * grows further.
+ * How long session stay stale before close even if buffer never grow further.
  */
 export const BACKPRESSURE_STALE_MS = 30_000;
 
 /**
- * Whether a value names a topic.
+ * Whether value name a topic.
  *
  * @param {unknown} value - The candidate.
- * @returns {value is LiveTopic} True when it is a known topic.
+ * @returns {value is LiveTopic} True when it be known topic.
  */
 export function isLiveTopic(value: unknown): value is LiveTopic {
   return typeof value === 'string' && (LIVE_TOPICS as readonly string[]).includes(value);
 }
 
 /**
- * The topic a wire code names, or null when it names none.
+ * Topic wire code name, or null when name none.
  *
  * @param {unknown} code - The frame's `t` field.
  * @returns {LiveTopic | null} The topic, or null.
@@ -314,11 +300,11 @@ export function topicOfCode(code: unknown): LiveTopic | null {
 }
 
 /**
- * Parse text into a plain JSON object, or null when it is anything else.
+ * Parse text into plain JSON object, or null when anything else.
  *
- * Arrays and primitives are refused, and so is `null`. Reading a field off a
- * non-object would be `undefined` rather than an error, which is how a parser
- * ends up accepting `"[]"` as a message.
+ * Array and primitive refused, and so be `null`. Reading a field off a
+ * non-object gives `undefined` with no error; that path lets the parser
+ * accept `"[]"` as a message.
  *
  * @param {string} raw - The frame's text.
  * @returns {Record<string, unknown> | null} The object, or null.
@@ -337,12 +323,11 @@ function parseObject(raw: string): Record<string, unknown> | null {
 }
 
 /**
- * Parse a client frame into one of the two messages the daemon accepts.
+ * Parse client frame into one of two message daemon accept.
  *
- * Returns null for everything else — wrong version, unknown type, a token that
- * is not a string, a plan that is neither a string nor null, a frame over the
- * size limit. The caller closes with {@link CLOSE_MALFORMED}; there is no
- * negotiation and no partial acceptance.
+ * Return null for everything else — wrong version, unknown type, token that
+ * no string, plan that neither string nor null, frame over size limit. Caller
+ * close with {@link CLOSE_MALFORMED}; no negotiation and no partial acceptance.
  *
  * @param {string} raw - The frame's text.
  * @returns {ClientMessage | null} The message, rebuilt field by field, or null.
@@ -392,11 +377,11 @@ export function parseClientMessage(raw: string): ClientMessage | null {
 }
 
 /**
- * Serialise a server frame, in the compact wire form.
+ * Serialise server frame, in compact wire form.
  *
- * @param {LiveTopic} topic - Which slice this is.
+ * @param {LiveTopic} topic - Which slice this be.
  * @param {unknown} data - Its new value.
- * @param {number} at - When it was sent, epoch milliseconds.
+ * @param {number} at - When sent, epoch milliseconds.
  * @returns {string} The frame's text.
  */
 export function encodeEnvelope<T extends LiveTopic>(
@@ -408,12 +393,12 @@ export function encodeEnvelope<T extends LiveTopic>(
 }
 
 /**
- * Parse a server frame, for the console side.
+ * Parse server frame, for console side.
  *
- * The payload is not inspected beyond being present: the topic determines its
- * shape, and the console applies it through the same validation its HTTP
- * hydration uses. What this guarantees is that the code names a topic the
- * console knows, so a reducer never dispatches on something it has no arm for.
+ * Payload not inspected beyond being present: topic determine its shape, and
+ * console apply it through same validation its HTTP hydration use. This
+ * guarantee code name topic console know, so reducer never dispatch on
+ * something it have no arm for.
  *
  * @param {string} raw - The frame's text.
  * @returns {LiveEnvelope | null} The envelope, decoded and rebuilt, or null.
@@ -436,9 +421,9 @@ export function parseEnvelope(raw: string): LiveEnvelope | null {
 }
 
 /**
- * The `auth` frame a client sends first.
+ * The `auth` frame client send first.
  *
- * @param {string} token - The credential from the URL fragment.
+ * @param {string} token - The credential from URL fragment.
  * @returns {string} The frame's text.
  */
 export function authFrame(token: string): string {
@@ -446,7 +431,7 @@ export function authFrame(token: string): string {
 }
 
 /**
- * The `watch` frame a client sends when the operator picks a plan.
+ * The `watch` frame client send when operator pick plan.
  *
  * @param {string | null} plan - The plan to watch, or null for none.
  * @returns {string} The frame's text.
@@ -456,11 +441,11 @@ export function watchFrame(plan: string | null): string {
 }
 
 /**
- * The `attach` frame a console sends to ask that PAW be attached to a
- * repository. Asking is all it does — see {@link ClientMessage}.
+ * The `attach` frame console send to ask that PAW be attached to
+ * repository. Asking be all it do — see {@link ClientMessage}.
  *
- * @param {string} path - Absolute path to the repository root.
- * @param {InitMode} mode - How to resolve an existing config.
+ * @param {string} path - Absolute path to repository root.
+ * @param {InitMode} mode - How to resolve existing config.
  * @returns {string} The frame's text.
  */
 export function encodeAttach(path: string, mode: InitMode): string {
@@ -468,11 +453,11 @@ export function encodeAttach(path: string, mode: InitMode): string {
 }
 
 /**
- * The `scope` frame a console sends to point an unscoped daemon at a
- * repository. A read, like {@link watchFrame} — nothing is written and no
- * approval is sought.
+ * The `scope` frame console send to point unscoped daemon at
+ * repository. A read, like {@link watchFrame} — nothing written and no
+ * approval sought.
  *
- * @param {string} path - Absolute path to the repository root.
+ * @param {string} path - Absolute path to repository root.
  * @returns {string} The frame's text.
  */
 export function encodeScope(path: string): string {
@@ -480,9 +465,9 @@ export function encodeScope(path: string): string {
 }
 
 /**
- * The `release` frame a console, TUI, or `paw ui` sends to ask the daemon to run
- * a plan's herd. Asking is all it does — the operator approves it in the terminal
- * before a live run spends anything. See {@link ClientMessage}.
+ * The `release` frame console, TUI, or `paw ui` send to ask daemon run
+ * plan's herd. Asking be all it do — operator approve it in terminal before
+ * live run spend anything. See {@link ClientMessage}.
  *
  * @param {RunSettings} settings - What to run and how.
  * @returns {string} The frame's text.

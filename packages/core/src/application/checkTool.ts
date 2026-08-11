@@ -1,12 +1,10 @@
 /**
  * PAW Check-Tool Use-Case
  *
- * @fileoverview Composes the {@link StorePort} with the pure enforcement
- * decision: query the unresolved violations for a session, hand them to
- * `decidePreToolUse`, and return the verdict. The application layer holds only
- * sequencing — the rule lives in the domain, the I/O behind the port. This is
- * what a hook client (or the daemon) calls; it is tested with a fake store, so
- * no database is touched.
+ * @fileoverview Join {@link StorePort} with pure enforcement decision. Fetch
+ * unresolved violations for session, hand to `decidePreToolUse`, return verdict.
+ * Hold only sequencing. Rule live in domain, I/O behind port. Hook client or
+ * daemon call it.
  *
  * @module @paw/core/application/checkTool
  * @version 0.0.0
@@ -22,16 +20,16 @@ import {
 import type { StorePort } from '../ports/index.js';
 
 /**
- * A request to check whether a tool may run — everything the decision needs
- * except the violations, which the use-case fetches.
+ * A request to check whether tool run — all decision need except violations.
+ * Use-case fetch violations itself.
  *
  * @interface CheckToolRequest
- * @property {string | null} sessionId - The session whose violations apply.
- * @property {string} toolName - The tool about to run.
- * @property {readonly string[]} targetPaths - Project-relative paths the tool would touch.
- * @property {string | null} envMatch - A detected secret/`.env` path, or null when clean.
+ * @property {string | null} sessionId - Session whose violations apply.
+ * @property {string} toolName - Tool about to run.
+ * @property {readonly string[]} targetPaths - Project-relative paths tool would touch.
+ * @property {string | null} envMatch - Detect secret/`.env` path, or null when clean.
  * @property {ReadonlySet<string>} exemptTools - Read-only tools never blocked by violations.
- * @property {ReadonlySet<string>} ignoredPaths - The subset of targetPaths that `.pawignore` covers.
+ * @property {ReadonlySet<string>} ignoredPaths - Subset of targetPaths that `.pawignore` cover.
  */
 export interface CheckToolRequest {
   readonly sessionId: string | null;
@@ -43,11 +41,11 @@ export interface CheckToolRequest {
 }
 
 /**
- * Decide whether a tool may run, fetching the session's violations first.
+ * Decide whether tool run. Fetch session violations first.
  *
- * @param {StorePort} store - The store to query for unresolved violations.
- * @param {CheckToolRequest} req - The request.
- * @returns {Promise<Decision>} The allow/deny decision.
+ * @param {StorePort} store - Store to query for unresolved violations.
+ * @param {CheckToolRequest} req - Request.
+ * @returns {Promise<Decision>} Allow/deny decision.
  */
 export async function checkTool(
   store: StorePort,

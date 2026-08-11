@@ -1,17 +1,15 @@
 /**
- * PAW Daemon Client
+ * PAW daemon client.
  *
- * @fileoverview One JSON-RPC round trip to the resident daemon, and the fail-open
- * rule that makes hooks safe (doc 10 §7): read the handshake token, connect,
- * `connect` then the method, resolve the result. ANY failure — no token, no
- * socket, a reset, a timeout, a malformed frame, an error frame — resolves to
- * null, and the caller writes the host's do-nothing output instead. No hook can
- * be bricked by a daemon problem, which is the whole reason enforcement is
- * allowed to move off the cold path.
+ * @fileoverview One JSON-RPC round trip to resident daemon, plus fail-open rule
+ * that make hook safe (doc 10 §7): read handshake token, connect, `connect` then
+ * method, resolve result. ANY failure — no token, no socket, reset, timeout,
+ * malformed frame, error frame — resolve null, caller write host do-nothing
+ * output instead. No daemon failure can break the hook.
  *
- * Lives in the daemon package beside the endpoint addressing and the RPC wire so
- * every driving adapter — cli, tui — shares one client. `connect` and `readToken`
- * are injected so every branch tests without a pipe.
+ * Live in daemon package beside endpoint addressing and RPC wire so every driving
+ * adapter — cli, tui — share one client. `connect` and `readToken` inject so every
+ * branch test without pipe.
  *
  * @module @paw/daemon/rpcClient
  * @version 0.0.0
@@ -30,21 +28,21 @@ import {
 } from '@paw/core';
 
 /**
- * Give-up deadline for a daemon round trip. A `tool.post` runs the project's real
- * gates inside pawd — a first run compiles the gate modules and one may shell out
- * to `tsc`, so 2s failed open on real repos while the block was still computing.
- * Sized to sit under the tightest host hook budget (pre-tool, ~10s) so the client
- * still fails open before the host kills the hook, never after.
+ * Give-up deadline for daemon round trip. A `tool.post` run project's real gates
+ * inside pawd — first run compile gate modules and one shell out to `tsc`, so 2s
+ * failed open on real repo while block still compute. Sized to sit under tightest
+ * host hook budget (pre-tool, ~10s) so client still fail open before host kill
+ * hook, never after.
  */
 const DEFAULT_TIMEOUT_MS = 8000;
 
 /**
- * Injectable seams for testing.
+ * Injectable seam for testing.
  *
  * @interface RpcCallDeps
- * @property {(path: string) => Socket} [connect] - Open the socket; defaults to `node:net`.
- * @property {(path: string) => string} [readToken] - Read the handshake token; defaults to reading the file.
- * @property {number} [timeoutMs] - Give-up deadline; defaults to 8s.
+ * @property {(path: string) => Socket} [connect] - Open socket; default `node:net`.
+ * @property {(path: string) => string} [readToken] - Read handshake token; default read file.
+ * @property {number} [timeoutMs] - Give-up deadline; default 8s.
  */
 export interface RpcCallDeps {
   connect?: (path: string) => Socket;
@@ -53,14 +51,14 @@ export interface RpcCallDeps {
 }
 
 /**
- * Call one method on the daemon and resolve its result, or null on any failure.
+ * Call one method on daemon, resolve result, or null on any failure.
  *
- * @param {string} socketPath - The daemon endpoint.
- * @param {string} tokenPath - The handshake token file.
- * @param {string} method - The method to call after the handshake.
- * @param {unknown} params - The method parameters.
- * @param {RpcCallDeps} [deps] - Injectable seams.
- * @returns {Promise<unknown | null>} The result, or null when anything went wrong.
+ * @param {string} socketPath - Daemon endpoint.
+ * @param {string} tokenPath - Handshake token file.
+ * @param {string} method - Method to call after handshake.
+ * @param {unknown} params - Method parameters.
+ * @param {RpcCallDeps} [deps] - Injectable seam.
+ * @returns {Promise<unknown | null>} Result, or null when anything go wrong.
  */
 export function rpcCall(
   socketPath: string,

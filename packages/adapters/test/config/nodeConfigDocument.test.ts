@@ -1,11 +1,10 @@
 /**
  * PAW Node Config Document Adapter Tests
  *
- * @fileoverview A round trip through a real `.paw/config.json` in a temp repo:
- * an absent config reads empty, a write creates the directory and round-trips,
- * and a malformed config fails loud rather than reading as empty. A getter root
- * is resolved per write, so a moved scope writes to whichever repo it currently
- * names. So `nodeConfigDocument.ts` reaches 100%.
+ * @fileoverview Round-trip real `.paw/config.json` in temp repo. Absent
+ * config read empty; write make directory and round-trip; malformed
+ * config fail loud. Resolve getter root per write; moved scope write to
+ * whichever repo it currently name. Cover `nodeConfigDocument.ts` to 100%.
  *
  * @module @paw/adapters/test/config/nodeConfigDocument
  * @version 0.0.0

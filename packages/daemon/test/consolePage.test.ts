@@ -1,10 +1,7 @@
 /**
  * PAW Console Page Resolution Tests
  *
- * @fileoverview Pins the two layouts PAW actually ships in. The console is one
- * self-contained page that sits beside the bundle in a built artifact and under
- * `packages/gui/dist` in a source checkout, and the resolver has to be right in
- * both without anything being passed on the command line.
+ * @fileoverview Tests the two layouts PAW ships: console self-contained page sits beside the bundle in a built artifact, and under `packages/gui/dist` in a source checkout. The resolver finds both; nothing is passed on the command line.
  *
  * @module @paw/daemon/test/consolePage
  * @version 0.0.0
@@ -16,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { CONSOLE_PAGE_FILE, consolePage, resolveConsolePage } from '../src/domain/consolePage.js';
 
 /**
- * Normalise a path for comparison regardless of platform separator.
+ * Normalise path for comparison, no matter platform separator.
  *
  * @param {string} p - The path.
  * @returns {string} The path with forward slashes.

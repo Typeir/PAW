@@ -1,15 +1,10 @@
 /**
  * PAW Node File Reader Adapter
  *
- * @fileoverview The {@link FileReaderPort} implementation over `node:fs`, and the
- * only place a swarm's attached context is actually read off disk. It is rooted:
- * every path resolves against a root directory and a path that escapes that root
- * is refused, so a selection that arrived from a browser — or a plan computing
- * paths from data — cannot reach into the rest of the machine. Environment files
- * are refused outright; secrets belong behind the keyring port, never in a
- * prompt. Fails loud per CONSTRAINTS.md Constraint 3: an unreadable path rejects
- * rather than resolving to an empty string a model would silently be told is the
- * file's content.
+ * @fileoverview {@link FileReaderPort} over `node:fs`. Reads swarm's attached
+ * context off disk. Each path resolves against the root directory; a path
+ * resolving outside the root is rejected. A path whose basename starts with
+ * `.env` is rejected. Unreadable path rejects per CONSTRAINTS.md Constraint 3.
  *
  * @module @paw/adapters/file/nodeFileReader
  * @version 0.0.0
@@ -22,20 +17,20 @@ import { basename, isAbsolute, relative, resolve } from 'node:path';
 import type { FileReaderPort } from '@paw/core';
 
 /**
- * Whether a filename is an environment file, which is never attachable.
+ * Whether a filename is an env file.
  *
  * @param {string} path - The path being read.
- * @returns {boolean} True when the basename looks like a `.env` file.
+ * @returns {boolean} True when basename starts with `.env`.
  */
 function isEnvFile(path: string): boolean {
   return basename(path).startsWith('.env');
 }
 
 /**
- * Resolve a requested path inside the root, refusing anything that escapes it.
+ * Resolve the requested path inside the root directory; reject any path that resolves outside it.
  *
  * @param {string} root - The absolute root directory.
- * @param {string} path - The requested path, relative to the root or absolute.
+ * @param {string} path - The requested path, relative to root or absolute.
  * @returns {string} The absolute path to read.
  */
 export function resolveInRoot(root: string, path: string): string {
@@ -48,10 +43,10 @@ export function resolveInRoot(root: string, path: string): string {
 }
 
 /**
- * Create the Node file reader.
+ * Create Node file reader.
  *
- * @param {string} [root] - The directory reads are confined to; defaults to the working directory.
- * @returns {FileReaderPort} A file reader rooted at `root`.
+ * @param {string} [root] - Root directory reads are limited to; defaults to working directory.
+ * @returns {FileReaderPort} File reader rooted at `root`.
  */
 export function createNodeFileReader(root: string = process.cwd()): FileReaderPort {
   const base = resolve(root);

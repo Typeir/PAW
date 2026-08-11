@@ -1,16 +1,7 @@
 /**
- * PAW Copilot-SDK Model Adapter
+ * PAW Copilot-SDK model adapter.
  *
- * @fileoverview The {@link ModelPort} implementation for our main herder
- * provider, the GitHub Copilot SDK — deliberately behind a one-function seam.
- * The SDK-specific work (spawning the runtime, creating a BYOK session, sending
- * a prompt, reading usage) is a {@link SessionRun} the caller injects; this
- * module only maps a {@link ModelRequest} to that call and its result back to a
- * {@link ModelResponse}. So the SDK lives in exactly one thin wiring function,
- * not smeared through the codebase: changing herder provider — or dropping the
- * SDK for a direct OpenAI-compatible client — is a different `SessionRun`, one
- * file, with `@paw/core` and every consumer untouched. Decoupled now, while the
- * surface is small, per the design intent, not at fifty times the size.
+ * @fileoverview {@link ModelPort} for PAW's GitHub Copilot SDK provider. The SDK work — spawn runtime, make BYOK session, send prompt, read usage — all run in the {@link SessionRun} the caller injects. This module maps a {@link ModelRequest} to that call and returns the result as {@link ModelResponse}. Replacing the provider needs a new `SessionRun` in this one file; `@paw/core` and its consumers are unchanged.
  *
  * @module @paw/adapters/model/copilotSdk
  * @version 0.0.0
@@ -21,10 +12,10 @@
 import type { ModelPort, ModelRequest, ModelResponse } from '@paw/core';
 
 /**
- * The provider boundary: run one completion and return its content and token
- * usage. The real implementation wraps `@github/copilot-sdk` (create a BYOK
- * session, `sendAndWait`, read `session.shutdown` usage); a fake implements it
- * for tests. Nothing else in PAW knows the SDK exists.
+ * Runs one completion and returns its content and token usage. Production
+ * impl wraps `@github/copilot-sdk` (make a BYOK session, `sendAndWait`, read
+ * `session.shutdown` usage); a fake impl does the same for tests. No other
+ * PAW code references the SDK.
  *
  * @callback SessionRun
  * @param {ModelRequest} request - The completion to run.
@@ -35,10 +26,10 @@ export type SessionRun = (
 ) => Promise<{ content: string; inputTokens: number; outputTokens: number }>;
 
 /**
- * Create a Copilot-SDK-backed model port from an injected session runner.
+ * Build Copilot-SDK-backed model port from injected session runner.
  *
- * @param {SessionRun} run - The provider boundary that actually runs completions.
- * @returns {ModelPort} A model port that maps requests and responses.
+ * @param {SessionRun} run - Runs completions for the model provider.
+ * @returns {ModelPort} Model port that maps requests to responses.
  */
 export function createCopilotSdkModel(run: SessionRun): ModelPort {
   return {

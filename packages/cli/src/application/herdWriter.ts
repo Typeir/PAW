@@ -1,18 +1,10 @@
 /**
  * PAW Herd Writer
  *
- * @fileoverview Persists what a herd produces, to the paths its plan declared.
- *
- * A plan says where its members write through `expectFiles` and writes nothing
- * itself — a plan that touched the disk could not be dry-run, doctored, or
- * previewed. So the declaration is the plan's and the writing is a consumer's,
- * and this is that consumer for the CLI.
- *
- * Written from each `settled` event rather than from the final result, because a
- * herd of four hundred against a live provider is minutes of paid work and a
- * failure at member sixty would otherwise throw away the fifty-nine already
- * bought. For the same reason a member whose file already exists can be skipped,
- * so a re-run resumes instead of paying twice.
+ * @fileoverview Save what herd produce, to path plan declare. Plan declare where
+ * member write through `expectFiles`, plan write nothing itself. This CLI
+ * consumer do writing. Write from each `settled` event; mid-herd failure keep
+ * member already produced. Skip member whose file already exist; re-run resume.
  *
  * @module @paw/cli/application/herdWriter
  * @version 0.0.0
@@ -23,12 +15,12 @@
 import { targetsOf, type DispatchEvent, type FileSystemPort, type SwarmPlan } from '@paw/core';
 
 /**
- * Persists a herd's output and reports what it wrote.
+ * Save herd output, report what write.
  *
  * @interface HerdWriter
- * @property {(event: DispatchEvent) => Promise<void>} onProgress - Hand to `dispatchSwarm`; writes each member as it settles.
- * @property {() => string[]} written - Every path written, in the order they landed.
- * @property {(key: string) => boolean} alreadyDone - Resume predicate: true once a member's declared output exists.
+ * @property {(event: DispatchEvent) => Promise<void>} onProgress - Hand to `dispatchSwarm`; write each member as it settle.
+ * @property {() => string[]} written - Every path written, in order they land.
+ * @property {(key: string) => boolean} alreadyDone - Resume check: true once member declared output exist.
  */
 export interface HerdWriter {
   onProgress(event: DispatchEvent): Promise<void>;
@@ -37,20 +29,17 @@ export interface HerdWriter {
 }
 
 /**
- * Build a writer for a plan.
+ * Build writer for plan.
  *
- * A member that declares no output file is a member with nothing to persist —
- * the run still happened and the console still showed it, so this is silence
- * rather than a failure. A member that declares one and produced no content is
- * the same: skipped and resumed members have no text to write.
+ * Member declare no output file, or declare one and produce no content (skipped
+ * and resumed member), write nothing.
  *
- * A failing write is not swallowed. It propagates through `onProgress` into the
- * dispatcher, which stops taking new members — losing the run is the correct
- * response to a disk that cannot keep it.
+ * Failing write not swallow. It propagate through `onProgress` into dispatcher,
+ * which stop take new member.
  *
- * @param {SwarmPlan<A>} plan - The plan being dispatched.
- * @param {FileSystemPort} fs - Where output goes.
- * @param {(path: string) => boolean} exists - Whether a path is already on disk, for resume.
+ * @param {SwarmPlan<A>} plan - The plan being dispatch.
+ * @param {FileSystemPort} fs - Where output go.
+ * @param {(path: string) => boolean} exists - Whether path already on disk, for resume.
  * @returns {HerdWriter} The writer.
  */
 export function createHerdWriter<A>(
@@ -91,12 +80,11 @@ export function createHerdWriter<A>(
 }
 
 /**
- * The output paths a plan declares for every member, for a resume check made
- * before the run rather than during it.
+ * Output path plan declare for every member, for resume check made before run.
  *
  * @param {SwarmPlan<A>} plan - The plan.
- * @param {number} total - How many members it has.
- * @returns {Map<string, string[]>} Resume key to declared outputs.
+ * @param {number} total - How many member it have.
+ * @returns {Map<string, string[]>} Resume key to declared output.
  */
 export function declaredOutputs<A>(
   plan: SwarmPlan<A>,

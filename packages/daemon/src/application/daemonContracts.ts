@@ -1,13 +1,7 @@
 /**
  * PAW Daemon Contracts
  *
- * @fileoverview The ports and value types the daemon composition is written over:
- * the runtime it drives every effect through, the socket hooks the wire adapter
- * fills, the options it takes, the handle it returns, and the small pure helpers
- * the composition shares. `DaemonRuntime` is the seam that lets the whole of
- * `runDaemon` be unit-tested against fakes while `nodeRuntime` supplies the real
- * effects — and lets `paw ui` and Electron run the daemon in their own process
- * rather than spawning a second one.
+ * @fileoverview Ports and value types daemon composition write over. Runtime drive every effect. Socket hooks wire adapter fill. Options daemon take. Handle daemon return. Pure helpers composition share. `DaemonRuntime` is the injected effect boundary. Unit-test `runDaemon` against fakes. `nodeRuntime` supply real effects. Run daemon in-process for `paw ui` and Electron.
  *
  * @module @paw/daemon/application/daemonContracts
  * @version 0.0.0
@@ -36,31 +30,30 @@ import type { FileEntry } from '../domain/tree.js';
 import type { ServerIdentity } from '../infrastructure/identityStore.js';
 import type { UpgradeRefusal } from '../infrastructure/security.js';
 
-/** The loopback address the daemon binds; the control API is local-only. */
+/** Daemon binds loopback address. Control API local-only. */
 export const LOOPBACK = '127.0.0.1';
 
-/** How often the process table, file tree, and plan list are re-read, in ms. */
+/** Process table, file tree, and plan list re-read this often, in ms. */
 export const PROCESS_POLL_MS = 3000;
 
-/** How often host facts are re-read and published — also the liveness tick. */
+/** Host facts re-read and published this often. Also liveness tick. */
 export const HOST_TICK_MS = 1000;
 
 /**
- * Whether two slice values are the same, by value — a fresh array of identical
- * rows is not news, and publishing it anyway is the waste this avoids.
+ * Whether two slice values equal, by value.
  *
- * @param {unknown} previous - The last published value.
- * @param {unknown} next - The freshly read one.
- * @returns {boolean} True when nothing changed.
+ * @param {unknown} previous - Last published value.
+ * @param {unknown} next - Freshly read one.
+ * @returns {boolean} True when nothing change.
  */
 export function sameValue(previous: unknown, next: unknown): boolean {
   return JSON.stringify(previous) === JSON.stringify(next);
 }
 
 /**
- * A thrown value as a line an operator can read.
+ * A thrown value as message line.
  *
- * @param {unknown} error - What was thrown.
+ * @param {unknown} error - What thrown.
  * @returns {string} The message.
  */
 export function reason(error: unknown): string {
@@ -68,10 +61,7 @@ export function reason(error: unknown): string {
 }
 
 /**
- * The port every role is bound to while the daemon is only reporting. It builds a
- * registry so the doctor can judge a role's model, and never dispatches — so a
- * call here means something asked the reporting daemon to spend tokens, and it
- * refuses loudly instead of returning an empty completion a caller would trust.
+ * ModelPort bound to every role while daemon only reports state. Registry doctor reads to judge role's model. `complete` throws; it never dispatches.
  */
 export const REFUSING_MODEL: ModelPort = {
   complete: async () => {
@@ -83,7 +73,7 @@ export const REFUSING_MODEL: ModelPort = {
  * A bound HTTP server.
  *
  * @interface ServerHandle
- * @property {number} port - The port actually bound (resolved when 0 was asked for).
+ * @property {number} port - Port actually bound (resolved when 0 asked for).
  * @property {() => Promise<void>} close - Stop listening.
  */
 export interface ServerHandle {
@@ -92,10 +82,10 @@ export interface ServerHandle {
 }
 
 /**
- * The certificate a server presents.
+ * Certificate a server present.
  *
  * @interface TlsMaterial
- * @property {string} cert - The server certificate chain, PEM.
+ * @property {string} cert - Server certificate chain, PEM.
  * @property {string} key - Its private key, PEM.
  */
 export interface TlsMaterial {
@@ -104,12 +94,12 @@ export interface TlsMaterial {
 }
 
 /**
- * What the runtime can tell the daemon about a socket asking to be upgraded.
+ * What runtime tell daemon about socket ask to upgrade.
  *
  * @interface UpgradeContext
- * @property {string} [host] - The request's `Host`.
- * @property {string} [origin] - The request's `Origin`.
- * @property {string[]} protocols - The subprotocols it offered.
+ * @property {string} [host] - Request's `Host`.
+ * @property {string} [origin] - Request's `Origin`.
+ * @property {string[]} protocols - Subprotocols it offered.
  */
 export interface UpgradeContext {
   readonly host: string | undefined;
@@ -118,11 +108,11 @@ export interface UpgradeContext {
 }
 
 /**
- * What the runtime drives once a socket has been accepted.
+ * What runtime drive once socket accepted.
  *
  * @interface AcceptedSocket
- * @property {(raw: string) => Promise<void>} message - One text frame arrived.
- * @property {() => void} closed - The peer went away.
+ * @property {(raw: string) => Promise<void>} message - One text frame arrive.
+ * @property {() => void} closed - The peer go away.
  */
 export interface AcceptedSocket {
   message(raw: string): Promise<void>;
@@ -130,13 +120,11 @@ export interface AcceptedSocket {
 }
 
 /**
- * The daemon's half of the WebSocket handshake, injected into the runtime. Split
- * in two on purpose: `check` runs while still plain HTTP — the cheap place to
- * refuse — and `accept` runs only after the upgrade succeeded.
+ * Daemon's half of WebSocket handshake, injected into runtime. `check` run while still plain HTTP. `accept` run only after upgrade succeed.
  *
  * @interface SocketHooks
- * @property {(context: UpgradeContext) => UpgradeRefusal | null} check - Whether to upgrade at all.
- * @property {(port: WsSessionPort) => AcceptedSocket} accept - Adopt an upgraded socket.
+ * @property {(context: UpgradeContext) => UpgradeRefusal | null} check - Whether upgrade at all.
+ * @property {(port: WsSessionPort) => AcceptedSocket} accept - Adopt upgraded socket.
  */
 export interface SocketHooks {
   check(context: UpgradeContext): UpgradeRefusal | null;
@@ -144,23 +132,23 @@ export interface SocketHooks {
 }
 
 /**
- * Every effect the daemon needs, injected.
+ * Every effect daemon need, injected.
  *
  * @interface DaemonRuntime
- * @property {(path: string) => Promise<string>} readFile - Read a file as UTF-8 text.
- * @property {(path: string, version: number) => Promise<unknown>} importModule - Import a module, reloading it when `version` changes.
- * @property {(path: string) => Promise<number>} modifiedAt - A file's last-modified time in milliseconds.
- * @property {() => Promise<HostProcess[]>} listProcesses - The processes PAW owns.
- * @property {(root: string) => Promise<FileEntry[]>} listFiles - The repository listing under a root.
- * @property {() => HostInfo} readHost - The host facts, read fresh.
- * @property {() => string} now - An ISO timestamp.
+ * @property {(path: string) => Promise<string>} readFile - Read file as UTF-8 text.
+ * @property {(path: string, version: number) => Promise<unknown>} importModule - Import module, reload it when `version` change.
+ * @property {(path: string) => Promise<number>} modifiedAt - File's last-modified time in milliseconds.
+ * @property {() => Promise<HostProcess[]>} listProcesses - Processes PAW own.
+ * @property {(root: string) => Promise<FileEntry[]>} listFiles - Repository listing under root.
+ * @property {() => HostInfo} readHost - Host facts, read fresh.
+ * @property {() => string} now - ISO timestamp.
  * @property {() => number} clock - Epoch milliseconds, for wire timestamps and session timers.
- * @property {(message: string) => void} warn - Report something the operator should see but that must not stop the daemon.
- * @property {() => string} randomToken - A fresh, unguessable session token.
+ * @property {(message: string) => void} warn - Report message for operator. Do not stop daemon.
+ * @property {() => string} randomToken - Fresh, unguessable session token.
  * @property {() => Promise<ServerIdentity>} identity - This machine's TLS identity, issued or renewed as needed.
- * @property {() => Promise<string>} readPage - The HTML to serve at `/`.
- * @property {Function} listen - Bind a TLS server.
- * @property {(fn, ms) => () => void} schedule - Run `fn` every `ms`; returns a canceller.
+ * @property {() => Promise<string>} readPage - HTML serve at `/`.
+ * @property {Function} listen - Bind TLS server.
+ * @property {(fn, ms) => () => void} schedule - Run `fn` every `ms`. Return canceller.
  */
 export interface DaemonRuntime {
   readFile(path: string): Promise<string>;
@@ -186,11 +174,11 @@ export interface DaemonRuntime {
 }
 
 /**
- * What a real dispatch reported back.
+ * What real dispatch reported back.
  *
  * @interface RunReport
  * @property {DispatchResult} result - Core's own dispatch result.
- * @property {BudgetSummary} usage - The tokens the run actually spent.
+ * @property {BudgetSummary} usage - Tokens run actually spent.
  */
 export interface RunReport {
   readonly result: DispatchResult;
@@ -198,9 +186,7 @@ export interface RunReport {
 }
 
 /**
- * Releases the plan's herd. Supplied by the consumer, because choosing the model a
- * run is dispatched against is a composition decision the reporting daemon takes
- * no part in. The second argument is how the run reports itself while it happens.
+ * Dispatch a swarm plan. Supplied by consumer. Reporting daemon select no model. Second argument report run's progress as it happen.
  */
 export type Dispatcher = (
   plan: SwarmPlan<unknown>,
@@ -211,18 +197,19 @@ export type Dispatcher = (
  * What to serve.
  *
  * @interface DaemonOptions
- * @property {string} [root] - The repository to serve; defaults to the working directory.
- * @property {string} [configPath] - An explicit config path; otherwise `.paw/config.json` is used when the repo has one.
- * @property {string} [planPath] - A plan to open on; otherwise the console opens with none selected.
- * @property {number} [port] - Port to bind; 0 (the default) takes an ephemeral one.
- * @property {number} [pollMs] - How often to re-read the process table, tree, config, and plan list.
- * @property {number} [hostMs] - How often to re-read and publish the host facts.
- * @property {readonly string[]} [allowOrigins] - Extra origins permitted to call the API.
- * @property {Dispatcher} [dispatch] - Release the opening plan's herd once, and report the run live.
- * @property {string} [scopeCeiling] - Permit consoles to re-scope the daemon, within this directory.
- * @property {RecentRoutesPort} [recent] - Remember each scope as a recent route and serve the list; omit to keep no history.
- * @property {(path: string, mode: InitMode) => void} [onAttach] - Receive attach requests; the daemon never writes.
- * @property {(settings: RunSettings) => void} [onRelease] - Receive release requests; the daemon never runs them itself.
+ * @property {string} [root] - Repository to serve. Defaults to working directory.
+ * @property {string} [configPath] - Explicit config path. Else `.paw/config.json` use when repo have one.
+ * @property {string} [planPath] - Plan to open on. Else console opens with none selected.
+ * @property {number} [port] - Port to bind. 0 (default) take ephemeral one.
+ * @property {number} [pollMs] - How often re-read process table, tree, config, and plan list.
+ * @property {number} [hostMs] - How often re-read and publish host facts.
+ * @property {readonly string[]} [allowOrigins] - Extra origins permitted to call API.
+ * @property {Dispatcher} [dispatch] - Dispatch the opening plan once, and report run live.
+ * @property {string} [scopeCeiling] - Permit consoles to re-scope daemon, within this directory.
+ * @property {RecentRoutesPort} [recent] - Remember each scope as recent route and serve list. Omit to keep no history.
+ * @property {(path: string, mode: InitMode) => void} [onAttach] - Receive attach requests. Daemon never write.
+ * @property {(settings: RunSettings) => void} [onRelease] - Receive release requests. Daemon never run them itself.
+ * @property {(settings: RunSettings) => Dispatcher} [dispatcherFor] - Build dispatcher for approved release settings. Shell own live registry and writers; omit and {@link DaemonHandle.release} throw.
  */
 export interface DaemonOptions {
   readonly root?: string;
@@ -238,23 +225,25 @@ export interface DaemonOptions {
   readonly recent?: RecentRoutesPort;
   onAttach?(path: string, mode: InitMode): void;
   onRelease?(settings: RunSettings): void;
+  dispatcherFor?(settings: RunSettings): Dispatcher;
 }
 
 /**
  * A running daemon.
  *
  * @interface DaemonHandle
- * @property {string} url - The URL the console is served at.
- * @property {number} port - The bound port.
- * @property {string} root - The repository being served.
- * @property {string} token - The per-boot credential every API call must present.
- * @property {ServerIdentity} identity - The TLS identity it is serving with.
- * @property {LiveBus} bus - Where the sources publish; what a live session subscribes to.
- * @property {string[]} plans - The plans discovered in it.
- * @property {string | null} openedOn - The plan the daemon opened on, if any.
- * @property {Promise<void> | null} dispatched - Settles when a released herd finishes; null when no run was asked for.
- * @property {(plan?: string | null) => Promise<PawSnapshot>} snapshot - The current snapshot for a plan, read live.
- * @property {(path: string) => Promise<void>} rescope - Point the daemon at another repository and republish.
+ * @property {string} url - URL console served at.
+ * @property {number} port - Bound port.
+ * @property {string} root - Repository being served.
+ * @property {string} token - Per-boot credential every API call must present.
+ * @property {ServerIdentity} identity - TLS identity it serve with.
+ * @property {LiveBus} bus - Where sources publish. What live session subscribe to.
+ * @property {string[]} plans - Plans discovered in it.
+ * @property {string | null} openedOn - Plan daemon opened on, if any.
+ * @property {Promise<void> | null} dispatched - Resolves when the released dispatch finishes. Null when no run asked for.
+ * @property {(settings: RunSettings) => Promise<void>} release - Run an approved release through the injected {@link DaemonOptions.dispatcherFor}, progress into the console; throw when no factory injected.
+ * @property {(plan?: string | null) => Promise<PawSnapshot>} snapshot - Current snapshot for plan, read live.
+ * @property {(path: string) => Promise<void>} rescope - Point daemon at another repository and republish.
  * @property {() => Promise<void>} close - Stop polling and stop listening.
  */
 export interface DaemonHandle {
@@ -267,17 +256,17 @@ export interface DaemonHandle {
   readonly plans: readonly string[];
   readonly openedOn: string | null;
   readonly dispatched: Promise<void> | null;
+  release(settings: RunSettings): Promise<void>;
   snapshot(plan?: string | null): Promise<PawSnapshot>;
   rescope(path: string): Promise<void>;
   close(): Promise<void>;
 }
 
 /**
- * Take the swarm plan out of an imported module, failing loud when the module
- * exports none — a selection that is not a plan has nothing to show.
+ * Take swarm plan out of imported module. Throw when module export none.
  *
- * @param {unknown} mod - The imported module.
- * @param {string} path - The path it came from, for the error message.
+ * @param {unknown} mod - Imported module.
+ * @param {string} path - Path it came from, for error message.
  * @returns {SwarmPlan<unknown>} The plan.
  */
 export function toPlan(mod: unknown, path: string): SwarmPlan<unknown> {
@@ -290,9 +279,9 @@ export function toPlan(mod: unknown, path: string): SwarmPlan<unknown> {
 }
 
 /**
- * How many models the config declares — the Keys rail count.
+ * How many models config declare. The Keys rail count.
  *
- * @param {Record<string, unknown>} config - The parsed config.
+ * @param {Record<string, unknown>} config - Parsed config.
  * @returns {number} The model count.
  */
 export function modelCount(config: Record<string, unknown>): number {
@@ -301,11 +290,11 @@ export function modelCount(config: Record<string, unknown>): number {
 }
 
 /**
- * A repo-relative path as the runtime should open it.
+ * Resolve repo-relative path to form runtime open.
  *
- * @param {string} root - The served repository.
- * @param {string} path - A repo-relative path.
- * @returns {string} The path to hand the runtime.
+ * @param {string} root - Served repository.
+ * @param {string} path - Repo-relative path.
+ * @returns {string} Path to hand runtime.
  */
 export function underRoot(root: string, path: string): string {
   const base = root === '' ? '.' : root.replace(/\\/g, '/').replace(/\/+$/, '');

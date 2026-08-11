@@ -1,9 +1,8 @@
 /**
  * PAW Adapters Barrel Test
  *
- * @fileoverview Imports the public barrel so its re-exports are covered, and
- * asserts each adapter factory is reachable from the package entry — the surface
- * consumers actually import.
+ * @fileoverview Import public barrel, cover re-exports. Assert each adapter
+ * factory reachable from package entry.
  *
  * @module @paw/adapters/test/index
  * @version 0.0.0

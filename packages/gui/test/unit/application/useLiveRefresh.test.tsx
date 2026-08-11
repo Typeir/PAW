@@ -1,10 +1,7 @@
 /**
- * Live Refresh Tests
+ * Live refresh tests.
  *
- * @fileoverview Drives the poll loop on fake timers: a static page polls
- * nothing, a healthy source folds each snapshot in, a failing source surfaces
- * the reason and keeps the last data, and a tree that unmounts mid-flight
- * neither updates nor leaks its interval.
+ * @fileoverview Drive poll loop on fake timers. Static page poll nothing. Healthy source fold each snapshot in. Failing source show reason and keep last data. Tree unmount mid-flight, neither update nor leak interval.
  *
  * @module @paw/gui/test/unit/application/useLiveRefresh
  */
@@ -21,7 +18,7 @@ import { makeSnapshot } from '../../fixtures.js';
  * Props for {@link Poller}.
  *
  * @interface PollerProps
- * @property {SnapshotSource | null} source - The source under test.
+ * @property {SnapshotSource | null} source - Source under test.
  */
 interface PollerProps {
   readonly source: SnapshotSource | null;
@@ -29,9 +26,9 @@ interface PollerProps {
 }
 
 /**
- * A probe that shows the last plan name it received and the last error.
+ * Probe show last plan name it got and last error.
  *
- * @param {PollerProps} props - The probe props.
+ * @param {PollerProps} props - Probe props.
  * @returns {JSX.Element} The probe.
  */
 function Poller({ source, plan = 'plans/demo.swarm.mjs' }: PollerProps) {
@@ -47,7 +44,7 @@ function Poller({ source, plan = 'plans/demo.swarm.mjs' }: PollerProps) {
 }
 
 /**
- * Advance the fake clock past one poll and let the microtasks settle.
+ * Advance fake clock past one poll, let microtasks settle.
  */
 async function tick(): Promise<void> {
   await act(async () => {

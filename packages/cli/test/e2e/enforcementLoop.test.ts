@@ -1,12 +1,10 @@
 /**
- * @fileoverview End-to-end proof of the whole stack as it actually runs: the thin
- * `paw hook` client talks over a real socket to a real resident daemon that owns
- * a real store, a real warm gate cache, and the real Copilot connector. Each step
- * is a separate client invocation (a fresh connection, as a real hook would be),
- * and the loop is driven through Copilot's own payloads and outputs: a bad edit
- * blocks, the violation denies other files via `permissionDecision` while
- * allowing the violated one, fixing it clears, the gate reopens. With the daemon
- * down, the client fails open.
+ * @fileoverview End-to-end test entire stack. `paw hook` client talk socket to
+ * resident daemon owns store, warm gate cache, Copilot connector. Each step is
+ * separate client call with fresh connection, driven by Copilot's own payloads
+ * and outputs: bad edit block; violation deny other files via
+ * `permissionDecision` while allow violated one; fix clear it; gate reopen.
+ * Daemon down, client fail open.
  *
  * @module @paw/cli/test/e2e/enforcementLoop
  */
@@ -39,7 +37,7 @@ let endpoint: string;
 let tokenFile: string;
 let handle: SocketServerHandle;
 
-/** Run the thin client once and return the parsed host output. */
+/** Run client once, return parsed host output. */
 async function hook(event: string, file: string, socket = endpoint): Promise<Record<string, unknown>> {
   const out: string[] = [];
   await runHook({

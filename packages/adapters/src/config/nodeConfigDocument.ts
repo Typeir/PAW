@@ -1,9 +1,9 @@
 /**
  * PAW Node Config Document Adapter
  *
- * @fileoverview The {@link ConfigDocumentPort} over `node:fs`, reading and writing
- * a repo's `.paw/config.json` whole. A repo with no config reads as an empty
- * document; a malformed one fails loud rather than being silently overwritten.
+ * @fileoverview {@link ConfigDocumentPort} over `node:fs`. Read and write whole
+ * repo `.paw/config.json`. Repo with no config read as empty document.
+ * Malformed one throw.
  *
  * @module @paw/adapters/config/nodeConfigDocument
  * @version 0.0.0
@@ -16,11 +16,10 @@ import { dirname, resolve } from 'node:path';
 import type { ConfigDocument, ConfigDocumentPort } from '@paw/core';
 
 /**
- * A config-document port bound to a repository's `.paw/config.json`. The root may
- * be a getter, resolved per read and write, so a console that switches which
- * consumer it holds edits that consumer's config rather than the boot one.
+ * Config-document port bound to repository `.paw/config.json`. Root may be
+ * getter, resolve fresh each read and write.
  *
- * @param {string | (() => string)} root - The repository root, or a getter for the current one.
+ * @param {string | (() => string)} root - Repository root, or getter for current one.
  * @returns {ConfigDocumentPort} The port.
  */
 export function createNodeConfigDocument(root: string | (() => string)): ConfigDocumentPort {

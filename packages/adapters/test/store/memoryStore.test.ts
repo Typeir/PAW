@@ -1,9 +1,9 @@
 /**
  * PAW In-Memory Store Tests
  *
- * @fileoverview Covers raising violations, session vs project scope visibility,
- * resolution by file within a session and at project scope, and the id
- * assignment — so `memoryStore.ts` reaches 100%.
+ * @fileoverview Cover raise violations, session vs project scope visibility,
+ * resolve by file in one session and at project scope, and id assign.
+ * `memoryStore.ts` hit 100%.
  *
  * @module @paw/adapters/test/store/memoryStore
  * @version 0.0.0

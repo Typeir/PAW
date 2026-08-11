@@ -1,6 +1,6 @@
 /**
- * @fileoverview Unit tests for the CLI's pure rendering. Every branch of
- * `decisionToOutput` is exercised so `render.ts` reaches 100% on its own.
+ * @fileoverview Unit test CLI pure render. Test every branch of
+ * `decisionToOutput`; `render.ts` hits 100% coverage.
  *
  * @module @paw/cli/test/unit/render
  */

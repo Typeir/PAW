@@ -1,22 +1,14 @@
 /**
  * PAW Console Page Location
  *
- * @fileoverview Finds the built React console the daemon serves. This is a
- * packaging question, not a runtime one, which is why it lives beside the
- * runtime rather than inside it: `nodeRuntime` serves whatever page it is
- * handed, and every shell that starts a daemon — `paw ui`, `pawd`, the Electron
- * main process — decides which one that is here.
- *
- * The console is a single self-contained file (`@paw/gui` inlines React and its
- * whole bundle into one page), so locating it is locating one file rather than
- * an asset tree. It sits in two places depending on how PAW was started, and
- * neither is knowable from a path constant: beside the bundle in a built
- * artifact, and under `packages/gui/dist` in a source checkout. So both are
- * probed, in that order.
- *
- * Resolution is relative to this module, which lands correctly in both layouts
- * without any shell passing an argument — a console the operator has to locate
- * by hand is not a console.
+ * @fileoverview Find built React console daemon serve. `nodeRuntime`
+ * serve page it get handed. Every shell that start daemon — `paw ui`,
+ * `pawd`, Electron main process — pick page here. `@paw/gui` inline
+ * React and whole bundle into one self-contained file, so find console find
+ * one file. Located in two places depending on how PAW starts: beside bundle in built artifact,
+ * and under `packages/gui/dist` in source checkout.
+ * Probe both, that order. Resolution is relative to this module, correct in
+ * both layouts, no shell argument needed.
  *
  * @module @paw/daemon/consolePage
  * @version 0.0.0
@@ -29,21 +21,21 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * The console page's filename. `live.html` is the target `@paw/gui` builds with
- * no snapshot injected, so it fetches `/api/state` from the daemon rather than
- * rendering a frozen demo.
+ * Console page filename. `live.html` be target `@paw/gui` build with
+ * no snapshot inject, so it fetch `/api/state` from daemon, no render frozen
+ * demo.
  */
 export const CONSOLE_PAGE_FILE = 'live.html';
 
 /**
- * Where the console sits, given the directory the running module occupies.
+ * Location of console, relative to the directory the running module occupies.
  *
- * Pure over an injected existence check so both layouts are tested from either
- * one. When the page is in neither place the preferred location is returned
- * rather than null: the caller reports the miss by path, and the path it names
- * should be where the file belongs rather than the last place that was tried.
+ * Takes an injected existence check, so either layout can be tested
+ * from any module directory. When the page exists nowhere, returns the
+ * preferred location: the caller reports the miss with that path,
+ * naming where the file belongs, not the last place tried.
  *
- * @param {string} moduleDir - Directory of the running module.
+ * @param {string} moduleDir - Directory of running module.
  * @param {(path: string) => boolean} exists - Whether a path exists.
  * @returns {string} The console page path.
  */
@@ -59,7 +51,7 @@ export function resolveConsolePage(
 }
 
 /**
- * Where the console sits for this installation.
+ * Location of console for this installation.
  *
  * @returns {string} The console page path.
  */

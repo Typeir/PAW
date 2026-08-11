@@ -1,24 +1,12 @@
 /**
  * PAW Daemon Slice Cache
  *
- * @fileoverview The snapshot, taken apart.
+ * @fileoverview Snapshot, take apart. Expensive part compute per version of
+ * its input, cache it. Plan briefs render once per mtime of plan file. Doctor
+ * run once per version of config. Compose read cached pieces. Version number
+ * come from caller — an mtime, a counter.
  *
- * `buildSnapshot` rebuilt the world on every read: it re-rendered a brief and a
- * resume key for every member and re-ran the doctor, per request, per open
- * console. For a plan with a few hundred members that is hundreds of template
- * renders every three seconds to produce a value that is, almost always,
- * byte-identical to the last one.
- *
- * So the expensive parts are computed **per version of their input** and cached:
- * a plan's briefs are rendered once per mtime of the plan file, the doctor runs
- * once per version of the config, and a read composes the cached pieces. Version
- * numbers come from the caller — an mtime, a counter — because deciding what
- * "changed" means is the caller's job, and caching against a guess is how a
- * console ends up showing yesterday's plan.
- *
- * Pure: a `Map`, and functions over plain values. What is cached is verified by
- * counting calls to the builder, which is the only honest way to test a cache —
- * asserting the value came back is not evidence it was not recomputed.
+ * Pure. Just `Map`, functions over plain values.
  *
  * @module @paw/daemon/cache
  * @version 0.0.0
@@ -45,12 +33,12 @@ import {
 import { formatUptime } from './snapshot.js';
 
 /**
- * A value cached against the version of the input it was computed from.
+ * Value cache against version of input it compute from.
  *
  * @interface VersionedCache
- * @property {Function} read - Return the cached value, or build and cache it when the version moved.
- * @property {(key: string) => void} forget - Drop an entry, e.g. when its file disappeared.
- * @property {() => number} size - How many entries are held.
+ * @property {Function} read - Return cached value, or build and cache it when version move.
+ * @property {(key: string) => void} forget - Drop entry, e.g. when its file disappear.
+ * @property {() => number} size - How many entry hold.
  */
 export interface VersionedCache<V> {
   read(key: string, version: number, build: () => V): V;
@@ -59,7 +47,7 @@ export interface VersionedCache<V> {
 }
 
 /**
- * Build a cache.
+ * Build cache.
  *
  * @returns {VersionedCache} The cache.
  */
@@ -83,8 +71,7 @@ export function createVersionedCache<V>(): VersionedCache<V> {
 }
 
 /**
- * The plan slice for "no plan selected". A console with nothing chosen shows
- * empty lists rather than the last plan's briefs, which is the truth.
+ * Plan slice for "no plan selected". Empty lists.
  *
  * @returns {PlanSlice} The empty slice.
  */
@@ -103,14 +90,13 @@ export function emptyPlanSlice(): PlanSlice {
 }
 
 /**
- * Render a plan into the slice the console shows. This is the expensive call the
- * cache exists to avoid: one `renderBrief` and one `planKey` per member, plus
- * the plan doctor.
+ * Render plan into slice for console show. One `renderBrief` and one
+ * `planKey` per member, plus plan doctor.
  *
- * @param {SwarmPlan<unknown>} plan - The loaded plan.
+ * @param {SwarmPlan<unknown>} plan - Loaded plan.
  * @param {string} source - Its module source.
- * @param {string} selectedPlan - The repo-relative path it was loaded from.
- * @returns {PlanSlice} The rendered slice.
+ * @param {string} selectedPlan - Repo-relative path it load from.
+ * @returns {PlanSlice} Rendered slice.
  */
 export function buildPlanSlice<Args>(
   plan: SwarmPlan<Args>,
@@ -132,19 +118,19 @@ export function buildPlanSlice<Args>(
 }
 
 /**
- * The cached pieces a snapshot is assembled from.
+ * The cached pieces a snapshot assemble from.
  *
  * @interface SnapshotParts
- * @property {HostInfo} host - Host facts, read fresh per request.
- * @property {HostProcess[]} processes - The owned process subtree.
- * @property {string} root - The served repository — the current scope.
- * @property {PlansSlice} plans - What the repository holds.
- * @property {PlanSlice} planDetail - The plan in view, rendered.
- * @property {DoctorReport} doctor - The config and role doctor.
+ * @property {HostInfo} host - Host fact, read fresh per request.
+ * @property {HostProcess[]} processes - Owned process subtree.
+ * @property {string} root - Served repository — the current scope.
+ * @property {PlansSlice} plans - What repository hold.
+ * @property {PlanSlice} planDetail - Plan in view, rendered.
+ * @property {DoctorReport} doctor - Config and role doctor.
  * @property {RunProgress} run - Run identity and progress.
- * @property {BudgetSummary} budget - What the run has spent.
+ * @property {BudgetSummary} budget - What run spend.
  * @property {Violation[]} violations - Open enforcement violations.
- * @property {string} socket - The bound address.
+ * @property {string} socket - Bound address.
  * @property {number} gates - Gate count for the rail.
  * @property {number} keys - Provider key count for the rail.
  */
@@ -164,12 +150,11 @@ export interface SnapshotParts {
 }
 
 /**
- * Assemble a snapshot from its cached parts. Nothing is computed here beyond the
- * daemon's own status line — every expensive field arrives already built, which
- * is the point.
+ * Assemble snapshot from its cached parts. Compute nothing here beyond daemon
+ * own status line. Every expensive field arrive already built.
  *
  * @param {SnapshotParts} parts - The pieces.
- * @returns {PawSnapshot} The console state.
+ * @returns {PawSnapshot} Console state.
  */
 export function composeSnapshot(parts: SnapshotParts): PawSnapshot {
   return {
@@ -205,11 +190,10 @@ export function composeSnapshot(parts: SnapshotParts): PawSnapshot {
 }
 
 /**
- * A run that has not been dispatched: zeros and an empty herd, which is the
- * truth rather than a plausible fiction.
+ * Run not dispatched. Zeros and empty members list.
  *
- * @param {string} id - The run identifier.
- * @param {string} startedAt - When the daemon started.
+ * @param {string} id - Run identifier.
+ * @param {string} startedAt - When daemon start.
  * @returns {RunProgress} The empty progress.
  */
 export function idleRun(id: string, startedAt: string): RunProgress {
@@ -217,9 +201,9 @@ export function idleRun(id: string, startedAt: string): RunProgress {
 }
 
 /**
- * A budget nothing has been spent from.
+ * Budget nothing spend from.
  *
- * @returns {BudgetSummary} The empty meter.
+ * @returns {BudgetSummary} Empty meter.
  */
 export function idleBudget(): BudgetSummary {
   return { spendUsd: 0, tokensIn: 0, tokensOut: 0 };

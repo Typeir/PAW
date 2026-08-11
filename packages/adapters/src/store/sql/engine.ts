@@ -1,15 +1,13 @@
 /**
  * PAW Store Engine Choice
  *
- * @fileoverview Which SQL engine backs the store on this machine. The choice is
- * machine-level rather than per-repository because it answers a question about
- * the host, not about a project: some managed laptops block the native SQLite
- * binding, and on those `node:sqlite` is unavailable no matter which repository
- * is open. So it is resolved from `PAW_HOME`'s config, with an environment
- * override for a one-off run, and it lives outside the database it selects —
- * a value stored in the store cannot tell you how to open the store.
+ * @fileoverview Select which SQL engine backs the store on this machine. The
+ * choice is machine-level: some managed laptops block the native SQLite
+ * binding, making `node:sqlite` unavailable there regardless of repo. Read
+ * from `PAW_HOME` config, plus an env override. Runs outside the database it
+ * selects.
  *
- * Pure over injected text: the caller reads the config file, this decides.
+ * Pure function: takes config text as input, returns the resolved engine.
  *
  * @module @paw/adapters/store/sql/engine
  * @version 0.0.0
@@ -18,48 +16,46 @@
  */
 
 /**
- * The engines PAW can back its store with.
+ * Engines PAW can back store with.
  *
- * `sqlite` is the native `node:sqlite` binding — real locking, incremental
- * writes, and bundleable with no dependency. `wasm` is sql.js, which works
- * where the native binding is blocked at the cost of rewriting the whole
- * database file on every mutation.
+ * `sqlite` native `node:sqlite` binding: file locking, incremental writes,
+ * bundleable, no dependency. `wasm` sql.js: work where native binding blocked,
+ * rewrite whole database file on every mutation.
  */
 export type StoreEngine = 'sqlite' | 'wasm';
 
 /**
- * Every valid engine name, for validation and for error messages that tell the
- * operator what they could have said instead.
+ * Every valid engine name. For validation and error messages.
  */
 export const STORE_ENGINES: readonly StoreEngine[] = ['sqlite', 'wasm'];
 
 /**
- * The engine used when nothing is configured.
+ * Engine used when nothing configured.
  */
 export const DEFAULT_STORE_ENGINE: StoreEngine = 'sqlite';
 
 /**
- * The key the machine config stores the engine under.
+ * Key machine config store engine under.
  */
 export const ENGINE_CONFIG_KEY = 'db';
 
 /**
- * The environment slice the resolver reads.
+ * Environment slice resolver read.
  *
  * @interface EngineEnv
- * @property {string} [PAW_DB_ENGINE] - A one-off override; beats the config file.
+ * @property {string} [PAW_DB_ENGINE] - One-off override. Takes precedence over the config file.
  */
 export interface EngineEnv {
   readonly PAW_DB_ENGINE?: string;
 }
 
 /**
- * Narrow a candidate to a known engine, or throw naming the valid choices.
+ * Narrow candidate to known engine, else throw naming valid choices.
  *
- * @param {string} value - The candidate engine name.
- * @param {string} source - Where it came from, for the error message.
- * @returns {StoreEngine} The validated engine.
- * @throws {Error} When the value is not a known engine.
+ * @param {string} value - Candidate engine name.
+ * @param {string} source - Where it come from. For error message.
+ * @returns {StoreEngine} Validated engine.
+ * @throws {Error} When value not known engine.
  */
 function validate(value: string, source: string): StoreEngine {
   const match = STORE_ENGINES.find((engine) => engine === value);
@@ -72,13 +68,11 @@ function validate(value: string, source: string): StoreEngine {
 }
 
 /**
- * Parse machine config text into an object, failing loudly on malformed input
- * so a typo in the config is reported rather than silently reverting the
- * operator to a default they did not choose.
+ * Parse machine config text into object. Throws on malformed input.
  *
- * @param {string | null} configText - The config file's contents, or null when absent.
- * @returns {Record<string, unknown>} The parsed config, empty when absent.
- * @throws {Error} When the text is not JSON, or is not a JSON object.
+ * @param {string | null} configText - Config file contents, or null when absent.
+ * @returns {Record<string, unknown>} Parsed config, empty when absent.
+ * @throws {Error} When text not JSON, or not JSON object.
  */
 function parseConfig(configText: string | null): Record<string, unknown> {
   if (configText === null || configText.trim() === '') {
@@ -99,12 +93,12 @@ function parseConfig(configText: string | null): Record<string, unknown> {
 }
 
 /**
- * Decide which engine backs the store.
+ * Select which engine backs the store.
  *
- * @param {EngineEnv} env - The environment, for a one-off override.
- * @param {string | null} configText - The machine config file's contents, or null when absent.
- * @returns {StoreEngine} The engine to open.
- * @throws {Error} When either source names an engine PAW does not have.
+ * @param {EngineEnv} env - The environment. For one-off override.
+ * @param {string | null} configText - Machine config file contents, or null when absent.
+ * @returns {StoreEngine} Engine to open.
+ * @throws {Error} When either source name engine PAW no have.
  */
 export function resolveStoreEngine(
   env: EngineEnv,
@@ -123,13 +117,12 @@ export function resolveStoreEngine(
 }
 
 /**
- * Write an engine choice into machine config, preserving every other key so
- * `paw config db` does not discard settings it does not own.
+ * Write engine choice into machine config. Keep every other key.
  *
- * @param {StoreEngine} engine - The engine to record.
- * @param {string | null} configText - The existing config contents, or null when absent.
- * @returns {string} The config text to write back.
- * @throws {Error} When the existing config is malformed, rather than clobbering it.
+ * @param {StoreEngine} engine - Engine to record.
+ * @param {string | null} configText - Existing config contents, or null when absent.
+ * @returns {string} Config text to write back.
+ * @throws {Error} When existing config malformed.
  */
 export function serialiseEngineChoice(
   engine: StoreEngine,

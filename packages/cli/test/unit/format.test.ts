@@ -1,9 +1,9 @@
 /**
- * PAW CLI Formatter Tests
+ * PAW CLI formatter tests.
  *
- * @fileoverview Covers every formatter branch — ready/not-ready doctor with
- * config and role problems, an ok and a refused plan doctor, a member brief, and
- * a released and a refused herd — so `format.ts` reaches 100%.
+ * @fileoverview Cover every formatter branch: ready and not-ready doctor with
+ * config and role problems, ok and refused plan doctor, member brief, released
+ * and refused herd. `format.ts` reach 100%.
  *
  * @module @paw/cli/test/unit/format
  * @version 0.0.0
@@ -107,7 +107,7 @@ describe('formatPruned', () => {
 });
 
 /**
- * Build a health report with defaults, overriding only what a case needs.
+ * Build health report with defaults. `over` override named fields.
  *
  * @param {Partial<HealthReport>} over - Fields to override.
  * @returns {HealthReport} The report.

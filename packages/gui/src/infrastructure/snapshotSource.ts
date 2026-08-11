@@ -1,13 +1,11 @@
 /**
  * PAW Console Snapshot Source
  *
- * @fileoverview Where the console's data comes from, and the honest split
- * between the two cases. Served by `pawd`, the page fetches `/api/state` and
- * keeps fetching — every field is then real, read from the host at the moment of
- * the request. Opened as a self-contained artifact, the build injected a
- * snapshot on `window` and there is nothing to poll; the console says so rather
- * than pretending a frozen fixture is live. The transport is taken as a seam, so
- * this is unit-tested without a network and without jsdom's fetch.
+ * @fileoverview Console get data from here. Two case. Served by
+ * `pawd`, page fetch `/api/state` and keep fetch — every field read from
+ * host at moment of request. Open self-contained artifact, build inject snapshot
+ * on `window`, nothing to poll. Transport passed in as parameter, unit-test
+ * without network and without jsdom fetch.
  *
  * @module @paw/gui/infrastructure/snapshotSource
  * @version 0.0.0
@@ -29,10 +27,10 @@ import {
 } from './liveSocket.js';
 
 /**
- * The slice of `Response` the source needs.
+ * The slice of `Response` source need.
  *
  * @interface ResponseLike
- * @property {boolean} ok - Whether the status is 2xx.
+ * @property {boolean} ok - Status be 2xx.
  * @property {number} status - The HTTP status code.
  * @property {() => Promise<unknown>} json - The parsed body.
  */
@@ -43,12 +41,12 @@ export interface ResponseLike {
 }
 
 /**
- * The request options the source sets — headers only; the console never sends a
- * body, and a `GET`-only API needs nothing else.
+ * The request options source set — headers only; console never send body,
+ * and `GET`-only API need nothing else.
  *
  * @interface RequestInitLike
- * @property {string} [method] - The HTTP method; absent means GET.
- * @property {string} [body] - The request body, for a write.
+ * @property {string} [method] - HTTP method; absent mean GET.
+ * @property {string} [body] - Request body, for write.
  * @property {Record<string, string>} [headers] - Headers to send.
  */
 export interface RequestInitLike {
@@ -58,17 +56,16 @@ export interface RequestInitLike {
 }
 
 /**
- * The slice of `fetch` the source needs.
+ * The slice of `fetch` source need.
  */
 export type FetchLike = (url: string, init?: RequestInitLike) => Promise<ResponseLike>;
 
 /**
- * Wrap a transport so every request carries the daemon's token. Done once, at
- * the boundary, so no source, hook, or component ever handles the credential —
- * they cannot leak what they never see.
+ * Wrap transport so every request carry daemon token. Do once, at
+ * boundary, so no source, hook, or component ever handle credential.
  *
  * @param {FetchLike} fetchFn - The underlying transport.
- * @param {string | null} token - The adopted token, or null when the tab has none.
+ * @param {string | null} token - The adopted token, or null when tab have none.
  * @returns {FetchLike} The authenticated transport.
  */
 export function authedFetch(fetchFn: FetchLike, token: string | null): FetchLike {
@@ -83,37 +80,37 @@ export function authedFetch(fetchFn: FetchLike, token: string | null): FetchLike
 }
 
 /**
- * The window fields the self-contained build writes.
+ * The window fields self-contained build write.
  *
  * @interface PawWindow
- * @property {PawSnapshot} [__PAW_DATA__] - A snapshot injected by the static build.
+ * @property {PawSnapshot} [__PAW_DATA__] - A snapshot static build inject.
  */
 export interface PawWindow {
   __PAW_DATA__?: PawSnapshot;
 }
 
 /**
- * The daemon's state endpoint.
+ * Daemon state endpoint.
  */
 export const STATE_URL = '/api/state';
 
 /**
- * The daemon's repository tree endpoint.
+ * Daemon repository tree endpoint.
  */
 export const TREE_URL = '/api/tree';
 
 /**
- * A source of repository file trees — `pawd`'s `/api/tree`.
+ * A source of repository file trees — `pawd` `/api/tree`.
  */
 export type TreeSource = () => Promise<readonly TreeNode[]>;
 
 /**
- * Build a source that reads the daemon's live state. A non-2xx response throws:
- * the caller renders the failure, and a stale console is never shown as fresh.
+ * Build source that read daemon live state. Non-2xx response throw:
+ * caller render failure, stale console never show as fresh.
  *
  * @param {FetchLike} fetchFn - The transport.
  * @param {string} [url] - The endpoint to read.
- * @returns {SnapshotSource} A source that yields the current snapshot.
+ * @returns {SnapshotSource} A source that yield current snapshot.
  */
 export function createHttpSource(fetchFn: FetchLike, url: string = STATE_URL): SnapshotSource {
   return async (plan: string | null): Promise<PawSnapshot> => {
@@ -127,14 +124,13 @@ export function createHttpSource(fetchFn: FetchLike, url: string = STATE_URL): S
 }
 
 /**
- * Build a source that reads the daemon's repository tree, optionally narrowed
- * to a directory inside it. Like the state source, a non-2xx response throws
- * rather than resolving to an empty tree that would read as "this repo has no
- * files".
+ * Build source that read daemon repository tree, optionally narrow
+ * to directory inside it. Like state source, non-2xx response throw;
+ * an empty tree would be misread as "this repo have no files".
  *
  * @param {FetchLike} fetchFn - The transport.
- * @param {string} [root] - A directory within the served tree to narrow to.
- * @returns {TreeSource} A source that yields the current tree.
+ * @param {string} [root] - A directory within served tree to narrow to.
+ * @returns {TreeSource} A source that yield current tree.
  */
 export function createTreeSource(fetchFn: FetchLike, root = ''): TreeSource {
   const url = root === '' ? TREE_URL : `${TREE_URL}?root=${encodeURIComponent(root)}`;
@@ -148,18 +144,18 @@ export function createTreeSource(fetchFn: FetchLike, root = ''): TreeSource {
 }
 
 /**
- * What the shell needs to mount: the snapshot to boot from, the source to keep
- * it live, and the tree the file selector browses — both null for the static
- * artifact, which has no daemon behind it and therefore no repository to show.
+ * What shell need to mount: snapshot to boot from, source to keep
+ * it live, and tree file selector browse — both null for static
+ * artifact, which have no daemon behind it and therefore no repository to show.
  *
  * @interface Boot
  * @property {PawSnapshot} snapshot - The initial snapshot.
- * @property {SnapshotSource | null} source - The polling source used while the socket is down, or null when static.
- * @property {SocketFactory | null} connect - Opens the live socket, or null when static or not on https.
- * @property {TreeSource | null} treeSource - The tree source, or null when static.
- * @property {ConfigClient | null} config - The binding editor's client, or null when static.
- * @property {RecentClient | null} recent - The scope picker's recent-routes client, or null when static.
- * @property {string | null} token - The credential this tab adopted, or null.
+ * @property {SnapshotSource | null} source - Polling source used while socket down, or null when static.
+ * @property {SocketFactory | null} connect - Open live socket, or null when static or not on https.
+ * @property {TreeSource | null} treeSource - Tree source, or null when static.
+ * @property {ConfigClient | null} config - Binding editor client, or null when static.
+ * @property {RecentClient | null} recent - Scope picker recent-routes client, or null when static.
+ * @property {string | null} token - Credential this tab adopted, or null.
  */
 export interface Boot {
   readonly snapshot: PawSnapshot;
@@ -172,13 +168,13 @@ export interface Boot {
 }
 
 /**
- * Resolve the console's data: the injected snapshot when the build supplied one,
- * otherwise the daemon's live state. A live boot adopts the token from the
- * address bar first, and every transport it hands back is already carrying it.
+ * Resolve console data: injected snapshot when build supply one,
+ * otherwise daemon live state. Live boot adopt token from
+ * address bar first, and every transport it hand back already carry it.
  *
- * @param {PawWindow & AuthWindow} win - The window to read the injected snapshot and credential from.
- * @param {FetchLike} fetchFn - The transport for the live case.
- * @returns {Promise<Boot>} The snapshot, its sources, and the adopted token.
+ * @param {PawWindow & AuthWindow} win - Window to read injected snapshot and credential from.
+ * @param {FetchLike} fetchFn - Transport for live case.
+ * @returns {Promise<Boot>} Snapshot, its sources, and adopted token.
  */
 export async function boot(
   win: PawWindow & AuthWindow & SocketWindow,
@@ -204,9 +200,8 @@ export async function boot(
   return {
     snapshot: await source(null),
     source,
-    // No socket when the page is not on https or the environment has none: the
-    // console then polls, which is slower and correct, rather than downgrading
-    // the wire to something a credential should never travel over.
+    // No socket when page not on https or environment have none: console then
+    // poll. Credential never travel over a wire not bound to the daemon host.
     connect: url === null || ctor === undefined ? null : createSocketFactory(url, ctor),
     treeSource: createTreeSource(authed),
     config: createConfigClient(authed),

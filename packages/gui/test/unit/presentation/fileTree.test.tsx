@@ -1,11 +1,11 @@
 /**
- * File Tree Tests
+ * File tree tests
  *
- * @fileoverview The ported selector, as an operator uses it: open the dropdown,
- * expand a folder, check a file, check a folder to take everything under it,
- * and watch a half-chosen folder read as half-chosen. Also the ways the dropdown
- * closes — outside click and Escape — and the way it does not: choosing a file
- * leaves it open, because attaching context is a multi-step act.
+ * @fileoverview The ported selector, as operator use it: open dropdown,
+ * expand folder, check file, check folder to take everything under it,
+ * and watch half-chosen folder read half-chosen. Also ways dropdown
+ * close — outside click and Escape — and way it not: choosing file
+ * leave it open, because attach context multi-step act.
  *
  * @module @paw/gui/test/unit/presentation/fileTree
  */
@@ -32,7 +32,8 @@ const TREE: TreeNode[] = [
 ];
 
 /**
- * The selector wired to real selection state, as the console wires it.
+ * Selector wired to real selection state; tests cover the same toggleContext
+ * logic the console uses.
  *
  * @returns {JSX.Element} The harness.
  */

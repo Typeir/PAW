@@ -1,10 +1,8 @@
 /**
  * PAW Home Tests
  *
- * @fileoverview Pins the per-platform rules from any platform, since the
- * resolver is pure over an injected environment. Moved here with `pawHome`
- * itself when the installer needed it and could not be made to depend on the
- * daemon to get it.
+ * @fileoverview Pin per-platform `pawHome` rules from any platform.
+ * Resolver pure over injected environment.
  *
  * @module @paw/core/test/domain/pawHome
  * @version 0.0.0
@@ -16,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { binDir, pawHome } from '../../src/domain/pawHome.js';
 
 describe('pawHome', () => {
-  it('honours an explicit override above all', () => {
+  it('honours an explicit override before platform defaults', () => {
     expect(pawHome('linux', { PAW_HOME: '/tmp/paw-home' })).toBe('/tmp/paw-home');
     expect(
       pawHome('win32', {
@@ -43,7 +41,7 @@ describe('pawHome', () => {
     expect(pawHome('win32', { USERPROFILE: 'C:\\Users\\x' })).toBe('C:/Users/x/paw');
   });
 
-  it('fails loud rather than writing keys somewhere arbitrary', () => {
+  it('throws when no base directory can be resolved', () => {
     expect(() => pawHome('win32', {})).toThrow('neither LOCALAPPDATA nor USERPROFILE');
     expect(() => pawHome('darwin', {})).toThrow('HOME is not set');
     expect(() => pawHome('linux', {})).toThrow('neither XDG_DATA_HOME nor HOME');
@@ -52,7 +50,7 @@ describe('pawHome', () => {
 });
 
 describe('binDir', () => {
-  it('puts the binary under the machine home, not a repository', () => {
+  it('places the binary under the resolved machine home directory', () => {
     expect(binDir('/home/x/.local/share/paw')).toBe('/home/x/.local/share/paw/bin');
     expect(binDir('C:/Users/x/AppData/Local/paw')).toBe(
       'C:/Users/x/AppData/Local/paw/bin',

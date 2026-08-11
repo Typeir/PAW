@@ -1,14 +1,12 @@
 /**
  * PAW Canonical Event Model
  *
- * @fileoverview The host-agnostic event stream PAW reasons over, and the
- * response it returns. This is the contract PAW ships. A host — the Copilot SDK,
- * the Copilot CLI, a VS Code extension, or tomorrow an Anthropic or Codex
- * runtime — never speaks its own semantics to PAW's core; a connector translates
- * the host's native surface into one of these {@link PawEvent}s and translates a
- * {@link PawResponse} back. PAW's loop is identical for every host; only the
- * connector at the edge differs. That is what lets PAW sit anywhere and bolt onto
- * anything through configuration rather than through hardcoded names and paths.
+ * @fileoverview Host-agnostic event stream PAW process, plus response it
+ * return. Contract PAW ship. Host — Copilot SDK, Copilot CLI, VS Code extension,
+ * Anthropic codex runtime — never pass own native semantics to PAW core;
+ * connector maps host native event format onto one of these {@link PawEvent}s
+ * and maps {@link PawResponse} back. PAW runs same loop for every host; only
+ * connector at edge differ. PAW binds to host through config.
  *
  * @module @paw/core/domain/event
  * @version 0.0.0
@@ -17,8 +15,8 @@
  */
 
 /**
- * The canonical event kinds, as a runtime list so a boundary can validate an
- * event string off the wire without a second hand-kept copy.
+ * Canonical event kinds as runtime list; boundary validate event string off wire
+ * against it.
  */
 export const PAW_EVENT_TYPES = [
   'session.start',
@@ -29,19 +27,19 @@ export const PAW_EVENT_TYPES = [
 ] as const;
 
 /**
- * The canonical event kinds. Hosts map their own lifecycle names onto these.
+ * Canonical event kinds. Hosts map own lifecycle names onto these.
  */
 export type PawEventType = (typeof PAW_EVENT_TYPES)[number];
 
 /**
- * A tool is about to run — the enforcement decision point.
+ * Tool about to run — enforcement decision point.
  *
  * @interface ToolPreEvent
  * @property {'tool.pre'} type - Discriminant.
  * @property {string | null} sessionId - Host session id, or null.
  * @property {string} toolName - Canonical tool name.
- * @property {readonly string[]} targetPaths - Project-relative paths the tool would touch.
- * @property {string | null} envMatch - A secret/`.env` path or command the connector detected, or null.
+ * @property {readonly string[]} targetPaths - Project-relative paths tool would touch.
+ * @property {string | null} envMatch - Secret/`.env` path or command connector detect, or null.
  */
 export interface ToolPreEvent {
   readonly type: 'tool.pre';
@@ -52,14 +50,14 @@ export interface ToolPreEvent {
 }
 
 /**
- * A tool has finished — the gate/record point.
+ * Tool done — gate/record point.
  *
  * @interface ToolPostEvent
  * @property {'tool.post'} type - Discriminant.
  * @property {string | null} sessionId - Host session id, or null.
  * @property {string} toolName - Canonical tool name.
- * @property {readonly string[]} editedPaths - Paths the tool changed.
- * @property {boolean} failed - Whether the tool reported failure.
+ * @property {readonly string[]} editedPaths - Paths tool changed.
+ * @property {boolean} failed - Tool report failure or not.
  */
 export interface ToolPostEvent {
   readonly type: 'tool.post';
@@ -70,12 +68,12 @@ export interface ToolPostEvent {
 }
 
 /**
- * The user submitted a prompt — the L1 context injection point.
+ * User submit prompt — L1 context injection point.
  *
  * @interface PromptSubmittedEvent
  * @property {'prompt.submitted'} type - Discriminant.
  * @property {string | null} sessionId - Host session id, or null.
- * @property {string} prompt - The submitted prompt text.
+ * @property {string} prompt - Submitted prompt text.
  */
 export interface PromptSubmittedEvent {
   readonly type: 'prompt.submitted';
@@ -84,12 +82,12 @@ export interface PromptSubmittedEvent {
 }
 
 /**
- * A session began.
+ * Session begin.
  *
  * @interface SessionStartEvent
  * @property {'session.start'} type - Discriminant.
  * @property {string | null} sessionId - Host session id, or null.
- * @property {string} source - How it started (host-specific label).
+ * @property {string} source - How it start (host-specific label).
  */
 export interface SessionStartEvent {
   readonly type: 'session.start';
@@ -98,13 +96,13 @@ export interface SessionStartEvent {
 }
 
 /**
- * A session is ending — the final-gate point.
+ * Session end — final-gate point.
  *
  * @interface SessionEndEvent
  * @property {'session.end'} type - Discriminant.
  * @property {string | null} sessionId - Host session id, or null.
- * @property {string} reason - Why it ended (host-specific label).
- * @property {boolean} nested - Whether this is a nested/re-entrant end that must be ignored.
+ * @property {string} reason - Why it end (host-specific label).
+ * @property {boolean} nested - Nested/re-entrant end, must ignore.
  */
 export interface SessionEndEvent {
   readonly type: 'session.end';
@@ -114,8 +112,8 @@ export interface SessionEndEvent {
 }
 
 /**
- * The canonical event union. A connector produces exactly one of these from a
- * host's native payload.
+ * Canonical event union. Connector produce exactly one these from host native
+ * payload.
  */
 export type PawEvent =
   | ToolPreEvent
@@ -125,13 +123,13 @@ export type PawEvent =
   | SessionEndEvent;
 
 /**
- * The canonical response PAW returns for an event. A connector maps this to its
- * host's native output shape.
+ * Canonical response PAW return for event. Connector map this to its host native
+ * output shape.
  *
- * - `allow` — proceed; may carry hidden context for the model.
- * - `deny` — veto a tool (the pre-tool block).
- * - `block` — stop a post-tool or session-end from proceeding, with a reason.
- * - `context` — inject context without blocking (the L1 injection).
+ * - `allow` — proceed; may carry hidden context for model.
+ * - `deny` — veto tool (pre-tool block).
+ * - `block` — stop post-tool or session-end from proceeding, with reason.
+ * - `context` — inject context without blocking (L1 injection).
  * - `noop` — nothing to do.
  */
 export type PawResponse =

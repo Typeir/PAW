@@ -1,8 +1,8 @@
 /**
- * @fileoverview Unit tests for the daemon endpoint addressing. They pin a stable,
- * case/slash-insensitive project id, the win32 pipe form and the POSIX socket
- * form (with and without `$XDG_RUNTIME_DIR`), and the token/lock paths — so
- * `endpoint.ts` reaches 100% on either host.
+ * @fileoverview Test daemon endpoint addressing. Pin stable
+ * case/slash-insensitive project id. Pin win32 pipe form. Pin POSIX socket
+ * form (with and without `$XDG_RUNTIME_DIR`). Pin token/lock paths. Cover
+ * `endpoint.ts` 100% on either host.
  *
  * @module @paw/daemon/test/endpoint
  */

@@ -1,9 +1,8 @@
 /**
  * Snapshot Source Tests
  *
- * @fileoverview Covers both ways the console gets data — a daemon's
- * `/api/state` and a build-injected snapshot — and the loud failure when the
- * daemon answers with anything but success.
+ * @fileoverview Tests both data paths — daemon `/api/state` and build-injected
+ * snapshot — and the error thrown when the daemon returns a non-success status.
  *
  * @module @paw/gui/test/unit/infrastructure/snapshotSource
  */
@@ -27,10 +26,10 @@ import type {
 import { makeSnapshot } from '../../fixtures.js';
 
 /**
- * A window with no credential in its address bar and no storage behind it.
+ * Window with no credential in address bar an' no storage behind it.
  *
- * @param {string} [hash] - The fragment to boot with.
- * @returns {PawWindow & AuthWindow} The fake window.
+ * @param {string} [hash] - Fragment to boot with.
+ * @returns {PawWindow & AuthWindow} Fake window.
  */
 const makeWindow = (hash = ''): PawWindow & AuthWindow & SocketWindow => ({
   location: { hash, pathname: '/', search: '', host: '127.0.0.1:8971', protocol: 'https:' },
@@ -38,7 +37,7 @@ const makeWindow = (hash = ''): PawWindow & AuthWindow & SocketWindow => ({
 });
 
 /**
- * A `WebSocket` constructor that opens nothing — `boot` only stores it.
+ * `WebSocket` constructor that open nothing — `boot` only store it.
  */
 const FakeSocket = class {
   send(): void {}
@@ -46,10 +45,10 @@ const FakeSocket = class {
 } as unknown as WebSocketConstructor;
 
 /**
- * A fetch that answers with a snapshot.
+ * Fetch that answer with snapshot.
  *
- * @param {unknown} body - The body to answer with.
- * @returns {FetchLike} The fake transport.
+ * @param {unknown} body - Body to answer with.
+ * @returns {FetchLike} Fake transport.
  */
 function okFetch(body: unknown): FetchLike {
   return vi.fn(async () => ({ ok: true, status: 200, json: async () => body }));
@@ -185,8 +184,7 @@ describe('boot', () => {
     expect(noSocket.connect).toBeNull();
     expect(noSocket.source).not.toBeNull();
 
-    // Served over plain http: the credential must never travel over a wire
-    // anything on the machine can read, so the console polls instead.
+    // Plain http: WebSocket disabled, so boot polls the daemon instead.
     const plain = {
       ...makeWindow(),
       location: { hash: '', pathname: '/', search: '', host: 'x', protocol: 'http:' },

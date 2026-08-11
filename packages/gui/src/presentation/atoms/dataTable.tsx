@@ -1,10 +1,9 @@
 /**
  * Data Table Atom
  *
- * @fileoverview The console's one table: upper-case column heads over monospace
- * rows, with right-alignment declared per column so numbers line up on their
- * digits. Rows are the caller's children, because a herd row and a process row
- * carry different cells but the same frame.
+ * @fileoverview Console one table. Upper-case column head over monospace row.
+ * Right-align declared per column so number line up on digit. Row be caller
+ * child, because herd row and process row carry different cell but same frame.
  *
  * @module @paw/gui/presentation/atoms/dataTable
  * @version 0.0.0
@@ -18,9 +17,9 @@ import type { ReactNode } from 'react';
  * One column head.
  *
  * @interface Column
- * @property {string} key - A stable key.
- * @property {string} label - The head label.
- * @property {boolean} [right] - Right-align the column.
+ * @property {string} key - Stable key.
+ * @property {string} label - Head label.
+ * @property {boolean} [right] - Right-align column.
  */
 export interface Column {
   readonly key: string;
@@ -32,7 +31,7 @@ export interface Column {
  * Props for {@link DataTable}.
  *
  * @interface DataTableProps
- * @property {readonly Column[]} columns - The column heads.
+ * @property {readonly Column[]} columns - Column heads.
  * @property {ReactNode} children - The `tr` rows.
  */
 export interface DataTableProps {
@@ -41,10 +40,10 @@ export interface DataTableProps {
 }
 
 /**
- * A console table.
+ * Console table.
  *
- * @param {DataTableProps} props - The table props.
- * @returns {JSX.Element} The table.
+ * @param {DataTableProps} props - Table props.
+ * @returns {JSX.Element} Table.
  */
 export function DataTable({ columns, children }: DataTableProps) {
   return (

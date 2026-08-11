@@ -1,10 +1,10 @@
 /**
  * PAW Event Router Tests
  *
- * @fileoverview Routes each canonical event through the router against a fake
- * store — pre-tool allow, allow-with-nudge, deny, ignored-path allow, prompt L1
- * context and its empty and absent forms, and a non-acting event — so
- * `handleEvent.ts` reaches 100%.
+ * @fileoverview Route each canonical event through router against fake
+ * store: pre-tool allow, allow-with-nudge, deny, ignored-path allow, prompt L1
+ * context and empty and absent forms, and non-acting event. Cover
+ * `handleEvent.ts` to 100%.
  *
  * @module @paw/core/test/application/handleEvent
  * @version 0.0.0

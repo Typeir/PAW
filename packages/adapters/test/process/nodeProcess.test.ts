@@ -1,10 +1,9 @@
 /**
  * PAW Node Process Adapter Tests
  *
- * @fileoverview Drives the process adapter against real short-lived Node
- * processes — stdout, stderr, non-zero exit, a passed environment, a timeout, a
- * spawn that cannot launch, and a detached spawn — covering every branch,
- * including the loud rejections on failure.
+ * @fileoverview Drive process adapter against real short-lived Node processes.
+ * Check stdout, stderr, non-zero exit, passed env, timeout, spawn that cannot
+ * launch, detached spawn. Cover every branch, including rejections on failure.
  *
  * @module @paw/adapters/test/process/nodeProcess
  * @version 0.0.0

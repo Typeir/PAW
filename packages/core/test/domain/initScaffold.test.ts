@@ -1,8 +1,8 @@
 /**
  * PAW Init Scaffold Tests
  *
- * @fileoverview Covers `planInit` — the host-agnostic config and the delegating
- * git hook, with their executable flags — so the bytes an attach writes are pinned wherever it is driven from.
+ * @fileoverview Cover `planInit`: host-agnostic config an' delegating git hook,
+ * with exec flags. Pin bytes attach writes.
  *
  * @module @paw/core/test/domain/initScaffold
  * @version 0.0.0

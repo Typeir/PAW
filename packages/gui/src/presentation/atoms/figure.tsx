@@ -1,10 +1,9 @@
 /**
  * Figure Atom
  *
- * @fileoverview A large tabular number over a small caption — the budget card's
- * token counts and its spend. The cost variant right-aligns and takes the good
- * colour, which is how the card reads at a glance: two inputs on the left, what
- * they cost on the right.
+ * @fileoverview Big tabular number over small caption, used for budget card
+ * token counts and spend. Cost variant right-aligns and applies a distinct
+ * colour; the card shows two inputs on the left and their cost on the right.
  *
  * @module @paw/gui/presentation/atoms/figure
  * @version 0.0.0
@@ -13,12 +12,12 @@
  */
 
 /**
- * Props for {@link Figure}.
+ * Figure props. Pass to {@link Figure}.
  *
  * @interface FigureProps
  * @property {string} value - The figure.
- * @property {string} caption - The caption beneath it.
- * @property {boolean} [cost] - Render as the trailing cost figure.
+ * @property {string} caption - Caption beneath it.
+ * @property {boolean} [cost] - Render as trailing cost figure.
  */
 export interface FigureProps {
   readonly value: string;
@@ -27,7 +26,7 @@ export interface FigureProps {
 }
 
 /**
- * A captioned figure.
+ * Captioned figure.
  *
  * @param {FigureProps} props - The figure props.
  * @returns {JSX.Element} The figure.

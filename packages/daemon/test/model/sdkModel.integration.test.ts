@@ -1,12 +1,10 @@
 /**
- * @fileoverview Proves the whole SDK egress pipeline end-to-end against the real
- * Copilot runtime and a stub provider — no API key, opt-in behind `PAW_SDK_LIVE=1`
- * because it spawns the ~159 MB runtime. It asserts the completion returns the
- * stub's content and the stub's *real* token usage (not a fabricated zero),
- * proving that {@link PawEgress} stamped the key, performed the call, read usage
- * from the response, and correlated it to the session — the recovery for the
- * SDK's missing usage. If the token counts came back as the stub's 42/7, the
- * daemon-owned BYOK egress works.
+ * @fileoverview Exercises the SDK egress pipeline end-to-end against a stub
+ * provider. Opt-in behind `PAW_SDK_LIVE=1`; gated because it spawns a ~159 MB
+ * Copilot runtime. Sends a completion, reads token usage from the response,
+ * and asserts the {@link PawEgress} stamp key and the provided auth token reach
+ * the provider. The stub returns token counts 42/7. Runs through daemon-owned
+ * BYOK egress.
  *
  * @module @paw/daemon/test/model/sdkModel.integration
  */
@@ -54,6 +52,8 @@ describe.skipIf(!LIVE)('SDK model egress (integration)', () => {
       provider: { type: 'openai', baseUrl },
       authToken: () => 'sk-stub',
       baseDirectory: join(home, '.copilot-home'),
+      workingDirectory: home,
+      safemode: false,
     });
 
     try {

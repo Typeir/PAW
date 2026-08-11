@@ -1,11 +1,9 @@
 /**
  * PAW Attach Request Tests
  *
- * @fileoverview Covers the third thing a console may say. It is a *request*,
- * not a command: the daemon records it and an operator approves it elsewhere, so
- * what these pin is the parsing discipline the other two messages already hold —
- * an allow-list that rebuilds the message, refuses anything it does not
- * recognise, and refuses a mode outside the three the domain defines.
+ * @fileoverview Cover attach message. Daemon record request, operator approve
+ * elsewhere. Pin parsing discipline — allow-list rebuild message, refuse thing
+ * no recognise, refuse mode outside three domain define.
  *
  * @module @paw/core/test/domain/attachRequest
  * @version 0.0.0

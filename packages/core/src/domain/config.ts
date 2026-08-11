@@ -1,12 +1,10 @@
 /**
- * PAW Configuration Schema
+ * PAW Config Schema
  *
- * @fileoverview The host-agnostic config that unbolts PAW from `.github` and
- * from Copilot. A repo declares where PAW lives, where its gates are, which
- * connector schema its host speaks, and where that host reads and writes — as
- * data, not as hardcoded paths and event names. Point PAW at your stuff and name
- * your connector; the enforcement loop is identical regardless. `validateConfig`
- * fails loud on a config that would silently misbehave.
+ * @fileoverview Host-agnostic config, not coupled to `.github` or Copilot. Repo
+ * declares where PAW state lives, where gates are, which connector schema the host
+ * uses, and where host reads and writes, as data. Enforcement loop identical across connectors.
+ * `validateConfig` returns a ConfigProblem for each field that fails validation.
  *
  * @module @paw/core/domain/config
  * @version 0.0.0
@@ -17,13 +15,13 @@
 import type { ModelCapabilities } from './role.js';
 
 /**
- * A repo's PAW configuration.
+ * Repo's PAW config.
  *
  * @interface PawConfig
- * @property {string} root - Directory PAW's installed state lives in (gitignored). Anywhere; not necessarily `.github`.
- * @property {string} gatesDir - Directory quality gates are discovered from.
- * @property {string} connector - Name of the host connector this repo uses (e.g. `copilot-hooks`, `copilot-sdk`, `vscode`).
- * @property {Record<string, string>} [hostPaths] - Where the connector reads/writes host files (e.g. a hooks.json target), keyed by a connector-defined name.
+ * @property {string} root - Directory PAW's installed state live in (gitignored). Any location.
+ * @property {string} gatesDir - Directory where quality gates get discovered from.
+ * @property {string} connector - Name of host connector repo use (e.g. `copilot-hooks`, `copilot-sdk`, `vscode`).
+ * @property {Record<string, string>} [hostPaths] - Where connector read/write host files (e.g. hooks.json target), keyed by connector-defined name.
  * @property {readonly string[]} [exemptTools] - Read-only tools never blocked by violations.
  * @property {readonly string[]} [sourceDirectories] - Directories gates scan by default.
  */
@@ -37,8 +35,8 @@ export interface PawConfig {
 }
 
 /**
- * A repo's `.paw/config.json` as parsed, with the registry slice typed and every
- * other field passed through so an edit preserves what it does not touch.
+ * Repo's `.paw/config.json` as parsed. Registry slice typed, every other field
+ * passed through.
  *
  * @interface ConfigDocument
  * @property {Readonly<Record<string, ModelCapabilities>>} [models] - Declared models by id.
@@ -51,11 +49,11 @@ export interface ConfigDocument {
 }
 
 /**
- * A single configuration problem.
+ * One configuration problem.
  *
  * @interface ConfigProblem
  * @property {string} field - The offending field.
- * @property {string} message - What is wrong.
+ * @property {string} message - What wrong.
  */
 export interface ConfigProblem {
   readonly field: string;
@@ -63,20 +61,18 @@ export interface ConfigProblem {
 }
 
 /**
- * Whether a value is a non-empty string.
+ * Whether value be non-empty string.
  *
  * @param {unknown} v - The value.
- * @returns {boolean} True when it is a non-empty string.
+ * @returns {boolean} True when it non-empty string.
  */
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.length > 0;
 }
 
 /**
- * Validate a candidate config, returning every problem found. A connector this
- * repo cannot resolve, or a missing required path, is a problem — surfaced, not
- * swallowed, so a misconfigured PAW refuses to run rather than enforcing nothing
- * silently.
+ * Validate candidate config, return every problem found. Unresolvable connector
+ * or missing required path be problem.
  *
  * @param {unknown} candidate - The parsed config object.
  * @param {readonly string[]} knownConnectors - Connector names PAW can resolve.

@@ -1,13 +1,11 @@
 /**
  * PAW GUI Browser Shell
  *
- * @fileoverview The driving side of the hexagon in the browser, and nothing
- * more: resolve where the data comes from, mount {@link ConsoleApp} into `#app`,
- * and get out of the way. It holds no rules and is excluded from unit coverage —
- * it is the DOM/boot shell, the browser counterpart of the CLI's process shell —
- * while everything it composes is unit-tested to 100%. A boot that fails paints
- * the reason into the page and rethrows: a console that cannot reach its daemon
- * says so instead of showing an empty window.
+ * @fileoverview Browser entry point. Resolve where data come from, mount
+ * {@link ConsoleApp} into `#app`, then exit. Excluded from unit coverage — DOM/boot
+ * shell, browser counterpart of CLI process shell — unit tests cover the modules
+ * it composes to 100%. On boot failure paint reason into page and rethrow: if
+ * console cannot reach daemon, say so, no empty window.
  *
  * @module @paw/gui/main
  * @version 0.0.0
@@ -23,7 +21,7 @@ import { windowControls, type ShellWindow } from './infrastructure/shell.js';
 import { ConsoleApp } from './presentation/consoleApp.js';
 
 /**
- * Resolve the snapshot and mount the console.
+ * Resolve snapshot, mount console.
  */
 async function mount(): Promise<void> {
   const host = document.getElementById('app');

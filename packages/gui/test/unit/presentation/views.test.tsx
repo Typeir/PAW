@@ -1,9 +1,9 @@
 /**
- * Subsystem View Tests
+ * Subsystem view test.
  *
- * @fileoverview The non-swarm subsystems: the Overview built from real host
- * facts, the role bindings and their three verdicts, the enforcement ledger full
- * and empty, and the honest stand-in for what no daemon report backs yet.
+ * @fileoverview Non-swarm subsystem. Overview built from real host fact. Role
+ * binding show three verdict. Enforcement ledger show full and empty. Views
+ * render a placeholder when no daemon reports yet.
  *
  * @module @paw/gui/test/unit/presentation/views
  */
@@ -21,7 +21,7 @@ import { SectionOutlet } from '../../../src/presentation/views/sectionOutlet.js'
 import { ViolationsView } from '../../../src/presentation/views/violationsView.js';
 import { makeSnapshot, renderInConsole } from '../../fixtures.js';
 
-/** A config client whose declared models and write outcomes are set per test. */
+/** Config client. Declared model and write outcome set per test. */
 const configClient = (over: Partial<ConfigClient> = {}): ConfigClient => ({
   models: async () => ['fast', 'slow'],
   bind: async () => ({ ok: true }),
@@ -29,7 +29,7 @@ const configClient = (over: Partial<ConfigClient> = {}): ConfigClient => ({
   ...over,
 });
 
-/** Render the Roles view over a config client, so it is editable. */
+/** Render Roles view over config client. Make editable. */
 const renderEditable = (client: ConfigClient) =>
   render(
     <ConsoleProvider snapshot={makeSnapshot()} config={client}>

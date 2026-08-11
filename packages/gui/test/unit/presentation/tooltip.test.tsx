@@ -1,9 +1,8 @@
 /**
- * @fileoverview Covers the Tooltip atom: it renders only the trigger when
- * disabled, shows on hover after the delay (portalled `role="tooltip"`, wired via
- * `aria-describedby`), hides on leave, shows on focus, and forwards an extra
- * className to its wrapper — so `tooltip.tsx` reaches 100% with fake timers and no
- * real layout.
+ * @fileoverview Test Tooltip atom. Render only trigger when disabled. Show on
+ * hover after delay (portalled `role="tooltip"`, wired via `aria-describedby`).
+ * Hide on leave. Show on focus. Forward extra className to wrapper. Give
+ * `tooltip.tsx` 100% with fake timers and no real layout.
  *
  * @module @paw/gui/test/unit/presentation/tooltip
  */

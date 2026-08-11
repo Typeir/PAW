@@ -1,30 +1,26 @@
 /**
  * PAW Electron Main Process
  *
- * @fileoverview The desktop shell for the PAW console, and by design a shell
- * only. It starts `pawd` inside this very process — the same `runDaemon` the CLI
- * calls, on the same node runtime — and opens one hardened
- * {@link BrowserWindow} on the loopback URL that daemon bound. The window
- * therefore shows live data: the host facts, the owned process subtree, and the
- * plan's doctor, re-read on every poll, rather than a page frozen at build time.
+ * @fileoverview Desktop shell for PAW console. Start `pawd` inside
+ * this same process — same `runDaemon` CLI call, same node runtime — and open
+ * one hardened {@link BrowserWindow} on loopback URL daemon bound. Window re-reads
+ * live data every poll: host facts, owned process subtree, plan doctor; content
+ * from the daemon snapshot.
  *
- * The window is **frameless**, and the console's own titlebar is therefore the
- * real one: it drags the window, and its three lights minimise, maximise, and
- * close it over a single IPC channel that accepts those three named actions and
- * nothing else. A browser tab gets no such bridge, so the same console draws no
- * window chrome there — the costume of a fake window belongs to neither shell.
+ * Window **frameless**. Console renders its own titlebar; three buttons
+ * minimise, maximise, close over single IPC channel. Channel accepts only those
+ * three actions. Browser tab has no IPC bridge, so the same console draws no
+ * window chrome there.
  *
- * The security posture is otherwise unchanged and is stated in one place below:
- * context isolation on, node integration off, sandbox on, a strict CSP stamped
- * on every response whose only relaxation is `connect-src` for the daemon's own
- * origin, navigation away denied, and that one narrow bridge as the window's
- * single channel to the main process. The daemon serves TLS, and this shell
- * **pins** its certificate rather than trusting a store: the only certificate it
- * will accept is the one the daemon in this same process is holding, so the
- * desktop app needs no trust-store change and cannot be redirected by one. Nothing here is domain logic —
- * per decision doc 11 the GUI is a presenter over the daemon, and Electron is a
- * shell around that GUI, not a twin that owns a second brain. A `--capture`
- * launch renders once to a PNG for regression, then quits.
+ * Security posture otherwise unchanged, stated in one place below: context
+ * isolation on, node integration off, sandbox on, strict CSP applied to every
+ * response. Only relaxation `connect-src` for daemon's own origin. Navigation
+ * away denied. The IPC channel is the window's only channel to main process.
+ * Daemon serve TLS, shell **pins** its certificate: accept only certificate
+ * daemon in this same process hold; no trust-store lookup. Desktop app need no
+ * trust-store change, cannot be redirected by one. No domain logic here — per
+ * decision doc 11 GUI presenter over daemon, Electron shell around that GUI.
+ * `--capture` launch render once to PNG for regression, then quit.
  *
  * @module @paw/electron/main
  * @version 0.0.0
@@ -35,7 +31,7 @@
 import { app, BrowserWindow, ipcMain, session } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   chromiumFingerprint,
   createNodeRecentRoutes,
@@ -47,13 +43,12 @@ import {
 } from '@paw/daemon';
 
 /**
- * Whether this launch is a headless regression capture rather than an
- * interactive session.
+ * This launch is a headless regression capture.
  */
 const IS_CAPTURE = process.argv.includes('--capture') || process.env.PAW_CAPTURE === '1';
 
 /**
- * The hardened `webPreferences` shared by the interactive and capture windows.
+ * Hardened `webPreferences` shared by interactive and capture windows.
  */
 const SECURE_WEB_PREFERENCES = {
   preload: join(__dirname, 'preload.cjs'),
@@ -66,14 +61,14 @@ const SECURE_WEB_PREFERENCES = {
 } as const;
 
 /**
- * The Content-Security-Policy stamped onto every response. `default-src 'none'`
- * denies everything, then only the console's own needs are re-granted: the
- * inline bundle's script and style, `data:` images and fonts, and `connect-src`
- * for the daemon's origin alone — that single grant is what lets the page poll
- * `/api/state`, and it reaches nothing else on the network.
+ * Content-Security-Policy applied to every response. `default-src 'none'`
+ * deny everything, then re-grant only console's own needs: inline bundle's
+ * script and style, `data:` images and fonts, and `connect-src` for daemon's
+ * origin alone — that single grant lets page poll `/api/state`, reach nothing
+ * else on network.
  *
- * @param {string} origin - The daemon's origin, e.g. `https://127.0.0.1:8971`.
- * @returns {string} The policy.
+ * @param {string} origin - Daemon's origin, e.g. `https://127.0.0.1:8971`.
+ * @returns {string} Policy.
  */
 function cspFor(origin: string): string {
   return [
@@ -91,13 +86,12 @@ function cspFor(origin: string): string {
 }
 
 /**
- * Read what repository this shell should serve. Nothing is required: with no
- * arguments it serves the directory it was launched from, discovering that
- * repo's config and every plan in it, exactly as `paw ui` does. A plan may be
- * named to open on.
+ * Read repository this shell launches. No arguments required; resolves the
+ * directory launched from, discovers that repo's config and every plan in it,
+ * as `paw ui` do. Plan may be named to open on.
  *
- * @param {string[]} argv - The process argv.
- * @returns {{ root: string; configPath?: string; planPath?: string }} The launch options.
+ * @param {string[]} argv - Process argv.
+ * @returns {{ root: string; configPath?: string; planPath?: string }} Launch options.
  */
 export function readLaunchArgs(argv: string[]): {
   root: string;
@@ -111,14 +105,14 @@ export function readLaunchArgs(argv: string[]): {
   const [planPath] = argv
     .slice(2)
     .filter((a) => !a.startsWith('-') && !a.endsWith('.cjs'));
-  return { root: flag('root') ?? '.', configPath: flag('config'), planPath };
+  return { root: resolve(flag('root') ?? '.'), configPath: flag('config'), planPath };
 }
 
 /**
- * Stamp the policy onto every response for the default session. Registered
- * before any load, so the first document is already governed.
+ * Apply policy to every response for default session. Register before any
+ * load, so first document already governed.
  *
- * @param {string} origin - The daemon's origin.
+ * @param {string} origin - Daemon's origin.
  */
 function installCsp(origin: string): void {
   const csp = cspFor(origin);
@@ -130,21 +124,18 @@ function installCsp(origin: string): void {
 }
 
 /**
- * Trust exactly one certificate: the one the daemon in this very process just
- * loaded from disk. Everything else is refused outright.
+ * Trust exactly one certificate: one daemon in this very process just loaded
+ * from disk. Refuse everything else outright.
  *
- * This is a **pin**, and it is a stronger claim than trusting the CA would be —
- * the shell is not asking "did something on this machine vouch for this name?",
- * it is asking "is this the certificate my own daemon is holding?". The operator
- * therefore never has to add the CA to a trust store for the desktop app to
- * work, and adding it would not widen what this window will talk to.
+ * This is a **pin**: the shell compares the presented certificate against the
+ * fingerprint of the daemon it launched. No trust-store lookup runs, and adding
+ * a CA to the trust store does not widen what the window accepts.
  *
- * The verdicts are Chromium's: `0` accepts, `-2` rejects, and there is no branch
- * that returns `-3` (defer to Chromium) or that treats a verification failure as
- * a prompt. A shell that can be talked out of its pin is not pinned.
+ * Verdicts match Chromium's: `0` accept, `-2` reject. No branch returns `-3`
+ * (defer to Chromium) nor turns verification failure into a prompt.
  *
- * @param {string} fingerprint - The served certificate's digest, as PAW records it.
- * @param {string} host - The only hostname this shell may reach.
+ * @param {string} fingerprint - Served certificate's digest, as PAW record it.
+ * @param {string} host - Only hostname this shell may reach.
  */
 function pinDaemonCertificate(fingerprint: string, host: string): void {
   const expected = chromiumFingerprint(fingerprint);
@@ -154,10 +145,9 @@ function pinDaemonCertificate(fingerprint: string, host: string): void {
 }
 
 /**
- * Serve the three window actions the console's titlebar asks for, and nothing
- * else. The window is frameless — the console draws its titlebar, so these are
- * the buttons on it. Any other action is refused rather than interpreted, and
- * the request only ever moves the window it came from.
+ * Serve three window actions from the console titlebar. Window is frameless so
+ * the console draws its titlebar and these are its buttons. Any other action
+ * throws. Requests act only on the window that sent them.
  */
 function installWindowControls(): void {
   ipcMain.handle('paw:window', (event, action: unknown) => {
@@ -186,10 +176,10 @@ function installWindowControls(): void {
 }
 
 /**
- * Deny every navigation and every new-window request, pinning the shell to the
- * daemon's page. Defence in depth behind the CSP.
+ * Deny every navigation and every new-window request, keeping the shell on the
+ * daemon page. Second line of defense behind CSP.
  *
- * @param {BrowserWindow} win - The window to guard.
+ * @param {BrowserWindow} win - Window to guard.
  */
 function lockToDaemon(win: BrowserWindow): void {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -198,10 +188,10 @@ function lockToDaemon(win: BrowserWindow): void {
 }
 
 /**
- * Create the one hardened window on the daemon's URL.
+ * Create one hardened window on daemon's URL.
  *
- * @param {string} url - The daemon's console URL.
- * @returns {BrowserWindow} The created window.
+ * @param {string} url - Daemon's console URL.
+ * @returns {BrowserWindow} Created window.
  */
 function createWindow(url: string): BrowserWindow {
   const win = new BrowserWindow({
@@ -222,28 +212,28 @@ function createWindow(url: string): BrowserWindow {
 }
 
 /**
- * How long a capture waits after the page loads. `loadURL` resolves when the
- * document is loaded, which is before the console's first fetches of
- * `/api/state` and `/api/tree` have answered — capturing at that instant golden-
- * images a loading spinner rather than the console.
+ * How long capture waits after page load. `loadURL` resolves when the document
+ * loads, before the console's first fetches of `/api/state` and `/api/tree`
+ * answer; capturing at that instant captures the loading spinner.
  */
 const SETTLE_MS = 1200;
 
 /**
- * Wait, so a capture photographs a settled page.
+ * Wait after page load so the console fetches of `/api/state` and
+ * `/api/tree` have answered before capture.
  *
  * @param {number} ms - Milliseconds to wait.
- * @returns {Promise<void>} Resolves when the time has passed.
+ * @returns {Promise<void>} Resolve when time pass.
  */
 function settle(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
- * Render the console once in a hidden window, write a PNG of it, and return —
- * the regression-screenshot path.
+ * Render console once in hidden window, write PNG of it, return — the
+ * regression-screenshot path.
  *
- * @param {string} url - The daemon's console URL.
+ * @param {string} url - Daemon's console URL.
  */
 async function capture(url: string): Promise<void> {
   const win = new BrowserWindow({
@@ -265,19 +255,19 @@ async function capture(url: string): Promise<void> {
 }
 
 /**
- * The console page the daemon serves, resolved from this bundle's own location
- * (`packages/electron/dist`) rather than from the daemon's, which a CommonJS
- * bundle cannot know.
+ * Console page daemon serve, resolved from this bundle's own location
+ * (`packages/electron/dist`). The daemon's own location is gone after the
+ * CommonJS bundling.
  */
 const GUI_PAGE = join(__dirname, '..', '..', 'gui', 'dist', 'live.html');
 
 /**
- * The daemon this shell runs, kept so it can be stopped with the app.
+ * Daemon this shell run, kept so stop it with app.
  */
 let daemon: DaemonHandle | null = null;
 
 /**
- * Start the daemon, then the window.
+ * Start daemon, then window.
  */
 async function start(): Promise<void> {
   daemon = await runDaemon(
@@ -298,10 +288,8 @@ async function start(): Promise<void> {
   installCsp(`https://127.0.0.1:${daemon.port}`);
   installWindowControls();
 
-  // The console reads its credential from the URL fragment and immediately
-  // replaces it out of history — the same path a browser takes from the printed
-  // URL. Giving the desktop shell a private channel instead would mean a second
-  // authentication path to keep correct, and this one is already tested.
+  // Console reads its credential from the URL fragment, which is replaced out
+  // of history — the same path a browser takes from a printed URL.
   const url = `${daemon.url}#t=${daemon.token}`;
 
   if (IS_CAPTURE) {

@@ -1,9 +1,9 @@
 /**
  * Console Hook Tests
  *
- * @fileoverview The selector hooks, the bound actions, the theme, and the arrow
- * scrub — the application layer's whole surface, exercised through small probes
- * rather than through the console, so a failure here names the hook.
+ * @fileoverview Selector hooks, bound actions, theme, arrow scrub — the
+ * application hooks layer. Exercise through small probes, no console, so a
+ * failure here identifies the failing hook.
  *
  * @module @paw/gui/test/unit/application/hooks
  */
@@ -27,7 +27,7 @@ import { useTheme } from '../../../src/application/hooks/useTheme.js';
 import { renderInConsole } from '../../fixtures.js';
 
 /**
- * A probe over every selector hook.
+ * Probe over every selector hook.
  *
  * @returns {JSX.Element} The probe.
  */
@@ -108,7 +108,7 @@ describe('useConsoleActions', () => {
 });
 
 /**
- * A probe over the theme control.
+ * Probe over theme control.
  *
  * @returns {JSX.Element} The probe.
  */
@@ -149,7 +149,7 @@ describe('useTheme', () => {
  *
  * @interface ScrubProbeProps
  * @property {boolean} enabled - Whether scrubbing is bound.
- * @property {(delta: number) => void} step - The scrub sink.
+ * @property {(delta: number) => void} step - Receives scrub delta.
  */
 interface ScrubProbeProps {
   readonly enabled: boolean;
@@ -157,9 +157,9 @@ interface ScrubProbeProps {
 }
 
 /**
- * A probe over the arrow-key scrub.
+ * Probe over arrow-key scrub.
  *
- * @param {ScrubProbeProps} props - The probe props.
+ * @param {ScrubProbeProps} props - Probe props.
  * @returns {JSX.Element} The probe.
  */
 function ScrubProbe({ enabled, step }: ScrubProbeProps) {

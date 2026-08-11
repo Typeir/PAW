@@ -1,25 +1,21 @@
 /**
  * PAW Enforcement Control Bridge
  *
- * @fileoverview The console's write verbs, as thin bridges to the enforcement
- * daemon's socket. The console (`paw ui`) holds no violation store of its own —
- * that lives in the resident pawd the hooks autostart — so an operator pruning
- * the backlog or stopping enforcement from the console is one JSON-RPC round trip
- * to that daemon over the same socket the CLI and TUI use. There is exactly one
- * place a write is validated and dispatched, and this reuses it rather than
- * opening a second.
+ * @fileoverview Console write verbs, thin bridge to enforcement daemon socket.
+ * Console (`paw ui`) holds no violation store; the hooks autostart a resident
+ * pawd that holds the store. Prune backlog or stop enforcement be one JSON-RPC
+ * round trip to that pawd over same socket CLI and TUI use, reuse single
+ * validated write path.
  *
- * The scope is resolved per request, not captured at construction: a console
- * grabs one consumer at a time and can switch to another, so each verb targets
- * the socket of whichever consumer the console currently holds.
+ * Scope resolve per request: console hold one consumer at a time and can switch
+ * to another, so each verb target socket of whichever consumer console currently
+ * hold.
  *
- * A daemon that does not answer is not an error to surface loudly: pawd may simply
- * not be running for this repository. The round trip fails open to null and the
- * verb answers 503 with a plain reason, so the console can say "no enforcement
- * daemon here" rather than hang or 500.
+ * When pawd no answer — maybe not running for this repository — round trip fail
+ * open to null and verb answer 503 with plain reason.
  *
- * This is exposed only when the operator starts the console with `--control`; the
- * default console composes no control port and stays observational.
+ * Exposed only when console start with `--control`; default console compose no
+ * control port and stay observational.
  *
  * @module @paw/daemon/enforcementControl
  * @version 0.0.0
@@ -37,19 +33,19 @@ import { rpcCall } from '../infrastructure/rpcClient.js';
  * Injectable seams for testing.
  *
  * @interface EnforcementControlSeams
- * @property {(method: string, params: unknown, root: string) => Promise<unknown | null>} [rpc] - One round trip to the pawd for `root`; defaults to a real socket call.
+ * @property {(method: string, params: unknown, root: string) => Promise<unknown | null>} [rpc] - One round trip to pawd for `root`; default to real socket call.
  */
 export interface EnforcementControlSeams {
   rpc?: (method: string, params: unknown, root: string) => Promise<unknown | null>;
 }
 
 /**
- * One round trip to the enforcement pawd for a repository, over its socket.
+ * One round trip to enforcement pawd for repository, over its socket.
  *
  * @param {string} method - The JSON-RPC method.
  * @param {unknown} params - Its params.
- * @param {string} root - The repository whose pawd to reach.
- * @returns {Promise<unknown | null>} The result, or null when no pawd answered.
+ * @param {string} root - Repository whose pawd to reach.
+ * @returns {Promise<unknown | null>} Result, or null when no pawd answered.
  */
 function socketRpc(method: string, params: unknown, root: string): Promise<unknown | null> {
   const endpoint = socketPath(root, {
@@ -61,8 +57,8 @@ function socketRpc(method: string, params: unknown, root: string): Promise<unkno
 }
 
 /**
- * The answer when pawd did not respond: no enforcement daemon is holding a store
- * for this repository, which is a state to report, not a failure to hide.
+ * Answer when pawd no respond: no enforcement daemon hold store for this
+ * repository.
  */
 const UNREACHABLE: ControlResult = {
   status: 503,
@@ -70,12 +66,12 @@ const UNREACHABLE: ControlResult = {
 };
 
 /**
- * The control port a `--control` console exposes: the enforcement writes, each a
- * single round trip to the resident pawd for this repository.
+ * Control port a `--control` console expose: enforcement writes, each single
+ * round trip to resident pawd for this repository.
  *
- * @param {string | (() => string)} root - The repository the console serves, or a getter for the scope it currently holds.
+ * @param {string | (() => string)} root - Repository console serve, or getter for scope it currently hold.
  * @param {EnforcementControlSeams} [seams] - Injectable seams.
- * @returns {ControlPort} The registered writes.
+ * @returns {ControlPort} Registered writes.
  */
 export function enforcementControl(
   root: string | (() => string),

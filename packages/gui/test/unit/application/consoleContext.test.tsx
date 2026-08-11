@@ -1,9 +1,8 @@
 /**
  * Console Context Tests
  *
- * @fileoverview Proves the provider hands out state, dispatch, and wire health,
- * and that a panel mounted outside it fails loud instead of rendering an empty
- * console.
+ * @fileoverview Verify provider exposes state, dispatch, and wire health. Panel
+ * mounted outside it throws an error; it never renders an empty console.
  *
  * @module @paw/gui/test/unit/application/consoleContext
  */
@@ -25,7 +24,7 @@ import type { SocketHandlers, SocketLike } from '../../../src/infrastructure/liv
 import { makeSnapshot, renderInConsole } from '../../fixtures.js';
 
 /**
- * A probe that shows the state it can see and can move it.
+ * Probe. Show state it see, move state.
  *
  * @returns {JSX.Element} The probe.
  */
@@ -116,8 +115,8 @@ describe('ConsoleProvider', () => {
     act(() => handlers?.message(encodeEnvelope('hello', makeSnapshot(), 1)));
     expect(screen.getByTestId('mode')).toHaveTextContent('live');
 
-    // Two frames in one tick. Reading React state in the fold would apply the
-    // second to the data as it was before the first, and silently lose one.
+    // Two frames in one tick. Read React state in fold, second apply to data
+    // as before first. Silently lose one.
     act(() => {
       handlers?.message(encodeEnvelope('host', { ...makeSnapshot().host, pid: 111 }, 2));
       handlers?.message(encodeEnvelope('processes', [{ pid: 9, ppid: 1, name: 'w' }], 3));
@@ -125,7 +124,7 @@ describe('ConsoleProvider', () => {
 
     expect(screen.getByTestId('pid')).toHaveTextContent('111');
     expect(screen.getByTestId('procs')).toHaveTextContent('1');
-    // While the socket is live the console makes no requests at all.
+    // Socket live, console make no requests at all.
     expect(poll).not.toHaveBeenCalled();
   });
 

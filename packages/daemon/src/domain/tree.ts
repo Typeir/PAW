@@ -1,13 +1,9 @@
 /**
- * PAW Daemon File Tree
+ * PAW Daemon file tree.
  *
- * @fileoverview Turns a flat directory listing into the {@link TreeNode} tree the
- * file selector browses, and narrows that tree to a subtree. Pure over its
- * input, so every rule the operator sees — what is hidden, what sorts first,
- * what a missing path means — is a unit test; the `readdir` walk that produces
- * the listing lives in `nodeRuntime`. Narrowing works on the already-built tree
- * rather than on a path, which is what keeps `/api/tree?root=…` structurally
- * unable to serve anything the daemon did not already decide to list.
+ * @fileoverview Build {@link TreeNode} tree file selector browse from flat
+ * directory listing. Narrow that tree to subtree. Pure over input; `readdir`
+ * walk that make listing live in `nodeRuntime`. Narrowing work on built tree.
  *
  * @module @paw/daemon/tree
  * @version 0.0.0
@@ -18,11 +14,11 @@
 import type { TreeNode } from '@paw/core';
 
 /**
- * One entry of a directory listing, relative to the served root.
+ * One entry of directory listing, relative to served root.
  *
  * @interface FileEntry
- * @property {string} path - The entry's path relative to the root.
- * @property {boolean} isFile - Whether the entry is a file.
+ * @property {string} path - Entry path relative to root.
+ * @property {boolean} isFile - True when entry be file.
  */
 export interface FileEntry {
   readonly path: string;
@@ -30,8 +26,8 @@ export interface FileEntry {
 }
 
 /**
- * The directories a repository browser never wants to walk into: build output,
- * dependencies, and version-control internals.
+ * Directories tree omit: build output, dependencies, version-control
+ * internals.
  */
 export const IGNORED_DIRS: readonly string[] = [
   '.git',
@@ -43,12 +39,12 @@ export const IGNORED_DIRS: readonly string[] = [
 ];
 
 /**
- * A mutable node used while the tree is being assembled.
+ * Mutable node, use while assemble tree.
  *
  * @interface MutableNode
- * @property {string} name - The entry's own name.
- * @property {string} path - The entry's path.
- * @property {boolean} isFile - Whether it is a file.
+ * @property {string} name - Entry own name.
+ * @property {string} path - Entry path.
+ * @property {boolean} isFile - True when file.
  * @property {MutableNode[]} children - Child entries.
  */
 interface MutableNode {
@@ -59,12 +55,11 @@ interface MutableNode {
 }
 
 /**
- * Normalise a listing path to the tree's own form: forward slashes, no leading
- * `./`, no trailing slash. Fails loud on an empty path — a listing that names
- * nothing is a defect in whatever produced it.
+ * Normalise listing path to tree form: forward slashes, no leading `./`, no
+ * trailing slash. Throw on empty path.
  *
- * @param {string} path - The raw path.
- * @returns {string} The normalised path.
+ * @param {string} path - Raw path.
+ * @returns {string} Normalised path.
  */
 function normalise(path: string): string {
   const clean = path.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
@@ -75,11 +70,11 @@ function normalise(path: string): string {
 }
 
 /**
- * Whether any segment of a path is an ignored directory.
+ * Check whether any segment of path be ignored directory.
  *
- * @param {string} path - The normalised path.
- * @param {readonly string[]} ignore - The directory names to hide.
- * @returns {boolean} True when the entry should not be listed.
+ * @param {string} path - Normalised path.
+ * @param {readonly string[]} ignore - Directory names to hide.
+ * @returns {boolean} True when entry should not list.
  */
 function isHidden(path: string, ignore: readonly string[]): boolean {
   return path.split('/').some((segment) => ignore.includes(segment));
@@ -88,9 +83,9 @@ function isHidden(path: string, ignore: readonly string[]): boolean {
 /**
  * Order siblings: directories first, then files, each alphabetically.
  *
- * @param {MutableNode} a - The left sibling.
- * @param {MutableNode} b - The right sibling.
- * @returns {number} The comparison result.
+ * @param {MutableNode} a - Left sibling.
+ * @param {MutableNode} b - Right sibling.
+ * @returns {number} Comparison result.
  */
 function bySort(a: MutableNode, b: MutableNode): number {
   if (a.isFile !== b.isFile) {
@@ -100,10 +95,10 @@ function bySort(a: MutableNode, b: MutableNode): number {
 }
 
 /**
- * Freeze the assembled tree into the served contract, sorting as it goes.
+ * Freeze assembled tree into served contract, sort on the way.
  *
- * @param {MutableNode[]} nodes - The assembled siblings.
- * @returns {TreeNode[]} The sorted, immutable nodes.
+ * @param {MutableNode[]} nodes - Assembled siblings.
+ * @returns {TreeNode[]} Sorted, immutable nodes.
  */
 function seal(nodes: MutableNode[]): TreeNode[] {
   return [...nodes].sort(bySort).map((node) => ({
@@ -115,13 +110,12 @@ function seal(nodes: MutableNode[]): TreeNode[] {
 }
 
 /**
- * Build the file tree from a flat listing. Directories no entry named are
- * inferred from the paths of the files inside them, so a walk may list only
- * files and still produce a browsable tree.
+ * Build file tree from flat listing. Directories with no entry name get
+ * inferred from paths of files inside them.
  *
- * @param {readonly FileEntry[]} entries - The listing, relative to the root.
+ * @param {readonly FileEntry[]} entries - Listing, relative to root.
  * @param {readonly string[]} [ignore] - Directory names to hide.
- * @returns {TreeNode[]} The tree's roots.
+ * @returns {TreeNode[]} Tree roots.
  */
 export function buildFileTree(
   entries: readonly FileEntry[],
@@ -163,13 +157,12 @@ export function buildFileTree(
 }
 
 /**
- * The children of the node at `path`, or null when the tree has no such node. A
- * file answers with its own (empty) children rather than with null: it exists,
- * it simply contains nothing.
+ * Children of node at `path`, or null when tree have no such node. File return
+ * its own empty children array.
  *
- * @param {readonly TreeNode[]} nodes - The tree to search.
- * @param {string} path - The path to narrow to.
- * @returns {readonly TreeNode[] | null} The children, or null when absent.
+ * @param {readonly TreeNode[]} nodes - Tree to search.
+ * @param {string} path - Path to narrow to.
+ * @returns {readonly TreeNode[] | null} Children, or null when absent.
  */
 export function findSubtree(
   nodes: readonly TreeNode[],

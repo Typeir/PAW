@@ -1,22 +1,21 @@
 /**
  * PAW CLI
  *
- * @fileoverview The driving side of the hexagon and the CLI's composition root.
- * Routes a subcommand to its handler in `commands/*` and prints what the
- * formatters return:
+ * @fileoverview Driving side of hexagon. Compose root of CLI. Route subcommand
+ * to handler in `commands/*`, print what formatters return:
  *
- *   paw check                     read a decision-input on stdin, allow/deny (exit 0/2)
- *   paw hook --copilot "tool.pre" bridge a host hook into the loop
+ *   paw check                     read decision-input on stdin, allow/deny (exit 0/2)
+ *   paw hook --copilot "tool.pre" bridge host hook into loop
  *   paw daemon status|stop        inspect or stop this repo's resident pawd
  *   paw doctor <config.json>      validate config + role bindings
- *   paw swarm doctor|show|run     validate / preview / dispatch a swarm plan
+ *   paw swarm doctor|show|run     validate / preview / dispatch swarm plan
  *   paw ui [plan.swarm.mjs]       serve this repository's console
  *   paw trust [--dry-run]         install this machine's PAW CA
  *
- * Holds no rules. Each handler is process-shell (stdin, dynamic import, sockets,
- * `process.exit`), so this file and everything under `commands/` are excluded
- * from unit coverage and exercised by the E2E, which spawns this entry. Fails
- * loud: an unknown command or a malformed input exits non-zero with a message.
+ * Handlers here are the process shell (stdin, dynamic import, sockets,
+ * `process.exit`). This file and all under `commands/` are excluded from unit
+ * coverage and exercised by E2E that spawn this entry. Unknown command or
+ * malformed input exits non-zero with a message.
  *
  * @module @paw/cli/infrastructure/main
  * @version 0.0.0
@@ -25,6 +24,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { buildRegistry, runDoctor, type ModelPort } from '@paw/core';
 import { formatDoctor } from '../domain/format.js';
 import { runCheck } from './commands/check.js';
@@ -46,10 +46,10 @@ const NOOP_PORT: ModelPort = {
 };
 
 /**
- * Load and parse a JSON config file.
+ * Load and parse JSON config file.
  *
- * @param {string} path - Path to the config.
- * @returns {Promise<Record<string, unknown>>} The parsed config.
+ * @param {string} path - Path to config.
+ * @returns {Promise<Record<string, unknown>>} Parsed config.
  */
 async function loadConfig(path: string): Promise<Record<string, unknown>> {
   return JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
@@ -58,7 +58,7 @@ async function loadConfig(path: string): Promise<Record<string, unknown>> {
 /**
  * CLI entrypoint.
  *
- * @returns {Promise<number>} The exit code for the routed command.
+ * @returns {Promise<number>} Exit code for routed command.
  */
 async function main(): Promise<number> {
   const [command, ...rest] = process.argv.slice(2);
@@ -74,7 +74,7 @@ async function main(): Promise<number> {
     return runHookCommand(rest);
   }
   if (command === '__pawd') {
-    return runPawd(rest[0] ?? process.cwd());
+    return runPawd(resolve(rest[0] ?? process.cwd()));
   }
   if (command === 'daemon') {
     return runDaemonCommand(rest, print);
@@ -107,6 +107,13 @@ async function main(): Promise<number> {
     return report.ok ? 0 : 1;
   }
   if (command === 'swarm') {
+    const [sub, ...swarmRest] = rest;
+    if (sub === 'run' && swarmRest.includes('--ui')) {
+      return runUi(
+        [...swarmRest.filter((word) => word !== '--ui'), '--run', '--open'],
+        print,
+      );
+    }
     return runSwarm(rest, print);
   }
   if (command === 'ui') {

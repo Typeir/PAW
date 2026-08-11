@@ -1,14 +1,7 @@
 /**
  * Tooltip Atom
  *
- * @fileoverview A real tooltip, ported from Ikuisuus's `ui/tooltip` to replace the
- * console's browser `title=` attributes — which cannot be styled, are slow to
- * appear, and (the reason it matters here) never fire on a disabled control. It
- * wraps its trigger in a listening span so a hover over a disabled button still
- * surfaces the reason it is disabled, portals a `role="tooltip"` element to the
- * body, and positions it with the pure {@link calculatePosition}. Show and hide
- * are delayed and timer-driven, so the whole thing is deterministic under fake
- * timers; jsdom's zero rects are harmless because the math simply clamps.
+ * @fileoverview Hover/focus tooltip. Port from Ikuisuus `ui/tooltip`. Replace console browser `title=` attributes — no style, slow to appear, never fire on disabled control. Wrap trigger in listening span so hover over disabled button still surface why. Portal `role="tooltip"` element to body. Position by pure {@link calculatePosition}. Show and hide delay, timer-driven. Whole thing deterministic under fake timers. jsdom zero rects harmless — math just clamp.
  *
  * @module @paw/gui/presentation/atoms/tooltip
  * @version 0.0.0
@@ -24,13 +17,13 @@ import { calculatePosition, type TooltipPlacement } from '../lib/calculatePositi
  * Props for {@link Tooltip}.
  *
  * @interface TooltipProps
- * @property {ReactNode} content - The tooltip content.
- * @property {TooltipPlacement} [placement] - Preferred side; defaults to `top`.
- * @property {number} [showDelay] - Milliseconds before showing; defaults to 200.
- * @property {number} [hideDelay] - Milliseconds before hiding; defaults to 0.
- * @property {boolean} [disabled] - When true, render the trigger with no tooltip at all.
- * @property {string} [className] - Extra class for the wrapping span, so layout (e.g. `push`) survives the wrap.
- * @property {ReactNode} children - The trigger.
+ * @property {ReactNode} content - Tooltip content.
+ * @property {TooltipPlacement} [placement] - Preferred side; default `top`.
+ * @property {number} [showDelay] - Millisecond before show; default 200.
+ * @property {number} [hideDelay] - Millisecond before hide; default 0.
+ * @property {boolean} [disabled] - True render trigger with no tooltip at all.
+ * @property {string} [className] - Extra class for wrapping span, so layout (e.g. `push`) survive wrap.
+ * @property {ReactNode} children - Trigger.
  */
 export interface TooltipProps {
   readonly content: ReactNode;
@@ -43,10 +36,10 @@ export interface TooltipProps {
 }
 
 /**
- * A hover/focus tooltip around a trigger.
+ * Hover/focus tooltip around trigger.
  *
- * @param {TooltipProps} props - The tooltip props.
- * @returns {JSX.Element} The wrapped trigger.
+ * @param {TooltipProps} props - Tooltip props.
+ * @returns {JSX.Element} Wrapped trigger.
  */
 export function Tooltip({
   content,

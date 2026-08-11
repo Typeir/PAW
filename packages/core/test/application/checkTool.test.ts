@@ -1,9 +1,8 @@
 /**
- * PAW Check-Tool Use-Case Tests
+ * PAW check-tool use-case tests
  *
- * @fileoverview Drives the use-case against a fake {@link StorePort} to confirm
- * it fetches the session's violations and returns the decision they imply — no
- * database involved.
+ * @fileoverview Drive use-case against fake {@link StorePort}. Confirm it
+ * fetch session violations and return decision they imply; no database.
  *
  * @module @paw/core/test/application/checkTool
  * @version 0.0.0
@@ -20,8 +19,7 @@ import {
 } from '../../src/application/checkTool.js';
 
 /**
- * A store that returns a fixed violation list and records the session it was
- * asked about.
+ * Fake store. Return fixed violation list, record session asked about.
  *
  * @param {Violation[]} violations - What `unresolvedFor` returns.
  * @returns {StorePort & { asked: (string | null)[] }} The fake store.

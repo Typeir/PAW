@@ -1,12 +1,12 @@
 /**
  * PAW Installer Shell Detection
  *
- * @fileoverview Decides which shell PAW is being activated for and which profile
- * file (or, on Windows, which environment store) its PATH edit belongs in. Pure:
- * the platform and the `$SHELL` value are passed in, so every branch is a unit
- * test and `main.ts` supplies the real `process.platform` / `process.env.SHELL`.
- * Windows always resolves to the per-user environment store rather than a profile
- * file, because that is where a persistent, no-admin PATH change lives there.
+ * @fileoverview Decide which shell PAW activate for, and which profile
+ * file (or, on Windows, which environment store) its PATH edit belong in. Pure:
+ * platform and `$SHELL` value pass in, so every branch be unit
+ * test and `main.ts` supply actual `process.platform` / `process.env.SHELL`.
+ * Windows always resolve to per-user environment store, not a profile
+ * file, because persistent no-admin PATH changes are stored there.
  *
  * @module @paw/installer/shell
  * @version 0.0.0
@@ -15,23 +15,23 @@
  */
 
 /**
- * A shell PAW knows how to activate its PATH in.
+ * Shell PAW know how activate its PATH in.
  */
 export type Shell = 'powershell' | 'bash' | 'zsh' | 'fish' | 'unknown';
 
 /**
- * The Windows per-user environment store — not a file, edited via the OS API.
+ * Windows per-user environment store — no file, edit via OS API.
  */
 export const WINDOWS_ENV = 'HKCU\\Environment';
 
 /**
- * Detect the shell from the platform and the `$SHELL` value. Windows resolves to
- * `powershell` (the registry strategy) regardless of an interactive bash, because
- * the persistent PATH lives in the per-user environment there.
+ * Detect shell from platform and `$SHELL` value. Windows resolve to
+ * `powershell` (registry strategy) no matter interactive bash, because
+ * persistent PATH is stored in the per-user environment there.
  *
  * @param {string} platform - `process.platform` (e.g. `win32`, `darwin`, `linux`).
  * @param {string | undefined} shellEnv - `process.env.SHELL`, if set.
- * @returns {Shell} The detected shell.
+ * @returns {Shell} Detected shell.
  */
 export function detectShell(platform: string, shellEnv: string | undefined): Shell {
   if (platform === 'win32') {
@@ -55,12 +55,12 @@ export function detectShell(platform: string, shellEnv: string | undefined): She
 }
 
 /**
- * The PATH-edit target for a shell: a profile file, or the Windows environment
+ * PATH-edit target for shell: profile file, or Windows environment
  * store.
  *
- * @param {Shell} shell - The detected shell.
- * @param {string} home - The user's home directory.
- * @returns {string} The absolute profile path, or {@link WINDOWS_ENV}.
+ * @param {Shell} shell - Detected shell.
+ * @param {string} home - User home directory.
+ * @returns {string} Absolute profile path, or {@link WINDOWS_ENV}.
  */
 export function profileTarget(shell: Shell, home: string): string {
   switch (shell) {

@@ -1,13 +1,11 @@
 /**
  * Security Policy Tests
  *
- * @fileoverview The three gates, tested as an attacker would probe them: a token
- * that must not leak its length or its prefix, an origin list that must refuse
- * `null` and everything it was not told about, a host list that must refuse a
- * rebinding name, and a CORS posture that must emit nothing at all for a
- * stranger. Also the two headers that are deliberately *absent* — credentials
- * and HSTS — because a later "helpful" addition of either is a regression this
- * suite is here to catch.
+ * @fileoverview Three gates: token never leaks its length or prefix, origin
+ * list rejects `null` and every origin not explicitly listed, host list
+ * rejects rebinding names, CORS emits nothing for unrecognized origins.
+ * Also two headers are absent — credentials and HSTS — so any
+ * later addition of either is a regression this suite catches.
  *
  * @module @paw/daemon/test/security
  */
@@ -55,7 +53,7 @@ describe('verifyToken', () => {
     expect(verifyToken(TOKEN, undefined)).toBe(false);
   });
 
-  it('mints 256 bits of token', () => {
+  it('produces 256 bits of token', () => {
     expect(TOKEN_BYTES).toBe(32);
   });
 });
@@ -78,7 +76,7 @@ describe('bearerFrom', () => {
 });
 
 describe('selfOrigins / allowedOrigins / normaliseOrigin', () => {
-  it('trusts all three spellings of its own loopback origin', () => {
+  it('accepts all three spellings of its own loopback origin', () => {
     expect(selfOrigins(8971)).toEqual([
       'https://127.0.0.1:8971',
       'https://localhost:8971',
@@ -92,7 +90,7 @@ describe('selfOrigins / allowedOrigins / normaliseOrigin', () => {
     expect(normaliseOrigin('http://127.0.0.1:5173/some/path')).toBe('http://127.0.0.1:5173');
   });
 
-  it('refuses a wildcard, a foreign scheme, junk, and plaintext off the machine', () => {
+  it('refuses a wildcard, a foreign scheme, malformed strings, and non-loopback plaintext', () => {
     expect(normaliseOrigin('*')).toBeNull();
     expect(normaliseOrigin('null')).toBeNull();
     expect(normaliseOrigin('')).toBeNull();
@@ -101,7 +99,7 @@ describe('selfOrigins / allowedOrigins / normaliseOrigin', () => {
     expect(normaliseOrigin('http://evil.example')).toBeNull();
   });
 
-  it('folds the operator’s origins in beside its own, dropping refusals', () => {
+  it('appends the operator’s listed origins to its own, dropping ones that fail validation', () => {
     const allowed = allowedOrigins(8971, ['http://localhost:5173', 'http://evil.example', '*']);
     expect(allowed).toContain('https://127.0.0.1:8971');
     expect(allowed).toContain('http://localhost:5173');
@@ -122,14 +120,14 @@ describe('originAllowed', () => {
     expect(originAllowed('https://localhost:8971', allowed)).toBe(true);
   });
 
-  it('refuses a stranger, a look-alike port, and an unattributable page', () => {
+  it('refuses an unlisted origin, a different port, and a null origin', () => {
     expect(originAllowed('https://evil.example', allowed)).toBe(false);
     expect(originAllowed('https://127.0.0.1:9999', allowed)).toBe(false);
     expect(originAllowed('http://127.0.0.1:8971', allowed)).toBe(false);
     expect(originAllowed('null', allowed)).toBe(false);
   });
 
-  it('lets a non-browser through to face the token instead', () => {
+  it('passes a request with no Origin through to the bearer-token check', () => {
     expect(originAllowed(undefined, allowed)).toBe(true);
   });
 });
@@ -182,9 +180,9 @@ describe('decideUpgrade', () => {
     expect(decideUpgrade(base)).toBeNull();
   });
 
-  it('lets a non-browser client through to face the token instead', () => {
-    // No Origin means no browser, so there is no origin to judge — the first
-    // frame still has to carry the credential.
+  it('passes a non-browser client through to the bearer-token check', () => {
+    // No Origin mean no browser, so no origin to judge — first frame still
+    // carry credential.
     expect(decideUpgrade({ ...base, origin: undefined })).toBeNull();
   });
 
@@ -196,7 +194,7 @@ describe('decideUpgrade', () => {
     expect(decideUpgrade({ ...base, host: undefined })?.status).toBe(400);
   });
 
-  it('refuses a stranger’s Origin — the handshake is exempt from CORS, so this is the only gate', () => {
+  it('refuses an unlisted Origin — the handshake is exempt from CORS, so this is the only gate', () => {
     expect(decideUpgrade({ ...base, origin: 'https://evil.example' })).toEqual({
       status: 403,
       message: 'origin not allowed',
@@ -221,17 +219,17 @@ describe('decideUpgrade', () => {
     expect(decideUpgrade({ ...base, preAuthSessions: MAX_PREAUTH_SESSIONS - 1 })).toBeNull();
   });
 
-  it('never locks the operator out over someone else’s failed guesses', () => {
-    // A global cooldown here would be a denial of service any local process can
-    // trigger against the operator's own console — the daemon cannot tell one
-    // loopback peer from another, so it must not try to punish by peer.
+  it('never applies a global cooldown that some other loopback process could trigger', () => {
+    // A global cooldown is a denial of service any local process can trigger
+    // against the operator’s own console — the daemon cannot tell one loopback
+    // peer from another, so it must not punish by peer.
     expect(decideUpgrade(base)).toBeNull();
     expect(Object.keys(base)).not.toContain('cooldownActive');
   });
 
-  it('judges the request before the daemon’s own capacity', () => {
-    // A rebinding page must be told 400 whether or not the daemon happens to be
-    // busy: the answer must not depend on load, or it becomes a probe.
+  it('answers request-validation rejections regardless of the daemon’s own capacity', () => {
+    // A rebinding page must get 400 whether or not the daemon is busy: the
+    // answer must not depend on load, or it becomes a probe of load.
     const busy = { ...base, liveSessions: MAX_SESSIONS };
     expect(decideUpgrade({ ...busy, host: 'evil.example' })?.status).toBe(400);
     expect(decideUpgrade({ ...busy, origin: 'https://evil.example' })?.status).toBe(403);
@@ -263,12 +261,12 @@ describe('corsHeadersFor', () => {
     expect(headers.vary).toBe('Origin');
   });
 
-  it('grants nothing to a stranger, and nothing when there is no origin', () => {
+  it('emits nothing for an unlisted origin, and nothing when there is no origin', () => {
     expect(corsHeadersFor('https://evil.example', allowed)).toEqual({ vary: 'Origin' });
     expect(corsHeadersFor(undefined, allowed)).toEqual({ vary: 'Origin' });
   });
 
-  it('never allows credentials — there is no cookie to ride in on', () => {
+  it('never allows credentials — the daemon does not issue account cookies', () => {
     for (const origin of [undefined, 'https://evil.example', 'http://localhost:5173']) {
       expect(corsHeadersFor(origin, allowed)).not.toHaveProperty(
         'access-control-allow-credentials',
@@ -287,7 +285,7 @@ describe('securityHeaders', () => {
     });
   });
 
-  it('deliberately omits HSTS, which would hijack every localhost port', () => {
+  it('omits HSTS, which would force HTTPS on every localhost port', () => {
     expect(securityHeaders()).not.toHaveProperty('strict-transport-security');
   });
 });
@@ -323,7 +321,7 @@ describe('inlineScriptHashes', () => {
     expect(hashes[0]).toMatch(/^'sha256-[A-Za-z0-9+/]+=*'$/);
   });
 
-  it('changes completely for a single changed byte, which is the point', () => {
+  it('changes completely for a single changed byte', () => {
     const [before] = inlineScriptHashes('<script>alert(1)</script>');
     const [after] = inlineScriptHashes('<script>alert(2)</script>');
     expect(before).not.toBe(after);
@@ -352,15 +350,16 @@ describe('inlineScriptHashes', () => {
     expect(inlineScriptHashes('<html><body>nothing</body></html>')).toEqual([]);
   });
 
-  it('is what turns the CSP from a general permission into a named one', () => {
+  it('makes the CSP name specific scripts by digest and avoids a general script permission', () => {
     const page = '<html><script>boot()</script></html>';
     const named = cspFor(8971, inlineScriptHashes(page));
     expect(named).toContain("script-src 'sha256-");
     expect(named).not.toContain("script-src 'unsafe-inline'");
 
-    // With nothing to hash there is nothing to name, and the fallback is the
-    // honest one — a browser ignores 'unsafe-inline' the moment a hash appears,
-    // so emitting both would be a policy that silently means only the hashes.
+    // With nothing to hash there is nothing to name; the fallback is
+    // 'unsafe-inline'. A browser ignores 'unsafe-inline' the moment any hash
+    // appears, so emitting both would make a policy that in effect allows
+    // only the hashes.
     expect(cspFor(8971, [])).toContain("script-src 'unsafe-inline'");
   });
 });

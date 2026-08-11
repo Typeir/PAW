@@ -1,12 +1,11 @@
 /**
- * Scope Card Tests
+ * Scope Card Test
  *
- * @fileoverview The scope picker rendered over a live console: it lists the
- * routes it fetched, grabs a typed route and a clicked recent one as real scope
- * frames on the wire, shows a grabbed route in the recent list without a reload,
- * ignores a blank route, reports a read failure, and shows a placeholder when
- * nothing has been grabbed. A page with no daemon behind it renders nothing at
- * all. So `scopeCard.tsx` reaches 100%.
+ * @fileoverview Scope picker over live console: list fetched routes, send grab
+ * of typed route and clicked recent route as scope frame, show grabbed route
+ * in recent list without reload, ignore blank route, report read failure, show
+ * placeholder when nothing grabbed. Page with no daemon renders nothing.
+ * Covers `scopeCard.tsx` at 100%.
  *
  * @module @paw/gui/test/unit/presentation/scopeCard
  */
@@ -21,17 +20,18 @@ import type { SocketHandlers, SocketLike } from '../../../src/infrastructure/liv
 import { ScopeCard } from '../../../src/presentation/views/scopeCard.js';
 import { makeSnapshot } from '../../fixtures.js';
 
-/** A recent-routes client whose list is set per test. */
+/** Recent-routes client. List set per test. */
 const recentClient = (over: Partial<RecentClient> = {}): RecentClient => ({
   list: async () => ['/work/a', '/work/b'],
+  remove: async (route) => ['/work/a', '/work/b'].filter((entry) => entry !== route),
   ...over,
 });
 
 /**
- * Render the card over a console driven to `live`, so a grab is a real frame.
+ * Render card over a console connected to `live`, so a grab sends a scope frame.
  *
- * @param {RecentClient} recent - The recent-routes client.
- * @returns {{ sent: string[] }} The frames the socket received.
+ * @param {RecentClient} recent - Recent-routes client.
+ * @returns {{ sent: string[] }} Frames socket received.
  */
 function renderLive(recent: RecentClient): { sent: string[] } {
   const sent: string[] = [];
@@ -53,7 +53,7 @@ function renderLive(recent: RecentClient): { sent: string[] } {
   return { sent };
 }
 
-/** The path from the last frame the socket received. */
+/** Path from last frame socket received. */
 const lastScope = (sent: string[]): unknown => parseClientMessage(sent[sent.length - 1]);
 
 describe('ScopeCard', () => {
@@ -73,8 +73,8 @@ describe('ScopeCard', () => {
   });
 
   it('pips the route matching the current scope, not the newest', async () => {
-    // The fixture snapshot is scoped to C:\code\demo; listing it second proves
-    // the pip follows the scope rather than the top of the list.
+    // Fixture snapshot scoped to C:\code\demo. List it second to prove the pip
+    // follows scope.
     renderLive(recentClient({ list: async () => ['/work/other', 'C:\\code\\demo'] }));
     const current = await screen.findByRole('button', { name: 'C:\\code\\demo' });
     const other = screen.getByRole('button', { name: '/work/other' });
@@ -145,5 +145,35 @@ describe('ScopeCard', () => {
   it('shows a placeholder when nothing has been grabbed yet', async () => {
     renderLive(recentClient({ list: async () => [] }));
     expect(await screen.findByText('— no recent routes —')).toBeInTheDocument();
+  });
+
+  it('refuses a relative route with a reason, sending no frame', async () => {
+    const { sent } = renderLive(recentClient({ list: async () => [] }));
+    await screen.findByText('— no recent routes —');
+    const before = sent.length;
+    await userEvent.type(screen.getByLabelText('Repository to grab'), 'repo/sub{Enter}');
+    expect(await screen.findByText('route must be an absolute path')).toBeInTheDocument();
+    expect(sent).toHaveLength(before);
+  });
+
+  it('removes a route through the client and shows the shrunken list', async () => {
+    renderLive(recentClient());
+    await screen.findByRole('button', { name: '/work/a' });
+    await userEvent.click(screen.getByRole('button', { name: 'Remove /work/a from recent routes' }));
+    expect(await screen.findByRole('button', { name: '/work/b' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '/work/a' })).toBeNull();
+  });
+
+  it('reports when a route cannot be removed', async () => {
+    renderLive(
+      recentClient({
+        remove: async () => {
+          throw new Error('offline');
+        },
+      }),
+    );
+    await screen.findByRole('button', { name: '/work/a' });
+    await userEvent.click(screen.getByRole('button', { name: 'Remove /work/b from recent routes' }));
+    expect(await screen.findByText('could not remove the route')).toBeInTheDocument();
   });
 });

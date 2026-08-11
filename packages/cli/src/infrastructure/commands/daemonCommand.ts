@@ -1,9 +1,8 @@
 /**
  * PAW CLI — daemon command
  *
- * @fileoverview `paw daemon status|stop`: inspect or stop this repository's
- * resident pawd over the socket. Both are clients that fail gracefully when no
- * daemon answers — an absent daemon is a state to report, not an error.
+ * @fileoverview `paw daemon status|stop`: look at or stop this repo's
+ * resident pawd over socket. Both socket clients. Missing daemon report as state.
  *
  * @module @paw/cli/infrastructure/commands/daemonCommand
  * @version 0.0.0
@@ -19,14 +18,13 @@ import { formatDaemonStatus, formatDaemonStop } from '../../domain/daemonStatus.
 import { autostartSeams } from './pawd.js';
 
 /**
- * Run the `daemon` subcommand: inspect, stop, or restart this repository's
- * resident daemon over the socket (doc 10 §12). `restart` stops the running
- * daemon, waits for it to release the socket, then autostarts a fresh one — the
- * clean way to pick up new pawd code without hunting the process by hand.
+ * Run `daemon` subcommand: inspect, stop, or restart this repo's
+ * resident daemon over socket (doc 10 §12). `restart` stop running
+ * daemon, wait for socket release, then autostart fresh one.
  *
- * @param {string[]} rest - The words after `daemon`.
+ * @param {string[]} rest - Words after `daemon`.
  * @param {(lines: string[]) => void} print - Line printer.
- * @returns {Promise<number>} 0 when a daemon answered (or was started), 1 when none did.
+ * @returns {Promise<number>} 0 when daemon answer (or start), 1 when none.
  */
 export async function runDaemonCommand(
   rest: string[],

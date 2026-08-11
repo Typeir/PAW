@@ -1,12 +1,7 @@
 /**
- * PAW CLI — gates command
+ * PAW CLI — gates command.
  *
- * @fileoverview `paw gates` runs this repository's quality gates on demand. It is
- * deliberately diff-scoped — a full-repo scan takes minutes and is what CI is
- * for, so it is not offered here. The default is the working-tree change set
- * (unstaged + staged + untracked); `--staged` narrows to the index for a
- * pre-commit check. Both feed the same `@paw/adapters` node runner pawd uses on
- * a hook, so a manual run and an enforced one agree.
+ * @fileoverview `paw gates` run repo quality gates, diff-scoped. Default to working-tree change set (unstaged + staged + untracked); `--staged` narrow to index for pre-commit check. Both feed `@paw/adapters` node runner pawd use on hook.
  *
  * @module @paw/cli/infrastructure/commands/gates
  * @version 0.0.0
@@ -20,12 +15,11 @@ import { parseArgs } from '../../domain/context.js';
 import { formatGateReport } from '../../domain/format.js';
 
 /**
- * Run a git command under a root and return its non-empty, slash-normalised
- * lines, or an empty list when git is unavailable or the command fails.
+ * Run git command under root, return non-empty slash-normalised lines, or empty list when git missing or command fail.
  *
- * @param {string} root - The repository root.
- * @param {readonly string[]} args - The git arguments.
- * @returns {string[]} The output lines.
+ * @param {string} root - repository root.
+ * @param {readonly string[]} args - git arguments.
+ * @returns {string[]} output lines.
  */
 function gitLines(root: string, args: readonly string[]): string[] {
   try {
@@ -39,11 +33,11 @@ function gitLines(root: string, args: readonly string[]): string[] {
 }
 
 /**
- * Resolve the diff-scoped file set: the working-tree changes, or the staged index.
+ * Resolve diff-scoped file set: working-tree changes, or staged index.
  *
- * @param {string} root - The repository root.
- * @param {'changed' | 'staged'} scope - Which diff to resolve.
- * @returns {string[]} Deduped, project-relative paths.
+ * @param {string} root - repository root.
+ * @param {'changed' | 'staged'} scope - which diff to resolve.
+ * @returns {string[]} deduped, project-relative paths.
  */
 function resolveFiles(root: string, scope: 'changed' | 'staged'): string[] {
   if (scope === 'staged') {
@@ -59,11 +53,11 @@ function resolveFiles(root: string, scope: 'changed' | 'staged'): string[] {
 }
 
 /**
- * Run the `gates` subcommand.
+ * Run `gates` subcommand.
  *
- * @param {string[]} rest - The words after `gates`.
- * @param {(lines: string[]) => void} print - Line printer.
- * @returns {Promise<number>} 0 when every gate passed (or nothing changed), 1 on failure.
+ * @param {string[]} rest - words after `gates`.
+ * @param {(lines: string[]) => void} print - line printer.
+ * @returns {Promise<number>} 0 when every gate pass (or nothing changed), 1 on failure.
  */
 export async function runGates(
   rest: string[],

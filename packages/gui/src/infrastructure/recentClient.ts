@@ -1,12 +1,12 @@
 /**
  * PAW Console Recent Routes Client
  *
- * @fileoverview The scope picker's read transport: the routes the console has
- * recently grabbed, from `GET /api/recent`. A route is a place PAW may be
- * installed, not a daemon that is running, so this reads a plain list and never
- * probes liveness. The grab itself is a live-wire frame, not a request, so this
- * client only reads. The transport is the same authenticated {@link FetchLike}
- * the snapshot source uses, so the credential is never handled here.
+ * @fileoverview Scope picker read transport: get recently grabbed routes from
+ * `GET /api/recent`. A route may name a PAW install, not a running daemon.
+ * Read the plain list; never probe liveness. The grab is a one-shot snapshot
+ * frame from the live daemon, not a stream.
+ * Client only reads. Uses same authenticated {@link FetchLike} as snapshot source.
+ * It holds no credential.
  *
  * @module @paw/gui/infrastructure/recentClient
  * @version 0.0.0
@@ -14,37 +14,45 @@
  * @since 5.0.0
  */
 
-import type { FetchLike } from './snapshotSource.js';
+import type { FetchLike, ResponseLike } from './snapshotSource.js';
 
 /**
- * The daemon's recent-routes read endpoint.
+ * Daemon recent-routes read endpoint.
  */
 export const RECENT_URL = '/api/recent';
 
 /**
- * The scope picker's read verb.
+ * Scope picker verbs: read list, forget stale entry.
  *
  * @interface RecentClient
- * @property {() => Promise<readonly string[]>} list - The recently-grabbed routes, newest first.
+ * @property {() => Promise<readonly string[]>} list - Recent grabbed routes, newest first.
+ * @property {(route: string) => Promise<readonly string[]>} remove - Forget route; give back new list.
  */
 export interface RecentClient {
   list(): Promise<readonly string[]>;
+  remove(route: string): Promise<readonly string[]>;
 }
 
 /**
- * Build a recent-routes client over an authenticated transport.
+ * Build recent-routes client over authenticated transport.
  *
- * @param {FetchLike} fetchFn - The authenticated transport.
+ * @param {FetchLike} fetchFn - Authenticated transport.
  * @returns {RecentClient} The client.
  */
 export function createRecentClient(fetchFn: FetchLike): RecentClient {
+  const parse = async (response: ResponseLike, what: string): Promise<readonly string[]> => {
+    if (!response.ok) {
+      throw new Error(`PAW console: ${what} responded ${response.status}`);
+    }
+    return (await response.json()) as readonly string[];
+  };
   return {
     async list(): Promise<readonly string[]> {
-      const response = await fetchFn(RECENT_URL);
-      if (!response.ok) {
-        throw new Error(`PAW console: ${RECENT_URL} responded ${response.status}`);
-      }
-      return (await response.json()) as readonly string[];
+      return parse(await fetchFn(RECENT_URL), RECENT_URL);
+    },
+    async remove(route: string): Promise<readonly string[]> {
+      const url = `${RECENT_URL}?route=${encodeURIComponent(route)}`;
+      return parse(await fetchFn(url, { method: 'DELETE' }), url);
     },
   };
 }

@@ -1,11 +1,7 @@
 /**
- * PAW Violation Domain
+ * PAW violation domain.
  *
- * @fileoverview The `Violation` domain type and the pure operations over a set
- * of them. Extracting these out of the enforcement decision keeps that decision
- * readable and gives each rule a named, individually-tested home — the "extract
- * to a helper with JSDoc rather than an inline comment" rule made structural.
- * Nothing here performs I/O; persistence is the {@link StorePort}'s job.
+ * @fileoverview `Violation` type and pure operations over set of them. Nothing here do I/O; persistence is {@link StorePort}'s job.
  *
  * @module @paw/core/domain/violation
  * @version 0.0.0
@@ -14,14 +10,14 @@
  */
 
 /**
- * An unresolved rule violation attached to a file.
+ * Unresolved rule violation reported for a single file.
  *
  * @interface Violation
- * @property {number} id - Stable identifier from the store.
- * @property {string} filePath - Project-relative, forward-slash path the adapter normalised.
- * @property {string} rule - Gate or hook rule that raised it.
- * @property {string} message - Human-readable description shown to the agent.
- * @property {boolean} indirectFix - True when the fix requires a different file (e.g. a missing test), so editing the flagged file cannot clear it.
+ * @property {number} id - Stable id from store.
+ * @property {string} filePath - Project-relative, forward-slash path adapter normalise.
+ * @property {string} rule - Gate or hook rule raise it.
+ * @property {string} message - Human-readable description show to agent.
+ * @property {boolean} indirectFix - True when fix need different file (e.g. missing test); edit flagged file no clear it.
  */
 export interface Violation {
   readonly id: number;
@@ -32,11 +28,10 @@ export interface Violation {
 }
 
 /**
- * The set of files carrying at least one direct (non-indirect) violation. These
- * are the files whose editing the fix path must always permit.
+ * Set of files carry at least one direct (non-indirect) violation. Fix path must always allow edit them.
  *
  * @param {readonly Violation[]} violations - Unresolved violations in scope.
- * @returns {ReadonlySet<string>} File paths with a direct violation.
+ * @returns {ReadonlySet<string>} File paths with direct violation.
  */
 export function directlyViolatedFiles(
   violations: readonly Violation[],
@@ -47,9 +42,7 @@ export function directlyViolatedFiles(
 }
 
 /**
- * Whether every violation is indirect-fix. When true the agent must be nudged
- * rather than blocked, because the fix needs a new file that a block would
- * forbid it from creating.
+ * Every violation indirect-fix? True = nudge agent; false = block.
  *
  * @param {readonly Violation[]} violations - Unresolved violations in scope.
  * @returns {boolean} True if all are indirect-fix.
@@ -59,32 +52,27 @@ export function allIndirect(violations: readonly Violation[]): boolean {
 }
 
 /**
- * The most items any enforcement reason lists before summarising the rest, and
- * the hard character ceiling on the whole reason. A hook output too large to
- * display inline is enforcement the agent is blind to — the feedback is
- * redirected to a file it never reads, so it cannot self-correct. Both caps keep
- * every reason small enough to reach the agent.
+ * Most items any enforcement reason list before summarise rest, and hard character ceiling on whole reason. Both caps keep every reason small enough display inline.
  */
 const MAX_ITEMS = 15;
 const MAX_REASON = 4000;
 
 /**
- * Cap a reason's length so it always fits an inline display.
+ * Cap reason length fit inline display.
  *
  * @param {string} text - The reason.
- * @param {number} [max] - The character ceiling; defaults to {@link MAX_REASON}.
- * @returns {string} The reason, truncated with a marker when it exceeds the ceiling.
+ * @param {number} [max] - Character ceiling; default {@link MAX_REASON}.
+ * @returns {string} Reason, truncated with marker when exceed ceiling.
  */
 export function truncate(text: string, max: number = MAX_REASON): string {
   return text.length > max ? `${text.slice(0, max)}\n…[truncated]` : text;
 }
 
 /**
- * The hidden nudge shown when only indirect-fix violations remain, capped so it
- * stays displayable.
+ * Hidden nudge shown when only indirect-fix violations remain, capped to stay displayable.
  *
- * @param {readonly Violation[]} violations - The indirect-fix violations.
- * @returns {string} A bounded nudge listing files and messages.
+ * @param {readonly Violation[]} violations - Indirect-fix violations.
+ * @returns {string} Bounded nudge list files and messages.
  */
 export function formatIndirectNudge(violations: readonly Violation[]): string {
   const shown = violations
@@ -97,12 +85,10 @@ export function formatIndirectNudge(violations: readonly Violation[]): string {
 }
 
 /**
- * The deny reason: each directly-violated file with the rules failing on it, so
- * the agent knows which file to open and what to fix — not merely that something
- * is wrong somewhere. Bounded so it stays displayable.
+ * Deny reason: each directly-violated file with rules failing on it. Bounded to stay displayable.
  *
- * @param {readonly Violation[]} violations - The directly-violated (non-indirect) violations.
- * @returns {string} A bounded deny reason, one line per file.
+ * @param {readonly Violation[]} violations - Directly-violated (non-indirect) violations.
+ * @returns {string} Bounded deny reason, one line per file.
  */
 export function formatOutstanding(violations: readonly Violation[]): string {
   const byFile = new Map<string, Set<string>>();

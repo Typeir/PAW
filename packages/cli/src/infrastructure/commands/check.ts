@@ -1,9 +1,9 @@
 /**
  * PAW CLI — check command
  *
- * @fileoverview `paw check`: read a decision-input on stdin, print the allow/deny
- * decision, and exit 0/2. This is the stdin + `process.exit` shell of the
- * enforcement decision; the decision itself is `@paw/core`'s `decidePreToolUse`.
+ * @fileoverview `paw check`: read decision-input from stdin, print allow/deny
+ * decision, exit 0/2. Shell of enforcement decision, wraps stdin + `process.exit`;
+ * decision itself come from `@paw/core`'s `decidePreToolUse`.
  *
  * @module @paw/cli/infrastructure/commands/check
  * @version 0.0.0
@@ -16,9 +16,9 @@ import { decisionToOutput } from '../../domain/render.js';
 import { readStdin } from '../stdin.js';
 
 /**
- * Run the `check` subcommand: a stdin enforcement decision.
+ * Run `check` subcommand: enforcement decision from stdin.
  *
- * @returns {Promise<never>} Never returns; exits with the decision's code.
+ * @returns {Promise<never>} Never return; exit with decision code.
  */
 export async function runCheck(): Promise<never> {
   const wire = JSON.parse(await readStdin()) as {

@@ -1,8 +1,8 @@
 /**
- * @fileoverview Unit tests for the per-connection wiring, driven through a fake
- * socket so the write, close-on-session-say-so, and error-swallow branches are
- * exercised deterministically without coaxing a real socket into resetting. The
- * real bind/accept/close path is covered by the integration tier.
+ * @fileoverview Test per-connection wiring. Use fake socket. Write branch,
+ * close-on-session-say-so branch, error-swallow branch all run deterministically.
+ * No coax real socket into reset. Real bind/accept/close path live in integration
+ * tier.
  *
  * @module @paw/daemon/test/socketServer
  */
@@ -40,7 +40,7 @@ const line = (obj: unknown): string => `${JSON.stringify(obj)}\n`;
 const connect = (token = 'T') =>
   line({ jsonrpc: '2.0', id: 1, method: 'connect', params: { token, protocolVersion: 1 } });
 
-/** A fake socket capturing writes, its end, and its data/error handlers. */
+/** Fake socket. Grab writes, end, and data/error handlers. */
 function fakeSocket() {
   const handlers: { data?: (c: string) => void; error?: (e: Error) => void } = {};
   const written: string[] = [];

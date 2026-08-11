@@ -1,26 +1,22 @@
 /**
  * PAW Daemon Security Policy
  *
- * @fileoverview Who may talk to the daemon, and what it says back. Every rule
- * here is a pure function over strings, so the policy that guards a local
- * control API — which reports the operator's host, process table, repository
- * tree and briefs — is decided in unit tests rather than inside a socket
- * callback nobody can reach.
+ * @fileoverview Each rule is a pure function over strings deciding which
+ * origins and hosts may call the daemon. Policy guards the local control API —
+ * report operator host, process table, repository tree, briefs — decided in
+ * unit tests, not inside the socket callback.
  *
- * Three gates, and they answer different attackers. The **token** stops another
- * process on the machine: 256 bits, minted per boot, compared in constant time.
- * The **origin** allow-list stops a web page the operator happens to have open,
- * which can send requests to loopback and can open WebSockets (the handshake is
- * exempt from CORS entirely). The **host** allow-list stops DNS rebinding, where
- * a page re-points its own name at 127.0.0.1 and inherits the daemon's origin.
- * TLS makes rebinding fail at the handshake as well; this is the belt behind
- * that brace.
+ * Three gates. **Token** stops another process on the machine: 256 bits, minted
+ * per boot, compared in constant time. **Origin** allow-list stops a web page
+ * the operator has open from sending requests to loopback and opening
+ * WebSockets (upgrade handshake exempt from CORS). **Host** allow-list stops
+ * DNS rebinding, where a page points its own name at 127.0.0.1 and inherits the
+ * daemon origin. TLS also fails rebinding at handshake.
  *
- * CORS here is a deny-by-default: the daemon emits no
- * `Access-Control-Allow-Origin` at all unless the request's origin is on the
- * list, and never emits `Access-Control-Allow-Credentials` — there is no cookie
- * or session to ride, which is what makes CSRF structurally impossible against
- * a bearer-token API.
+ * CORS here deny-by-default: daemon emits no
+ * `Access-Control-Allow-Origin` unless the request origin is on the list, and
+ * never emits `Access-Control-Allow-Credentials`. With no cookie or session to
+ * ride, CSRF is structurally impossible against the bearer-token API.
  *
  * @module @paw/daemon/security
  * @version 0.0.0
@@ -32,25 +28,25 @@ import { LIVE_SUBPROTOCOL, MAX_PREAUTH_SESSIONS, MAX_SESSIONS } from '@paw/core'
 import { createHash, timingSafeEqual } from 'node:crypto';
 
 /**
- * How many random bytes a session token carries. 256 bits: brute force over a
- * loopback socket is not a threat model, it is a joke.
+ * Random bytes the session token carries. 256 bits: brute force over a loopback
+ * socket is not a realistic threat.
  */
 export const TOKEN_BYTES = 32;
 
 /**
- * The loopback names a browser may legitimately reach this daemon by.
+ * Loopback names a browser may use to reach this daemon.
  */
 export const LOOPBACK_HOSTS: readonly string[] = ['127.0.0.1', 'localhost', '[::1]', '::1'];
 
 /**
- * Compare a presented token against the real one without leaking, through
- * timing, how much of a guess was correct. Both sides are hashed first so the
- * comparison is over equal-length digests — `timingSafeEqual` throws on a length
- * mismatch, and that throw would itself be a length oracle.
+ * Compare presented token against real one. No leak, through timing, how much
+ * of guess correct. Both sides hashed first so comparison over equal-length
+ * digests — `timingSafeEqual` throw on length mismatch, that throw itself be
+ * length oracle.
  *
- * @param {string} expected - The daemon's token.
- * @param {string | null | undefined} candidate - What the caller presented.
- * @returns {boolean} True when they match.
+ * @param {string} expected - Daemon's token.
+ * @param {string | null | undefined} candidate - Caller presented this.
+ * @returns {boolean} True when match.
  */
 export function verifyToken(expected: string, candidate: string | null | undefined): boolean {
   if (typeof candidate !== 'string' || candidate.length === 0) {
@@ -62,12 +58,11 @@ export function verifyToken(expected: string, candidate: string | null | undefin
 }
 
 /**
- * The token out of an `Authorization` header, or null when the header is absent
- * or is not a bearer credential. The scheme is matched case-insensitively, as
- * RFC 7235 requires.
+ * Take token from `Authorization` header. Null when header absent or not bearer
+ * credential. Scheme matched case-insensitively, RFC 7235 require.
  *
- * @param {string | undefined} authorization - The raw header value.
- * @returns {string | null} The token, or null.
+ * @param {string | undefined} authorization - Raw header value.
+ * @returns {string | null} Token, or null.
  */
 export function bearerFrom(authorization: string | undefined): string | null {
   if (authorization === undefined) {
@@ -78,26 +73,24 @@ export function bearerFrom(authorization: string | undefined): string | null {
 }
 
 /**
- * The origins the daemon serves itself on. A browser may spell loopback three
- * ways and each is a distinct origin, so all three are trusted equally.
+ * Origins the daemon serves itself on. A browser treats the three loopback
+ * spellings as three distinct origins, so all three are included.
  *
- * @param {number} port - The bound port.
- * @returns {string[]} The daemon's own origins.
+ * @param {number} port - Bound port.
+ * @returns {string[]} Daemon's own origins.
  */
 export function selfOrigins(port: number): string[] {
   return [`https://127.0.0.1:${port}`, `https://localhost:${port}`, `https://[::1]:${port}`];
 }
 
 /**
- * Normalise an operator-supplied origin, refusing anything that would widen the
- * daemon's exposure: a wildcard, a scheme that is not http/https, a bare
- * hostname, and — the important one — plain `http` on anything but loopback,
- * where the traffic could be read or forged on the wire. A loopback `http`
- * origin is allowed because that is a development server on the same machine,
- * which is the real reason this flag exists.
+ * Normalise operator-supplied origin. Refuse anything that widens daemon
+ * exposure: wildcard, scheme not http/https, bare hostname, and plain `http`
+ * on anything but loopback, where traffic could be read or forged on the wire.
+ * Loopback `http` origin allowed for a development server on the same machine.
  *
  * @param {string} value - The `--allow-origin` value.
- * @returns {string | null} The canonical origin, or null when it is refused.
+ * @returns {string | null} Canonical origin, or null when refused.
  */
 export function normaliseOrigin(value: string): string | null {
   let url: URL;
@@ -116,10 +109,10 @@ export function normaliseOrigin(value: string): string | null {
 }
 
 /**
- * The origins a request may claim, given the port the daemon bound and whatever
- * the operator explicitly allowed.
+ * Origins request may claim, given port daemon bound and whatever operator
+ * explicitly allow.
  *
- * @param {number} port - The bound port.
+ * @param {number} port - Bound port.
  * @param {readonly string[]} [allowed] - Operator-supplied origins.
  * @returns {string[]} Every acceptable origin, deduplicated.
  */
@@ -131,15 +124,15 @@ export function allowedOrigins(port: number, allowed: readonly string[] = []): s
 }
 
 /**
- * Whether a request's `Origin` may talk to the daemon. An absent origin is not a
- * browser — a `curl` or the CLI — and passes this gate to face the token gate
- * instead; origin checks restrain browsers, tokens restrain processes. The
- * literal string `null`, which is what a `file://` page and a sandboxed iframe
- * send, is always refused: it is unattributable by construction.
+ * Whether request `Origin` may talk to daemon. Absent origin not browser — a
+ * `curl` or CLI — pass this gate, face token gate instead; origin checks
+ * restrain browsers, tokens restrain processes. Literal string `null`, what
+ * `file://` page and sandboxed iframe send, always refused: unattributable by
+ * construction.
  *
- * @param {string | undefined} origin - The request's `Origin` header.
- * @param {readonly string[]} allowed - The acceptable origins.
- * @returns {boolean} True when the request may proceed.
+ * @param {string | undefined} origin - Request's `Origin` header.
+ * @param {readonly string[]} allowed - Acceptable origins.
+ * @returns {boolean} True when request may proceed.
  */
 export function originAllowed(origin: string | undefined, allowed: readonly string[]): boolean {
   if (origin === undefined) {
@@ -152,15 +145,14 @@ export function originAllowed(origin: string | undefined, allowed: readonly stri
 }
 
 /**
- * Whether a request's `Host` names this daemon. A rebinding page arrives with
- * its own name in `Host`; a legitimate console arrives with a loopback name and
- * the bound port. An absent `Host` is refused — HTTP/1.1 requires it, and its
- * absence means the request was not shaped by a browser or by anything that
- * should be trusted with this API.
+ * Whether request `Host` names this daemon. A rebinding page arrives with its
+ * own name in `Host`; a console arrives with a loopback name and bound port.
+ * Absent `Host` refused — HTTP/1.1 requires it, so absence means the request
+ * carries no verifiable host.
  *
- * @param {string | undefined} host - The request's `Host` header.
- * @param {number} port - The bound port.
- * @returns {boolean} True when the host names this daemon.
+ * @param {string | undefined} host - Request's `Host` header.
+ * @param {number} port - Bound port.
+ * @returns {boolean} True when host name this daemon.
  */
 export function hostAllowed(host: string | undefined, port: number): boolean {
   if (host === undefined || host === '') {
@@ -178,14 +170,13 @@ export function hostAllowed(host: string | undefined, port: number): boolean {
 }
 
 /**
- * The CORS headers for a request, which are none at all unless its origin is on
- * the list. Credentials are never allowed: the API authenticates with a bearer
- * token the page holds in memory, so there is nothing a cross-origin request
- * could ride in on.
+ * CORS headers for request, none at all unless its origin on list. Credentials
+ * never allowed: API authenticate with bearer token page hold in memory, so
+ * nothing cross-origin request could ride in on.
  *
- * @param {string | undefined} origin - The request's `Origin` header.
- * @param {readonly string[]} allowed - The acceptable origins.
- * @returns {Record<string, string>} The headers to merge into the response.
+ * @param {string | undefined} origin - Request's `Origin` header.
+ * @param {readonly string[]} allowed - Acceptable origins.
+ * @returns {Record<string, string>} Headers to merge into response.
  */
 export function corsHeadersFor(
   origin: string | undefined,
@@ -204,13 +195,12 @@ export function corsHeadersFor(
 }
 
 /**
- * The headers every response carries, whatever it is. `Strict-Transport-Security`
- * is deliberately absent: HSTS is keyed by host across every port, so sending it
- * for `localhost` would force https onto every other development server on the
- * operator's machine — a footgun aimed at the whole workstation to protect a
- * loopback socket that is already TLS-only.
+ * Headers every response carries. `Strict-Transport-Security` omitted: HSTS is
+ * keyed by host across every port, so sending it for `localhost` forces https
+ * onto every other development server on the operator machine, even though the
+ * loopback socket is already TLS-only.
  *
- * @returns {Record<string, string>} The baseline headers.
+ * @returns {Record<string, string>} Baseline headers.
  */
 export function securityHeaders(): Record<string, string> {
   return {
@@ -222,20 +212,20 @@ export function securityHeaders(): Record<string, string> {
 }
 
 /**
- * The `'sha256-…'` CSP sources for every inline script in a page.
+ * `'sha256-…'` CSP sources for every inline script in the page.
  *
- * The console is a single self-contained file with its bundle inlined, so the
- * scripts are known at the moment the daemon reads the page and never change
- * while it runs. Hashing them turns `script-src 'unsafe-inline'` — which permits
- * *any* inline script, including one injected through a rendering bug — into a
- * grant naming exactly the bundle that was built.
+ * Console is a single self-contained file with an inlined bundle, so scripts
+ * are known when the daemon reads the page and never change while it runs.
+ * Hashing them turns `script-src 'unsafe-inline'` — which permits any inline
+ * script, including one injected through a rendering bug — into a grant naming
+ * exactly the bundle that was built.
  *
- * The digest covers the element's text content exactly as the browser sees it,
- * so a script with a `src` is skipped (it has no inline body) and nothing is
- * trimmed: a single changed byte is a different hash, which is the point.
+ * Digest covers element text content exactly as the browser sees it. A script
+ * with a `src` is skipped (no inline body) and nothing is trimmed: any changed
+ * byte produces a different hash.
  *
- * @param {string} html - The page as it will be served.
- * @returns {string[]} The hash sources, in document order, deduplicated.
+ * @param {string} html - Page as it will be served.
+ * @returns {string[]} Hash sources, in document order, deduplicated.
  */
 export function inlineScriptHashes(html: string): string[] {
   const hashes: string[] = [];
@@ -255,11 +245,11 @@ export function inlineScriptHashes(html: string): string[] {
 }
 
 /**
- * Why an upgrade was refused, as a plain HTTP response.
+ * Why upgrade refused, plain HTTP response.
  *
  * @interface UpgradeRefusal
- * @property {number} status - The status to answer with.
- * @property {string} message - The body, which says what failed and nothing more.
+ * @property {number} status - Status to answer with.
+ * @property {string} message - Body, say what failed, nothing more.
  */
 export interface UpgradeRefusal {
   readonly status: number;
@@ -267,16 +257,16 @@ export interface UpgradeRefusal {
 }
 
 /**
- * What the daemon knows about a socket asking to become a WebSocket.
+ * What daemon know about socket asking to become WebSocket.
  *
  * @interface UpgradeRequest
- * @property {string} [host] - The request's `Host`.
- * @property {string} [origin] - The request's `Origin`.
- * @property {string[]} protocols - The subprotocols the client offered.
- * @property {number} port - The bound port.
- * @property {string[]} origins - The acceptable origins.
- * @property {number} liveSessions - How many authenticated sessions are open.
- * @property {number} preAuthSessions - How many sockets are open but unauthenticated.
+ * @property {string} [host] - Request's `Host`.
+ * @property {string} [origin] - Request's `Origin`.
+ * @property {string[]} protocols - Subprotocols client offered.
+ * @property {number} port - Bound port.
+ * @property {string[]} origins - Acceptable origins.
+ * @property {number} liveSessions - How many authenticated sessions open.
+ * @property {number} preAuthSessions - How many sockets open but unauthenticated.
  */
 export interface UpgradeRequest {
   readonly host: string | undefined;
@@ -289,29 +279,26 @@ export interface UpgradeRequest {
 }
 
 /**
- * Whether a socket may be upgraded, decided before any WebSocket state exists.
+ * Whether the socket may upgrade, decided before any WebSocket state exists.
  *
- * Every refusal here is a plain HTTP response, which is the cheap place to say
- * no: a rejected upgrade costs the daemon a socket close, where an accepted one
- * costs a session, a timer, and a buffer. The order is deliberate — identity of
- * the *request* first (`Host`, then `Origin`, then the subprotocol), then the
- * daemon's own capacity. A rebinding page must be told 400 whether or not the
- * daemon happens to be busy, or the answer becomes a probe.
+ * Every refusal here is a plain HTTP response: a rejected upgrade costs the
+ * daemon a socket close, an accepted one a session, timer, and buffer. Order —
+ * identity of the request first (`Host`, then `Origin`, then subprotocol), then
+ * daemon capacity — keeps a rebinding page told 400 whether or not the daemon
+ * is busy, so the answer cannot become a probe.
  *
- * There is deliberately **no lockout after repeated failures**. On loopback the
- * daemon cannot tell one local peer from another, so a global cooldown is a
- * denial of service any local process can trigger against the operator's own
- * console — strictly worse than the guessing it would prevent, given a 256-bit
- * credential and a four-socket pre-auth cap. Failures are counted and reported
- * to the operator instead of being turned into a lock.
+ * **No lockout after repeated failures.** On loopback the daemon cannot tell
+ * one local peer from another, so a global cooldown would be a denial of
+ * service any local process can trigger against the operator's own console.
+ * Failures are counted and reported to the operator, not turned into a lock.
  *
- * The token is **not** checked here. It arrives in the first frame after the
- * upgrade, because a browser cannot set headers on a WebSocket handshake and
- * putting a credential in the URL would write it into every log that records a
- * request line.
+ * Token **not** checked here. It arrives in the first frame after upgrade,
+ * because the browser cannot set a header on the WebSocket handshake, and
+ * putting the credential in the URL would write it into every log that records
+ * the request line.
  *
- * @param {UpgradeRequest} request - What is known about the socket.
- * @returns {UpgradeRefusal | null} The refusal, or null when it may proceed.
+ * @param {UpgradeRequest} request - What known about socket.
+ * @returns {UpgradeRefusal | null} Refusal, or null when may proceed.
  */
 export function decideUpgrade(request: UpgradeRequest): UpgradeRefusal | null {
   if (!hostAllowed(request.host, request.port)) {
@@ -330,31 +317,31 @@ export function decideUpgrade(request: UpgradeRequest): UpgradeRefusal | null {
 }
 
 /**
- * The page's Content-Security-Policy, built per boot because the origin — and
- * therefore the one `wss://` the console may open — is not known until the
- * daemon binds a port. Everything is denied by default; the console's own
- * inline bundle and its single socket back to this daemon are the only grants.
+ * Page Content-Security-Policy, built per boot because origin — and therefore
+ * one `wss://` console may open — not known until daemon bind port. Everything
+ * denied by default; console own inline bundle and single socket back to this
+ * daemon be only grants.
  *
- * @param {number} port - The bound port.
- * @param {readonly string[]} [scriptHashes] - `'sha256-…'` sources for the page's own inline scripts.
- * @returns {string} The policy.
+ * @param {number} port - Bound port.
+ * @param {readonly string[]} [scriptHashes] - `'sha256-…'` sources for page's own inline scripts.
+ * @returns {string} Policy.
  */
 export function cspFor(port: number, scriptHashes: readonly string[] = []): string {
   const origins = selfOrigins(port);
   const connect = [...origins, ...origins.map((origin) => origin.replace('https://', 'wss://'))];
-  // A hash source and `'unsafe-inline'` are not additive: a browser that
-  // understands hashes ignores `'unsafe-inline'` entirely. So listing the page's
-  // own scripts by digest is what actually narrows the grant, and falling back
-  // to `'unsafe-inline'` only happens when there is no script to hash at all.
+  // Hash source and `'unsafe-inline'` not additive: a browser that understands
+  // hashes ignores `'unsafe-inline'` entirely. So listing the page's own
+  // scripts by digest narrows the grant, and falls back to `'unsafe-inline'`
+  // only when there is no script to hash at all.
   const script = scriptHashes.length === 0 ? "'unsafe-inline'" : scriptHashes.join(' ');
   return [
     "default-src 'none'",
     `script-src ${script}`,
-    // Styles stay inline-permitted: the console injects its stylesheet from
-    // React at runtime, so there is no static text to hash. A nonce would mean
-    // rewriting the served HTML per boot, and the exposure it would close —
+    // Styles stay inline-permitted: the console injects a stylesheet from React
+    // at runtime, so there is no static text to hash. A nonce would mean
+    // rewriting the served HTML per boot; the exposure a nonce would close —
     // CSS-based exfiltration on a page whose only data source is this daemon —
-    // does not justify a mutation of the artifact on every request.
+    // does not justify mutating the artifact on every request.
     "style-src 'unsafe-inline'",
     "img-src 'self' data:",
     "font-src 'self' data:",

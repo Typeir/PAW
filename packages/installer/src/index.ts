@@ -1,9 +1,9 @@
 /**
  * PAW Installer — Public API
  *
- * @fileoverview The pure planners and the port-driven application layer for
- * installing and activating PAW. `main.ts` (the argv + real-adapter shell) and the
- * `adapters/` (the OS writes) consume these; nothing here performs I/O directly.
+ * @fileoverview Pure planners and port-driven app layer for install and activate
+ * PAW. `main.ts` (argv + real-adapter shell) and `adapters/` (OS writes) consume
+ * these; nothing here do I/O direct.
  *
  * @module @paw/installer
  * @version 0.0.0

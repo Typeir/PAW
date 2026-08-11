@@ -1,15 +1,15 @@
 /**
  * Select Atom
  *
- * @fileoverview A styled single-select dropdown, ported from Ikuisuus's
- * `ui/filterSelect` and pared to what the console needs: a controlled listbox with
- * optional type-to-filter, full keyboard operation, and a real ARIA
- * `combobox`→`listbox`/`option` wiring, so it reads to a screen reader and works
- * without a mouse — matching the platform `<select>` it replaces while looking like
- * the rest of the instrument panel. It positions with plain absolute CSS (no
- * floating-ui) and closes on outside click or Escape, so it is fully unit-testable
- * in jsdom; it deliberately does not `scrollIntoView` (untestable there and
- * needless for the short lists a repository holds).
+ * @fileoverview Styled single-select dropdown, ported from Ikuisuus
+ * `ui/filterSelect`, pared to what console need: controlled listbox with
+ * optional type-to-filter, full keyboard operation, ARIA
+ * `combobox`→`listbox`/`option` wiring. Announces to screen reader,
+ * works without mouse, matches platform `<select>` semantics, styled to
+ * match rest of instrument panel. Positions with plain absolute CSS (no
+ * floating-ui). Closes on outside click or Escape — unit-testable in
+ * jsdom. No `scrollIntoView`: untestable in jsdom, unnecessary for the
+ * short lists this control renders.
  *
  * @module @paw/gui/presentation/atoms/select
  * @version 0.0.0
@@ -31,8 +31,8 @@ import {
  * One selectable option.
  *
  * @interface SelectOption
- * @property {string} value - The option's value, emitted on select.
- * @property {string} label - The option's visible label.
+ * @property {string} value - Option value, emit on select.
+ * @property {string} label - Option visible label.
  */
 export interface SelectOption {
   readonly value: string;
@@ -43,14 +43,14 @@ export interface SelectOption {
  * Props for {@link Select}.
  *
  * @interface SelectProps
- * @property {string} value - The currently selected value (controlled).
- * @property {readonly SelectOption[]} options - The options to choose from.
- * @property {(value: string) => void} onChange - Called with the chosen value.
- * @property {string} ariaLabel - Accessible name for the control.
- * @property {string} [placeholder] - Shown when `value` matches no option.
- * @property {boolean} [searchable] - Show a filter box that narrows the options.
- * @property {boolean} [disabled] - Disable the control.
- * @property {string} [id] - Base id for the listbox wiring.
+ * @property {string} value - Current selected value (controlled).
+ * @property {readonly SelectOption[]} options - Options to choose from.
+ * @property {(value: string) => void} onChange - Call with chosen value.
+ * @property {string} ariaLabel - Accessible name for control.
+ * @property {string} [placeholder] - Shown when `value` match no option.
+ * @property {boolean} [searchable] - Show filter box that narrow options.
+ * @property {boolean} [disabled] - Disable control.
+ * @property {string} [id] - Base id for listbox wiring.
  */
 export interface SelectProps {
   readonly value: string;

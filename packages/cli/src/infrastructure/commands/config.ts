@@ -1,11 +1,7 @@
 /**
  * PAW CLI — config command
  *
- * @fileoverview `paw config` edits a repo's model bindings on disk: show the
- * roles and what each is bound to, bind a role to a declared model, unbind one,
- * or declare a model. The CLI holds filesystem authority, so it writes
- * `.paw/config.json` directly through the core edit engine — the same engine the
- * console reaches over its control API.
+ * @fileoverview `paw config` edit repo model bindings on disk: show roles and bindings, bind role to declared model, unbind, or declare model. CLI hold filesystem authority; write `.paw/config.json` through core edit engine, same engine console reach over control API.
  *
  * @module @paw/cli/infrastructure/commands/config
  * @version 0.0.0
@@ -27,9 +23,9 @@ import type { ConfigDocumentPort } from '@paw/core';
 import { parseArgs } from '../../domain/context.js';
 
 /**
- * Print the declared models and each role's binding.
+ * Print declared models and each role binding.
  *
- * @param {ConfigDocument} config - The current document.
+ * @param {ConfigDocument} config - Current document.
  * @param {(lines: string[]) => void} print - Line printer.
  */
 function showConfig(config: ConfigDocument, print: (lines: string[]) => void): void {
@@ -46,13 +42,13 @@ function showConfig(config: ConfigDocument, print: (lines: string[]) => void): v
 }
 
 /**
- * Write an edit, or report why it was refused.
+ * Write edit, or report why refused.
  *
- * @param {ConfigEdit} edit - The edit outcome.
- * @param {ConfigDocumentPort} doc - The document to write.
+ * @param {ConfigEdit} edit - Edit outcome.
+ * @param {ConfigDocumentPort} doc - Document to write.
  * @param {(lines: string[]) => void} print - Line printer.
- * @param {string} done - The line to print on success.
- * @returns {Promise<number>} 0 on success, 1 on a refusal.
+ * @param {string} done - Line to print on success.
+ * @returns {Promise<number>} 0 on success, 1 on refusal.
  */
 async function commit(
   edit: ConfigEdit,
@@ -70,11 +66,11 @@ async function commit(
 }
 
 /**
- * Run the `config` subcommand.
+ * Run `config` subcommand.
  *
- * @param {string[]} rest - The words after `config`.
+ * @param {string[]} rest - Words after `config`.
  * @param {(lines: string[]) => void} print - Line printer.
- * @returns {Promise<number>} The exit code.
+ * @returns {Promise<number>} Exit code.
  */
 export async function runConfig(
   rest: string[],

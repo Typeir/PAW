@@ -1,12 +1,9 @@
 /**
  * PAW Node Process Adapter
  *
- * @fileoverview The {@link ProcessPort} implementation over `node:child_process`,
- * cross-platform. One correct detach, replacing the four hand-rolled copies in
- * the legacy code — including the bug where `postToolUse` awaited the child on
- * Windows and thereby defeated fire-and-forget. Fails loud per CONSTRAINTS.md
- * Constraint 3: a spawn that cannot launch rejects; it never resolves as if it
- * had worked. A non-zero exit is a result, not a failure — the process ran.
+ * @fileoverview Build {@link ProcessPort} on `node:child_process`, cross-platform.
+ * Fail loud per CONSTRAINTS.md Constraint 3. Spawn no launch — reject. Non-zero
+ * exit resolve result; process ran.
  *
  * @module @paw/adapters/process/nodeProcess
  * @version 0.0.0
@@ -22,9 +19,9 @@ import type {
 } from '@paw/core';
 
 /**
- * Create the Node process adapter.
+ * Make Node process adapter.
  *
- * @returns {ProcessPort} A process port backed by `node:child_process`.
+ * @returns {ProcessPort} Process port backed by `node:child_process`.
  */
 export function createNodeProcess(): ProcessPort {
   return {

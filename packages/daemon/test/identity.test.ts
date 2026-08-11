@@ -1,10 +1,7 @@
 /**
- * Identity Policy Tests
+ * Identity policy tests.
  *
- * @fileoverview Where the machine's identity lives, and when it must be
- * replaced. The rotation rules are boundary tests because getting them wrong is
- * either a daemon that will not start one morning (expired leaf, no renewal) or
- * one that churns the operator's trust store (CA reissued needlessly).
+ * @fileoverview Tests identity lifecycle and when it changes, and rotation-rule boundaries. Failure modes covered: daemon fails to start when the leaf expires without renewal; needless CA reissue churns the trust store.
  *
  * @module @paw/daemon/test/identity
  * @version 0.0.0
@@ -38,7 +35,7 @@ import { identityPaths, pawHome } from '../src/domain/pawHome.js';
 const NOW = new Date('2026-08-06T12:00:00.000Z');
 
 /**
- * Metadata for an identity issued today.
+ * Metadata for an identity issued now.
  *
  * @param {Partial<IdentityMeta>} [over] - Fields to override.
  * @returns {IdentityMeta} The metadata.
@@ -58,8 +55,7 @@ describe('the constrained CA', () => {
     expect(LOOPBACK_DNS).toBe('localhost');
     expect(LOOPBACK_V4_SUBTREE).toBe('127.0.0.0/8');
     expect(LOOPBACK_V6_SUBTREE).toBe('::1/128');
-    // A bare address here would encode 4 bytes, which is valid in a SAN and
-    // malformed inside a GeneralSubtree — OpenSSL rejects the chain.
+    // Bare address here encode 4 bytes, valid in SAN and malformed inside GeneralSubtree — OpenSSL reject chain.
     expect(LOOPBACK_V4_SUBTREE).toContain('/');
     expect(LOOPBACK_V6_SUBTREE).toContain('/');
   });

@@ -1,10 +1,10 @@
 /**
  * Run Reporting Tests
  *
- * @fileoverview What the console is told about a run: the token meter counts
- * what the port actually carried and lets a failure through, and a finished
- * dispatch maps to the herd exactly as core reported it — no member is invented,
- * and a refused plan reports an empty herd rather than a hopeful one.
+ * @fileoverview Console learns about a run from these events: the token meter
+ * counts tokens a port carries and lets failures pass through. A finished
+ * dispatch maps to the herd exactly as the core report does. A refused plan
+ * reports an empty herd.
  *
  * @module @paw/daemon/test/run
  */
@@ -97,11 +97,11 @@ describe('toRunProgress', () => {
 
 describe('trackRun', () => {
   /**
-   * The event a dispatcher emits when a member begins.
+   * Event the dispatcher emits when a member starts.
    *
-   * @param {number} member - The member index.
-   * @param {number} total - The plan's member count.
-   * @returns {DispatchEvent} The event.
+   * @param {number} member - Member index.
+   * @param {number} total - Plan member count.
+   * @returns {DispatchEvent} Event.
    */
   const started = (member: number, total = 3): DispatchEvent => ({
     phase: 'started',
@@ -111,12 +111,12 @@ describe('trackRun', () => {
   });
 
   /**
-   * The event a dispatcher emits when a member settles.
+   * Event the dispatcher emits when a member settles.
    *
-   * @param {number} member - The member index.
-   * @param {'done' | 'skipped'} state - How it finished.
-   * @param {string} [content] - What the model returned.
-   * @returns {DispatchEvent} The event.
+   * @param {number} member - Member index.
+   * @param {'done' | 'skipped'} state - How member finish.
+   * @param {string} [content] - What model return.
+   * @returns {DispatchEvent} Event.
    */
   const settled = (
     member: number,
@@ -165,8 +165,7 @@ describe('trackRun', () => {
     tracker.apply(started(0));
     const progress = tracker.apply(settled(0, 'done'));
 
-    // `confirmed` is output actually captured, which is the number an operator
-    // is watching — a member that answered with nothing did not produce work.
+    // `confirmed` = output captured. A member returning no content produces no work.
     expect(progress.done).toBe(1);
     expect(progress.confirmed).toBe(0);
   });
@@ -203,8 +202,7 @@ describe('trackRun', () => {
       ],
     };
 
-    // The live view and the authoritative end-of-run view must not disagree, or
-    // the console visibly changes its mind at the moment the run finishes.
+    // Live view matches the authoritative end-of-run view when the run finishes.
     expect(tracker.progress()).toEqual(toRunProgress(result, 'r', 't'));
   });
 

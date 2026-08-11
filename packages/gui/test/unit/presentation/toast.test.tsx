@@ -1,10 +1,10 @@
 /**
- * @fileoverview Covers the Toast system: it throws outside a provider, fires each
- * type through its shorthand (icon + message, with and without a title), auto-
- * dismisses after the per-type and custom durations, keeps a zero-duration toast
- * until dismissed, caps the stack, dismisses via the close button (timed and
- * sticky), hides the button when not dismissible, dismisses all at once, and
- * honours the position — so `toast.tsx` reaches 100% with fake timers and no real
+ * @fileoverview Cover Toast system: throw outside provider, fire each
+ * type via shorthand (icon + message, with and without title), auto-
+ * dismiss after per-type and custom durations, keep zero-duration toast
+ * till dismissed, cap stack, dismiss via close button (timed and
+ * sticky), hide button when not dismissible, dismiss all at once, and
+ * honour position — so `toast.tsx` reach 100% with fake timers and no real
  * layout.
  *
  * @module @paw/gui/test/unit/presentation/toast
@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider, useToast, type ToastPosition } from '../../../src/presentation/atoms/toast.js';
 
 /**
- * A harness that fires toasts on demand.
+ * A harness that fire toasts on demand.
  */
 function Harness() {
   const t = useToast();
@@ -56,9 +56,9 @@ function Harness() {
 }
 
 /**
- * Render the harness inside a provider.
+ * Render harness inside provider.
  *
- * @param position - The toaster position.
+ * @param position - Toaster position.
  */
 function setup(position?: ToastPosition) {
   return render(

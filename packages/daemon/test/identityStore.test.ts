@@ -1,12 +1,7 @@
 /**
- * Identity Store Tests
+ * Test identity store.
  *
- * @fileoverview Every state the identity directory can be found in, including
- * the ones that only occur months later or after someone has been editing files
- * by hand. The two assertions worth naming: a reissued CA must come back
- * untrusted, and a renewed leaf must not touch the CA — get either wrong and the
- * operator is either warned about nothing or asked to re-approve every ninety
- * days until they stop reading the warning.
+ * @fileoverview Cover every state identity directory sit, include case come months later or after someone hand-edit file. Two named checks: reissued CA must come back untrusted, renewed leaf must no touch CA. Get either wrong and operator get warn bout nothing or get ask re-approve every ninety days till stop read warning.
  *
  * @module @paw/daemon/test/identityStore
  * @version 0.0.0
@@ -39,10 +34,10 @@ const PATHS = identityPaths('/home/x/.local/share/paw');
 const WHO = { user: 'dtira', host: 'LAPTOP' };
 
 /**
- * Metadata describing an identity issued today.
+ * Metadata describe identity issue today.
  *
  * @param {Partial<IdentityMeta>} [over] - Fields to override.
- * @returns {IdentityMeta} The metadata.
+ * @returns {IdentityMeta} Metadata.
  */
 const meta = (over: Partial<IdentityMeta> = {}): IdentityMeta => ({
   version: META_VERSION,
@@ -55,10 +50,10 @@ const meta = (over: Partial<IdentityMeta> = {}): IdentityMeta => ({
 });
 
 /**
- * A fake identity directory holding the given files.
+ * Fake identity directory hold given files.
  *
  * @param {Record<string, string>} files - Path to contents.
- * @returns {IdentityIo & { written: Record<string, string>; secrets: string[]; dirs: string[] }} The io and what it recorded.
+ * @returns {IdentityIo & { written: Record<string, string>; secrets: string[]; dirs: string[] }} Io and what it record.
  */
 const fakeIo = (
   files: Record<string, string> = {},
@@ -97,9 +92,9 @@ const fakeIo = (
 };
 
 /**
- * An issuer that mints recognisable certificates without any crypto.
+ * Issuer mint recognisable cert, no crypto.
  *
- * @returns {IdentityIssuer} The fake issuer.
+ * @returns {IdentityIssuer} Fake issuer.
  */
 const fakeIssuer = (): IdentityIssuer => ({
   issueCa: vi.fn(async (user: string, host: string) => ({
@@ -117,10 +112,10 @@ const fakeIssuer = (): IdentityIssuer => ({
 });
 
 /**
- * An identity directory in a healthy state.
+ * Identity directory in healthy state.
  *
- * @param {IdentityMeta} [stored] - The sidecar to store.
- * @returns {Record<string, string>} The files.
+ * @param {IdentityMeta} [stored] - Sidecar to store.
+ * @returns {Record<string, string>} Files.
  */
 const healthy = (stored: IdentityMeta = meta()): Record<string, string> => ({
   [PATHS.caCert]: 'CA-CERT(stored)',
@@ -131,10 +126,10 @@ const healthy = (stored: IdentityMeta = meta()): Record<string, string> => ({
 });
 
 /**
- * A loaded identity, for the notice tests.
+ * Loaded identity, for notice test.
  *
  * @param {Partial<ServerIdentity>} [over] - Fields to override.
- * @returns {ServerIdentity} The identity.
+ * @returns {ServerIdentity} Loaded identity.
  */
 const loaded = (over: Partial<ServerIdentity> = {}): ServerIdentity => ({
   cert: 'LEAF',
@@ -269,8 +264,7 @@ describe('loadIdentity on a healthy machine', () => {
   it('re-proves the keys are private on every boot, not only the one that wrote them', async () => {
     const io = fakeIo(healthy());
     await loadIdentity(PATHS, io, fakeIssuer(), WHO, NOW);
-    // A key lives for months. A restore, a copy, or a stray chmod in between is
-    // exactly the case the write-time check cannot see.
+    // Key live for month. Restore, copy, stray chmod in between — case write-time check no see.
     expect(io.checked).toEqual([PATHS.caKey, PATHS.leafKey]);
   });
 

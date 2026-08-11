@@ -1,8 +1,8 @@
 /**
- * @fileoverview Unit tests for project-path normalisation — the fix for absolute
- * host paths doubling against the root. They pin: an absolute path under the root
- * (case-insensitively, with a trailing slash) becomes relative; an already-
- * relative path and one outside the root are left alone; the root itself is `.`.
+ * @fileoverview Unit tests for project-path normalisation. Stop absolute host
+ * paths doubling against root. Pin: absolute path under root (case-insensitively,
+ * with trailing slash) become relative; already-relative path and one outside
+ * root stay unchanged; root itself be `.`.
  *
  * @module @paw/core/test/domain/projectPath
  */

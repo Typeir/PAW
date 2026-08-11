@@ -1,9 +1,9 @@
 /**
  * Hydration Tests
  *
- * @fileoverview Proves the wire-to-console mapping is complete, and that the
- * boundary refuses a snapshot whose member count disagrees with the per-member
- * arrays it shipped rather than rendering a console that quietly omits members.
+ * @fileoverview Prove wire-to-console mapping complete. hydrate rejects a
+ * snapshot whose declared member count does not match the length of
+ * per-member arrays. No member is silently omitted from the console.
  *
  * @module @paw/gui/test/unit/application/hydrateSnapshot
  */

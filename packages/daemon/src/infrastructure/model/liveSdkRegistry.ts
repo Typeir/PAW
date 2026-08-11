@@ -1,15 +1,15 @@
 /**
- * PAW Live SDK Registry
+ * PAW live SDK registry
  *
- * @fileoverview Builds a {@link RoleRegistry} whose port issues real completions
- * through PAW's daemon-owned SDK egress — the replacement for the vendored raw
- * DeepSeek runtime. It opens one shared Copilot client (the injected
- * {@link OpenModel}, `openSdkModel` in production), binds the plan's role to the
- * live model, and hands back the client's `close` so a run can shut the runtime
- * down when the herd finishes. DeepSeek is the default target expressed as data
- * (`baseUrl` + model, overridable by env or argument), not a code path; the key
- * is read from the environment lazily at egress and never held here. Fails loud
- * per CONSTRAINTS.md Constraint 3: a run with no key throws at the first call.
+ * @fileoverview Build {@link RoleRegistry}. Route issue completions
+ * through PAW daemon-owned SDK egress — replace vendored raw
+ * DeepSeek runtime. Open one shared Copilot client (the injected
+ * {@link OpenModel}, `openSdkModel` in production), bind plan role to
+ * live model, return client `close` so run can stop the runtime
+ * when the run finishes. DeepSeek defaults stored as data
+ * (`baseUrl` + model), overridable by env or argument; key
+ * read from environment lazily at egress and never held here. Fail loud
+ * per CONSTRAINTS.md Constraint 3: run with no key throws at first call.
  *
  * @module @paw/daemon/model/liveSdkRegistry
  * @version 0.0.0
@@ -30,8 +30,8 @@ const DEFAULT_BASE = 'https://api.deepseek.com';
 const DEFAULT_MODEL = 'deepseek-chat';
 
 /**
- * The capabilities the live model is declared to have, so a role that requires
- * tools, structured output, or a large window is satisfied by the binding.
+ * Capabilities live model declared to have, so role that require
+ * tools, structured output, or large window satisfied by binding.
  */
 const LIVE_CAPS: ModelCapabilities = {
   contextTokens: 128_000,
@@ -44,22 +44,22 @@ const LIVE_CAPS: ModelCapabilities = {
 };
 
 /**
- * Opens a shared SDK-backed model. `openSdkModel` in production; a fake in tests.
+ * Open shared SDK-backed model. `openSdkModel` in production; fake in tests.
  *
  * @callback OpenModel
- * @param {OpenSdkModelOptions} options - Provider, key source, and runtime home.
- * @returns {Promise<{ port: ModelPort; close: () => Promise<void> }>} The port and its stop hook.
+ * @param {OpenSdkModelOptions} options - Provider, key source, runtime home.
+ * @returns {Promise<{ port: ModelPort; close: () => Promise<void> }>} Port and its stop hook.
  */
 export type OpenModel = (
   options: OpenSdkModelOptions,
 ) => Promise<{ port: ModelPort; close: () => Promise<void> }>;
 
 /**
- * A live registry paired with the hook that stops its client.
+ * Live registry paired with hook that stop its client.
  *
  * @interface LiveSdkRegistry
- * @property {RoleRegistry} registry - The plan's role bound to the live model.
- * @property {() => Promise<void>} close - Stops the shared client; call once the herd is done.
+ * @property {RoleRegistry} registry - Plan role bound to live model.
+ * @property {() => Promise<void>} close - Stop shared client; call once the run finishes.
  */
 export interface LiveSdkRegistry {
   readonly registry: RoleRegistry;
@@ -67,20 +67,22 @@ export interface LiveSdkRegistry {
 }
 
 /**
- * Build a live registry for a plan, routing completions through the SDK egress.
+ * Build live registry for plan, route completions through SDK egress.
  *
- * @param {SwarmPlan<unknown>} plan - The plan being run.
- * @param {OpenModel} openModel - Opens the shared SDK model.
- * @param {object} opts - Overrides and the runtime home.
- * @param {string} opts.baseDirectory - Where the runtime writes session state.
- * @param {string} [opts.baseUrl] - Provider base URL; defaults to `DEEPSEEK_BASE_URL` or the public endpoint.
- * @param {string} [opts.model] - Model id; defaults to `DEEPSEEK_MODEL` or `deepseek-chat`.
- * @returns {Promise<LiveSdkRegistry>} The registry and its close hook.
+ * @param {SwarmPlan<unknown>} plan - Plan being run.
+ * @param {OpenModel} openModel - Open shared SDK model.
+ * @param {object} opts - Overrides, runtime home, agentic surface.
+ * @param {string} opts.baseDirectory - Where runtime write session state.
+ * @param {string} opts.workingDirectory - Absolute root members built-in tools operate within; served repository.
+ * @param {boolean} opts.safemode - When true, members denied shell — option-A surface.
+ * @param {string} [opts.baseUrl] - Provider base URL; default `DEEPSEEK_BASE_URL` or public endpoint.
+ * @param {string} [opts.model] - Model id; default `DEEPSEEK_MODEL` or `deepseek-chat`.
+ * @returns {Promise<LiveSdkRegistry>} Registry and its close hook.
  */
 export async function liveSdkRegistryFor(
   plan: SwarmPlan<unknown>,
   openModel: OpenModel,
-  opts: { baseDirectory: string; baseUrl?: string; model?: string },
+  opts: { baseDirectory: string; workingDirectory: string; safemode: boolean; baseUrl?: string; model?: string },
 ): Promise<LiveSdkRegistry> {
   const baseUrl = opts.baseUrl ?? process.env.DEEPSEEK_BASE_URL ?? DEFAULT_BASE;
   const modelId = opts.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_MODEL;
@@ -94,6 +96,8 @@ export async function liveSdkRegistryFor(
       return key;
     },
     baseDirectory: opts.baseDirectory,
+    workingDirectory: opts.workingDirectory,
+    safemode: opts.safemode,
   });
   const registry = buildRegistry(
     { models: { [modelId]: LIVE_CAPS }, roles: { [plan.role]: modelId } },

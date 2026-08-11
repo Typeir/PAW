@@ -1,24 +1,21 @@
 /**
- * Copilot SDK BYOK — step-0 proof
+ * Copilot SDK BYOK integration
  *
- * @fileoverview Proves the pinned `@github/copilot-sdk` runs headless in this
- * repo, and guards the pin against the drift that let a raw-fetch shim displace
- * the SDK path (see `.ignore/research/byoksdk/22-byok-modelport-recovery.md` §8).
+ * @fileoverview Pin `@github/copilot-sdk` and run it headless in this repo.
+ * Guard pin against drift. Raw-fetch shim must no displace SDK path. See
+ * `.ignore/research/byoksdk/22-byok-modelport-recovery.md` §8.
  *
- * The version guard is always-on and deterministic: it reads the installed
- * package version and fails the moment the pin is downgraded or a caret lets it
- * float. That single assertion is the anti-degradation tripwire for the whole
- * BYOK recovery — nothing below it can be built on `0.2.2`.
+ * Version guard always-on, deterministic. Read installed package version.
+ * Fail if the pin downgrades or a caret allows it to walk. The pin assertion
+ * fails the build below `0.2.2`.
  *
- * The two live proofs are opt-in behind `PAW_SDK_LIVE=1` because they spawn the
- * ~159 MB Copilot runtime binary. They need no API key and spend no credit: a
- * local stub HTTP server is the BYOK provider, so they are reproducible in CI on
- * demand without a secret. Test A asserts a session runs with
- * `getAuthStatus().isAuthenticated === false` and one outbound request carrying
- * our `Authorization` header reaches the stub. Test B dispatches a custom
- * `defineTool` call back into our handler with structured arguments — the tool
- * surface a raw completions POST cannot carry, and the capability the eventual
- * real `SessionRun` depends on.
+ * Two opt-in live tests behind `PAW_SDK_LIVE=1`. They spawn the ~159 MB
+ * Copilot runtime binary. Need no API key, spend no credit. Local stub
+ * HTTP server the BYOK provider, reproducible in CI on demand without
+ * secret. Test A asserts a session runs with
+ * `getAuthStatus().isAuthenticated === false`, sends one outbound request
+ * carrying our `Authorization` header, and reaches the stub. Test B dispatches
+ * a custom `defineTool` call back into our handler with structured arguments.
  *
  * @module @paw/daemon/test/integration/sdkByok
  */
@@ -36,8 +33,8 @@ const PINNED = '1.0.8';
 const LIVE = process.env.PAW_SDK_LIVE === '1';
 
 /**
- * The minimal slice of the SDK surface these proofs exercise, declared locally
- * so the test binds to behaviour rather than to the SDK's full type shape.
+ * Minimal slice of SDK surface the tests exercise. Declare local. Tests bind
+ * to behaviour the SDK exposes.
  */
 interface SdkModule {
   CopilotClient: new (opts: Record<string, unknown>) => {
@@ -55,8 +52,8 @@ interface SdkModule {
 }
 
 /**
- * Resolve the installed `@github/copilot-sdk` version without relying on the
- * package exposing `./package.json` through its exports map.
+ * Resolve installed `@github/copilot-sdk` version. Package does not expose
+ * its own `./package.json` through the exports map.
  *
  * @returns {string} The installed version string.
  */
@@ -74,10 +71,10 @@ function installedSdkVersion(): string {
 }
 
 /**
- * Strip any ambient GitHub identity so a BYOK session cannot silently fall back
- * to a real Copilot login and mask a broken provider block.
+ * Strip any ambient GitHub identity so the BYOK session cannot fall back to
+ * a real Copilot login and mask a broken provider block.
  *
- * @returns {NodeJS.ProcessEnv} A copy of the environment with the tokens removed.
+ * @returns {NodeJS.ProcessEnv} Copy of the environment with the tokens removed.
  */
 function headlessEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };

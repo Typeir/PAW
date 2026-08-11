@@ -1,15 +1,14 @@
 /**
  * PAW Console Shell Detection
  *
- * @fileoverview Which shell the console is running in, and what that shell lets
- * it do. A desktop shell owns a real window: it hands the page a bridge with
- * minimise/maximise/close, and the console then draws the window's titlebar
- * because it *is* the titlebar. A browser tab owns no window, so the console
- * draws no window chrome there — a page with painted traffic lights and a
- * rounded "window" floating on a desk is a costume, and the buttons on it do
- * nothing. The console asks the shell rather than guessing from the URL, and it
- * treats a bridge without working controls as no bridge at all, so a light is
- * only ever drawn when pressing it does something.
+ * @fileoverview Detects which shell the console runs in: desktop or web.
+ * Desktop shell owns a native window and exposes a page bridge with
+ * minimise/maximise/close controls. The console draws a titlebar in
+ * desktop mode because the console is the titlebar. A browser tab has no
+ * window, so the console draws no window chrome there. The console queries
+ * the shell; the URL carries no shell information. A bridge without all three
+ * working controls is treated as
+ * absent. A control light is drawn only when the action is usable.
  *
  * @module @paw/gui/infrastructure/shell
  * @version 0.0.0
@@ -18,14 +17,14 @@
  */
 
 /**
- * What a desktop shell exposes to the page.
+ * What desktop shell show page.
  *
  * @interface PawBridge
- * @property {string} [version] - The shell's version.
- * @property {string} [platform] - The host platform.
- * @property {() => void} [minimize] - Minimise the window.
- * @property {() => void} [maximize] - Maximise or restore the window.
- * @property {() => void} [close] - Close the window.
+ * @property {string} [version] - Shell version.
+ * @property {string} [platform] - Host platform.
+ * @property {() => void} [minimize] - Minimise window.
+ * @property {() => void} [maximize] - Maximise or restore window.
+ * @property {() => void} [close] - Close window.
  */
 export interface PawBridge {
   readonly version?: string;
@@ -36,27 +35,27 @@ export interface PawBridge {
 }
 
 /**
- * The window a shell may have injected a bridge into.
+ * Window object that may expose the desktop bridge.
  *
  * @interface ShellWindow
- * @property {PawBridge} [paw] - The desktop bridge, when there is one.
+ * @property {PawBridge} [paw] - Desktop bridge, when there be one.
  */
 export interface ShellWindow {
   paw?: PawBridge;
 }
 
 /**
- * Where the console is running: inside a window it controls, or in a browser.
+ * Where console run: inside window console control, or in browser.
  */
 export type Shell = 'desktop' | 'web';
 
 /**
- * The window controls a desktop shell provides.
+ * Window controls desktop shell give.
  *
  * @interface WindowControls
- * @property {() => void} minimize - Minimise the window.
- * @property {() => void} maximize - Maximise or restore the window.
- * @property {() => void} close - Close the window.
+ * @property {() => void} minimize - Minimise window.
+ * @property {() => void} maximize - Maximise or restore window.
+ * @property {() => void} close - Close window.
  */
 export interface WindowControls {
   minimize(): void;
@@ -65,10 +64,10 @@ export interface WindowControls {
 }
 
 /**
- * The window controls, or null when nothing can actually drive a window.
+ * Window controls, or null when the bridge lacks any of the three controls.
  *
- * @param {ShellWindow} win - The window to read the bridge from.
- * @returns {WindowControls | null} The controls, or null in a browser.
+ * @param {ShellWindow} win - Window to read bridge from.
+ * @returns {WindowControls | null} Controls, or null in browser.
  */
 export function windowControls(win: ShellWindow): WindowControls | null {
   const bridge = win.paw;
@@ -88,10 +87,10 @@ export function windowControls(win: ShellWindow): WindowControls | null {
 }
 
 /**
- * Which shell the console is in.
+ * Which shell console in.
  *
- * @param {ShellWindow} win - The window to inspect.
- * @returns {Shell} `desktop` when a window bridge is present and usable, else `web`.
+ * @param {ShellWindow} win - Window to inspect.
+ * @returns {Shell} `desktop` when window bridge present and usable, else `web`.
  */
 export function detectShell(win: ShellWindow): Shell {
   return windowControls(win) === null ? 'web' : 'desktop';

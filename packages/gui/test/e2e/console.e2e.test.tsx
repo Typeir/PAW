@@ -1,11 +1,11 @@
 /**
  * Console E2E
  *
- * @fileoverview The whole console, driven the way an operator drives it: mount
- * it on a snapshot, walk the rail, scrub with the keyboard, jump from a herd row
- * to its brief, and — the point of the rewrite — watch it take a fresh snapshot
- * off the wire and re-render the real host facts, then say so out loud when the
- * daemon stops answering. No panel is stubbed; this is the app.
+ * @fileoverview Full console, driven by operator input. Mounted on a snapshot.
+ * Navigate every subsystem, scrub members with arrow keys, jump from a herd row
+ * to its member brief. Polls a source function for fresh snapshots and re-renders
+ * host facts from them; shows a status banner when the daemon stops answering.
+ * All panels real; none stubbed.
  *
  * @module @paw/gui/test/e2e/console.e2e
  */
@@ -95,8 +95,8 @@ describe('the live wire', () => {
       });
     const source = (): Promise<PawSnapshot> => answer();
 
-    // A daemon behind the page but no socket to it: the console falls back to
-    // polling rather than sitting on its boot snapshot.
+    // No WebSocket available. Console falls back to polling the source,
+    // starting from the initial snapshot.
     renderConsole(makeSnapshot(), source, 1000);
     expect(screen.getByText('pawd live · 2h14m · pid 4242')).toBeInTheDocument();
 
@@ -117,7 +117,7 @@ describe('the live wire', () => {
     const banner = screen.getByRole('status');
     expect(banner).toHaveTextContent('live wire down — polling');
     expect(banner).toHaveTextContent('fetch failed');
-    // The last snapshot stays on screen, labelled, rather than being cleared.
+    // Last snapshot stay on screen, labelled, no clear.
     expect(screen.getByText('pawd live · 9h99m · pid 4242')).toBeInTheDocument();
   });
 });

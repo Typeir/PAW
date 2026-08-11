@@ -1,26 +1,13 @@
 /**
  * PAW Daemon Event Bus
  *
- * @fileoverview One typed publish/subscribe point, so a source publishes a slice
- * without knowing who is listening and a listener subscribes without knowing who
- * produces. This is the backend twin of the console's context: sources and
- * sessions are wired to the bus once, in `runDaemon`, rather than every consumer
- * re-implementing "poll this and notify those".
+ * @fileoverview One typed publish/subscribe point. Source publish slice, no know who listen. Listener subscribe, no know who produce. Wire source and session to bus once, in `runDaemon`.
  *
- * Two behaviours are deliberate and both exist because the listeners are
- * WebSocket sessions.
+ * **Listener throw no stop others.** Delivery keep go to every remaining listener. Failure go through injected `onError`.
  *
- * **A listener that throws does not stop the others.** Delivery continues to
- * every remaining listener and the failure is reported through the injected
- * `onError`. A control daemon whose whole fan-out dies because one socket was
- * closed mid-publish is a daemon that goes silent for everyone.
+ * **Unsubscribe during publish safe.** Delivery iterate copy of listener set. This case when session unsubscribe self while handle event.
  *
- * **Unsubscribing during a publish is safe.** Delivery iterates a copy of the
- * listener set, which is exactly the case that arises when a session closes
- * itself in response to an event it just received.
- *
- * Pure — a `Map` of `Set`s and nothing else — so the fan-out rules are unit
- * tested rather than observed on a live socket.
+ * Pure: `Map` of `Set`s.
  *
  * @module @paw/daemon/bus
  * @version 0.0.0
@@ -31,23 +18,22 @@
 import type { LiveTopic, LiveTopicMap } from '@paw/core';
 
 /**
- * What a subscriber is handed when its topic changes.
+ * What subscriber get when topic change.
  */
 export type LiveListener<T extends LiveTopic> = (data: LiveTopicMap[T]) => void;
 
 /**
- * Told when a listener throws, so the failure is reported rather than swallowed
- * and rather than taking the publish down with it.
+ * Told when listener throw.
  */
 export type BusErrorReporter = (topic: LiveTopic, error: unknown) => void;
 
 /**
- * The typed fan-out point.
+ * Typed fan-out point.
  *
  * @interface LiveBus
- * @property {Function} subscribe - Listen to a topic; returns the unsubscribe.
- * @property {Function} publish - Deliver a slice's new value to every listener.
- * @property {(topic: LiveTopic) => number} listenerCount - How many are listening, for tests and limits.
+ * @property {Function} subscribe - Listen to topic; return unsubscribe.
+ * @property {Function} publish - Give slice new value to every listener.
+ * @property {(topic: LiveTopic) => number} listenerCount - How many listen, for tests and limits.
  */
 export interface LiveBus {
   subscribe<T extends LiveTopic>(topic: T, listener: LiveListener<T>): () => void;
@@ -56,9 +42,9 @@ export interface LiveBus {
 }
 
 /**
- * Build a bus.
+ * Build bus.
  *
- * @param {BusErrorReporter} onError - Told when a listener throws.
+ * @param {BusErrorReporter} onError - Told when listener throw.
  * @returns {LiveBus} The bus.
  */
 export function createBus(onError: BusErrorReporter): LiveBus {

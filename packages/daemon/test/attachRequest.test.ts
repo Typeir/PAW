@@ -1,12 +1,7 @@
 /**
  * PAW Attach Request Session Tests
  *
- * @fileoverview Covers the daemon's part in an attach request, which is
- * deliberately almost nothing: it hands the request to whoever started it and
- * tells the console to look at that terminal. What these pin is the boundary —
- * that no filesystem authority is exercised here, that an unauthenticated
- * request never reaches the handler, and that a daemon nobody is listening to
- * refuses rather than swallowing a request that would never be seen.
+ * @fileoverview Cover daemon part in attach request. Daemon forwards each attach request to the handler passed by the console and reports where approval happens. Tests fix the boundary: daemon grants no filesystem authority, does not call handler before authentication, rejects when no handler present, and never drops a request without an error response.
  *
  * @module @paw/daemon/test/attachRequest
  * @version 0.0.0
@@ -30,7 +25,7 @@ import type { SessionDeps, WsSessionPort } from '../src/domain/session.js';
 const TOKEN = 'a-token';
 
 /**
- * A socket fake recording what was sent and how it was closed.
+ * Fake socket records what was sent and how it was closed.
  *
  * @returns {WsSessionPort & { sent: string[]; closed: Array<[number, string]> }} The port.
  */
@@ -53,9 +48,9 @@ function fakePort(): WsSessionPort & {
 }
 
 /**
- * Session deps recording attach requests instead of acting on them.
+ * Session deps record attach requests.
  *
- * @param {boolean} listening - Whether an `onAttach` handler is supplied.
+ * @param {boolean} listening - Whether `onAttach` handler supplied.
  * @returns {SessionDeps & { requests: Array<[string, string]> }} The deps.
  */
 function fakeDeps(
@@ -80,7 +75,7 @@ function fakeDeps(
 }
 
 /**
- * A watcher that counts nothing anyone here asserts on.
+ * Watcher no test asserts against.
  *
  * @returns {object} The watcher.
  */
@@ -234,9 +229,9 @@ describe('attach requests', () => {
 });
 
 /**
- * Session deps recording release requests instead of running them.
+ * Session deps record release requests.
  *
- * @param {boolean} listening - Whether an `onRelease` handler is supplied.
+ * @param {boolean} listening - Whether `onRelease` handler supplied.
  * @returns {SessionDeps & { released: RunSettings[] }} The deps.
  */
 function releaseDeps(listening = true): SessionDeps & { released: RunSettings[] } {

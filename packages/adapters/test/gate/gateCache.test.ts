@@ -1,10 +1,5 @@
 /**
- * @fileoverview Unit tests for the warm gate cache. They pin the daemon-critical
- * behaviour: a first run imports and gates; an unchanged second run reuses the
- * cached gate; an edited gate (different size) is re-imported and its new verdict
- * is used; a removed gate is dropped; an invalid module is skipped; and an absent
- * gates dir clears the cache. Edits change file size, so invalidation is
- * deterministic regardless of same-millisecond mtimes.
+ * @fileoverview Unit test warm gate cache. Pin behavior. First run import and gate. Unchanged second run reuse cached gate. Edited gate (different size) re-import, use new verdict. Removed gate drop. Invalid module skip. Absent gates dir clear cache. Invalidation key on file size. Deterministic, no care same-millisecond mtimes.
  *
  * @module @paw/adapters/test/gate/gateCache
  */
@@ -15,7 +10,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createGateCache } from '../../src/index.js';
 
-/** A gate that flags any line containing `marker`. */
+/** Gate flag any line hold `marker`. */
 const gateFlagging = (marker: string) => `export const gate = {
   id: 'flag', name: 'Flag ${marker}', port: 'code-quality', severity: 'critical', appliesTo: ['.ts'],
   async check(ctx) {

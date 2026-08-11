@@ -1,13 +1,12 @@
 /**
  * Rail
  *
- * @fileoverview The left rail: the subsystems grouped as PAW thinks of them —
- * Enforce, Models, Work — over a foot of daemon facts. It is a `nav` of real
- * lists under real headings, and the foot is a description list, because every
- * line in it is a labelled value; a screen reader can then walk the groups
- * instead of hearing an undifferentiated run of buttons. Counts come from the
- * snapshot, so an open violation is visible from anywhere in the console, and
- * the foot's socket and resident memory are the real ones the daemon reported.
+ * @fileoverview Left rail. Groups subsystems Enforce, Models, Work above a
+ * foot of daemon facts. `nav` contains lists under headings. Foot is a
+ * description list; each line is a labelled value. Screen reader announces
+ * each group heading before its buttons. Counts come from snapshot, open
+ * violation visible from anywhere in console. Foot socket and resident
+ * memory come from daemon report.
  *
  * @module @paw/gui/presentation/chrome/rail
  * @version 0.0.0
@@ -32,8 +31,8 @@ import { NavItem } from '../atoms/navItem.js';
  * Props for {@link Group}.
  *
  * @interface GroupProps
- * @property {string} label - The group's heading.
- * @property {ReactNode} children - The group's items.
+ * @property {string} label - Group heading.
+ * @property {ReactNode} children - Group items.
  */
 interface GroupProps {
   readonly label: string;
@@ -43,7 +42,7 @@ interface GroupProps {
 /**
  * One labelled group of rail items.
  *
- * @param {GroupProps} props - The group props.
+ * @param {GroupProps} props - Group props.
  * @returns {JSX.Element} The group.
  */
 function Group({ label, children }: GroupProps) {
@@ -56,7 +55,7 @@ function Group({ label, children }: GroupProps) {
 }
 
 /**
- * The subsystem rail.
+ * Subsystem rail.
  *
  * @returns {JSX.Element} The rail.
  */

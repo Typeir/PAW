@@ -1,18 +1,16 @@
 /**
- * PAW Console Credential
+ * PAW Console credential
  *
- * @fileoverview How the console comes to hold the daemon's per-boot token, and
- * how it stops holding it in a place anyone can read.
+ * @fileoverview Console grab daemon per-boot token. Also make token unreadable.
  *
- * The daemon prints its URL with the token in the **fragment** — `#t=…` — for a
- * specific reason: a fragment is never sent to a server, never lands in an
- * access log, and never rides along in a `Referer`. The page takes it from
- * `location.hash`, copies it into `sessionStorage` (per-tab, per-origin, and it
- * survives a reload), and then rewrites the address bar so the credential is not
- * sitting in a URL the operator might copy, screenshot, or bookmark.
+ * Daemon print URL with token in **fragment** — `#t=…` — for reason: fragment
+ * never go to server, never hit access log, never ride in `Referer`. Page take
+ * token from `location.hash`, copy into `sessionStorage` (per-tab, per-origin,
+ * survive reload), then rewrite address bar. Credential no sit in URL operator
+ * might copy, screenshot, or bookmark.
  *
- * A tab with no token is not a tab that retries: it is locked out, and says so.
- * Guessing is not a recovery strategy for a 256-bit credential.
+ * Tab with no token not retry tab. It lock out, and say so. Guessing no work
+ * for 256-bit credential.
  *
  * @module @paw/gui/infrastructure/auth
  * @version 0.0.0
@@ -21,24 +19,23 @@
  */
 
 /**
- * The fragment parameter the daemon prints the token in.
+ * Fragment parameter daemon print token in.
  */
 export const TOKEN_PARAM = 't';
 
 /**
- * Where the adopted token lives for the rest of the tab's life.
+ * Where adopted token live for rest of tab's life.
  */
 export const TOKEN_STORAGE_KEY = 'paw.token';
 
 /**
- * The slice of `sessionStorage` the console needs. Taken as a seam so the
- * adoption rules are unit-tested without a browser, and so a page served in a
- * context where storage throws (a sandboxed frame, a hardened profile) degrades
- * instead of failing to boot.
+ * Slice of `sessionStorage` console need. Take as seam so adoption rules test
+ * without browser. Page served where storage throw (sandboxed frame, hardened
+ * profile) degrade, not fail boot.
  *
  * @interface TokenStorage
- * @property {(key: string) => string | null} getItem - Read a stored value.
- * @property {(key: string, value: string) => void} setItem - Store a value.
+ * @property {(key: string) => string | null} getItem - Read stored value.
+ * @property {(key: string, value: string) => void} setItem - Store value.
  */
 export interface TokenStorage {
   getItem(key: string): string | null;
@@ -46,11 +43,11 @@ export interface TokenStorage {
 }
 
 /**
- * The slice of `window` the token adoption reads and rewrites.
+ * Slice of `window` token adoption read and rewrite.
  *
  * @interface AuthWindow
- * @property {{ hash: string; pathname: string; search: string }} location - The current address.
- * @property {{ replaceState: (data: unknown, unused: string, url: string) => void }} history - Used to strip the credential from the address bar.
+ * @property {{ hash: string; pathname: string; search: string }} location - Current address.
+ * @property {{ replaceState: (data: unknown, unused: string, url: string) => void }} history - Strip credential from address bar.
  * @property {TokenStorage} [sessionStorage] - Per-tab storage, absent in exotic contexts.
  */
 export interface AuthWindow {
@@ -60,11 +57,10 @@ export interface AuthWindow {
 }
 
 /**
- * The token carried in a URL fragment, if there is one. The fragment is parsed
- * as a parameter list so it can carry more than one key later without changing
- * how the token is found.
+ * Token carried in URL fragment, if one there. Fragment parse as parameter list
+ * so carry more than one key later, no change way token found.
  *
- * @param {string} hash - The `location.hash`, with or without its leading `#`.
+ * @param {string} hash - The `location.hash`, with or without leading `#`.
  * @returns {string | null} The token, or null.
  */
 export function tokenFromHash(hash: string): string | null {
@@ -77,15 +73,14 @@ export function tokenFromHash(hash: string): string | null {
 }
 
 /**
- * Take the token out of the address bar and into the tab.
+ * Take token out address bar, put in tab.
  *
- * A fragment token wins and is immediately stripped from the URL; otherwise the
- * one this tab already adopted is reused, which is what makes a reload work. A
- * storage that refuses to be written is not fatal — the token is returned and
- * used for this page's life, and only a reload would need the printed URL again.
+ * Fragment token win, strip from URL now. Else reuse token tab already adopt —
+ * that make reload work. Storage refuse write not fatal. Token return, use for
+ * page's life. Only reload need printed URL again.
  *
- * @param {AuthWindow} win - The window to read.
- * @returns {string | null} The token this tab should present, or null.
+ * @param {AuthWindow} win - Window to read.
+ * @returns {string | null} Token tab should present, or null.
  */
 export function adoptToken(win: AuthWindow): string | null {
   const fresh = tokenFromHash(win.location.hash);
@@ -99,7 +94,7 @@ export function adoptToken(win: AuthWindow): string | null {
   try {
     win.sessionStorage?.setItem(TOKEN_STORAGE_KEY, fresh);
   } catch {
-    // A storage that refuses the write costs a reload, not a session.
+    // Refuse write cost reload, not session.
   }
   win.history.replaceState(null, '', `${win.location.pathname}${win.location.search}`);
   return fresh;

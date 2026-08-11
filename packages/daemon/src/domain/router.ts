@@ -1,22 +1,16 @@
 /**
  * PAW Daemon Router
  *
- * @fileoverview The daemon's request routing as a pure function of a request and
- * its dependencies: it serves the web UI page at `/`, the live
- * {@link PawSnapshot} as JSON at `/api/state`, the repository file tree at
- * `/api/tree`, and refuses everything else — with the reason, and with the
- * correct status. No socket, no streams; `nodeRuntime` wraps this in a TLS
- * server, but every decision, every header, and every refusal is made here and
- * unit-tested.
+ * @fileoverview Route request to response, pure function of request and deps.
+ * Serve web UI page at `/`, live {@link PawSnapshot} as JSON at `/api/state`,
+ * repo file tree at `/api/tree`, refuse all else with reason and status.
+ * `nodeRuntime` wrap this in TLS server; every decision, header, refusal made
+ * here and unit-tested.
  *
- * The gates run before the routes and in a deliberate order, cheapest and
- * broadest first: `Host` (a rebinding page names itself, not us), `Origin` (a
- * page the operator has open may send requests to loopback), then the bearer
- * token (another process on the machine has no origin at all). The page itself
- * is ungated — it is the static bundle and carries no data — while everything
- * under `/api/` requires all three. The snapshot and the tree are provided as
- * thunks so each request re-reads them: the data is live, not a value frozen at
- * boot.
+ * Gates run before routes. Cheapest and broadest first: `Host`, then `Origin`,
+ * then bearer token. Page ungated, carry no data; everything under `/api/`
+ * need all three. Snapshot and tree come as thunks, so each request re-read
+ * live data.
  *
  * @module @paw/daemon/router
  * @version 0.0.0
@@ -39,7 +33,7 @@ import {
 import { findSubtree } from './tree.js';
 
 /**
- * A routed HTTP response, ready for the runtime to write to a socket.
+ * Routed HTTP response. Ready for runtime to write to socket.
  *
  * @interface HttpResponse
  * @property {number} status - The HTTP status code.
@@ -53,15 +47,13 @@ export interface HttpResponse {
 }
 
 /**
- * The headers the router reads. Everything else about the request is ignored,
- * which is itself a policy: nothing is routed on a header the daemon has not
- * declared an interest in.
+ * Headers the router read. Ignore all other request headers.
  *
  * @interface RequestHeaders
  * @property {string} [authorization] - The bearer credential.
- * @property {string} [origin] - The requesting page's origin, when a browser sent it.
- * @property {string} [host] - The authority the client believes it reached.
- * @property {string} [contentType] - The body's media type, gated on writes.
+ * @property {string} [origin] - Requesting page's origin, when browser sent it.
+ * @property {string} [host] - Authority client believe it reached.
+ * @property {string} [contentType] - Body media type, gated on writes.
  */
 export interface RequestHeaders {
   readonly authorization?: string;
@@ -71,13 +63,13 @@ export interface RequestHeaders {
 }
 
 /**
- * One request, as the router sees it.
+ * One request, as router see it.
  *
  * @interface HttpRequest
  * @property {string} method - The HTTP method.
- * @property {string} path - The path, without the query string.
+ * @property {string} path - The path, without query string.
  * @property {URLSearchParams} [query] - The parsed query string.
- * @property {RequestHeaders} [headers] - The headers the router reads.
+ * @property {RequestHeaders} [headers] - The headers router read.
  * @property {string} [body] - The raw request body, present on writes.
  */
 export interface HttpRequest {
@@ -89,11 +81,10 @@ export interface HttpRequest {
 }
 
 /**
- * The registry slice the config editor reads: the declared models and every
- * role's binding.
+ * Registry slice config editor read: declared models and every role binding.
  *
  * @interface ConfigView
- * @property {string[]} models - The declared model ids.
+ * @property {string[]} models - Declared model ids.
  * @property {Record<string, string>} roles - Role id → model id bindings.
  */
 export interface ConfigView {
@@ -102,19 +93,20 @@ export interface ConfigView {
 }
 
 /**
- * What the router needs to answer a request.
+ * What router need to answer request.
  *
  * @interface RouterDeps
- * @property {string} page - The web UI HTML to serve at `/`.
- * @property {(plan: string | null) => Promise<PawSnapshot>} snapshot - Produces the current snapshot for a selected plan, per request.
- * @property {() => readonly TreeNode[]} tree - Produces the current repository file tree.
- * @property {string} token - The per-boot token every `/api/` request must present.
- * @property {number} port - The bound port, for the host gate and the page's CSP.
- * @property {readonly string[]} scriptHashes - CSP sources for the page's own inline scripts.
- * @property {readonly string[]} origins - The origins allowed to call the API.
- * @property {ControlPort} [control] - The writes this daemon exposes; absent leaves it observational.
- * @property {() => ConfigView} [config] - The declared models and role bindings, for the config editor.
- * @property {() => Promise<readonly string[]>} [recent] - The recently-grabbed routes, newest first, for the scope picker.
+ * @property {string} page - Web UI HTML to serve at `/`.
+ * @property {(plan: string | null) => Promise<PawSnapshot>} snapshot - Produce current snapshot for selected plan, per request.
+ * @property {() => readonly TreeNode[]} tree - Produce current repository file tree.
+ * @property {string} token - Per-boot token every `/api/` request must present.
+ * @property {number} port - Bound port, for host gate and page CSP.
+ * @property {readonly string[]} scriptHashes - CSP sources for page's own inline scripts.
+ * @property {readonly string[]} origins - Origins allowed to call API.
+ * @property {ControlPort} [control] - Writes this daemon expose; absent leave it observational.
+ * @property {() => ConfigView} [config] - Declared models and role bindings, for config editor.
+ * @property {() => Promise<readonly string[]>} [recent] - Recently-grabbed routes, newest first, for scope picker.
+ * @property {(route: string) => Promise<readonly string[]>} [forgetRecent] - Drop route from recent list, return new list. Daemon-own metadata, so it need no {@link ControlPort} — delete a stale entry never touch the consumer repo.
  */
 export interface RouterDeps {
   readonly page: string;
@@ -122,6 +114,7 @@ export interface RouterDeps {
   readonly tree: () => readonly TreeNode[];
   readonly config?: () => ConfigView;
   readonly recent?: () => Promise<readonly string[]>;
+  readonly forgetRecent?: (route: string) => Promise<readonly string[]>;
   readonly token: string;
   readonly port: number;
   readonly scriptHashes: readonly string[];
@@ -130,7 +123,7 @@ export interface RouterDeps {
 }
 
 /**
- * A plain-text refusal, carrying the baseline headers like every other response.
+ * Plain-text refusal. Carry baseline headers like every other response.
  *
  * @param {number} status - The status code.
  * @param {string} body - The reason.
@@ -150,12 +143,11 @@ function refuse(
 }
 
 /**
- * A JSON response, never cached — every read is of live state, and a write's
- * result is only ever true at the instant it is produced.
+ * JSON response. Never cached; reads of live state.
  *
- * @param {unknown} body - The value to serialise.
- * @param {Record<string, string>} cors - The CORS headers this request earned.
- * @param {number} [status] - The status code; 200 for a read.
+ * @param {unknown} body - Value to serialise.
+ * @param {Record<string, string>} cors - CORS headers this request earned.
+ * @param {number} [status] - The status code; 200 for read.
  * @returns {HttpResponse} The response.
  */
 function json(body: unknown, cors: Record<string, string>, status = 200): HttpResponse {
@@ -172,15 +164,13 @@ function json(body: unknown, cors: Record<string, string>, status = 200): HttpRe
 }
 
 /**
- * Serve the live snapshot for the plan the request selected. A plan the
- * repository does not hold is a 404 with the reason, not a 500 and not a
- * silently empty console — the selection can only name what the daemon
- * discovered.
+ * Serve live snapshot for plan request selected. Plan repo not hold returns
+ * 404 with reason.
  *
  * @param {RouterDeps} deps - The snapshot provider.
- * @param {URLSearchParams | undefined} query - The request's query parameters.
- * @param {Record<string, string>} cors - The CORS headers this request earned.
- * @returns {Promise<HttpResponse>} The snapshot, or 404 for an unknown plan.
+ * @param {URLSearchParams | undefined} query - Request query parameters.
+ * @param {Record<string, string>} cors - CORS headers this request earned.
+ * @returns {Promise<HttpResponse>} The snapshot, or 404 for unknown plan.
  */
 async function stateResponse(
   deps: RouterDeps,
@@ -199,12 +189,12 @@ async function stateResponse(
 }
 
 /**
- * Serve the file tree, optionally narrowed to a directory within it.
+ * Serve file tree. Optionally narrow to directory within it.
  *
  * @param {RouterDeps} deps - The tree provider.
- * @param {URLSearchParams | undefined} query - The request's query parameters.
- * @param {Record<string, string>} cors - The CORS headers this request earned.
- * @returns {HttpResponse} The tree, or 404 when the requested root is not in it.
+ * @param {URLSearchParams | undefined} query - Request query parameters.
+ * @param {Record<string, string>} cors - CORS headers this request earned.
+ * @returns {HttpResponse} The tree, or 404 when requested root not in it.
  */
 function treeResponse(
   deps: RouterDeps,
@@ -223,18 +213,16 @@ function treeResponse(
 }
 
 /**
- * Answer a write — POST, PUT, or DELETE. Observational by default: a daemon with
- * no control port refuses every write with 405 and never looks at the credential,
- * which is the posture a read-only deployment keeps. With a control port, the same
- * gates a read faces apply (host already passed; origin, then token), the body is
- * sanitised, and the request is dispatched to the handler registered for its
- * method and path. An unknown route is a 404 raised *after* the token gate, so an
- * unauthenticated caller can neither drive a write nor map which writes exist.
+ * Answer write — POST, PUT, or DELETE. Observational by default: daemon with
+ * no control port refuse every write with 405 and never read credential. With
+ * control port, read gates apply (host already passed; origin, then token),
+ * body sanitised, request dispatched to handler registered for its method and
+ * path. Unknown route return 404 after token gate.
  *
  * @param {HttpRequest} request - The request.
  * @param {RouterDeps} deps - The control port and security policy.
- * @param {RequestHeaders} headers - The request headers, already defaulted.
- * @param {Record<string, string>} cors - The CORS headers this request earned.
+ * @param {RequestHeaders} headers - Request headers, already defaulted.
+ * @param {Record<string, string>} cors - CORS headers this request earned.
  * @returns {Promise<HttpResponse>} The response.
  */
 async function writeResponse(
@@ -268,7 +256,7 @@ async function writeResponse(
 }
 
 /**
- * Route a request to a response.
+ * Route request to response.
  *
  * @param {HttpRequest} request - The request.
  * @param {RouterDeps} deps - The page, snapshot, tree, control port, and security policy.
@@ -289,6 +277,23 @@ export async function route(request: HttpRequest, deps: RouterDeps): Promise<Htt
       return refuse(403, 'origin not allowed', cors);
     }
     return { status: 204, headers: { ...securityHeaders(), ...cors }, body: '' };
+  }
+
+  if (request.method === 'DELETE' && request.path === '/api/recent') {
+    if (!originAllowed(headers.origin, deps.origins)) {
+      return refuse(403, 'origin not allowed', cors);
+    }
+    if (!verifyToken(deps.token, bearerFrom(headers.authorization))) {
+      return refuse(401, 'unauthorized', {
+        ...cors,
+        'www-authenticate': 'Bearer realm="pawd"',
+      });
+    }
+    const target = request.query?.get('route') ?? '';
+    if (deps.forgetRecent === undefined || target === '') {
+      return refuse(404, 'not found', cors);
+    }
+    return json(await deps.forgetRecent(target), cors);
   }
 
   if (isWriteMethod(request.method)) {

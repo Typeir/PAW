@@ -1,8 +1,8 @@
 /**
- * PAW Config Validation Tests
+ * PAW config validation tests.
  *
- * @fileoverview Covers `validateConfig` across a valid config, a non-object, all
- * missing required fields, and an unknown connector — so `config.ts` reaches 100%.
+ * @fileoverview Fire `validateConfig` at valid config, non-object, all fields
+ * gone, and unknown connector. Cover `config.ts` to 100%.
  *
  * @module @paw/core/test/domain/config
  * @version 0.0.0

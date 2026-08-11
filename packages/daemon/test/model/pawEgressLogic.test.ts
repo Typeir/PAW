@@ -1,12 +1,10 @@
 /**
- * @fileoverview Covers {@link handleEgress}, the pure core of PAW's daemon-owned
- * BYOK egress: it stamps the provider key onto the outbound request, stamps the
- * session's output ceiling onto a chat-completion body (the only place the
- * provider learns `max_tokens`, since the SDK forwards none), performs the call
- * through an injected fetch, and — only for a successful response tied to a
- * session — reads token usage from the body and reports it. Proven with a fake
- * fetch and no SDK. The key is asserted present on the request the fetch
- * receives, never logged.
+ * @fileoverview Cover {@link handleEgress}, pure core of PAW daemon BYOK egress.
+ * Stamps provider key onto outbound request. Stamps session output ceiling onto
+ * chat-completion body — only place provider learn `max_tokens`, SDK forward
+ * none. Call through injected fetch. Only for successful response tied to a
+ * session, read token usage from body, report it. Proven with fake fetch, no
+ * SDK. Key asserted present on request fetch receive, never logged.
  *
  * @module @paw/daemon/test/model/pawEgressLogic
  */
@@ -21,7 +19,7 @@ const jsonResponse = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
 /**
- * Base egress deps: no cap, an ok empty-usage response, overridable per test.
+ * Base egress deps: no cap, ok empty-usage response, overridable per test.
  *
  * @param over - Overrides.
  */

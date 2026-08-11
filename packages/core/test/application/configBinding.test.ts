@@ -1,9 +1,9 @@
 /**
  * PAW Config Binding Edit Tests
  *
- * @fileoverview Every arm of the three edits and the capability parser: an id or
- * role that is refused, a model that is not declared, a preserved sibling field,
- * and each way capabilities can be malformed. So `configBinding.ts` reaches 100%.
+ * @fileoverview Test every branch of three edits and capability parser.
+ * Refused id or role, undeclared model, preserved sibling field, each
+ * malformed-capabilities case. Cover `configBinding.ts` hundred percent.
  *
  * @module @paw/core/test/application/configBinding
  * @version 0.0.0

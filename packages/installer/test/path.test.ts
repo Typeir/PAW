@@ -1,9 +1,9 @@
 /**
  * PAW Installer PATH Planner Tests
  *
- * @fileoverview Covers `planPathEdit` on every arm — Windows absent (prepend) and
+ * @fileoverview Cover `planPathEdit` on every arm — Windows absent (prepend) and
  * present (no-op), POSIX append (bash export) and already-present (marker), and the
- * fish line — so `path.ts` reaches 100%.
+ * fish line — so `path.ts` reach 100%.
  *
  * @module @paw/installer/test/path
  * @version 0.0.0
@@ -17,16 +17,26 @@ import { MARK_BEGIN, planPathEdit } from '../src/path.js';
 const base = { home: '/home/x', binDir: '/home/x/.paw/bin', currentPath: '', profileText: '' };
 
 describe('planPathEdit', () => {
-  it('prepends the bin dir to the Windows user Path when absent', () => {
+  it('prepends the backslashed bin dir to the Windows user Path when absent', () => {
     const edit = planPathEdit({ ...base, shell: 'powershell', currentPath: 'C:\\Windows;C:\\Tools' });
     expect(edit.kind).toBe('windows-registry');
-    expect(edit.newPath).toBe('/home/x/.paw/bin;C:\\Windows;C:\\Tools');
+    expect(edit.newPath).toBe('\\home\\x\\.paw\\bin;C:\\Windows;C:\\Tools');
   });
 
   it('is a no-op when the bin dir is already on the Windows Path', () => {
     const edit = planPathEdit({ ...base, shell: 'powershell', currentPath: `${base.binDir};C:\\Windows` });
     expect(edit.kind).toBe('already-present');
     expect(edit.newPath).toBeUndefined();
+  });
+
+  it('treats slash style, case, and trailing slash as the same Windows entry', () => {
+    const edit = planPathEdit({
+      ...base,
+      shell: 'powershell',
+      binDir: 'C:/Users/X/paw/bin',
+      currentPath: 'c:\\users\\x\\PAW\\bin\\;C:\\Windows',
+    });
+    expect(edit.kind).toBe('already-present');
   });
 
   it('appends a marker block with an export line for bash/zsh', () => {

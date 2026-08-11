@@ -1,10 +1,9 @@
 /**
  * Config Client Tests
  *
- * @fileoverview The binding editor's transport: reading the models and the loud
- * failure when the read fails; the writes and every way a write can be refused —
- * a JSON reason from the edit engine, a JSON body with no reason, and a plain-text
- * transport refusal that is not JSON at all.
+ * @fileoverview Transport for binding editor. Read models. Scream loud when read
+ * fail. Write. Show every way write get refused — JSON reason from edit engine,
+ * JSON body with no reason, plain-text refusal that no JSON at all.
  *
  * @module @paw/gui/test/unit/infrastructure/configClient
  */
@@ -17,7 +16,7 @@ import {
 } from '../../../src/infrastructure/configClient.js';
 import type { FetchLike, ResponseLike } from '../../../src/infrastructure/snapshotSource.js';
 
-/** A fetch that answers with a fixed response. */
+/** Fetch that answer with fixed response. */
 const respond = (response: Partial<ResponseLike> & { ok: boolean }): FetchLike =>
   vi.fn(async () => ({ status: response.ok ? 200 : 422, json: async () => ({}), ...response }));
 

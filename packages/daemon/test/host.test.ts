@@ -1,8 +1,8 @@
 /**
  * PAW Daemon Host Tests
  *
- * @fileoverview Covers `readHostInfo`'s mapping from the injected process/os seams
- * to {@link HostInfo}, including the uptime rounding — so `host.ts` reaches 100%.
+ * @fileoverview Test `readHostInfo`. Map injected process/os seams to
+ * {@link HostInfo}, rounding uptime. Cover `host.ts` to 100%.
  *
  * @module @paw/daemon/test/host
  * @version 0.0.0

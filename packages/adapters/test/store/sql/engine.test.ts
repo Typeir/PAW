@@ -1,9 +1,7 @@
 /**
- * PAW Store Engine Resolution Tests
+ * PAW store engine resolution test.
  *
- * @fileoverview Proves the engine choice is resolved from an explicit override
- * first and a machine-level config second, and that an unrecognised value fails
- * loudly rather than falling back to a default the operator did not ask for.
+ * @fileoverview Prove engine choice resolve from explicit override first, machine-level config second. Unknown value fail loud.
  *
  * @module @paw/adapters/test/store/sql/engine
  * @version 0.0.0

@@ -1,10 +1,7 @@
 /**
- * Slice Cache Tests
+ * Slice cache test.
  *
- * @fileoverview Whether the cache actually avoids work, proven by counting
- * builder calls rather than by checking the value came back — a cache that
- * returns the right answer while recomputing it every time passes the second
- * test and fails the only one that matters.
+ * @fileoverview Test cache avoid work. Prove by count builder calls.
  *
  * @module @paw/daemon/test/cache
  * @version 0.0.0
@@ -47,9 +44,9 @@ const DOCTOR: DoctorReport = { ok: true, roles: [], findings: [] } as unknown as
 const PLANS: PlansSlice = { plans: ['a.swarm.mjs'], configPath: '.paw/config.json' };
 
 /**
- * A plan whose briefs are cheap but countable.
+ * Build plan with countable briefs.
  *
- * @param {number} members - How many members it has.
+ * @param {number} members - Member count.
  * @returns {SwarmPlan<{ files: string[] }>} The plan.
  */
 const planOf = (members: number): SwarmPlan<{ files: string[] }> => ({
@@ -89,8 +86,8 @@ describe('createVersionedCache', () => {
     const cache = createVersionedCache<string>();
     const build = vi.fn((): string => 'v');
     cache.read('k', 200, build);
-    // A restored file has an older mtime and is genuinely different content;
-    // treating "not newer" as "unchanged" would serve the wrong plan.
+    // Restored file has older mtime, real different content. Call "not newer"
+    // unchanged and we serve wrong plan.
     cache.read('k', 100, build);
     expect(build).toHaveBeenCalledTimes(2);
   });
@@ -138,16 +135,16 @@ describe('buildPlanSlice', () => {
     const brief = vi.spyOn(plan, 'brief');
 
     cache.read('lore', 7, () => buildPlanSlice(plan, 'src', 'lore'));
-    // More than one render per member: the plan doctor renders them again to
-    // check them, so a cache miss costs over 800 template renders here.
+    // More than one render per member. Plan doctor render them again to check
+    // them. Cache miss cost over 800 template renders here.
     expect(brief.mock.calls.length).toBeGreaterThanOrEqual(400);
 
     brief.mockClear();
     cache.read('lore', 7, () => buildPlanSlice(plan, 'src', 'lore'));
     cache.read('lore', 7, () => buildPlanSlice(plan, 'src', 'lore'));
 
-    // Two more reads of an unchanged plan: zero renders. This is the sweep's
-    // item 5 — hundreds of briefs every three seconds, per open console, gone.
+    // Two more reads of unchanged plan: zero renders. Sweep item 5 — hundreds
+    // of briefs every three seconds, per open console, gone.
     expect(brief).not.toHaveBeenCalled();
   });
 });

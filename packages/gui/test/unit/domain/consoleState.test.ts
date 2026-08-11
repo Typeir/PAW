@@ -1,9 +1,7 @@
 /**
  * Console State Tests
  *
- * @fileoverview Every transition of the reducer and every selector the views
- * read through, exercised without React — the state is pure, so this is where
- * the console's rules are proved.
+ * @fileoverview Test every reducer transition and every selector view. State is pure, so the tests run without React.
  *
  * @module @paw/gui/test/unit/domain/consoleState
  */

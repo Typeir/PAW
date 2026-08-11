@@ -1,11 +1,9 @@
 /**
  * PAW CLI Formatters
  *
- * @fileoverview Pure renderings of core reports into terminal lines — the
- * doctor, the swarm plan doctor, a member's brief (the script editor's preview
- * in the terminal), and a herd result. No I/O; these own the CLI's coverage.
- * The process shell in `main.ts` loads files, calls core, and prints what these
- * return.
+ * @fileoverview Render core reports to terminal lines: doctor, swarm plan
+ * doctor, member brief, herd result. No I/O. Process shell in `main.ts` load
+ * files, call core, print what these return.
  *
  * @module @paw/cli/domain/format
  * @version 0.0.0
@@ -27,7 +25,7 @@ const GATE_FINDING_CAP = 25;
 const VIOLATION_CAP = 40;
 
 /**
- * Render a mark for a boolean status.
+ * Render mark for boolean status.
  *
  * @param {boolean} ok - The status.
  * @returns {string} `✓` or `✗`.
@@ -37,9 +35,9 @@ function mark(ok: boolean): string {
 }
 
 /**
- * Render the unified doctor report.
+ * Render unified doctor report.
  *
- * @param {DoctorReport} report - The report from `runDoctor`.
+ * @param {DoctorReport} report - Report from `runDoctor`.
  * @returns {string[]} Terminal lines.
  */
 export function formatDoctor(report: DoctorReport): string[] {
@@ -59,10 +57,10 @@ export function formatDoctor(report: DoctorReport): string[] {
 }
 
 /**
- * Render a gate run's health report as terminal lines: a one-line summary, then
- * each failing gate with its findings, capped so a large run stays readable.
+ * Render gate run's health report as terminal lines: one-line summary, then
+ * each failing gate with its findings, capped.
  *
- * @param {HealthReport} report - The report from the gate runner.
+ * @param {HealthReport} report - Report from gate runner.
  * @returns {string[]} Terminal lines.
  */
 export function formatGateReport(report: HealthReport): string[] {
@@ -90,8 +88,8 @@ export function formatGateReport(report: HealthReport): string[] {
 }
 
 /**
- * Render the outstanding-violations list, grouped by file and capped so a large
- * backlog stays readable. A null result means no daemon answered.
+ * Render outstanding-violations list, group by file, cap. Null result mean no
+ * daemon answer.
  *
  * @param {{ violations?: Violation[] } | null} result - The `violations.list` reply.
  * @returns {string[]} Terminal lines.
@@ -132,10 +130,10 @@ export function formatViolations(result: { violations?: Violation[] } | null): s
 }
 
 /**
- * Render the outcome of a prune. A null result means no daemon answered.
+ * Render outcome of prune. Null result mean no daemon answer.
  *
  * @param {{ cleared?: number } | null} result - The `violations.prune` reply.
- * @param {string | null} file - The file pruned, or null for all files.
+ * @param {string | null} file - File pruned, or null for all files.
  * @returns {string[]} Terminal lines.
  */
 export function formatPruned(result: { cleared?: number } | null, file: string | null): string[] {
@@ -146,10 +144,10 @@ export function formatPruned(result: { cleared?: number } | null, file: string |
 }
 
 /**
- * Render a swarm plan's doctor findings.
+ * Render swarm plan's doctor findings.
  *
  * @param {string} name - The plan name.
- * @param {DoctorFinding[]} findings - The findings from `doctorPlan`.
+ * @param {DoctorFinding[]} findings - Findings from `doctorPlan`.
  * @returns {string[]} Terminal lines.
  */
 export function formatPlanDoctor(
@@ -165,14 +163,13 @@ export function formatPlanDoctor(
 }
 
 /**
- * Render one member's brief — the terminal form of the GUI's brief preview.
- * Callers that have composed the dispatched prompt (a brief plus its attached
- * context) pass it in, so the dry-run shows what would actually be sent rather
- * than the brief alone.
+ * Render one member's brief — terminal form of GUI's brief preview.
+ * Callers pass composed dispatched prompt (brief plus attached context), or
+ * fall back to member's rendered brief.
  *
  * @param {SwarmPlan<A>} plan - The plan.
  * @param {number} member - Zero-based member index.
- * @param {string} [text] - The text to show; defaults to the member's rendered brief.
+ * @param {string} [text] - Text to show; default member's rendered brief.
  * @returns {string[]} The brief, header then body lines.
  */
 export function formatBrief<A>(
@@ -184,9 +181,9 @@ export function formatBrief<A>(
 }
 
 /**
- * Render a herd dispatch result.
+ * Render herd dispatch result.
  *
- * @param {DispatchResult} result - The result from `dispatchSwarm`.
+ * @param {DispatchResult} result - Result from `dispatchSwarm`.
  * @returns {string[]} Terminal lines.
  */
 export function formatHerd(result: DispatchResult): string[] {

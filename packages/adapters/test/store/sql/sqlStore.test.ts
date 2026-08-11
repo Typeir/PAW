@@ -1,12 +1,11 @@
 /**
  * PAW SQL Store Tests
  *
- * @fileoverview Drives the SQL-backed {@link StorePort} against a real engine
- * (sql.js, in memory) so the SQL itself is under test rather than a mock of it,
- * and asserts the semantics {@link createMemoryStore} defines as the reference:
- * session-scoped rows plus project-scoped rows visible to everyone, resolution
- * scoped exactly. The same suite runs against every driver in `DRIVERS`, so a
- * second engine cannot drift from the first.
+ * @fileoverview Drive SQL-back {@link StorePort} against real engine
+ * (sql.js, in memory). Assert semantics {@link createMemoryStore} define as
+ * reference: session-scoped rows plus project-scoped rows visible to everyone,
+ * resolution scoped exact. Run same suite against every driver in
+ * `DRIVERS`.
  *
  * @module @paw/adapters/test/store/sql/sqlStore
  * @version 0.0.0
@@ -22,7 +21,7 @@ import { createSqlStore } from '../../../src/store/sql/sqlStore.js';
 import { openSqlJsMemoryDriver } from './helpers.js';
 
 /**
- * A violation with sensible defaults for the fields a test does not care about.
+ * Build violation with default field values.
  *
  * @param {Partial<Violation>} over - Fields to override.
  * @returns {Violation} The violation.

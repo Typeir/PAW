@@ -1,14 +1,13 @@
 /**
  * PAW Registry Builder
  *
- * @fileoverview Builds a {@link RoleRegistry} from a repo's config: the role
- * declarations come from code ({@link BUILTIN_ROLES}), the model capabilities and
- * role→model bindings come from config, and the {@link ModelPort} for each binding
- * is injected — a placeholder for the doctor, which never calls it, or a real
- * adapter for a run. This is the composition step every face (CLI, TUI, GUI)
- * shares, so it lives in core rather than being copied per surface. Fails loud per
- * CONSTRAINTS.md Constraint 3: a role bound to a model the config never declared
- * throws rather than silently binding nothing.
+ * @fileoverview Build {@link RoleRegistry} from repo config: role
+ * declarations from code ({@link BUILTIN_ROLES}), model capabilities and
+ * role→model bindings from config, inject {@link ModelPort} for each binding.
+ * The port factory runs only in the run path; the doctor service never calls
+ * it. Composition step shared by CLI, TUI, and GUI; defined in core. Per
+ * CONSTRAINTS.md Constraint 3, throws when a role is bound to a model the
+ * config does not declare.
  *
  * @module @paw/core/application/buildRegistry
  * @version 0.0.0
@@ -22,7 +21,7 @@ import { BUILTIN_ROLES } from './builtinRoles.js';
 import type { ModelBinding, RoleRegistry } from './roleRegistry.js';
 
 /**
- * The registry-relevant slice of a repo's config.
+ * Registry-relevant slice of repo config.
  *
  * @interface RegistryConfig
  * @property {Record<string, ModelCapabilities>} [models] - Declared models by id, with their capabilities.
@@ -34,12 +33,12 @@ export interface RegistryConfig {
 }
 
 /**
- * Build a role registry from config and a port factory.
+ * Build role registry from config and port factory.
  *
  * @param {RegistryConfig} config - The models and bindings.
- * @param {(modelId: string) => ModelPort} portFor - Supplies the port for a model id.
+ * @param {(modelId: string) => ModelPort} portFor - Supply port for model id.
  * @returns {RoleRegistry} The declarations plus resolved bindings.
- * @throws {Error} When a role is bound to a model the config did not declare.
+ * @throws {Error} When role bound to model config did not declare.
  */
 export function buildRegistry(
   config: RegistryConfig,

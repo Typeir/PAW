@@ -1,9 +1,8 @@
 /**
  * Section Outlet
  *
- * @fileoverview The one place the active rail subsystem becomes a view. Keeping
- * the mapping here means a new subsystem is a case and a component, and no other
- * file learns what sections exist.
+ * @fileoverview Maps active section to its view. Adding a subsystem requires
+ * one switch case and one component. No other file knows what sections exist.
  *
  * @module @paw/gui/presentation/views/sectionOutlet
  * @version 0.0.0
@@ -19,7 +18,7 @@ import { SwarmView } from './swarm/swarmView.js';
 import { ViolationsView } from './violationsView.js';
 
 /**
- * Titles for the subsystems no daemon report backs yet.
+ * Titles for subsystem no daemon report back yet.
  */
 const PENDING: Record<'gates' | 'keys' | 'logs', string> = {
   gates: 'Gates',
@@ -28,7 +27,7 @@ const PENDING: Record<'gates' | 'keys' | 'logs', string> = {
 };
 
 /**
- * The view for the active subsystem.
+ * View for active subsystem.
  *
  * @returns {JSX.Element} The view.
  */

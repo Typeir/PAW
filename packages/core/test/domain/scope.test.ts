@@ -1,11 +1,7 @@
 /**
- * PAW Scope Tests
+ * PAW scope test.
  *
- * @fileoverview Covers pointing an unscoped daemon at a repository. Scoping is
- * a *read* — it changes what the daemon looks at, exactly as `watch` changes
- * which plan it reports — so it needs no approval, and what has to be pinned
- * instead is its ceiling: a console may name a directory beneath the operator's
- * home and nothing above or outside it.
+ * @fileoverview Cover point unscoped daemon at repo. Scope be read: change what daemon look at. Pin ceiling: console name only dir below operator home.
  *
  * @module @paw/core/test/domain/scope
  * @version 0.0.0

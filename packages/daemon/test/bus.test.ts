@@ -1,10 +1,7 @@
 /**
  * Event Bus Tests
  *
- * @fileoverview The fan-out rules, including the two that only matter once the
- * listeners are real WebSocket sessions: a listener that throws must not silence
- * the rest, and a listener that unsubscribes while being notified must not
- * corrupt the delivery it is in the middle of.
+ * @fileoverview Tests fan-out rules. Delivery reaches every listener on a topic. A throwing listener must not stop delivery to the others. A listener that unsubscribes mid-delivery must not skip the next listener. Delivery iterates a snapshot captured at publish time; a listener subscribing during that publish sees the next event only.
  *
  * @module @paw/daemon/test/bus
  * @version 0.0.0
@@ -106,7 +103,7 @@ describe('a bus under duress', () => {
 
     bus.publish('host', HOST);
 
-    // One dead session must not make the daemon go silent for every other one.
+    // A throwing listener must not stop delivery to other listeners.
     expect(after).toHaveBeenCalledWith(HOST);
     expect(onError).toHaveBeenCalledWith('host', boom);
   });
@@ -132,8 +129,7 @@ describe('a bus under duress', () => {
 
     bus.publish('host', HOST);
 
-    // Delivery iterates a snapshot: a listener registered mid-publish sees the
-    // next event, never the one that was already in flight.
+    // Delivery iterates a snapshot of listeners captured at publish time; a listener registered mid-publish is invoked on the next publish only.
     expect(late).not.toHaveBeenCalled();
     expect(bus.listenerCount('host')).toBe(2);
   });

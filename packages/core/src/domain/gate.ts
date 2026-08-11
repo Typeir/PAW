@@ -1,11 +1,12 @@
 /**
  * PAW Gate Contract
  *
- * @fileoverview The QualityGate contract, ported verbatim from the legacy
- * `healthCheckTypes.ts` so a consumer's `.paw/gates/*.gate.*` files compile and
- * run unchanged. A gate is a pure decision over a {@link GateContext}; discovery,
- * loading, and execution live behind the {@link module:@paw/core/ports.GateRunner}
- * port. These are the shapes every gate, the runner, and the detector share.
+ * @fileoverview QualityGate contract. Come verbatim from legacy
+ * `healthCheckTypes.ts`; consumer `.paw/gates/*.gate.*` files compile and run
+ * unchanged. Gate be pure decision over {@link GateContext}; discovery,
+ * loading, and execution live behind
+ * {@link module:@paw/core/ports.GateRunner} port. Shapes every gate,
+ * runner, and detector share.
  *
  * @module @paw/core/domain/gate
  * @version 0.0.0
@@ -14,7 +15,7 @@
  */
 
 /**
- * Logical grouping for quality gates. Ports enable running subsets of checks
+ * Logical grouping for quality gates. Ports let run subsets of checks
  * (e.g. only `code-quality` gates).
  */
 export type GatePort =
@@ -25,14 +26,14 @@ export type GatePort =
   | 'custom';
 
 /**
- * A single quality gate. Implementations are auto-discovered from `.paw/gates/`.
+ * A single quality gate. Implementations auto-discover from `.paw/gates/`.
  *
  * @interface QualityGate
  * @property {string} id - Unique kebab-case identifier.
  * @property {string} name - Human-readable display name.
  * @property {GatePort} port - Logical grouping.
- * @property {'critical' | 'warning'} severity - Base severity when this gate fails.
- * @property {string[]} appliesTo - File extensions this gate cares about.
+ * @property {'critical' | 'warning'} severity - Base severity when this gate fail.
+ * @property {string[]} appliesTo - File extensions this gate care about.
  * @property {string[]} [dependsOn] - Gate IDs that must run before this one.
  */
 export interface QualityGate {
@@ -46,7 +47,7 @@ export interface QualityGate {
 }
 
 /**
- * Execution context passed to every gate. Contains pre-resolved file lists, mode
+ * Execution context passed to every gate. Contain pre-resolved file lists, mode
  * flags, and git state.
  *
  * @interface GateContext
@@ -75,7 +76,7 @@ export interface GateContext {
  * @property {string} message - Human-readable violation description.
  * @property {string} [suggestion] - Actionable fix suggestion.
  * @property {'critical' | 'warning'} [severity] - Per-finding severity override.
- * @property {boolean} [indirectFix] - True if this finding cannot be fixed by editing the violated file.
+ * @property {boolean} [indirectFix] - True if this finding cannot fix by editing violated file.
  */
 export interface GateFinding {
   file: string;
@@ -107,7 +108,7 @@ export interface GateStats {
  *
  * @interface GateResult
  * @property {string} gate - Gate identifier.
- * @property {boolean} passed - True if no violations found.
+ * @property {boolean} passed - True if no violation found.
  * @property {'critical' | 'warning' | 'info'} severity - Effective severity.
  * @property {GateFinding[]} findings - Individual violations.
  * @property {GateStats} stats - Execution statistics.
@@ -121,10 +122,10 @@ export interface GateResult {
 }
 
 /**
- * Top-level report produced by the gate runner.
+ * Top-level report produced by gate runner.
  *
  * @interface HealthReport
- * @property {string} timestamp - ISO timestamp of the run.
+ * @property {string} timestamp - ISO timestamp of run.
  * @property {'full' | 'changed-only'} mode - Execution mode.
  * @property {string[] | null} changedFiles - Changed file list when scoped.
  * @property {'PASS' | 'FAIL'} overall - Aggregate result.

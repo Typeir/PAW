@@ -1,11 +1,10 @@
 /**
  * PAW Enforcement RPC Methods
  *
- * @fileoverview The socket methods a resident daemon answers for enforcement:
- * hook.dispatch, violations.list, violations.prune, and — when control is
- * enabled — daemon.status and daemon.stop. Factored out of the socket
- * composition so the one daemon can serve them over both its socket and, later,
- * its HTTP surface, against a single store.
+ * @fileoverview Socket methods resident daemon answer for enforcement:
+ * hook.dispatch, violations.list, violations.prune, and — when control
+ * enabled — daemon.status and daemon.stop. One daemon serve them over socket
+ * and, later, HTTP surface, against single store.
  *
  * @module @paw/daemon/application/enforcementMethods
  * @version 0.0.0
@@ -25,11 +24,11 @@ import {
 const EVENTS: ReadonlySet<string> = new Set(PAW_EVENT_TYPES);
 
 /**
- * Narrow untrusted RPC params into a {@link HookDispatch}, or null when they are
- * not a well-formed dispatch: only a host, a known event, and an object payload.
+ * Narrow untrusted RPC params into {@link HookDispatch}, or null when malformed:
+ * need host, known event, object payload.
  *
- * @param {unknown} params - The method params off the wire.
- * @returns {HookDispatch | null} The dispatch, or null.
+ * @param {unknown} params - Method params off wire.
+ * @returns {HookDispatch | null} Dispatch, or null.
  */
 export function toDispatch(params: unknown): HookDispatch | null {
   const p = (params ?? {}) as { host?: unknown; event?: unknown; payload?: unknown };
@@ -44,13 +43,13 @@ export function toDispatch(params: unknown): HookDispatch | null {
 }
 
 /**
- * What the methods need beyond the dispatch deps.
+ * What methods need beyond dispatch deps.
  *
  * @interface EnforcementMethodOptions
- * @property {string} projectRoot - The root reported by daemon.status.
- * @property {() => void} resetIdle - Called on every method to defer the idle timer.
- * @property {() => Promise<void>} close - Closes the server, for daemon.stop.
- * @property {{ pid: number; now: () => number; onStop: () => void }} [control] - Enables daemon.status/stop.
+ * @property {string} projectRoot - Root reported by daemon.status.
+ * @property {() => void} resetIdle - Called on every method to defer idle timer.
+ * @property {() => Promise<void>} close - Close server, for daemon.stop.
+ * @property {{ pid: number; now: () => number; onStop: () => void }} [control] - Enable daemon.status/stop.
  */
 export interface EnforcementMethodOptions {
   readonly projectRoot: string;
@@ -60,11 +59,11 @@ export interface EnforcementMethodOptions {
 }
 
 /**
- * Build the enforcement RPC method table against a store and dispatch deps.
+ * Build enforcement RPC method table against store and dispatch deps.
  *
- * @param {DispatchHookDeps} deps - The store, gates, connectors, and policy.
+ * @param {DispatchHookDeps} deps - Store, gates, connectors, policy.
  * @param {EnforcementMethodOptions} opts - Lifecycle callbacks and control.
- * @returns {Record<string, (params: unknown) => Promise<unknown>>} The methods.
+ * @returns {Record<string, (params: unknown) => Promise<unknown>>} Methods.
  */
 export function enforcementMethods(
   deps: DispatchHookDeps,

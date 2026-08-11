@@ -1,10 +1,9 @@
 /**
- * PAW Daemon Process Ownership Tests
+ * PAW Daemon process ownership tests.
  *
- * @fileoverview Covers `collectSubtree` — a normal tree (excluding unrelated
- * processes and grouping siblings), a root absent from the table but with
- * children, and a `ppid` cycle that must terminate — so `process.ts` reaches 100%
- * and the exposure filter can never silently widen.
+ * @fileoverview Cover `collectSubtree` — normal tree (throw out unrelated
+ * filtered-out processes, root absent from table but has children, and
+ * `ppid` cycle that must terminate, so `process.ts` reports full coverage.
  *
  * @module @paw/daemon/test/process
  * @version 0.0.0

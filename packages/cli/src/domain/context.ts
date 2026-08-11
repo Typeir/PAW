@@ -1,14 +1,10 @@
 /**
- * PAW CLI Context Arguments
+ * PAW CLI context arguments.
  *
- * @fileoverview The pure half of `--context`: reading flags off an argv,
- * expanding the patterns an operator typed against a listing of the repository,
- * and attaching the result to a plan. The console's file selector and this flag
- * are two faces of the same seam — both end at `SwarmPlan.contextFiles`, which
- * `dispatchSwarm` reads through a port — so a run started from the terminal and
- * one started from a selection agree byte for byte. Fails loud per CONSTRAINTS.md
- * Constraint 3: a pattern that matches nothing is a mistake worth stopping for,
- * not a quietly empty attachment.
+ * @fileoverview Pure half of `--context`. Read flags off argv, expand pattern
+ * against repo listing, attach result to plan. Console file selector and this
+ * flag both end at `SwarmPlan.contextFiles`. `dispatchSwarm` read through a
+ * port. Fail loud per CONSTRAINTS.md Constraint 3. Pattern match nothing throw.
  *
  * @module @paw/cli/domain/context
  * @version 0.0.0
@@ -19,12 +15,12 @@
 import type { SwarmPlan } from '@paw/core';
 
 /**
- * An argv split into what it means.
+ * Split argv into positional words, flags, and values.
  *
  * @interface ParsedArgs
- * @property {string[]} positional - The words that are not flags or flag values.
- * @property {ReadonlySet<string>} flags - Bare `--flag` switches, without the dashes.
- * @property {ReadonlyMap<string, string>} values - `--flag=value` and `--flag value` pairs.
+ * @property {string[]} positional - Words not flags nor flag values.
+ * @property {ReadonlySet<string>} flags - Bare `--flag` switch, no dashes.
+ * @property {ReadonlyMap<string, string>} values - `--flag=value` and `--flag value` pair.
  */
 export interface ParsedArgs {
   readonly positional: string[];
@@ -33,20 +29,13 @@ export interface ParsedArgs {
 }
 
 /**
- * How many swarm members a run may have in flight, from an operator's flags.
+ * Number of concurrent swarm members to run, from operator flags.
+ * Dispatch batch by default. `--sequential` forces one at a time.
+ * `--concurrency=N` sets the bound directly, overriding `--sequential`.
  *
- * A herd is dispatched in batches by default, because its members are
- * independent requests and running them one at a time spends the whole run
- * waiting on a network. `--sequential` forces one at a time — the honest answer
- * when a provider is rate-limiting, when a run must be reproducible in order, or
- * when watching the log land in order matters more than finishing quickly.
- *
- * `--concurrency=N` names a bound directly and wins over `--sequential`, so an
- * explicit number is never silently overridden by a habit flag.
- *
- * @param {ParsedArgs} args - The parsed subcommand arguments.
- * @returns {number | undefined} The bound, or undefined to take the dispatcher's default.
- * @throws {Error} When `--concurrency` is not a positive whole number.
+ * @param {ParsedArgs} args - Parsed subcommand arguments.
+ * @returns {number | undefined} Bound, or undefined take dispatcher default.
+ * @throws {Error} When `--concurrency` not positive whole number.
  */
 export function concurrencyFrom(args: ParsedArgs): number | undefined {
   const raw = args.values.get('concurrency');
@@ -63,17 +52,13 @@ export function concurrencyFrom(args: ParsedArgs): number | undefined {
 }
 
 /**
- * The per-run output ceiling, from an operator's flags.
+ * Per-run output ceiling, from operator flags. `--max-tokens=N` cap every
+ * member token for this run. Override bound model default. Absent, member
+ * take model default. Collect here. `dispatchSwarm` apply it.
  *
- * `--max-tokens=N` caps every member's generated tokens for this run, overriding
- * the bound model's declared default — the honest lever for "let the answers run
- * longer" or "keep them short and cheap". Absent, each member takes the model's
- * default. The value is only collected here; `dispatchSwarm` applies it, so the
- * CLI, the TUI, and the console all cap a run the same way.
- *
- * @param {ParsedArgs} args - The parsed subcommand arguments.
- * @returns {number | undefined} The ceiling, or undefined to take the model default.
- * @throws {Error} When `--max-tokens` is not a positive whole number.
+ * @param {ParsedArgs} args - Parsed subcommand arguments.
+ * @returns {number | undefined} Ceiling, or undefined take model default.
+ * @throws {Error} When `--max-tokens` not positive whole number.
  */
 export function maxTokensFrom(args: ParsedArgs): number | undefined {
   const raw = args.values.get('max-tokens');
@@ -88,12 +73,12 @@ export function maxTokensFrom(args: ParsedArgs): number | undefined {
 }
 
 /**
- * Split an argv, given the flags that take a value. Both `--flag value` and
- * `--flag=value` are accepted, because both are what people type.
+ * Split argv, given flags that take value. Accept both `--flag value` and
+ * `--flag=value`.
  *
- * @param {readonly string[]} argv - The words to parse.
- * @param {readonly string[]} valueFlags - Flag names (without dashes) that take a value.
- * @returns {ParsedArgs} The split argv.
+ * @param {readonly string[]} argv - Words to parse.
+ * @param {readonly string[]} valueFlags - Flag name (no dashes) that take value.
+ * @returns {ParsedArgs} Split argv.
  */
 export function parseArgs(
   argv: readonly string[],
@@ -127,11 +112,10 @@ export function parseArgs(
 }
 
 /**
- * Split a `--context` value into patterns, dropping the empties a trailing
- * comma leaves behind.
+ * Split `--context` value into patterns. Drop empties trailing comma left.
  *
- * @param {string | undefined} value - The raw flag value.
- * @returns {string[]} The patterns.
+ * @param {string | undefined} value - Raw flag value.
+ * @returns {string[]} Patterns.
  */
 export function splitPatterns(value: string | undefined): string[] {
   return (value ?? '')
@@ -141,21 +125,21 @@ export function splitPatterns(value: string | undefined): string[] {
 }
 
 /**
- * Whether a pattern contains glob syntax rather than naming one file.
+ * Whether pattern hold glob syntax.
  *
  * @param {string} pattern - The pattern.
- * @returns {boolean} True when it must be matched rather than taken literally.
+ * @returns {boolean} True when pattern must match as glob.
  */
 export function isGlob(pattern: string): boolean {
   return /[*?[\]]/.test(pattern);
 }
 
 /**
- * Compile a glob to a regular expression over `/`-separated paths. `**` crosses
- * directory boundaries, `*` and `?` do not.
+ * Compile glob to regex over `/`-separated paths. `**` cross directory
+ * boundary. `*` and `?` not.
  *
  * @param {string} pattern - The glob.
- * @returns {RegExp} An anchored matcher.
+ * @returns {RegExp} Anchored matcher.
  */
 export function globToRegExp(pattern: string): RegExp {
   let out = '';
@@ -181,14 +165,12 @@ export function globToRegExp(pattern: string): RegExp {
 }
 
 /**
- * Expand the patterns an operator gave against the repository's files. A literal
- * path is taken as written — whether it exists is the file reader's business,
- * and it says so loudly at dispatch — while a glob that matches nothing throws
- * here, before a single member is briefed.
+ * Expand pattern operator give against repo files. Literal path take as
+ * written. Glob match nothing throw here.
  *
- * @param {readonly string[]} patterns - The patterns from `--context`.
- * @param {readonly string[]} candidates - Every file path in the repository.
- * @returns {string[]} The resolved paths, sorted and deduplicated.
+ * @param {readonly string[]} patterns - Patterns from `--context`.
+ * @param {readonly string[]} candidates - Every file path in repo.
+ * @returns {string[]} Resolved paths, sorted and deduped.
  */
 export function resolveContext(
   patterns: readonly string[],
@@ -213,13 +195,12 @@ export function resolveContext(
 }
 
 /**
- * Attach a fixed set of files to every member of a plan. The plan keeps its own
- * `contextFiles` when the operator named none, so a plan that computes its own
- * per-member context is not overwritten by an empty flag.
+ * Attach fixed set of files to every member of plan. Empty `paths` leave
+ * plan own `contextFiles` untouched.
  *
  * @param {SwarmPlan<A>} plan - The plan.
- * @param {readonly string[]} paths - The files to attach to every member.
- * @returns {SwarmPlan<A>} The plan, with the attachment applied.
+ * @param {readonly string[]} paths - Files to attach to every member.
+ * @returns {SwarmPlan<A>} Plan, with attachment applied.
  */
 export function withContext<A>(plan: SwarmPlan<A>, paths: readonly string[]): SwarmPlan<A> {
   if (paths.length === 0) {

@@ -1,18 +1,12 @@
 /**
  * PAW TUI Init Prompt
  *
- * @fileoverview The terminal's answer to an existing `.paw/config.json`. The
- * verdict — whether a config is there, whether PAW wrote it, whether it has been
- * edited since — comes from `@paw/core`; this decides only what a terminal
- * operator is offered and which key means what.
+ * @fileoverview Renders a conflict from existing `.paw/config.json`. Conflict kind (config present, PAW wrote it, edited since) comes from `@paw/core`; this module maps which choice the operator picks and which key triggers it.
  *
- * It exists because the resolution cannot be a CLI flag alone. `paw init
- * --merge` is a fine answer for someone who already knows what they will find,
- * and no answer at all for someone who does not — so every surface presents the
- * same {@link InitConflict}, and this is the terminal's presentation of it.
+ * Resolution is not expressible by CLI flag alone: `paw init
+ * --merge` requires knowing the conflict exists before choosing. Every surface presents the same {@link InitConflict}; this module renders it for the terminal.
  *
- * Pure, like the rest of the TUI's state: the shell reads the file and performs
- * the write, this maps a keypress to an intent.
+ * I/O belongs to the shell: it reads the file and writes the result. This module only maps keypresses to choices.
  *
  * @module @paw/tui/domain/initPrompt
  * @version 0.0.0
@@ -23,8 +17,8 @@
 import type { InitConflict, InitMode } from '@paw/core';
 
 /**
- * What an operator can choose. `cancel` is not an `InitMode` — it means no
- * write happens at all, which no mode expresses.
+ * Choices an operator can make. `cancel` means no write at
+ * all; no `InitMode` expresses that.
  */
 export type InitChoice = InitMode | 'cancel';
 
@@ -32,9 +26,9 @@ export type InitChoice = InitMode | 'cancel';
  * One offered resolution.
  *
  * @interface InitOption
- * @property {InitChoice} choice - The intent this row commits to.
- * @property {string} label - The row's name.
- * @property {string} detail - What it does to the file on disk.
+ * @property {InitChoice} choice - Choice this row selects when committed.
+ * @property {string} label - Row's name.
+ * @property {string} detail - What it do to file on disk.
  */
 export interface InitOption {
   readonly choice: InitChoice;
@@ -43,8 +37,8 @@ export interface InitOption {
 }
 
 /**
- * The offered resolutions, safest first. `cancel` leads because the cursor
- * starts on the first row, and the first row is the one a mistaken Enter picks.
+ * Resolutions for the conflict, ordered so the first row is `Cancel`,
+ * where the cursor starts and where a stray Enter leaves config untouched.
  */
 export const INIT_OPTIONS: readonly InitOption[] = [
   { choice: 'cancel', label: 'Cancel', detail: 'leave the config untouched' },
@@ -61,12 +55,12 @@ export const INIT_OPTIONS: readonly InitOption[] = [
 ];
 
 /**
- * The prompt's state.
+ * Prompt's state.
  *
  * @interface InitPromptState
- * @property {InitConflict} conflict - What was found at the config path.
+ * @property {InitConflict} conflict - What found at config path.
  * @property {number} cursor - Index into {@link INIT_OPTIONS}.
- * @property {InitChoice | null} decision - The committed choice, or null while still open.
+ * @property {InitChoice | null} decision - Committed choice, or null while still open.
  */
 export interface InitPromptState {
   readonly conflict: InitConflict;
@@ -75,25 +69,25 @@ export interface InitPromptState {
 }
 
 /**
- * Open the prompt for a conflict.
+ * Open prompt for conflict.
  *
- * @param {InitConflict} conflict - What was found at the config path.
- * @returns {InitPromptState} The initial state, on the safe option.
+ * @param {InitConflict} conflict - What found at config path.
+ * @returns {InitPromptState} Initial state, cursor on `Cancel` (index 0).
  */
 export function initPromptState(conflict: InitConflict): InitPromptState {
   return { conflict, cursor: 0, decision: null };
 }
 
 /**
- * Map a keypress to the next prompt state.
+ * Map keypress to next prompt state.
  *
- * Once a decision is committed the state is inert: a keypress arriving after
- * the operator has answered must not change the answer the shell is already
- * acting on.
+ * Once `decision` is set, the state is closed: a keypress after
+ * the operator answered must not change the answer the shell
+ * has acted on.
  *
- * @param {InitPromptState} state - The current state.
- * @param {string} key - The key name.
- * @returns {InitPromptState} The next state.
+ * @param {InitPromptState} state - Current state.
+ * @param {string} key - Key name.
+ * @returns {InitPromptState} Next state.
  */
 export function reduceInitPrompt(
   state: InitPromptState,

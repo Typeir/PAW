@@ -1,11 +1,11 @@
 /**
  * PAW TUI Renderer Tests
  *
- * @fileoverview Snapshots a full screen for each view and each notable data
- * shape — a ready and an unready doctor, the plan/brief view with fit padding,
- * exact-fit, and truncation, and a released, a refused, and an unreleased herd —
- * so `screen.ts` reaches 100% and every frame is a regression artifact. The
- * snapshots are the regression tier from CONSTRAINTS.md Constraint 1.
+ * @fileoverview Snap full screen for each view and each notable data shape —
+ * ready and unready doctor, plan/brief view with fit padding, exact-fit, and
+ * truncation, and released, refused, and unreleased herd. Cover 100% of
+ * screen.ts lines; every frame is a regression artifact per CONSTRAINTS.md
+ * Constraint 1.
  *
  * @module @paw/tui/test/unit/screen
  * @version 0.0.0
@@ -64,8 +64,9 @@ const passReport: HealthReport = {
 };
 
 /**
- * A plan whose brief has a short line, an exactly-68-char line (the frame's inner
- * width), and an over-long line — so `fit` pads, matches, and truncates.
+ * Plan whose brief has a short line, an exactly-68-char line (frame's inner
+ * width), and an over-long line — covering fit padding, exact fit, and
+ * truncation.
  */
 const plan: SwarmPlan<unknown> = {
   name: 'demo',
@@ -153,9 +154,9 @@ const configNoModels: ConfigSnapshot = {
 };
 
 /**
- * Build a state on a given view with the given data pieces.
+ * Build state on given view with given data pieces.
  *
- * @param view - The active view.
+ * @param view - Active view.
  * @param over - Data overrides.
  * @param member - Selected member.
  */

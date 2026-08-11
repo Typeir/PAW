@@ -1,15 +1,14 @@
 /**
  * PAW SDK Model Shell
  *
- * @fileoverview The one file in the repository that imports `@github/copilot-sdk`
- * and spawns its runtime — the thin shell that turns the three unit-covered cores
+ * @fileoverview Only file import `@github/copilot-sdk` and spawn runtime. The three unit-covered cores
  * ({@link handleEgress}, {@link createSdkSessionRun}, {@link parseProviderUsage})
- * into a live {@link ModelPort}. PAW owns egress: a {@link PawEgress} request
- * handler stamps the provider key onto every outbound model call, performs it, and
- * reads token usage from the response — so the key never reaches the runtime and
- * the SDK's missing usage is recovered. The client is started once and shared
- * across a run's concurrent completions; `close` stops it. Excluded from unit
- * coverage in `vitest.config.ts` (it needs the 159 MB runtime) and proven by the
+ * together implement {@link ModelPort}. {@link PawEgress} request
+ * handler stamps provider key on every outbound model call, and
+ * reads token usage from response — so key never reach runtime and
+ * SDK missing usage get recovered. Client start once and share
+ * across run concurrent completions; `close` stop it. Exclude from unit
+ * coverage in `vitest.config.ts` (need 159 MB runtime) and prove by
  * opt-in `PAW_SDK_LIVE` integration test.
  *
  * @module @paw/daemon/model/sdkModel
@@ -18,7 +17,7 @@
  * @since 5.0.0
  */
 
-import { CopilotClient, CopilotRequestHandler, type CopilotRequestContext } from '@github/copilot-sdk';
+import { CopilotClient, CopilotRequestHandler, approveAll, type CopilotRequestContext } from '@github/copilot-sdk';
 import { createCopilotSdkModel } from '@paw/adapters';
 import type { ModelPort } from '@paw/core';
 import { handleEgress, type EgressDeps } from './pawEgressLogic.js';
@@ -26,14 +25,14 @@ import { createSdkSessionRun, type ProviderBlock, type SdkClientLike } from './s
 import type { TokenUsage } from './providerUsage.js';
 
 /**
- * The request handler PAW hands the runtime: every outbound model call is routed
- * through {@link handleEgress}, so PAW adds the key and reads usage itself.
+ * Request handler that PAW passes to runtime: every outbound model call routes
+ * through {@link handleEgress}, so PAW adds key and reads usage itself.
  */
 class PawEgress extends CopilotRequestHandler {
   readonly #deps: EgressDeps;
 
   /**
-   * @param {EgressDeps} deps - Token source, fetch, and usage sink.
+   * @param {EgressDeps} deps - Token source, fetch, usage sink.
    */
   constructor(deps: EgressDeps) {
     super();
@@ -41,9 +40,9 @@ class PawEgress extends CopilotRequestHandler {
   }
 
   /**
-   * @param {Request} request - The outbound model-layer request.
-   * @param {CopilotRequestContext} ctx - The per-request context carrying the session id.
-   * @returns {Promise<Response>} The provider response.
+   * @param {Request} request - Outbound model-layer request.
+   * @param {CopilotRequestContext} ctx - Per-request context carry session id.
+   * @returns {Promise<Response>} Provider response.
    */
   protected sendRequest(request: Request, ctx: CopilotRequestContext): Promise<Response> {
     return handleEgress(request, ctx.sessionId, this.#deps);
@@ -54,21 +53,25 @@ class PawEgress extends CopilotRequestHandler {
  * Options for {@link openSdkModel}.
  *
  * @interface OpenSdkModelOptions
- * @property {ProviderBlock} provider - The BYOK provider target (type + baseUrl, no key).
- * @property {() => string | Promise<string>} authToken - Yields the provider key at egress.
- * @property {string} baseDirectory - Where the runtime writes its session state.
+ * @property {ProviderBlock} provider - BYOK provider target (type + baseUrl, no key).
+ * @property {() => string | Promise<string>} authToken - Yield provider key at egress.
+ * @property {string} baseDirectory - Where runtime write session state.
+ * @property {string} workingDirectory - Absolute root member built-in file and shell tool operate within; served repository.
+ * @property {boolean} safemode - When true, member deny shell — option-A surface.
  */
 export interface OpenSdkModelOptions {
   readonly provider: ProviderBlock;
   readonly authToken: () => string | Promise<string>;
   readonly baseDirectory: string;
+  readonly workingDirectory: string;
+  readonly safemode: boolean;
 }
 
 /**
- * Start a shared Copilot client for BYOK egress and return a model port over it.
+ * Start shared Copilot client for BYOK egress and return model port over it.
  *
- * @param {OpenSdkModelOptions} options - Provider, key source, and runtime home.
- * @returns {Promise<{ port: ModelPort; close: () => Promise<void> }>} The port and a stop hook.
+ * @param {OpenSdkModelOptions} options - Provider, key source, runtime home.
+ * @returns {Promise<{ port: ModelPort; close: () => Promise<void> }>} Port and stop hook.
  */
 export async function openSdkModel(
   options: OpenSdkModelOptions,
@@ -96,6 +99,11 @@ export async function openSdkModel(
     options.provider,
     usageBySession,
     maxTokensBySession,
+    {
+      workingDirectory: options.workingDirectory,
+      safemode: options.safemode,
+      onPermissionRequest: approveAll,
+    },
   );
   return {
     port: createCopilotSdkModel(run),

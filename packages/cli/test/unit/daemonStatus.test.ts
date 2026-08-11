@@ -1,7 +1,7 @@
 /**
- * @fileoverview Unit tests for the daemon status/stop formatters. They pin the
- * running and the no-daemon rendering for both, so `daemonStatus.ts` reaches
- * 100% and a missing daemon reads as a plain state rather than a failure.
+ * @fileoverview Unit test daemon status/stop formatters. Pin running and
+ * no-daemon render for both; `daemonStatus.ts` hit 100%. Missing daemon render
+ * plain state.
  *
  * @module @paw/cli/test/unit/daemonStatus
  */

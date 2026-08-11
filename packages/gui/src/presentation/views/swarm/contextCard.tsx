@@ -1,13 +1,11 @@
 /**
  * Context Card
  *
- * @fileoverview Picks the repository files whose contents ride along with every
- * member's brief. The tree comes from the daemon's `/api/tree`, which serves the
- * repository it was pointed at and nothing else; the selection lives in console
- * state. What the card cannot do is release the run — the daemon has no control
- * API yet — so it shows the exact `--context` argument the selection means, and
- * the operator hands that to `paw swarm run` or `paw ui --run`. That is the
- * honest seam: one selection, one flag, one core path for CLI and console alike.
+ * @fileoverview Pick repo files whose contents attach to every member brief.
+ * Tree comes from daemon `/api/tree` and serves only the pointed repo.
+ * Selection lives in console state; the command bar's release carries it in
+ * `RunSettings.context`, and the `--context` line below shows the same selection
+ * as a CLI argument for a manually run herd. The two paths read one selection.
  *
  * @module @paw/gui/presentation/views/swarm/contextCard
  * @version 0.0.0
@@ -26,7 +24,7 @@ import { FileTreeSelect } from '../../atoms/fileTreeSelect.js';
 import { Placeholder } from '../../atoms/placeholder.js';
 
 /**
- * The attached-context picker.
+ * Attached-context picker.
  *
  * @returns {JSX.Element} The card.
  */

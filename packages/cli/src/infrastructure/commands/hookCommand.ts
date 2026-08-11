@@ -1,11 +1,11 @@
 /**
  * PAW CLI — hook command
  *
- * @fileoverview `paw hook --copilot "tool.pre"`: a thin client of the resident
- * daemon. It names the host (a flag) and the event (its value), autostarts pawd
- * if none is up, and hands the round trip to `runHook`, which asks pawd to decide
- * and writes the answer — or, with no daemon reachable, the host's do-nothing
- * output. No store, no gates, no per-hook state: the daemon owns all of it.
+ * @fileoverview `paw hook --copilot "tool.pre"`: client of resident daemon.
+ * Name host (a flag) and event (its value), autostart pawd if none up, then
+ * pass both to `runHook`. `runHook` sends the event to pawd and writes pawd's
+ * reply — or, with no daemon reachable, writes do-nothing output. No store, no
+ * gates, no per-hook state; daemon holds all state.
  *
  * @module @paw/cli/infrastructure/commands/hookCommand
  * @version 0.0.0
@@ -25,10 +25,10 @@ import { autostartSeams } from './pawd.js';
 const HOST_FLAGS = ['copilot'];
 
 /**
- * Run the `hook` subcommand: a thin client of the resident daemon.
+ * Run `hook` subcommand: client of resident daemon.
  *
- * @param {string[]} rest - The words after `hook`.
- * @returns {Promise<number>} The exit code (0; the decision rides in the JSON).
+ * @param {string[]} rest - Words after `hook`.
+ * @returns {Promise<number>} Exit code (0; decision written to stdout as JSON).
  */
 export async function runHookCommand(rest: string[]): Promise<number> {
   const args = parseArgs(rest, HOST_FLAGS);

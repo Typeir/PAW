@@ -1,11 +1,10 @@
 /**
  * PAW In-Memory Store Adapter
  *
- * @fileoverview A {@link StorePort} that keeps violations in memory. Useful as
- * the store a test drives, and as the reference semantics the sql.js and native
- * adapters must match: session-scoped rows plus project-scoped (null-session)
- * rows visible to everyone, resolution by file. Holds no persistence — a process
- * restart forgets everything, which is exactly right for a fake and for tests.
+ * @fileoverview {@link StorePort} keep violation in memory. Back tests. Define reference
+ * semantics sql.js and native adapter match: session-scoped row plus project-scoped
+ * (null-session) row visible to all, resolve by file. Hold no persistence; process
+ * restart forget everything.
  *
  * @module @paw/adapters/store/memoryStore
  * @version 0.0.0
@@ -16,12 +15,12 @@
 import type { StorePort, Violation } from '@paw/core';
 
 /**
- * One stored row: the violation plus its scope and resolution state.
+ * One stored row: violation plus scope and resolution state.
  *
  * @interface Row
- * @property {Violation} violation - The violation, with its assigned id.
- * @property {string | null} sessionId - Owning session, or null for project scope.
- * @property {boolean} resolved - Whether it has been resolved.
+ * @property {Violation} violation - The violation, with assigned id.
+ * @property {string | null} sessionId - Owning session, null for project scope.
+ * @property {boolean} resolved - Whether resolved.
  */
 interface Row {
   violation: Violation;
@@ -30,9 +29,9 @@ interface Row {
 }
 
 /**
- * Create an in-memory store.
+ * Create in-memory store.
  *
- * @returns {StorePort} A store backed by an in-memory array.
+ * @returns {StorePort} Store backed by in-memory array.
  */
 export function createMemoryStore(): StorePort {
   const rows: Row[] = [];

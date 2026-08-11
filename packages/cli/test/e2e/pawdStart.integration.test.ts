@@ -1,10 +1,9 @@
 /**
- * @fileoverview Integration coverage for the daemon startup composition. One run
- * uses the real defaults (random token, in-memory store) and drives the loop
- * through the thin client to prove startEnforcement stands a working daemon end
- * to end, including that an edit to an ignored path is skipped. A second run
- * injects the seams and asserts the token file it wrote. So `pawdStart.ts`
- * reaches 100%.
+ * @fileoverview Test daemon startup composition. First run use real defaults
+ * (random token, in-memory store) and drive loop through thin client; assert
+ * startEnforcement stand working daemon end to end and skip edit to ignored
+ * path. Second run inject seams and assert token file written. Cover
+ * `pawdStart.ts` to 100%.
  *
  * @module @paw/cli/test/e2e/pawdStart.integration
  */
@@ -31,7 +30,7 @@ const NO_BAD = `export const gate = {
 };
 `;
 
-/** A project root with a gate and sources. */
+/** Build project root with gate and sources. */
 function project(prefix: string): string {
   const root = mkdtempSync(path.join(tmpdir(), prefix));
   mkdirSync(path.join(root, '.paw', 'gates'), { recursive: true });
@@ -45,7 +44,7 @@ function project(prefix: string): string {
 const endpointOf = (root: string) =>
   socketPath(root, { platform: process.platform, xdgRuntimeDir: undefined, tmpdir: root });
 
-/** Run the thin client once against a root's daemon and return the parsed output. */
+/** Run thin client once against root's daemon and return parsed output. */
 async function hook(root: string, event: string, file: string): Promise<Record<string, unknown>> {
   const out: string[] = [];
   await runHook({

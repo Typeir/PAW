@@ -1,11 +1,10 @@
 /**
  * Button Atom
  *
- * @fileoverview The console's button. A control that a running `pawd` would drive
- * but nothing yet backs is rendered disabled, with the reason carried by a
- * {@link Tooltip} wrapper rather than a browser `title` — the console shows what
- * exists and says plainly what does not, in something it can actually style and
- * that fires even over a disabled control.
+ * @fileoverview Console button. Controls live `pawd` drive; renders disabled
+ * when no drive responds. Reason displays on {@link Tooltip} wrapper, not browser
+ * `title` — the tooltip inherits existing styles and fires even over a disabled
+ * button.
  *
  * @module @paw/gui/presentation/atoms/button
  * @version 0.0.0
@@ -19,11 +18,11 @@ import type { ReactNode } from 'react';
  * Props for {@link Button}.
  *
  * @interface ButtonProps
- * @property {boolean} [primary] - Render in the accent (primary) treatment.
- * @property {boolean} [disabled] - Disable the control.
- * @property {string} [align] - An extra class, e.g. `push` to shove it right.
- * @property {() => void} [onClick] - The click handler.
- * @property {ReactNode} children - The label.
+ * @property {boolean} [primary] - Render in accent (primary) treatment.
+ * @property {boolean} [disabled] - Disable control.
+ * @property {string} [align] - Extra class, e.g. `push`. Shifts button right.
+ * @property {() => void} [onClick] - Click handler.
+ * @property {ReactNode} children - Label.
  */
 export interface ButtonProps {
   readonly primary?: boolean;
@@ -34,10 +33,10 @@ export interface ButtonProps {
 }
 
 /**
- * A console button.
+ * Console button.
  *
- * @param {ButtonProps} props - The button props.
- * @returns {JSX.Element} The button.
+ * @param {ButtonProps} props - Button props.
+ * @returns {JSX.Element} Button.
  */
 export function Button({ primary, disabled, align, onClick, children }: ButtonProps) {
   const classes = ['btn'];

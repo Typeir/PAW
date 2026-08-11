@@ -1,16 +1,14 @@
 /**
  * PAW TUI
  *
- * @fileoverview The process shell: it loads a config and a plan, runs the doctor
- * and a deterministic herd for the read-only views, then drives the effect-
- * reducer against stdin. A keypress becomes a message; the reducer returns the
- * next state and any effects; the shell runs each effect (a verb — gates on the
- * working tree, and the daemon verbs over the socket, with restart shelling out to
- * `paw daemon restart`) and feeds the result back as a message. Two input modes
- * share the loop — a raw
- * keypress stream on a TTY, and a batch fold over piped input for the E2E — so a
- * snapshot test drives the same transitions a person does. Holds no rules and is
- * excluded from unit coverage (process I/O, dynamic import); the E2E spawns it.
+ * @fileoverview Process shell. Load config and plan, run doctor and deterministic
+ * herd for read-only views, then run effect-reducer against stdin. Keypress
+ * become message. Reducer returns next state and any effects. Shell runs each
+ * effect (verb — gates on working tree, daemon verbs over socket, restart shell
+ * out to `paw daemon restart`) and feeds result back as message. Two input modes
+ * share loop — raw keypress stream on TTY, batch fold over piped input for E2E —
+ * snapshot tests exercise the same transitions as keyboard input. Holds no rules and
+ * excluded from unit coverage (process I/O, dynamic import); E2E spawns it.
  *
  * @module @paw/tui/infrastructure/main
  * @version 0.0.0
@@ -70,18 +68,18 @@ const FULL_CAPS: ModelCapabilities = {
 };
 
 /**
- * Load and parse a JSON config file.
+ * Load and parse JSON config file.
  *
- * @param {string} path - Path to the config.
+ * @param {string} path - Path to config.
  */
 async function loadConfig(path: string): Promise<Record<string, unknown>> {
   return JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
 }
 
 /**
- * Dynamically import a swarm plan, failing loud when it exports none.
+ * Dynamically import swarm plan, throw if no `default` or `plan` export.
  *
- * @param {string} path - Path to the plan module.
+ * @param {string} path - Path to plan module.
  */
 async function loadPlan(path: string): Promise<SwarmPlan<unknown>> {
   const mod = (await import(pathToFileURL(resolve(path)).href)) as {
@@ -96,7 +94,7 @@ async function loadPlan(path: string): Promise<SwarmPlan<unknown>> {
 }
 
 /**
- * Build a registry binding the plan's role to a deterministic fake model.
+ * Build registry binding plan's role to deterministic fake model.
  *
  * @param {SwarmPlan<unknown>} plan - The plan being run.
  */
@@ -115,10 +113,10 @@ function fakeRegistryFor(plan: SwarmPlan<unknown>): RoleRegistry {
 }
 
 /**
- * Load everything the read-only views render: the doctor report and a herd.
+ * Load everything read-only views render: doctor report and herd.
  *
- * @param {string} configPath - Path to the config.
- * @param {string} planPath - Path to the plan.
+ * @param {string} configPath - Path to config.
+ * @param {string} planPath - Path to plan.
  */
 async function loadData(configPath: string, planPath: string): Promise<TuiData> {
   const config = await loadConfig(configPath);
@@ -136,9 +134,9 @@ async function loadData(configPath: string, planPath: string): Promise<TuiData> 
 }
 
 /**
- * The working-tree change set: unstaged, staged, and untracked files.
+ * Working-tree change set: unstaged, staged, untracked files.
  *
- * @param {string} root - The repository root.
+ * @param {string} root - Repository root.
  * @returns {string[]} Deduped, slash-normalised paths.
  */
 function changedFiles(root: string): string[] {
@@ -162,11 +160,11 @@ function changedFiles(root: string): string[] {
 }
 
 /**
- * The daemon endpoint and handshake token for this repository — the same
- * addressing the CLI's daemon and violations verbs use.
+ * Daemon endpoint and handshake token for repository — same addressing CLI's
+ * daemon and violations verbs use.
  *
- * @param {string} root - The repository root.
- * @returns {{ endpoint: string; token: string }} The socket path and token path.
+ * @param {string} root - Repository root.
+ * @returns {{ endpoint: string; token: string }} Socket path and token path.
  */
 function daemonEndpoint(root: string): { endpoint: string; token: string } {
   return {
@@ -180,10 +178,10 @@ function daemonEndpoint(root: string): { endpoint: string; token: string } {
 }
 
 /**
- * Read the daemon's status and the violations it holds into one snapshot. Either
- * call resolving null (no daemon) yields a not-running snapshot.
+ * Read daemon's status and held violations into one snapshot. Either call
+ * resolving null (no daemon) yield not-running snapshot.
  *
- * @param {string} root - The repository root.
+ * @param {string} root - Repository root.
  * @returns {Promise<DaemonSnapshot>} The snapshot.
  */
 async function daemonSnapshot(root: string): Promise<DaemonSnapshot> {
@@ -196,10 +194,10 @@ async function daemonSnapshot(root: string): Promise<DaemonSnapshot> {
 }
 
 /**
- * Read the repo's declared models and every role's binding into a snapshot.
+ * Read repo's declared models and every role's binding into snapshot.
  *
- * @param {ConfigDocumentPort} doc - The config document.
- * @returns {Promise<ConfigSnapshot>} The models and bindings.
+ * @param {ConfigDocumentPort} doc - Config document.
+ * @returns {Promise<ConfigSnapshot>} Models and bindings.
  */
 async function readConfigSnapshot(doc: ConfigDocumentPort): Promise<ConfigSnapshot> {
   const config = await doc.read();
@@ -213,14 +211,13 @@ async function readConfigSnapshot(doc: ConfigDocumentPort): Promise<ConfigSnapsh
 }
 
 /**
- * Run one effect and produce the message that carries its result. Gates run the
- * project's gates on the working-tree changes; the daemon actions go over the
- * socket; the config actions edit the bindings on disk. Each resolves to the
- * message its view folds.
+ * Run one effect and produce message that carry its result. Gates run project's
+ * gates on working-tree changes; daemon actions go over socket; config actions
+ * edit bindings on disk. Each resolve to message its view folds.
  *
- * @param {Effect} effect - The effect to run.
- * @param {string} root - The repository root.
- * @returns {Promise<Msg>} The result message.
+ * @param {Effect} effect - Effect to run.
+ * @param {string} root - Repository root.
+ * @returns {Promise<Msg>} Result message.
  */
 async function runEffect(effect: Effect, root: string): Promise<Msg> {
   if (effect.kind === 'run-gates') {
@@ -251,7 +248,7 @@ async function runEffect(effect: Effect, root: string): Promise<Msg> {
     try {
       execFileSync('paw', ['daemon', 'restart'], { cwd: root, stdio: 'ignore', shell: true });
     } catch {
-      // A restart that fails to run just leaves the snapshot showing not-running.
+      // Failed restart just leave snapshot showing not-running.
     }
     return { kind: 'daemon', snapshot: await daemonSnapshot(root) };
   }
@@ -267,19 +264,19 @@ async function runEffect(effect: Effect, root: string): Promise<Msg> {
 }
 
 /**
- * Paint a screen to stdout, clearing the terminal first.
+ * Paint screen to stdout, clear terminal first.
  *
- * @param {TuiState} state - The state to render.
+ * @param {TuiState} state - State to render.
  */
 function paint(state: TuiState): void {
   process.stdout.write(`\x1b[2J\x1b[H${render(state).lines.join('\n')}\n`);
 }
 
 /**
- * Drive the effect-reducer with a raw-mode keypress loop on a TTY.
+ * Drive effect-reducer with raw-mode keypress loop on TTY.
  *
- * @param {TuiState} start - The initial state.
- * @param {string} root - The repository root.
+ * @param {TuiState} start - Initial state.
+ * @param {string} root - Repository root.
  */
 function runInteractive(start: TuiState, root: string): void {
   let state = start;
@@ -307,11 +304,11 @@ function runInteractive(start: TuiState, root: string): void {
 }
 
 /**
- * Fold the reducer over all of piped stdin, running effects between keys, then
- * print the final screen once — the deterministic path the E2E drives.
+ * Fold reducer over all of piped stdin, run effects between keys, then print
+ * final screen once — deterministic path E2E drive.
  *
- * @param {TuiState} start - The initial state.
- * @param {string} root - The repository root.
+ * @param {TuiState} start - Initial state.
+ * @param {string} root - Repository root.
  */
 async function runBatch(start: TuiState, root: string): Promise<void> {
   const chunks: Buffer[] = [];

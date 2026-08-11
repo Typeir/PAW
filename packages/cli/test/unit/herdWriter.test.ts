@@ -1,9 +1,7 @@
 /**
  * PAW Herd Writer Tests
  *
- * @fileoverview Pins that a herd's output actually lands on disk at the paths
- * its plan declared, as each member settles rather than at the end — the
- * property that makes a long paid run survive a failure partway through.
+ * @fileoverview Write each settled member's output to the path the plan declared.
  *
  * @module @paw/cli/test/unit/herdWriter
  * @version 0.0.0
@@ -16,10 +14,10 @@ import { describe, expect, it } from 'vitest';
 import { createHerdWriter, declaredOutputs } from '../../src/application/herdWriter.js';
 
 /**
- * A plan whose members write to `out/<n>.md`.
+ * Plan. Members write to `out/<n>.md`.
  *
- * @param {boolean} declares - Whether it declares `expectFiles` at all.
- * @returns {SwarmPlan<{ n: number }>} The plan.
+ * @param {boolean} declares - Declare `expectFiles` or not.
+ * @returns {SwarmPlan<{ n: number }>} Plan.
  */
 function planOf(declares = true): SwarmPlan<{ n: number }> {
   return {
@@ -34,9 +32,9 @@ function planOf(declares = true): SwarmPlan<{ n: number }> {
 }
 
 /**
- * A filesystem fake recording writes and directories.
+ * Filesystem fake. Record writes and dirs.
  *
- * @returns {object} The port and what it recorded.
+ * @returns {object} Port and recorded stuff.
  */
 function fakeFs() {
   const files = new Map<string, string>();
@@ -56,11 +54,11 @@ function fakeFs() {
 }
 
 /**
- * A settled event for a member.
+ * Settled event for member.
  *
- * @param {number} member - The member.
- * @param {string | undefined} content - What it produced.
- * @returns {DispatchEvent} The event.
+ * @param {number} member - Member.
+ * @param {string | undefined} content - What produce.
+ * @returns {DispatchEvent} Event.
  */
 const settledEvent = (member: number, content?: string): DispatchEvent => ({
   phase: 'settled',

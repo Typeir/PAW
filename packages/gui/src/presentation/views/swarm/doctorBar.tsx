@@ -1,11 +1,7 @@
 /**
  * Doctor Bar
  *
- * @fileoverview The plan's pre-flight, as `doctorPlan` reported it: does the
- * member count resolve, does every member get a non-empty brief, do two members
- * claim the same file, and is the plan's role bound to a model that satisfies
- * it. These are real findings computed by core over the real plan — the bar goes
- * green because the plan is sound, not because the console decided to.
+ * @fileoverview Pre-flight checks evaluated by `doctorPlan`. Each check resolves one question: member count non-zero? every member has a brief? two members claim the same file? plan role binds to a model that satisfies it? Findings computed directly from plan state. Bar green when plan is sound.
  *
  * @module @paw/gui/presentation/views/swarm/doctorBar
  * @version 0.0.0
@@ -21,12 +17,12 @@ import { Check } from '../../atoms/check.js';
 import { Tooltip } from '../../atoms/tooltip.js';
 
 /**
- * The reason the run controls are inert until a daemon can drive them.
+ * Run controls are disabled until a running pawd daemon is present.
  */
 export const NEEDS_DAEMON = 'requires a running pawd daemon';
 
 /**
- * The plan doctor bar.
+ * Plan doctor bar.
  *
  * @returns {JSX.Element} The bar.
  */

@@ -1,22 +1,17 @@
 /**
  * Herd Tab
  *
- * @fileoverview One row per dispatched member, and what a run has spent.
+ * @fileoverview Row per dispatched member, and what run spend.
  *
- * Split into three tables rather than one, ordered by what an operator needs to
- * see: what is still running, then what failed, then what settled. A single
- * table ordered by member index buries the two rows somebody is actually
- * watching among ninety that already worked — and a batch dispatch makes that
- * worse, because members no longer finish in order.
+ * Split three tables ordered by need: running first, then failed, then settled.
+ * One table ordered by member index would sort a running row under done rows —
+ * batch dispatch means members do not finish in dispatch order.
  *
- * A group with nothing in it is not rendered at all: an empty "failed" table is
- * a quiet lie about how much there is to look at.
+ * A group with empty rows does not render.
  *
- * The member cell is a real button, so choosing one scrubs the Plan tab's editor
- * to that member from a mouse, a keyboard, or a screen reader without a line of
- * hand-rolled key handling — a failure in the herd is one press from the brief
- * that produced it. Before a release nothing is dispatched and the budget reads
- * zero: the daemon reports what happened, and nothing has.
+ * Member cell is a real button; selecting it opens Plan tab editor for that
+ * member via keyboard or screen reader. Before any release nothing dispatches
+ * and budget reads zero, matching the daemon report.
  *
  * @module @paw/gui/presentation/views/swarm/herdTab
  * @version 0.0.0
@@ -41,10 +36,10 @@ const HERD_COLUMNS: readonly Column[] = [
 ];
 
 /**
- * The three groups the herd is shown in, in the order they are read.
+ * Three groups the herd renders in, read in order.
  *
- * `skipped` sits with `done` because both are settled and neither wants
- * attention — a member resumed from a previous run is not a problem to solve.
+ * `skipped` sits with `done`; both are settled states that need no
+ * interaction — a member resumed from a previous run is not an issue.
  */
 const GROUPS: readonly {
   readonly id: string;
@@ -57,12 +52,12 @@ const GROUPS: readonly {
 ];
 
 /**
- * One group's table of members.
+ * One group table of members.
  *
- * @param {object} props - The group and its rows.
- * @param {string} props.title - The group's heading.
- * @param {readonly MemberView[]} props.rows - Members in this group.
- * @param {(member: number) => void} props.onSelect - Scrub the Plan tab to a member.
+ * @param {object} props - Group and rows.
+ * @param {string} props.title - Group heading.
+ * @param {readonly MemberView[]} props.rows - Member in this group.
+ * @param {(member: number) => void} props.onSelect - Scrub Plan tab to member.
  * @returns {JSX.Element} The group.
  */
 function HerdGroup({
@@ -106,7 +101,7 @@ function HerdGroup({
 }
 
 /**
- * The per-member herd tables, grouped by what needs attention first.
+ * Per-member herd tables, grouped by attention state.
  *
  * @returns {JSX.Element} The card.
  */
@@ -118,7 +113,7 @@ function HerdTable() {
   if (run.members.length === 0) {
     return (
       <Card title='Herd' meta={meta}>
-        <Placeholder>— no members dispatched yet —</Placeholder>
+        <Placeholder>— no run released through this console · release with --run or swarm run --ui —</Placeholder>
       </Card>
     );
   }
@@ -145,7 +140,7 @@ function HerdTable() {
 }
 
 /**
- * The run's spend.
+ * The run spend.
  *
  * @returns {JSX.Element} The card.
  */

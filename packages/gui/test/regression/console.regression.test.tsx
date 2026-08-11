@@ -1,12 +1,12 @@
 /**
- * Console Regression
+ * Console regression.
  *
- * @fileoverview The visual regression tier from CONSTRAINTS.md Constraint 1: a
- * golden of the rendered DOM for every surface a human looks at — each rail
- * subsystem, each swarm tab, and the console with a clean ledger. The diff is
- * the test; an intended change updates the golden on purpose, in the same
- * commit. The window is rendered without the stylesheet so the golden is the
- * structure, not ninety lines of CSS repeated per snapshot.
+ * @fileoverview Visual regression tier from CONSTRAINTS.md Constraint 1: golden
+ * snapshot of rendered DOM for every console surface — each rail subsystem, each
+ * swarm tab, console with a clean ledger. A test fails when the rendered DOM
+ * differs from the golden snapshot; an intended change updates the golden in
+ * the same commit. The window renders without a stylesheet so the golden is DOM
+ * structure only.
  *
  * @module @paw/gui/test/regression/console.regression
  */

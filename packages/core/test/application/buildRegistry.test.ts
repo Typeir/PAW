@@ -1,9 +1,9 @@
 /**
  * PAW Registry Builder Tests
  *
- * @fileoverview Covers building a registry from bindings, the empty case, and the
- * loud throw when a role is bound to an undeclared model — so `buildRegistry.ts`
- * and the `BUILTIN_ROLES` data it consumes both reach 100%.
+ * @fileoverview Build registry from bindings, empty case, loud throw when role
+ * bound to undeclared model. Exercise `buildRegistry.ts` and `BUILTIN_ROLES`
+ * data it use, hit 100%.
  *
  * @module @paw/core/test/application/buildRegistry
  * @version 0.0.0

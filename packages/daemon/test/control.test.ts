@@ -1,11 +1,10 @@
 /**
- * PAW Daemon Control Port Tests
+ * PAW Daemon control port test.
  *
- * @fileoverview The write door's sanitiser, from the attacker's side: a body that
- * does not declare JSON is 415; malformed text is 400; a value that parses but is
- * not an object — a primitive, an array, `null` — is 422; an empty body is the
- * empty object; a real object passes. The content-type match tolerates a charset
- * but nothing broader. So `control.ts` reaches 100% and every refusal is pinned.
+ * @fileoverview Test write-door sanitiser. Body no JSON content-type get 415;
+ * malformed text get 400; value parse but not object — primitive, array, `null`
+ * — get 422; empty body read as empty object; object pass. Content-type match
+ * take charset parameter only. Cover `control.ts` to 100%.
  *
  * @module @paw/daemon/test/control
  * @version 0.0.0

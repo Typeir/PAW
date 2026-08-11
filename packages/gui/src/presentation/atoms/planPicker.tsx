@@ -1,13 +1,12 @@
 /**
  * Plan Picker Atom
  *
- * @fileoverview Which of the repository's plans the console is looking at. One
- * daemon serves a workspace, so the plan is a selection here rather than a
- * launch argument — picking another re-reads it from disk on the next poll,
- * with no restart and no second console. The ported {@link Select} carries it: a
- * styled, filterable listbox that reads to a screen reader and drives from the
- * keyboard, so it matches the rest of the console without giving up what the
- * platform `<select>` gave for free.
+ * @fileoverview Which repo plan console look at. One daemon serve one
+ * workspace, so plan be selection here not launch argument — pick other,
+ * re-read from disk on next poll, no restart, no second console. Ported
+ * {@link Select} carry it: styled, filterable listbox that read to screen
+ * reader and drive from keyboard, matching rest of console and retaining
+ * native `<select>` accessibility.
  *
  * @module @paw/gui/presentation/atoms/planPicker
  * @version 0.0.0
@@ -20,9 +19,9 @@ import { usePlans, useSelectedPlan } from '../../application/hooks/useConsole.js
 import { Select } from './select.js';
 
 /**
- * The repository's plan list, as a picker.
+ * Repo plan list, as picker.
  *
- * @returns {JSX.Element} The picker, or a note when the repository holds no plans.
+ * @returns {JSX.Element} The picker, or note when repo hold no plans.
  */
 export function PlanPicker() {
   const plans = usePlans();

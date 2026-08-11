@@ -1,10 +1,10 @@
 /**
  * PAW Copilot-Hooks Connector Tests
  *
- * @fileoverview Covers translation both ways — every event mapping, path
- * extraction from object and JSON-string args, malformed args, env detection,
- * both id casings, the unknown-event and non-object null cases, and every
- * response kind — so `copilotHooks.ts` reaches 100%.
+ * @fileoverview Test translation both way. Every event mapping, path
+ * extract from object and JSON-string args, malformed args, env detect,
+ * both id casing, unknown-event and non-object null case, every response
+ * kind. Cover `copilotHooks.ts` to 100%.
  *
  * @module @paw/connectors/test/copilotHooks
  * @version 0.0.0

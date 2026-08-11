@@ -1,8 +1,7 @@
 /**
- * @fileoverview Unit tests for the pawd RPC wire. They pin the NDJSON framing,
- * the allow-list parser across every frame kind and every malformed shape, and
- * the builders — so `rpcWire.ts` reaches 100% and the boundary pawd trusts
- * accepts exactly the envelope fields it names and nothing else.
+ * @fileoverview Test pawd RPC wire. Pin NDJSON framing, allow-list parser across
+ * every frame kind and malformed shape, and builders. Drive `rpcWire.ts` to 100%.
+ * Parser accept only the envelope fields it name.
  *
  * @module @paw/core/test/domain/rpcWire
  */

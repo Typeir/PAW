@@ -1,19 +1,18 @@
 /**
  * PAW Installer CLI (paw-setup)
  *
- * @fileoverview The installer's I/O shell: it gathers the real environment and
- * binds the real adapters, then delegates every decision to the pure planners and
- * the application layer. Two commands:
+ * @fileoverview Installer I/O shell. Reads argv, environment, and filesystem;
+ * binds adapters; delegates decisions to pure planner functions. Two commands:
  *
  *   paw-setup path [--bin=DIR] [--dry-run]   put PAW's bin dir on PATH
  *   paw-setup init [--dry-run]               attach PAW to the repo you are in
  *
- * `--dry-run` prints exactly what would change and writes nothing — the safe way
- * to inspect a PATH or repo edit before consenting to it. Excluded from unit
- * coverage (argv, real filesystem, PowerShell, `process.exit`); the logic it
- * drives is tested to 100%. Fails loud: an unknown command, or `init` outside a
- * repo, exits non-zero. This entry is what the SEA build packages into a native
- * `paw-setup` executable, and what the install scripts call to activate PATH.
+ * `--dry-run` print exactly what change and write nothing — safe way to inspect
+ * PATH or repo edit before consent. Excluded from unit coverage (argv, real
+ * filesystem, PowerShell, `process.exit`); logic it drives tested to 100%.
+ * Unknown command, or `init` outside a repo, exits non-zero. This module is
+ * bundled by SEA into the native `paw-setup` executable, and install scripts call
+ * it to activate PATH.
  *
  * @module @paw/installer/main
  * @version 0.0.0
@@ -32,35 +31,35 @@ import {
 } from '@paw/core';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { activatePath } from './apply.js';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { activatePath, installShims } from './apply.js';
 import { findRepoRoot } from './repo.js';
 import { createWindowsEnv } from './adapters/windowsEnv.js';
 
 /**
- * The default bin directory PAW installs its binary into.
+ * Default bin dir PAW install binary into.
  *
- * One global root for the whole install: the same `PAW_HOME` the TLS identity
- * already lives under, resolved by the same rules. `~/.paw` would be wrong on
- * Windows and would ignore XDG on Linux, and a second location would mean an
- * operator moving `PAW_HOME` moved half their installation.
+ * A single global bin root shared by the whole install, resolved by the same
+ * rules as `PAW_HOME`. `~/.paw` is wrong on Windows and XDG is ignored on Linux;
+ * a second location would leave half the install behind when `PAW_HOME` moves.
  *
- * Resolved on call rather than at module load so an environment that offers no
- * home directory fails inside the command that needed one, with that command's
- * error, instead of at import time.
+ * Resolve on call, not at module load, so env with no home dir fail inside
+ * command that need one, with that command's error, not at import time.
  *
- * @returns {string} The bin directory PAW installs into.
- * @throws {Error} When the platform offers no home directory.
+ * @returns {string} Bin directory PAW installs into.
+ * @throws {Error} When platform offer no home directory.
  */
 function defaultBinDir(): string {
   return binDir(pawHome(process.platform, process.env));
 }
 
 /**
- * Read a `--flag=value` option from argv.
+ * Read `--flag=value` option from argv.
  *
- * @param {string[]} argv - The arguments.
- * @param {string} name - The flag name (without `--` or `=`).
- * @returns {string | undefined} The value, if present.
+ * @param {string[]} argv - Arguments.
+ * @param {string} name - Flag name (no `--` or `=`).
+ * @returns {string | undefined} Value, if present.
  */
 function opt(argv: string[], name: string): string | undefined {
   const hit = argv.find((a) => a.startsWith(`--${name}=`));
@@ -70,12 +69,27 @@ function opt(argv: string[], name: string): string | undefined {
 /**
  * Run `paw-setup path`.
  *
- * @param {string[]} argv - Arguments after the command.
+ * @param {string[]} argv - Arguments after command.
  * @param {(s: string) => void} print - Line printer.
  */
 async function runPath(argv: string[], print: (s: string) => void): Promise<void> {
   const dryRun = argv.includes('--dry-run');
   const targetBin = opt(argv, 'bin') ?? defaultBinDir();
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+  const verb = dryRun ? 'would' : 'did';
+  const shims = await installShims(
+    {
+      platform: process.platform,
+      binDir: targetBin,
+      launchers: [
+        { name: 'paw', entry: join(repoRoot, 'bin', 'paw.mjs') },
+        { name: 'paw-setup', entry: join(repoRoot, 'bin', 'paw-setup.mjs') },
+      ],
+      dryRun,
+    },
+    createNodeFs(),
+  );
+  print(`shims: ${verb} write ${shims.map((s) => s.path.split('/').pop()).join(', ')} in ${targetBin}`);
   const edit = await activatePath(
     {
       platform: process.platform,
@@ -87,7 +101,6 @@ async function runPath(argv: string[], print: (s: string) => void): Promise<void
     createNodeFs(),
     createWindowsEnv(),
   );
-  const verb = dryRun ? 'would' : 'did';
   if (edit.kind === 'already-present') {
     print(`PATH: ${targetBin} already active (${edit.target}).`);
   } else if (edit.kind === 'windows-registry') {
@@ -100,7 +113,7 @@ async function runPath(argv: string[], print: (s: string) => void): Promise<void
 /**
  * Run `paw-setup init`.
  *
- * @param {string[]} argv - Arguments after the command.
+ * @param {string[]} argv - Arguments after command.
  * @param {(s: string) => void} print - Line printer.
  */
 async function runInit(argv: string[], print: (s: string) => void): Promise<void> {

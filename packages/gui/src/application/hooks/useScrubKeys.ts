@@ -1,11 +1,10 @@
 /**
  * PAW Console Scrub Keys
  *
- * @fileoverview The left/right arrow scrub over plan members, bound at the
- * document so it works wherever focus sits — except inside a text field, where
- * the arrows belong to the caret, and except outside the Plan tab, where there
- * is nothing to scrub. It is a hook rather than a listener buried in a shell so
- * the binding is exercised by the same suite as the rest of the console.
+ * @fileoverview Left/right arrow keyboards advance to previous or next plan
+ * member. Listener bound at document; skips text fields so arrow keys move the
+ * caret; active only while Plan tab showing. Implemented as hook so bindings
+ * test under same suite as rest of console.
  *
  * @module @paw/gui/application/hooks/useScrubKeys
  * @version 0.0.0
@@ -16,19 +15,19 @@
 import { useEffect } from 'react';
 
 /**
- * Whether a keystroke landed in something that edits text.
+ * True when event target edits text.
  *
  * @param {EventTarget | null} target - The event target.
- * @returns {boolean} True when the target is a text field.
+ * @returns {boolean} True when target is text field.
  */
 function isTextField(target: EventTarget | null): boolean {
   return target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement;
 }
 
 /**
- * Bind arrow-key member scrubbing while the Plan tab is active.
+ * Bind arrow-key member scrub while Plan tab active.
  *
- * @param {boolean} enabled - Whether the Plan tab is showing.
+ * @param {boolean} enabled - Whether Plan tab is active.
  * @param {(delta: number) => void} step - The scrub action.
  */
 export function useScrubKeys(enabled: boolean, step: (delta: number) => void): void {

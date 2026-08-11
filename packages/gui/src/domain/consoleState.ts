@@ -1,14 +1,13 @@
 /**
  * PAW Console State
  *
- * @fileoverview The pure heart of the console: the initial state, the reducer
- * that maps an action to the next state, and the selectors every view reads
- * through. React owns none of this — `useReducer` merely drives it — so a
- * transition is a unit test rather than a rendered assertion. Scrubbing a member
- * drops any draft, so the editor always shows the member in view; a `refresh`
- * swaps in a newer snapshot's data while keeping the operator where they were,
- * because a poll that reset the view to Overview every three seconds would make
- * the live console unusable.
+ * @fileoverview Console state core. Initial state, reducer map action to
+ * next state, and selectors every view read through. State live outside React:
+ * `useReducer` merely drive it, so each transition verify with a unit test.
+ * Scrub member drop any draft, so editor always show that member in
+ * view; a `refresh` swap in a newer snapshot's data while keep operator where
+ * them be, because a poll that reset view to Overview every three seconds make
+ * live console unusable.
  *
  * @module @paw/gui/domain/consoleState
  * @version 0.0.0
@@ -22,10 +21,10 @@ import { toggleContext } from './context.js';
 import { briefOf, clampMember } from './plan.js';
 
 /**
- * The starting state: the Swarm subsystem, the Plan tab, first member, no draft.
+ * Start state: Swarm subsystem, Plan tab, first member, no draft.
  *
- * @param {ConsoleData} data - The loaded data.
- * @returns {ConsoleState} The initial state.
+ * @param {ConsoleData} data - Loaded data.
+ * @returns {ConsoleState} Initial state.
  */
 export function initialState(data: ConsoleData): ConsoleState {
   return {
@@ -40,11 +39,11 @@ export function initialState(data: ConsoleData): ConsoleState {
 }
 
 /**
- * Advance the state by one action. Pure and total.
+ * Advance state by one action. Pure and total.
  *
- * @param {ConsoleState} state - The current state.
- * @param {ConsoleAction} action - The dispatched action.
- * @returns {ConsoleState} The next state.
+ * @param {ConsoleState} state - Current state.
+ * @param {ConsoleAction} action - Dispatched action.
+ * @returns {ConsoleState} Next state.
  */
 export function reduce(state: ConsoleState, action: ConsoleAction): ConsoleState {
   switch (action.type) {
@@ -76,42 +75,42 @@ export function reduce(state: ConsoleState, action: ConsoleAction): ConsoleState
 }
 
 /**
- * The brief the editor shows: the edited draft when present, else the plan's
- * rendered brief for the scrubbed member.
+ * Brief editor show: edited draft when present, else plan's rendered brief for
+ * scrubbed member.
  *
- * @param {ConsoleState} state - The current state.
- * @returns {string} The effective brief text.
+ * @param {ConsoleState} state - Current state.
+ * @returns {string} Effective brief text.
  */
 export function effectiveBrief(state: ConsoleState): string {
   return state.draft ?? briefOf(state.data.plan, state.member);
 }
 
 /**
- * The herd row for the scrubbed member, if the run dispatched it.
+ * Member row for scrubbed member, if run dispatch it.
  *
- * @param {ConsoleState} state - The current state.
- * @returns {MemberView | undefined} The row, or undefined when not dispatched.
+ * @param {ConsoleState} state - Current state.
+ * @returns {MemberView | undefined} Row, or undefined when not dispatched.
  */
 export function currentMemberView(state: ConsoleState): MemberView | undefined {
   return state.data.run.members.find((m) => m.member === state.member);
 }
 
 /**
- * How many members the run actually dispatched — everything that is not a skip.
+ * How many member run actually dispatch — everything that not a skip.
  *
- * @param {RunProgress} run - The run progress.
- * @returns {number} The dispatched count.
+ * @param {RunProgress} run - Run progress.
+ * @returns {number} Dispatched count.
  */
 export function dispatchedCount(run: RunProgress): number {
   return run.done + run.running + run.failed;
 }
 
 /**
- * Whether a named plan-doctor check is present and passing.
+ * Whether a named plan-doctor check present and passing.
  *
- * @param {readonly DoctorFinding[]} checks - The plan's doctor findings.
- * @param {string} check - The check name.
- * @returns {boolean} True when the check ran and passed.
+ * @param {readonly DoctorFinding[]} checks - Plan's doctor findings.
+ * @param {string} check - Check name.
+ * @returns {boolean} True when check ran and passed.
  */
 export function checkOk(checks: readonly DoctorFinding[], check: string): boolean {
   const finding = checks.find((f) => f.check === check);
@@ -119,21 +118,21 @@ export function checkOk(checks: readonly DoctorFinding[], check: string): boolea
 }
 
 /**
- * The doctor row for a role, if it is declared.
+ * Doctor row for a role, if it declared.
  *
- * @param {DoctorReport} doctor - The doctor report.
- * @param {string} role - The role name.
- * @returns {RoleDoctorRow | undefined} The row, or undefined when undeclared.
+ * @param {DoctorReport} doctor - Doctor report.
+ * @param {string} role - Role name.
+ * @returns {RoleDoctorRow | undefined} Row, or undefined when undeclared.
  */
 export function roleRow(doctor: DoctorReport, role: string): RoleDoctorRow | undefined {
   return doctor.roles.find((r) => r.role === role);
 }
 
 /**
- * Whether the plan's role is bound to a model that satisfies it.
+ * Whether plan's role bound to a model that satisfy it.
  *
- * @param {ConsoleData} data - The console data.
- * @returns {boolean} True when the role is declared and not blocking.
+ * @param {ConsoleData} data - Console data.
+ * @returns {boolean} True when role declared and not blocking.
  */
 export function planRoleOk(data: ConsoleData): boolean {
   const row = roleRow(data.doctor, data.plan.role);

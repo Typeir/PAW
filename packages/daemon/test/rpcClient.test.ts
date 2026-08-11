@@ -1,11 +1,11 @@
 /**
- * @fileoverview Unit tests for the daemon client, driven through a fake socket so
- * every fail-open path is deterministic: a good round trip returns the result;
- * a missing token, a connection error, an error frame, a malformed frame, and a
- * timeout each resolve to null; and a late event after settling is ignored. Two
- * cases omit an injected seam so the real default runs — reading a token from
- * disk, and opening a real socket — both against dead endpoints so they fail open
- * fast. So `rpcClient.ts` reaches 100% without a live pipe.
+ * @fileoverview Unit test for daemon client. Drive test through fake socket. Every
+ * fail-open path determinate: good round trip return result; missing token,
+ * connection error, error frame, malformed frame, timeout each resolve to null;
+ * late event after settle get ignored. Two cases skip injected reader/connector
+ * and use defaults — read token from disk, open real socket. Both hit a dead
+ * endpoint, so each fails open. `rpcClient.ts` reaches 100% coverage with no
+ * live pipe.
  *
  * @module @paw/daemon/test/rpcClient
  */
@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { encodeFrame, rpcFailure, rpcSuccess } from '@paw/core';
 import { rpcCall } from '../src/infrastructure/rpcClient.js';
 
-/** A fake socket whose events the test drives directly. */
+/** Fake socket. Test fire events straight at it. */
 function fakeSocket() {
   const listeners: Record<string, ((arg: never) => void)[]> = {};
   const written: string[] = [];

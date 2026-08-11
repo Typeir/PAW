@@ -1,10 +1,9 @@
 /**
- * Context Argument Tests
+ * Context argument test.
  *
- * @fileoverview The pure half of `--context`: argv splitting in both flag
- * spellings, pattern splitting, glob compilation, expansion against a
- * repository listing, and attaching the result to a plan without trampling the
- * context a plan computes for itself.
+ * @fileoverview Test pure half of `--context`: split argv in both flag
+ * spellings, split pattern, compile glob, expand against repository listing,
+ * stick result on plan. Plan compute own context, this stick add on.
  *
  * @module @paw/cli/test/unit/context
  * @version 0.0.0

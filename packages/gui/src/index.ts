@@ -1,10 +1,10 @@
 /**
  * PAW GUI — Public API
  *
- * @fileoverview What a shell needs to put the console on a screen: the app
- * component, the boot resolution that decides between a live daemon and an
- * injected snapshot, and the domain types a host might want to name. The
- * internals — atoms, views, hooks — stay private to the module.
+ * @fileoverview Shell need this to put console on screen: app
+ * component, boot resolution pick between live daemon and
+ * injected snapshot, and domain types host maybe want name. Internals —
+ * atoms, views, hooks — stay private to module.
  *
  * @module @paw/gui
  * @version 0.0.0

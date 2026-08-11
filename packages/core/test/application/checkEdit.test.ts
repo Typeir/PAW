@@ -1,9 +1,9 @@
 /**
- * @fileoverview Unit tests for the post-tool detector. They pin the loop's
- * recording half: ignored/empty edits do nothing, a clean gate run clears stale
- * violations and stays silent, and a critical run clears then records the fresh
- * findings and returns a `block`. A fake store captures raise/resolve calls and a
- * fake runner returns canned reports, so every branch is exercised for 100%.
+ * @fileoverview Unit tests for post-tool detector. Loop under test: ignored
+ * edits or empty file lists return noop, clean gate run clears stale
+ * violations and returns noop, critical run clears, records fresh findings,
+ * returns `block`. Fake store records raise/resolve calls, fake runner
+ * returns canned reports; every branch exercised to 100%.
  *
  * @module @paw/core/test/application/checkEdit
  */
@@ -20,7 +20,7 @@ import {
 } from '../../src/index.js';
 
 /**
- * A store fake that records what the detector raised and resolved.
+ * Store fake. Record what detector raised and resolved.
  */
 function fakeStore() {
   const raised: { violations: Violation[]; sessionId: string | null }[] = [];
@@ -47,7 +47,7 @@ function fakeStore() {
 }
 
 /**
- * A gate result with sensible defaults.
+ * Gate result with defaults.
  *
  * @param over - Fields to override.
  */
@@ -61,7 +61,7 @@ const result = (over: Partial<GateResult> = {}): GateResult => ({
 });
 
 /**
- * A runner returning a report built from the given gate results.
+ * Runner return report built from given gate results.
  *
  * @param gates - The per-gate results.
  */
@@ -85,7 +85,7 @@ const runnerOf = (gates: GateResult[]): GateRunner => ({
 });
 
 /**
- * A post-tool event over the given edited paths.
+ * Post-tool event over given edited paths.
  *
  * @param editedPaths - The changed paths.
  * @param sessionId - The owning session.

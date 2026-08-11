@@ -1,10 +1,7 @@
 /**
  * Atom Tests
  *
- * @fileoverview The console's building blocks, each rendered in isolation with
- * every variant it offers — the header a card may or may not have, the tone a
- * stat may carry, the four member states, the dot-or-count rail item. The atoms
- * are where the instrument-panel look is defined, so this is where it is pinned.
+ * @fileoverview Building blocks of console. Render each alone, every variant: header card may or may not have, tone stat carry, four member states, dot-or-count rail item. Atoms compose the console presentation layer.
  *
  * @module @paw/gui/test/unit/presentation/atoms
  */
@@ -34,7 +31,7 @@ import type { SocketLike } from '../../../src/infrastructure/liveSocket.js';
 import { makeSnapshot, renderInConsole } from '../../fixtures.js';
 
 /**
- * A socket that connects to nothing, for the banner states that never get one.
+ * Socket connect to nothing. For banner states never get one.
  */
 const neverSocket: SocketLike = {
   send: () => undefined,
@@ -248,8 +245,7 @@ describe('LiveBanner', () => {
   });
 
   it('says the wire is down, and offers to reconnect, while polling', () => {
-    // A daemon behind the page but no socket: degraded, and the console says so
-    // rather than looking healthy while showing data of unknown age.
+    // Daemon behind page but no socket: degraded. Console reports degraded while polling.
     render(
       <ConsoleProvider snapshot={makeSnapshot()} source={async () => makeSnapshot()}>
         <LiveBanner />
@@ -262,8 +258,7 @@ describe('LiveBanner', () => {
   });
 
   it('names the dead end when the daemon refused the credential', () => {
-    // No token to present: polling would be refused too, so the banner tells the
-    // operator the one thing that fixes it instead of spinning.
+    // No token present: polling refused too. Banner tells operator one remedy.
     render(
       <ConsoleProvider snapshot={makeSnapshot()} connect={() => neverSocket} token={null}>
         <LiveBanner />

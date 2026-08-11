@@ -1,9 +1,9 @@
 /**
- * @fileoverview Unit tests for the autostart herd guard, driven by injected
- * seams so the whole tree is deterministic: already-up returns at once; the lock
- * winner spawns and waits (coming up, or exhausting the deadline); a loser only
- * waits; a stale lock is cleared first; a fresh lock is left alone. So
- * `autostart.ts` reaches 100% without a process or a socket.
+ * @fileoverview Unit test for the daemon autostart guard. Drive by injected
+ * seams: already-up returns at once; lock winner spawns and waits until the
+ * socket comes up or the deadline elapses; loser only waits; stale lock is
+ * cleared first; fresh lock is left alone.
+ * Cover `autostart.ts` to 100% without process or socket.
  *
  * @module @paw/cli/test/unit/autostart
  */
@@ -12,10 +12,10 @@ import { describe, expect, it } from 'vitest';
 import { ensureDaemon, type AutostartSeams } from '../../src/application/autostart.js';
 
 /**
- * Seams whose probe follows a scripted sequence (the last value repeats), with
- * a fixed lock age and lock-winner outcome, counting each effect.
+ * Build seams. Probe follow scripted sequence (last value repeat), fixed lock
+ * age and lock-winner outcome, count each effect.
  *
- * @param cfg - probe sequence, lock age, and whether acquire wins.
+ * @param cfg - probe sequence, lock age, and whether acquire win.
  */
 function mock(cfg: { probe?: boolean[]; age?: number | null; won?: boolean }) {
   const probes = cfg.probe ?? [true];

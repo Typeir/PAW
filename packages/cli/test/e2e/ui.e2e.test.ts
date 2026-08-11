@@ -1,12 +1,8 @@
 /**
- * @fileoverview End-to-end test for `paw ui`. It spawns the real CLI, waits for
- * the line that announces where `pawd` is listening, and then talks to that
- * daemon over HTTP — the console page at `/` and the live snapshot at
- * `/api/state`, whose pid must be a real live process. This is the tier that
- * proves the command serves a **repository**: it starts with no plan named,
- * discovers the ones the repo holds, and switches between them over the wire
- * without a restart. The unit tiers cannot show that, because a socket is
- * exactly what they fake.
+ * @fileoverview E2E test for `paw ui`. Spawn real CLI, wait line that say where
+ * `pawd` listen, then talk to daemon over HTTP: console page at `/` and live
+ * snapshot at `/api/state`, whose pid be the running `pawd` process. Start with no plan
+ * named, find plans repo hold, switch between them over wire without restart.
  *
  * @module @paw/cli/test/e2e/ui
  */
@@ -29,10 +25,9 @@ let home = '';
 let ca = '';
 
 beforeEach(async () => {
-  // The child issues a real CA into whatever PAW_HOME points at. Give each test
-  // its own so the suite neither reads nor disturbs the operator's identity, the
-  // CA it mints can be read back here to verify the chain, and no test depends
-  // on whether an earlier one ran first.
+  // Child mint real CA into whatever PAW_HOME point at. Give each test own
+  // home so suite neither read nor disturb operator identity, CA it mint read
+  // back here to verify chain, and no test depend on whether earlier one run.
   home = await mkdtemp(join(tmpdir(), 'paw-cli-home-'));
 });
 
@@ -42,12 +37,12 @@ afterEach(() => {
 });
 
 /**
- * The snapshot fields these tests read.
+ * Snapshot fields these tests read.
  *
  * @interface WireState
  * @property {object} host - Host facts.
- * @property {string[]} plans - The repository's plans.
- * @property {string | null} selectedPlan - The plan in view.
+ * @property {string[]} plans - Repository plans.
+ * @property {string | null} selectedPlan - Plan in view.
  * @property {string} planName - Its name.
  * @property {string[]} briefs - Its rendered briefs.
  * @property {object} run - Run progress.
@@ -67,10 +62,10 @@ interface WireState {
 }
 
 /**
- * Start `paw ui` over the fixture repository and resolve once it announces its URL.
+ * Start `paw ui` over fixture repository, resolve once it announce its URL.
  *
- * @param args - Extra argv, e.g. a plan to open on or `--run`.
- * @returns {Promise<{ url: string; token: string; banner: string }>} The served URL, the credential it printed, and the banner.
+ * @param args - Extra argv, e.g. plan to open on or `--run`.
+ * @returns {Promise<{ url: string; token: string; banner: string }>} Served URL, credential it printed, and banner.
  */
 function startUi(...args: string[]): Promise<{ url: string; token: string; banner: string }> {
   return new Promise((resolve, reject) => {
@@ -99,13 +94,12 @@ function startUi(...args: string[]): Promise<{ url: string; token: string; banne
 }
 
 /**
- * Call the served daemon over TLS, verifying its certificate against the CA the
- * child process issued. `rejectUnauthorized` is on, so every call here is also a
- * check that `paw ui` serves a chain that validates.
+ * Call served daemon over TLS, verify its certificate against CA child process
+ * issue. `rejectUnauthorized` on; each call validate served chain.
  *
- * @param {string} url - The absolute URL.
+ * @param {string} url - Absolute URL.
  * @param {Record<string, string>} [headers] - Request headers.
- * @returns {Promise<{ status: number; body: string }>} The response.
+ * @returns {Promise<{ status: number; body: string }>} Response.
  */
 function call(
   url: string,
@@ -126,12 +120,12 @@ function call(
 }
 
 /**
- * Read the daemon's state, optionally for a selected plan.
+ * Read daemon state, optionally for selected plan.
  *
- * @param {string} url - The daemon URL.
- * @param {string} token - The credential printed with the URL.
- * @param {string} [plan] - The plan to ask for.
- * @returns {Promise<WireState>} The snapshot.
+ * @param {string} url - Daemon URL.
+ * @param {string} token - Credential printed with URL.
+ * @param {string} [plan] - Plan to ask for.
+ * @returns {Promise<WireState>} Snapshot.
  */
 async function readState(url: string, token: string, plan?: string): Promise<WireState> {
   const target = plan === undefined ? `${url}api/state` : `${url}api/state?plan=${plan}`;
@@ -140,9 +134,9 @@ async function readState(url: string, token: string, plan?: string): Promise<Wir
 }
 
 /**
- * Run the CLI to completion with the given argv.
+ * Run CLI to completion with given argv.
  *
- * @param args - The argv after the script path.
+ * @param args - Argv after script path.
  */
 function runCli(...args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve) => {
@@ -181,11 +175,13 @@ describe('paw ui (e2e)', () => {
     expect(picked.planName).toBe('demo');
     expect(picked.briefs).toHaveLength(2);
 
-    // The boot scope is remembered as a recent route, in PAW home, and served
-    // back for the console's scope picker.
+    // Boot scope remember as recent route, resolved absolute, in PAW home, and
+    // served back for console scope picker. Relative route never enter list.
     const recent = await call(`${url}api/recent`, { authorization: `Bearer ${token}` });
     expect(recent.status).toBe(200);
-    expect(JSON.parse(recent.body)).toContain('test/fixtures');
+    const routes = JSON.parse(recent.body) as string[];
+    expect(routes.some((route) => /test[\\/]fixtures$/.test(route))).toBe(true);
+    expect(routes.every((route) => /^([A-Za-z]:[\\/]|[\\/])/.test(route))).toBe(true);
   }, 30000);
 
   it('opens on the plan it was given', async () => {
@@ -234,8 +230,8 @@ describe('paw ui (e2e)', () => {
   it('serves over TLS with a certificate that verifies, and says how to trust it', async () => {
     const { url, banner } = await startUi();
     expect(url.startsWith('https://')).toBe(true);
-    // The first boot into a fresh PAW home mints the CA, so the banner must
-    // carry the fingerprint the OS dialog will show and the file to point at.
+    // First boot into fresh PAW home mint CA, so banner must carry fingerprint
+    // OS dialog show and file to point at.
     expect(banner).toContain('issued this machine a local CA · SHA256:');
     expect(banner).toContain('paw trust');
     expect(banner).toContain(join(home, 'identity', 'ca.crt').replace(/\\/g, '/'));
@@ -261,8 +257,8 @@ describe('paw trust (e2e)', () => {
     expect(code).toBe(0);
     expect(stdout).toMatch(/PAW local CA · SHA256(:[0-9A-F]{2}){32}/);
     expect(stdout).toContain(join(home, 'identity', 'ca.crt').replace(/\\/g, '/'));
-    // The operator must be able to compare the fingerprint against the OS dialog
-    // — telling them to click through is how a local CA becomes a habit.
+    // Operator must compare fingerprint against OS dialog, which must show
+    // that exact fingerprint.
     expect(stdout).toContain('the OS dialog must show that exact fingerprint');
     expect(stdout).toContain('dry run · nothing was changed');
 

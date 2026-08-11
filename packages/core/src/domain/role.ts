@@ -1,13 +1,7 @@
 /**
  * PAW Role Domain
  *
- * @fileoverview Roles declare a capability requirement; a binding maps a role to
- * a model with declared capabilities; this module decides whether the binding
- * satisfies the requirement. Provider-agnostic by construction — a role never
- * names a model and this domain never names a provider. That is the seam decision
- * doc 12 argues for, and it is why binding a no-tools model to an editing role is
- * a validation error a person sees before any tokens are spent, not a silent
- * swarm that files nothing.
+ * @fileoverview Role declare capability need. Binding map role to model with declared capability. Module decide binding meet need. Provider-agnostic: role never name model, domain never name provider. Bind no-tools model to editing role = validation error, surface before spend token.
  *
  * @module @paw/core/domain/role
  * @version 0.0.0
@@ -16,29 +10,27 @@
  */
 
 /**
- * Budget tier. `trivial` work runs thousands of times a day; `premium` is
- * reserved for the hardest, lowest-volume work.
+ * Budget tier. `trivial` work run thousand time a day; `premium` for hardest, low-volume work.
  */
 export type CostClass = 'trivial' | 'cheap' | 'standard' | 'premium';
 
 /**
- * Latency tolerance. `interactive` must not block a hook; `batch` may take
- * minutes.
+ * Latency tolerance. `interactive` not block a hook; `batch` take minutes.
  */
 export type LatencyClass = 'interactive' | 'background' | 'batch';
 
 /**
- * What a role's bound model must be able to do.
+ * What role bound model must do.
  *
  * @interface RoleRequirements
  * @property {number} minContextTokens - Smallest usable prompt window.
- * @property {number} maxOutputTokens - Output the role expects to consume.
- * @property {boolean} tools - Whether the role issues tool calls.
- * @property {boolean} structuredOutput - Whether it relies on schema-constrained arguments.
- * @property {boolean} reasoning - Whether it benefits from an extended-thinking mode.
- * @property {boolean} vision - Whether it sends images.
- * @property {CostClass} costClass - The most expensive tier the role will pay.
- * @property {LatencyClass} latencyClass - The role's latency tolerance.
+ * @property {number} maxOutputTokens - Output role expect to consume.
+ * @property {boolean} tools - Role issue tool calls?
+ * @property {boolean} structuredOutput - Relies on schema-constrained arguments?
+ * @property {boolean} reasoning - Benefit from extended-thinking mode?
+ * @property {boolean} vision - Sends images?
+ * @property {CostClass} costClass - Most expensive tier role pay.
+ * @property {LatencyClass} latencyClass - Role latency tolerance.
  */
 export interface RoleRequirements {
   readonly minContextTokens: number;
@@ -52,14 +44,14 @@ export interface RoleRequirements {
 }
 
 /**
- * A named unit of model work PAW performs internally.
+ * Named unit of model work PAW do internal.
  *
  * @interface RoleDeclaration
- * @property {string} id - Stable dotted identifier referenced by config bindings.
- * @property {string} owner - Subsystem that consumes it, for diagnostics.
- * @property {string} purpose - One line shown by `paw roles ls`.
- * @property {RoleRequirements} requires - The capability contract a binding must satisfy.
- * @property {boolean} optional - When true, the subsystem degrades instead of failing if the role is unbound or unsatisfied.
+ * @property {string} id - Stable dotted id, config binding reference.
+ * @property {string} owner - Subsystem that consume it, for diagnostics.
+ * @property {string} purpose - One line, show by `paw roles ls`.
+ * @property {RoleRequirements} requires - Capability contract binding must satisfy.
+ * @property {boolean} optional - True = subsystem degrade if role unbound or unsatisfied.
  */
 export interface RoleDeclaration {
   readonly id: string;
@@ -70,17 +62,16 @@ export interface RoleDeclaration {
 }
 
 /**
- * A model's declared capabilities — data, because no provider reports these
- * reliably across the field PAW must span.
+ * Model declared capabilities, as data.
  *
  * @interface ModelCapabilities
- * @property {number} contextTokens - Maximum context window.
- * @property {number} maxOutputTokens - Maximum output tokens.
- * @property {boolean} tools - Supports tool calls.
- * @property {boolean} structuredOutput - Supports schema-constrained output.
- * @property {boolean} reasoning - Supports an extended-thinking mode.
- * @property {boolean} vision - Accepts images.
- * @property {CostClass} costClass - The model's cost tier.
+ * @property {number} contextTokens - Max context window.
+ * @property {number} maxOutputTokens - Max output tokens.
+ * @property {boolean} tools - Support tool calls?
+ * @property {boolean} structuredOutput - Support schema-constrained output?
+ * @property {boolean} reasoning - Support extended-thinking mode?
+ * @property {boolean} vision - Accept images?
+ * @property {CostClass} costClass - Model cost tier.
  */
 export interface ModelCapabilities {
   readonly contextTokens: number;
@@ -93,10 +84,10 @@ export interface ModelCapabilities {
 }
 
 /**
- * The verdict of a satisfaction check.
+ * Verdict of satisfaction check.
  *
  * @interface Satisfaction
- * @property {boolean} ok - Whether the model satisfies the requirement.
+ * @property {boolean} ok - Model satisfy requirement?
  * @property {readonly string[]} reasons - One entry per unmet requirement; empty when ok.
  */
 export interface Satisfaction {
@@ -105,7 +96,7 @@ export interface Satisfaction {
 }
 
 /**
- * Rank of a cost tier, cheapest first.
+ * Rank of cost tier, cheapest first.
  */
 const COST_RANK: Readonly<Record<CostClass, number>> = {
   trivial: 0,
@@ -115,7 +106,7 @@ const COST_RANK: Readonly<Record<CostClass, number>> = {
 };
 
 /**
- * Boolean capabilities to check, paired with the phrase used when unmet.
+ * Boolean capability to check, paired with phrase used when unmet.
  */
 const BOOL_CAPS: ReadonlyArray<readonly [keyof RoleRequirements & keyof ModelCapabilities, string]> = [
   ['tools', 'tool calls'],
@@ -125,11 +116,11 @@ const BOOL_CAPS: ReadonlyArray<readonly [keyof RoleRequirements & keyof ModelCap
 ];
 
 /**
- * Decide whether a model's capabilities satisfy a role's requirements.
+ * Decide model capability satisfy role requirement.
  *
- * @param {RoleRequirements} req - What the role needs.
- * @param {ModelCapabilities} cap - What the model provides.
- * @returns {Satisfaction} Whether it satisfies, with a reason per shortfall.
+ * @param {RoleRequirements} req - What role need.
+ * @param {ModelCapabilities} cap - What model provide.
+ * @returns {Satisfaction} Satisfy or not, reason per shortfall.
  */
 export function satisfies(
   req: RoleRequirements,

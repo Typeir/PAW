@@ -1,9 +1,9 @@
 /**
  * PAW Swarm Domain Tests
  *
- * @fileoverview Covers member-count resolution, brief rendering, resume keys,
- * target resolution, and every branch of the plan doctor — including a plan
- * that fails each check — so `swarm.ts` reaches 100%.
+ * @fileoverview Cover member-count resolution, brief render, resume keys,
+ * target resolution, and every branch of plan doctor, plus plan that fail each
+ * check. Drive `swarm.ts` to 100%.
  *
  * @module @paw/core/test/domain/swarm
  * @version 0.0.0
@@ -28,7 +28,7 @@ interface Row {
 }
 
 /**
- * A healthy plan over three rows; overrides let each test bend one axis.
+ * Build healthy plan over three rows. Overrides replace individual fields.
  *
  * @param {Partial<SwarmPlan<{ rows: Row[] }>>} over - Fields to override.
  * @returns {SwarmPlan<{ rows: Row[] }>} A plan.
@@ -193,8 +193,7 @@ describe('doctorPlan', () => {
 
 describe('doctorPlan key-collision', () => {
   /**
-   * A plan whose members derive their key from a name, so a repeated name
-   * collides exactly as a repeated filename does in a real plan.
+   * Build plan where members derive key from name. Repeated name collides.
    *
    * @param {readonly string[]} names - One name per member.
    * @returns {SwarmPlan<{ names: readonly string[] }>} The plan.
@@ -216,9 +215,9 @@ describe('doctorPlan key-collision', () => {
   });
 
   it('refuses two members that share a key, naming both', () => {
-    // The real shape of this bug: two source files called `main.mdx` in
-    // different directories, reduced to the same key by a basename-derived
-    // naming rule.
+    // Real shape of this bug: two source files call `main.mdx`, sit in
+    // different directories, reduced to same key by basename-derived naming
+    // rule.
     const findings = doctorPlan(keyedBy(['bard/main', 'druid/main'].map((p) => p.split('/')[1])));
     const finding = findings.find((f) => f.check === 'key-collision');
 
@@ -235,8 +234,8 @@ describe('doctorPlan key-collision', () => {
   });
 
   it('refuses the release, because a collision silently skips real work', () => {
-    // Every later member sharing a key is reported `skipped`, which reads
-    // exactly like a legitimate resume — so the release must not proceed.
+    // Every later member sharing a key report `skipped`, reads exactly like
+    // legitimate resume — so release must not proceed.
     expect(doctorPlan(keyedBy(['same', 'same'])).every((f) => f.ok)).toBe(false);
   });
 });

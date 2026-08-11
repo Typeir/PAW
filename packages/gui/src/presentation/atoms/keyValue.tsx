@@ -1,9 +1,9 @@
 /**
  * Key/Value Atom
  *
- * @fileoverview A definition list for flat fact sheets — the host's pid, node
- * version, and working directory. A description list rather than a table
- * because these are labelled single facts, not rows of a set.
+ * @fileoverview Definition list for flat fact sheets — host pid, node version,
+ * working directory. Description list not table, cause these single labelled
+ * fact, not row of set.
  *
  * @module @paw/gui/presentation/atoms/keyValue
  * @version 0.0.0
@@ -17,8 +17,8 @@ import { Fragment, type ReactNode } from 'react';
  * One labelled fact.
  *
  * @interface Fact
- * @property {string} label - The fact's name.
- * @property {ReactNode} value - The fact.
+ * @property {string} label - Fact name.
+ * @property {ReactNode} value - Fact.
  */
 export interface Fact {
   readonly label: string;
@@ -29,17 +29,17 @@ export interface Fact {
  * Props for {@link KeyValue}.
  *
  * @interface KeyValueProps
- * @property {readonly Fact[]} facts - The facts to list.
+ * @property {readonly Fact[]} facts - Facts to list.
  */
 export interface KeyValueProps {
   readonly facts: readonly Fact[];
 }
 
 /**
- * A fact sheet.
+ * Fact sheet.
  *
- * @param {KeyValueProps} props - The list props.
- * @returns {JSX.Element} The definition list.
+ * @param {KeyValueProps} props - List props.
+ * @returns {JSX.Element} Definition list.
  */
 export function KeyValue({ facts }: KeyValueProps) {
   return (

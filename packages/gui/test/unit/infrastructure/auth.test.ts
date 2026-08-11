@@ -1,11 +1,11 @@
 /**
  * Credential Adoption Tests
  *
- * @fileoverview How a tab comes to hold the daemon's token and how quickly it
- * stops showing it. The behaviours that matter to review: the fragment is read
- * and then **erased from the address bar**, a reload reuses what the tab already
- * adopted, a tab with no token adopts nothing rather than inventing something,
- * and a storage that refuses to cooperate costs a reload instead of the session.
+ * @fileoverview Tab reads daemon token from URL fragment and erases the
+ * fragment from the address bar. It records the token in session storage.
+ * Reload reuses the recorded token without a fragment. A tab opened with no
+ * token adopts nothing. A storage that throws still returns the token on the
+ * current page and leaves later reloads tokenless.
  *
  * @module @paw/gui/test/unit/infrastructure/auth
  */
@@ -22,10 +22,10 @@ import {
 const TOKEN = 'r4nd0m-token-value_0123456789abcdefgh';
 
 /**
- * A window with a scriptable address bar and storage.
+ * Window with scriptable address bar and storage.
  *
- * @param {string} hash - The initial fragment.
- * @param {TokenStorage} [storage] - The storage seam.
+ * @param {string} hash - Initial fragment.
+ * @param {TokenStorage} [storage] - Token storage (defaults to an in-memory map).
  * @returns {AuthWindow & { replaced: string[] }} The fake window.
  */
 function makeWindow(
@@ -46,7 +46,7 @@ function makeWindow(
 }
 
 /**
- * A working storage.
+ * Working storage.
  *
  * @returns {TokenStorage} The store.
  */

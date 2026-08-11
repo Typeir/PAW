@@ -1,11 +1,10 @@
 /**
- * @fileoverview Unit tests for the node gate runner against a real, written-out
- * project: `.paw/gates/*.gate.mjs` modules and source files in a temp dir. They
- * pin real discovery, dynamic loading, the single-file context (targetFiles /
- * cached readFile / git), a clean pass, a critical fail with a located finding, a
- * warning that does not fail the run, a skipped non-gate module, a contained
- * throw, and an absent gates dir. Temp dirs are unique per run, so dynamic import
- * never collides.
+ * @fileoverview Test node gate runner against written-out project.
+ * `.paw/gates/*.gate.mjs` modules and source files in temp dir. Pins discovery,
+ * dynamic load, single-file context (targetFiles / cached readFile / git),
+ * clean pass, critical fail with located finding, warning no fail run,
+ * skip non-gate module, contain throw, and absent gates dir. Unique temp dir
+ * per run.
  *
  * @module @paw/adapters/test/gate/nodeGateRunner
  */
@@ -81,7 +80,7 @@ const THROW_STR = `export const gate = {
 let root: string;
 
 /**
- * Write a gate module under a project's `.paw/gates`.
+ * Write gate module under project's `.paw/gates`.
  *
  * @param proj - Absolute project root.
  * @param name - Gate file name.
@@ -94,7 +93,7 @@ function gate(proj: string, name: string, body: string): void {
 }
 
 /**
- * Write a source file under a project's `src`.
+ * Write source file under project's `src`.
  *
  * @param proj - Absolute project root.
  * @param name - File name.

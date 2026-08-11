@@ -1,10 +1,10 @@
 /**
- * PAW Role Registry Tests
+ * PAW role registry tests.
  *
- * @fileoverview Covers role resolution and the role doctor across every path —
+ * @fileoverview Test role resolution and role doctor on every path:
  * unknown role, optional and required unbound, optional and required
- * unsatisfied, and the happy path — using a fake {@link ModelPort} that is never
- * actually called, so the resolution logic reaches 100% with no I/O.
+ * unsatisfied, happy path. Use fake {@link ModelPort}, never call. Resolution
+ * logic hit 100%, no I/O.
  *
  * @module @paw/core/test/application/roleRegistry
  * @version 0.0.0
@@ -26,9 +26,8 @@ import {
 } from '../../src/application/roleRegistry.js';
 
 /**
- * A fake model port that records nothing and returns a fixed response. It exists
- * only to prove the registry hands back a port; it is never invoked in these
- * tests.
+ * Fake model port. Record nothing, return fixed response. Never invoked in
+ * these tests.
  */
 const fakePort: ModelPort = {
   complete: async () => ({ content: '', inputTokens: 0, outputTokens: 0 }),
@@ -45,12 +44,12 @@ const CAP: ModelCapabilities = {
 };
 
 /**
- * Build a role declaration.
+ * Build role declaration.
  *
  * @param {string} id - Role id.
- * @param {boolean} optional - Whether the role is optional.
+ * @param {boolean} optional - Whether role optional.
  * @param {Partial<RoleDeclaration['requires']>} reqOver - Requirement overrides.
- * @returns {RoleDeclaration} A declaration.
+ * @returns {RoleDeclaration} Declaration.
  */
 const decl = (
   id: string,
@@ -75,11 +74,11 @@ const decl = (
 });
 
 /**
- * Assemble a registry from declaration and binding entries.
+ * Assemble registry from declaration and binding entries.
  *
  * @param {RoleDeclaration[]} decls - Declarations.
  * @param {Array<[string, ModelBinding]>} binds - Binding entries.
- * @returns {RoleRegistry} A registry.
+ * @returns {RoleRegistry} Registry.
  */
 const registry = (
   decls: RoleDeclaration[],

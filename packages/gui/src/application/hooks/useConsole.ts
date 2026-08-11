@@ -1,11 +1,10 @@
 /**
  * PAW Console Selectors
  *
- * @fileoverview One hook per slice a panel actually needs, so a component reads
- * `usePlan()` instead of receiving a plan through four ancestors that do not care
- * about it. Every hook here is a thin read over the pure selectors in
- * `domain/consoleState`: the rules stay testable without React, and the hooks
- * stay a lookup rather than a second place where console logic accumulates.
+ * @fileoverview One hook per slice panel need. A component calls `usePlan()`
+ * directly; no ancestor threads the plan down. Every hook here reads a
+ * pure selector in `domain/consoleState`; rule stay testable without React,
+ * hook stays a lookup into the state.
  *
  * @module @paw/gui/application/hooks/useConsole
  * @version 0.0.0
@@ -22,99 +21,99 @@ import {
 import { useConsoleState } from '../context/consoleContext.js';
 
 /**
- * Everything the console renders.
+ * Everything console render.
  *
- * @returns {ConsoleData} The loaded data.
+ * @returns {ConsoleData} Loaded data.
  */
 export function useConsoleData(): ConsoleData {
   return useConsoleState().data;
 }
 
 /**
- * The plan under authorship.
+ * Plan under authorship.
  *
- * @returns {PlanView} The plan.
+ * @returns {PlanView} Plan.
  */
 export function usePlan(): PlanView {
   return useConsoleState().data.plan;
 }
 
 /**
- * The active rail subsystem.
+ * Active rail subsystem.
  *
- * @returns {Section} The section.
+ * @returns {Section} Section.
  */
 export function useSection(): Section {
   return useConsoleState().section;
 }
 
 /**
- * The active tab within the Swarm view.
+ * Active tab within Swarm view.
  *
- * @returns {Tab} The tab.
+ * @returns {Tab} Tab.
  */
 export function useTab(): Tab {
   return useConsoleState().tab;
 }
 
 /**
- * The scrubbed member index.
+ * Scrubbed member index.
  *
- * @returns {number} The member index.
+ * @returns {number} Member index.
  */
 export function useMember(): number {
   return useConsoleState().member;
 }
 
 /**
- * Whether the brief editor holds an unsaved edit.
+ * Whether brief editor hold unsaved edit.
  *
- * @returns {boolean} True when a draft is present.
+ * @returns {boolean} True when draft present.
  */
 export function useHasDraft(): boolean {
   return useConsoleState().draft !== null;
 }
 
 /**
- * The brief text the editor shows.
+ * Brief text editor show.
  *
- * @returns {string} The effective brief.
+ * @returns {string} Effective brief.
  */
 export function useBrief(): string {
   return effectiveBrief(useConsoleState());
 }
 
 /**
- * The herd row for the scrubbed member, if the run dispatched it.
+ * Member row for the member selected by `useMember()`.
  *
- * @returns {MemberView | undefined} The row, or undefined.
+ * @returns {MemberView | undefined} Row, or undefined.
  */
 export function useMemberView(): MemberView | undefined {
   return currentMemberView(useConsoleState());
 }
 
 /**
- * The repository files selected to ride along with every member's brief.
+ * Repository file selected to include in every member's brief.
  *
- * @returns {readonly string[]} The selected paths, sorted.
+ * @returns {readonly string[]} Selected paths, sorted.
  */
 export function useContextSelection(): readonly string[] {
   return useConsoleState().context;
 }
 
 /**
- * Every plan the served repository holds.
+ * Every plan served repository hold.
  *
- * @returns {readonly string[]} The plan paths, sorted.
+ * @returns {readonly string[]} Plan paths, sorted.
  */
 export function usePlans(): readonly string[] {
   return useConsoleState().data.plans;
 }
 
 /**
- * Which plan the console is looking at, as the daemon last reported it.
+ * Which plan console look at, as daemon last report it.
  *
- * @returns {string | null} The plan path, or null when none is selected.
+ * @returns {string | null} Plan path, or null when none selected.
  */
 export function useSelectedPlan(): string | null {
   return useConsoleState().data.selectedPlan;

@@ -1,12 +1,11 @@
 /**
- * @fileoverview End-to-end proof that pawd serves the enforcement loop over a
- * real socket. A client handshakes and drives `hook.dispatch` through the whole
- * cycle against a REAL store and a REAL warm gate cache over a written-out
- * project: a bad edit blocks, the violation denies other files but allows the
- * violated one, fixing it clears, the gate reopens. The connector is an inline
- * fake (the daemon does not depend on @paw/connectors; the copilot one is proven
- * in the cli tier); the store, gate cache, session, dispatch, and transport are
- * all real. Malformed dispatches exercise the param allow-list.
+ * @fileoverview End-to-end proof pawd serve enforcement loop over real socket.
+ * Client handshake, then drive `hook.dispatch` whole cycle against REAL store
+ * and REAL warm gate cache over written-out project: bad edit block, violation
+ * deny other files but allow violated one, fix clear, gate reopen. Connector
+ * inline fake (daemon no depend on @paw/connectors; copilot one proven in cli
+ * tier). Store, gate cache, session, dispatch, transport all real. Malformed
+ * dispatch exercise param allow-list.
  *
  * @module @paw/daemon/test/serveEnforcement.integration
  */
@@ -53,7 +52,7 @@ let handle: SocketServerHandle;
 let endpoint: string;
 let deps: DispatchHookDeps;
 
-/** A client that sends one frame and resolves with the next response line. */
+/** Client send one frame, resolve with next response line. */
 function open(pathName: string) {
   const c = netConnect(pathName);
   c.setEncoding('utf8');

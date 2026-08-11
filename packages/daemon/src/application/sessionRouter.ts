@@ -1,12 +1,10 @@
 /**
  * PAW Session Request Router
  *
- * @fileoverview The three out-of-band requests a live console may send — scope,
- * attach, release — and the daemon's narrow part in each. Scope is a read held to
- * a ceiling; attach and release only *ask*, and the daemon spends nothing and
- * gains no authority until the operator approves in the terminal that started it.
- * Each returns the frame to send back, so the session machine stays a router and
- * these hold the policy.
+ * @fileoverview Three out-of-band requests live console send — scope, attach,
+ * release. Daemon part in each. Scope read held to ceiling. Attach and release
+ * record console intent; daemon gain no authority until operator approve in
+ * terminal that start it. Each return frame to send back.
  *
  * @module @paw/daemon/application/sessionRouter
  * @version 0.0.0
@@ -18,15 +16,14 @@ import { withinRoot, type InitMode, type LiveTopicMap, type RunSettings } from '
 import type { SessionDeps } from '../domain/session.js';
 
 /**
- * Point the daemon at a repository, or say why not. Scoping is a read — it changes
- * what the daemon looks at and writes nothing — so no operator is asked; what it
- * is held to is a ceiling. A daemon started against a fixed repository supplies no
- * `onScope` and refuses; one with no ceiling refuses too, rather than treating an
- * absent bound as an open one.
+ * Point daemon at repository, or report why not. Scoping is read: change what
+ * daemon look at, write nothing. No operator ask; held to ceiling. Daemon start
+ * against fixed repository supply no `onScope` and refuse; one with no ceiling
+ * refuse too.
  *
- * @param {string} path - The directory the console named.
- * @param {SessionDeps} deps - What the session was built with.
- * @returns {LiveTopicMap['error'] | null} The problem to report, or null once dispatched.
+ * @param {string} path - Directory console name.
+ * @param {SessionDeps} deps - What session built with.
+ * @returns {LiveTopicMap['error'] | null} Problem to report, or null after dispatch.
  */
 export function dispatchScope(path: string, deps: SessionDeps): LiveTopicMap['error'] | null {
   const { onScope, scopeCeiling } = deps;
@@ -47,17 +44,14 @@ export function dispatchScope(path: string, deps: SessionDeps): LiveTopicMap['er
 }
 
 /**
- * Record that a console asked for PAW to be attached to a repository. The daemon's
- * entire part is remembering that someone asked: it writes nothing, resolves
- * nothing, and gains no filesystem authority. An operator approves out-of-band,
- * and the process that already holds authority performs the write — so killing the
- * daemon mid-flow leaves nothing half-done. Always answers, because a console told
- * nothing cannot tell a request in progress from one that was dropped.
+ * Record console ask for PAW attach to repository. Daemon store request,
+ * gain no authority until operator approve out-of-band. Process that already
+ * hold authority do the write. Always answer.
  *
- * @param {string} path - The repository the console named.
- * @param {InitMode} mode - How it asked for an existing config to be resolved.
- * @param {SessionDeps} deps - What the session was built with.
- * @returns {LiveTopicMap['error']} What to tell the console.
+ * @param {string} path - Repository console name.
+ * @param {InitMode} mode - How it ask for existing config to resolve.
+ * @param {SessionDeps} deps - What session built with.
+ * @returns {LiveTopicMap['error']} What to tell console.
  */
 export function dispatchAttach(
   path: string,
@@ -79,15 +73,13 @@ export function dispatchAttach(
 }
 
 /**
- * Record that a console asked for a plan's herd to be released. Symmetric to
- * {@link dispatchAttach}: the daemon spends nothing and runs nothing until the
- * operator approves in the terminal, which is what keeps a console-triggered live
- * herd non-autonomous. The CLI's standalone runner is the path that needs no
- * approval.
+ * Record console ask to release a plan. Symmetric to
+ * {@link dispatchAttach}: daemon run nothing until operator
+ * approve in terminal. CLI's standalone runner need no approval.
  *
- * @param {RunSettings} settings - What the console asked to run and how.
- * @param {SessionDeps} deps - What the session was built with.
- * @returns {LiveTopicMap['error']} What to tell the console.
+ * @param {RunSettings} settings - What console ask to run and how.
+ * @param {SessionDeps} deps - What session built with.
+ * @returns {LiveTopicMap['error']} What to tell console.
  */
 export function dispatchRelease(settings: RunSettings, deps: SessionDeps): LiveTopicMap['error'] {
   const { onRelease } = deps;

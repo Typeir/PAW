@@ -1,10 +1,9 @@
 /**
- * PAW CLI Rendering
+ * PAW CLI rendering.
  *
- * @fileoverview Pure rendering for the CLI consumer: a {@link Decision} becomes
- * text plus an exit code. No I/O — this is the part the unit tests own to 100%.
- * The process shell that reads stdin and calls `process.exit` lives in `main.ts`
- * and is covered by the E2E, per CONSTRAINTS.md Constraint 1.
+ * @fileoverview Pure render for CLI consumer. {@link Decision} become text plus
+ * exit code. No I/O. Process shell read stdin, call `process.exit`, live in
+ * `main.ts`, per CONSTRAINTS.md Constraint 1.
  *
  * @module @paw/cli/domain/render
  * @version 0.0.0
@@ -15,11 +14,11 @@
 import type { Decision } from '@paw/core';
 
 /**
- * A rendered CLI result.
+ * Rendered CLI result.
  *
  * @property text - What to print.
- * @property exitCode - 0 to allow, 2 to deny — mirroring the hook contract where
- *   exit 2 is a blocking veto.
+ * @property exitCode - 0 allow, 2 deny. Mirror hook contract where exit 2
+ *   block veto.
  */
 export interface CliOutput {
   readonly text: string;
@@ -27,10 +26,10 @@ export interface CliOutput {
 }
 
 /**
- * Render a decision to console output and an exit code.
+ * Render decision to console output and exit code.
  *
- * @param d - The decision from `@paw/core`.
- * @returns The text to print and the process exit code.
+ * @param d - Decision from `@paw/core`.
+ * @returns Text to print and process exit code.
  */
 export function decisionToOutput(d: Decision): CliOutput {
   if (d.kind === 'allow') {

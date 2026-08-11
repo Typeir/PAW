@@ -1,13 +1,11 @@
 /**
- * PAW Gate Cache (warm)
+ * PAW gate cache (warm)
  *
- * @fileoverview The {@link GateRunner} the resident daemon owns (doc 10 §8b): it
- * imports each gate once and keeps it, paying the loader cost at daemon start
- * rather than per tool call. Invalidation is by `mtimeMs` **and** `size` — size
- * catches an edit that lands in the same millisecond, which mtime alone would
- * miss — and a changed gate is re-imported with a `?v=<mtime>` cache-buster,
- * because ESM resolution is otherwise permanently memoised. Removed gates and a
- * vanished gates directory are dropped, so the cache follows the project.
+ * @fileoverview Cache held by the resident daemon (doc 10 §8b). Import each
+ * gate once at daemon start and keep it. Invalidate by `mtimeMs` and `size`;
+ * size also detects edits within the same millisecond. Re-import changed gates
+ * with a `?v=<mtime>` cache-buster to bypass ESM memoisation. Remove gates that
+ * no longer exist, and clear the cache when the gates directory is gone.
  *
  * @module @paw/adapters/gate/gateCache
  * @version 0.0.0
@@ -22,12 +20,12 @@ import type { GateRunner, HealthReport, QualityGate } from '@paw/core';
 import { GATE_FILE, executeGates } from './gateExec.js';
 
 /**
- * A cached gate with the file stats that validate it.
+ * Cached gate with file stats that validate it.
  *
  * @interface CachedGate
  * @property {number} mtimeMs - Last-modified time when imported.
  * @property {number} size - File size when imported.
- * @property {QualityGate} gate - The loaded gate.
+ * @property {QualityGate} gate - Loaded gate.
  */
 interface CachedGate {
   mtimeMs: number;
@@ -36,12 +34,12 @@ interface CachedGate {
 }
 
 /**
- * Return the current gates, importing only those new or changed since last time
- * and dropping any that vanished.
+ * Return current gates. Import only new or changed since last time. Drop any
+ * that vanished.
  *
  * @param {string} gatesDir - Absolute `.paw/gates` path.
- * @param {Map<string, CachedGate>} cache - The per-file cache to maintain.
- * @returns {Promise<QualityGate[]>} The current gates.
+ * @param {Map<string, CachedGate>} cache - Per-file cache to maintain.
+ * @returns {Promise<QualityGate[]>} Current gates.
  */
 async function loadCached(
   gatesDir: string,
@@ -80,11 +78,11 @@ async function loadCached(
 }
 
 /**
- * Create a warm {@link GateRunner} bound to a project root. The cache lives for
- * the runner's lifetime — the daemon's.
+ * Create warm {@link GateRunner} bound to project root. Cache live for runner
+ * lifetime — the daemon's.
  *
  * @param {string} rootDir - Absolute project root; gates live under `.paw/gates`.
- * @returns {GateRunner} A runner that imports gates once and invalidates by stat.
+ * @returns {GateRunner} Runner import gates once, invalidate by stat.
  */
 export function createGateCache(rootDir: string): GateRunner {
   const cache = new Map<string, CachedGate>();

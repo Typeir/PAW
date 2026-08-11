@@ -1,12 +1,12 @@
 /**
  * Tree Row Atom
  *
- * @fileoverview One row of the file tree, recursive over its children — the
- * Ikuisuus `FileTreeSelectRow`, changed from picking one path to checking many.
- * A file's checkbox toggles that file; a folder's toggles every file beneath it
- * and reads back as checked, indeterminate, or empty, so a half-chosen folder
- * looks half-chosen. Expansion state is the caller's, which keeps this row pure
- * and lets the whole tree share one open set.
+ * @fileoverview One row of file tree. Recursive over children. Based on
+ * Ikuisuus `FileTreeSelectRow`; changed from selecting one path to checking
+ * many. File checkbox toggles that file. Folder checkbox toggles every file
+ * under it. Reads back checked, indeterminate, or empty, matching the
+ * selection state of the files under the folder. Expansion state is the
+ * caller's; row holds none, whole tree reads one open set.
  *
  * @module @paw/gui/presentation/atoms/treeRow
  * @version 0.0.0
@@ -22,12 +22,12 @@ import { coverage, filesUnder } from '../../domain/context.js';
  * Props for {@link TreeRow}.
  *
  * @interface TreeRowProps
- * @property {TreeNode} node - The node to render.
- * @property {number} depth - How deep it sits, for indentation.
- * @property {ReadonlySet<string>} expanded - Paths of the open directories.
- * @property {(path: string) => void} onExpand - Open or close a directory.
- * @property {readonly string[]} selected - The current selection.
- * @property {(paths: readonly string[]) => void} onToggle - Toggle a group of paths.
+ * @property {TreeNode} node - Node to render.
+ * @property {number} depth - Tree depth of node. Drives indentation.
+ * @property {ReadonlySet<string>} expanded - Paths of open directories.
+ * @property {(path: string) => void} onExpand - Open or close directory.
+ * @property {readonly string[]} selected - Current selection.
+ * @property {(paths: readonly string[]) => void} onToggle - Toggle group of paths.
  */
 export interface TreeRowProps {
   readonly node: TreeNode;
@@ -39,7 +39,7 @@ export interface TreeRowProps {
 }
 
 /**
- * A file or directory row, with its children when open.
+ * File or directory row, with children when open.
  *
  * @param {TreeRowProps} props - The row props.
  * @returns {JSX.Element} The row.

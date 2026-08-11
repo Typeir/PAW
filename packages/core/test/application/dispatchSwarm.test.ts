@@ -1,10 +1,10 @@
 /**
- * PAW Dispatch-Swarm Tests
+ * PAW dispatch-swarm test.
  *
- * @fileoverview Drives the full swarm loop against an inline fake model and role
- * registry — covering doctor-refusal, a clean dispatch, the skip predicate,
- * resume via alreadyDone, and the loud throw when a role resolves to no model —
- * so `dispatchSwarm.ts` reaches 100% with no adapter dependency and no provider.
+ * @fileoverview Run full swarm loop with inline fake model and role
+ * registry: doctor refuse, clean dispatch, skip predicate, resume via
+ * alreadyDone, loud throw when role resolve to no model. Cover
+ * `dispatchSwarm.ts` full 100%, zero adapter, zero provider.
  *
  * @module @paw/core/test/application/dispatchSwarm
  * @version 0.0.0
@@ -24,7 +24,7 @@ import { dispatchSwarm } from '../../src/application/dispatchSwarm.js';
 import type { DispatchEvent } from '../../src/application/dispatchSwarm.js';
 
 /**
- * A model that echoes the prompt, so outcomes are inspectable.
+ * Echo prompt to each outcome.
  */
 const echoModel: ModelPort = {
   complete: async (req) => ({
@@ -62,10 +62,10 @@ const editRole: RoleDeclaration = {
 };
 
 /**
- * A registry binding `edit.apply` to the echo model.
+ * Bind `edit.apply` to echo model.
  *
  * @param {Partial<ModelBinding>} bindingOver - Binding overrides.
- * @returns {RoleRegistry} A registry.
+ * @returns {RoleRegistry} Registry.
  */
 const registry = (bindingOver: Partial<ModelBinding> = {}): RoleRegistry => ({
   declarations: new Map([[editRole.id, editRole]]),
@@ -75,11 +75,10 @@ const registry = (bindingOver: Partial<ModelBinding> = {}): RoleRegistry => ({
 });
 
 /**
- * A file reader over an in-memory filesystem, failing loud on a path it has
- * never heard of — exactly as a real reader does.
+ * File reader over in-memory filesystem; throw on unknown path.
  *
  * @param {Record<string, string>} files - Path → body.
- * @returns {FileReaderPort} The reader.
+ * @returns {FileReaderPort} Reader.
  */
 const reader = (files: Record<string, string> = {}): FileReaderPort => ({
   read: async (path: string) => {
@@ -92,10 +91,10 @@ const reader = (files: Record<string, string> = {}): FileReaderPort => ({
 });
 
 /**
- * A three-member plan; overrides bend one axis.
+ * Three-member plan; overrides replace fields.
  *
  * @param {Partial<SwarmPlan<{ n: number }>>} over - Plan overrides.
- * @returns {SwarmPlan<{ n: number }>} A plan.
+ * @returns {SwarmPlan<{ n: number }>} Plan.
  */
 const plan = (
   over: Partial<SwarmPlan<{ n: number }>> = {},
@@ -279,8 +278,7 @@ describe('dispatchSwarm progress', () => {
       },
     });
 
-    // The live view and the returned result come from one place, so a console
-    // watching a run cannot end up disagreeing with the run's own answer.
+    // Settled event carries the same outcome object the result returns.
     expect(events.filter((e) => e.phase === 'settled').map((e) => e.outcome)).toEqual(res.outcomes);
   });
 
@@ -392,5 +390,109 @@ describe('dispatchSwarm output budget', () => {
     });
 
     expect(seen).toEqual([512, 512]);
+  });
+});
+
+describe('dispatchSwarm tools', () => {
+  /**
+   * Model record tools each member's request carried.
+   *
+   * @returns {{ seen: (readonly string[] | undefined)[]; port: ModelPort }} Record and port.
+   */
+  const capture = (): { seen: (readonly string[] | undefined)[]; port: ModelPort } => {
+    const seen: (readonly string[] | undefined)[] = [];
+    return {
+      seen,
+      port: {
+        complete: async (req) => {
+          seen.push(req.availableTools);
+          return { content: 'x', inputTokens: 1, outputTokens: 1 };
+        },
+      },
+    };
+  };
+
+  it('grants a plan’s availableTools to every member, and resolveTools overrides per member', async () => {
+    const a = capture();
+    await dispatchSwarm(plan({ args: { n: 2 }, availableTools: ['read', 'edit'] }), {
+      registry: registry({ port: a.port }),
+      files: reader(),
+    });
+    expect(a.seen).toEqual([
+      ['read', 'edit'],
+      ['read', 'edit'],
+    ]);
+
+    const b = capture();
+    await dispatchSwarm(
+      plan({
+        args: { n: 2 },
+        availableTools: ['read'],
+        resolveTools: (_x, m) => (m === 0 ? ['edit'] : ['shell']),
+      }),
+      { registry: registry({ port: b.port }), files: reader() },
+    );
+    expect(b.seen).toEqual([['edit'], ['shell']]);
+  });
+
+  it('names no tools when the plan declares none, leaving the port on its role default', async () => {
+    const a = capture();
+    await dispatchSwarm(plan({ args: { n: 1 } }), {
+      registry: registry({ port: a.port }),
+      files: reader(),
+    });
+    expect(a.seen).toEqual([undefined]);
+  });
+});
+
+describe('dispatchSwarm system', () => {
+  /**
+   * Model record system sections each member's request carried.
+   *
+   * @returns {{ seen: (Record<string, string> | undefined)[]; port: ModelPort }} Record and port.
+   */
+  const capture = (): { seen: (Record<string, string> | undefined)[]; port: ModelPort } => {
+    const seen: (Record<string, string> | undefined)[] = [];
+    return {
+      seen,
+      port: {
+        complete: async (req) => {
+          seen.push(req.systemSections as Record<string, string> | undefined);
+          return { content: 'x', inputTokens: 1, outputTokens: 1 };
+        },
+      },
+    };
+  };
+
+  it('passes no sections when there is neither a baseline nor a plan system', async () => {
+    const a = capture();
+    await dispatchSwarm(plan({ args: { n: 1 } }), {
+      registry: registry({ port: a.port }),
+      files: reader(),
+    });
+    expect(a.seen).toEqual([undefined]);
+  });
+
+  it('passes the baseline unchanged when the plan has no system', async () => {
+    const a = capture();
+    await dispatchSwarm(plan({ args: { n: 1 } }), {
+      registry: registry({ port: a.port }),
+      files: reader(),
+      systemBaseline: { identity: 'id', tone: 'tn' },
+    });
+    expect(a.seen).toEqual([{ identity: 'id', tone: 'tn' }]);
+  });
+
+  it('applies the plan system over the baseline: replace, drop, and keep', async () => {
+    const a = capture();
+    await dispatchSwarm(
+      plan({ args: { n: 1 }, system: () => ({ identity: 'caveman', tone: undefined }) }),
+      {
+        registry: registry({ port: a.port }),
+        files: reader(),
+        systemBaseline: { identity: 'id', tone: 'tn', safety: 'sf' },
+      },
+    );
+    expect(a.seen).toEqual([{ identity: 'caveman', safety: 'sf' }]);
   });
 });

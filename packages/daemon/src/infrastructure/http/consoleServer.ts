@@ -1,13 +1,7 @@
 /**
  * PAW Console TLS Server
  *
- * @fileoverview The real socket the daemon serves the console over: a loopback
- * TLS server that answers with the router, refuses to hold a connection open on
- * a trickle of header bytes, and never tells a client why a request failed. It
- * upgrades a socket to the live wire only after the daemon's `check` hook has
- * said yes, adopts it into the session machine, and keeps it honest with a
- * heartbeat. The deciding is all in `sessions`/`serve`; this is the wiring that
- * turns their decisions into `node:https` and `ws`.
+ * @fileoverview Socket daemon serve console over. Loopback TLS server. Answer with router. Drop connection that sends headers too slowly. Return opaque errors. Upgrade socket to WebSocket only after daemon `check` hook approves. Adopt it into the WebSocket session. Send pings to keep it alive. Decisions are in `sessions`/`serve`; this file connects them to `node:https` and `ws`.
  *
  * @module @paw/daemon/infrastructure/http/consoleServer
  * @version 0.0.0
@@ -33,26 +27,24 @@ import type { AcceptedSocket, ServerHandle, SocketHooks, TlsMaterial } from '../
 import type { WsSessionPort } from '../../domain/session.js';
 import { firstHeader, offeredProtocols, toRequest } from './httpMessage.js';
 
-/** The IPv6 loopback the daemon binds alongside the IPv4 one. */
+/** IPv6 loopback. Daemon bind it next to IPv4 one. */
 export const LOOPBACK_V6 = '::1';
 
-/** How long a client may take to send its request headers. */
+/** How long client may take to send request headers. */
 const HEADERS_TIMEOUT_MS = 5_000;
 
-/** How long a whole request may take before the server drops it. */
+/** How long whole request take before server drops it. */
 const REQUEST_TIMEOUT_MS = 15_000;
 
-/** The floor TLS version the daemon negotiates. */
+/** Floor TLS version daemon negotiate. */
 const MIN_TLS = 'TLSv1.2';
 
 /**
- * Read a request body off the socket, refusing at the cap. Counting as it streams
- * means an oversized body is rejected the chunk it crosses the line, not after the
- * whole of it is already resident in memory.
+ * Read request body off socket. Refuse at cap. Count bytes as they stream. Reject on chunk that cross cap.
  *
- * @param {AsyncIterable<Buffer | string>} source - The request stream.
- * @param {number} cap - The largest body to buffer, in bytes.
- * @returns {Promise<{ ok: true; body: string } | { ok: false }>} The body, or an overflow.
+ * @param {AsyncIterable<Buffer | string>} source - Request stream.
+ * @param {number} cap - Biggest body to buffer, in bytes.
+ * @returns {Promise<{ ok: true; body: string } | { ok: false }>} Body, or overflow.
  */
 export async function readBody(
   source: AsyncIterable<Buffer | string>,
@@ -72,17 +64,13 @@ export async function readBody(
 }
 
 /**
- * Turn one request into one response: buffer a write's body under the cap, route
- * it, and write what the router returned. A body over the cap is a 413 the router
- * never has to see; a body is read only for a write, so a read never waits on a
- * stream. Any thrown error is a 500 that says nothing — an error message from a
- * control API is reconnaissance.
+ * Turn one request into one response. Buffer write body under cap. Route it. Write what router return. Body over cap is 413 before routing. Body read only for write. Any thrown error is opaque 500.
  *
- * @param {IncomingMessage} req - The incoming request.
- * @param {ServerResponse} res - The response to write.
- * @param {string} host - The bound host, to resolve a relative URL against.
- * @param {(request: HttpRequest) => Promise<HttpResponse>} handler - The router.
- * @returns {Promise<void>} When the response has been written.
+ * @param {IncomingMessage} req - Incoming request.
+ * @param {ServerResponse} res - Response to write.
+ * @param {string} host - Bound host. Resolve relative URL against it.
+ * @param {(request: HttpRequest) => Promise<HttpResponse>} handler - Router.
+ * @returns {Promise<void>} When response written.
  */
 export async function answerRequest(
   req: IncomingMessage,
@@ -113,14 +101,12 @@ export async function answerRequest(
 }
 
 /**
- * A TLS server that answers with the router, refuses to hold a connection open
- * on a trickle of header bytes, and never tells a client why a request failed —
- * an error message from a control API is reconnaissance.
+ * TLS server. Answer with router. Drop connection that sends headers too slowly. Return opaque errors.
  *
- * @param {TlsMaterial} tls - The certificate and key to present.
- * @param {(request: HttpRequest) => Promise<HttpResponse>} handler - The router.
- * @param {string} host - The bound host, to resolve a relative URL against.
- * @returns {TlsServer} The unbound server.
+ * @param {TlsMaterial} tls - Certificate and key to present.
+ * @param {(request: HttpRequest) => Promise<HttpResponse>} handler - Router.
+ * @param {string} host - Bound host. Resolve relative URL against it.
+ * @returns {TlsServer} Unbound server.
  */
 export function createConsoleServer(
   tls: TlsMaterial,
@@ -136,11 +122,9 @@ export function createConsoleServer(
 }
 
 /**
- * Refuse an upgrade while it is still plain HTTP. The response is written by hand
- * because Node hands over the raw socket; `Connection: close` and an explicit
- * `Content-Length` keep a client from waiting for a body that never comes.
+ * Refuse upgrade while still plain HTTP. Write response by hand. `node:http` passes the raw socket to the upgrade handler. Set `Connection: close` and explicit `Content-Length`.
  *
- * @param {Duplex} socket - The raw socket.
+ * @param {Duplex} socket - Raw socket.
  * @param {UpgradeRefusal} refusal - Why.
  */
 export function refuseUpgrade(socket: Duplex, refusal: UpgradeRefusal): void {
@@ -157,16 +141,11 @@ export function refuseUpgrade(socket: Duplex, refusal: UpgradeRefusal): void {
 }
 
 /**
- * Wire an upgraded socket to the session machine, and keep it honest with a
- * heartbeat: a ping every {@link PING_MS} with a hard {@link PONG_TIMEOUT_MS}
- * deadline that terminates rather than closes, since a client that stopped
- * answering will not finish a closing handshake either. Binary frames are
- * refused — this protocol is JSON text, and a second decode path on a security
- * boundary is a second place to get it wrong.
+ * Connect upgraded socket to the WebSocket session. Send a ping every {@link PING_MS} and require a pong within {@link PONG_TIMEOUT_MS}, terminate socket otherwise. Refuse binary frames; protocol is JSON text.
  *
- * @param {WebSocket} ws - The upgraded socket.
- * @param {SocketHooks} hooks - The daemon's half.
- * @param {(message: string) => void} warn - Report a failure without dying of it.
+ * @param {WebSocket} ws - Upgraded socket.
+ * @param {SocketHooks} hooks - Daemon half.
+ * @param {(message: string) => void} warn - Report failure without dying of it.
  */
 export function adoptSocket(
   ws: WebSocket,
@@ -228,14 +207,12 @@ export function adoptSocket(
 }
 
 /**
- * Attach the live wire to a bound server. The server upgrades nothing until
- * {@link SocketHooks.check} says yes; `handleProtocols` only echoes the
- * subprotocol the daemon speaks, and the real refusal happens in the gate.
+ * Attach WebSocket handler to bound server. Server upgrades nothing until {@link SocketHooks.check} approves. `handleProtocols` echoes daemon subprotocol. Refusal happens in the check hook.
  *
- * @param {TlsServer} server - The bound server.
- * @param {SocketHooks} hooks - The daemon's half.
- * @param {(message: string) => void} warn - Report a failure without dying of it.
- * @returns {WebSocketServer} The attached server, for shutdown.
+ * @param {TlsServer} server - Bound server.
+ * @param {SocketHooks} hooks - Daemon half.
+ * @param {(message: string) => void} warn - Report failure without dying of it.
+ * @returns {WebSocketServer} Attached server, for shutdown.
  */
 export function attachLiveWire(
   server: TlsServer,
@@ -268,15 +245,13 @@ export function attachLiveWire(
 }
 
 /**
- * Bind a server, rejecting if it cannot take the address. An `error` after
- * binding is reported and survived rather than thrown — one broken connection is
- * not a reason to drop every other one.
+ * Bind server. Reject if it cannot take address. `error` after binding reported and survived.
  *
- * @param {TlsServer} server - The server to bind.
- * @param {number} port - The port.
- * @param {string} host - The address.
- * @param {boolean} ipv6Only - Whether to refuse v4-mapped connections on it.
- * @returns {Promise<void>} Resolves once bound.
+ * @param {TlsServer} server - Server to bind.
+ * @param {number} port - Port.
+ * @param {string} host - Address.
+ * @param {boolean} ipv6Only - Refuse v4-mapped connections on it.
+ * @returns {Promise<void>} Resolve once bound.
  */
 export function bindServer(
   server: TlsServer,
@@ -297,10 +272,10 @@ export function bindServer(
 }
 
 /**
- * Stop a server listening.
+ * Stop server listening.
  *
- * @param {TlsServer} server - The server.
- * @returns {Promise<void>} Resolves once closed.
+ * @param {TlsServer} server - Server.
+ * @returns {Promise<void>} Resolve once closed.
  */
 export function closeServer(server: TlsServer): Promise<void> {
   return new Promise<void>((done, fail) => {
@@ -309,15 +284,11 @@ export function closeServer(server: TlsServer): Promise<void> {
 }
 
 /**
- * Bind the IPv6 loopback alongside the IPv4 one, on the same port. A failure is
- * reported and survived: the daemon is already reachable on `127.0.0.1`, and a
- * machine with IPv6 disabled is a configuration, not a fault — but the symptom
- * (`https://localhost` failing while `https://127.0.0.1` works) must never be
- * silent.
+ * Bind IPv6 loopback next to IPv4 one, same port. Failure reported and survived. Log symptom (`https://localhost` fail while `https://127.0.0.1` work).
  *
- * @param {TlsServer} server - The second server.
- * @param {number} port - The port IPv4 bound.
- * @returns {Promise<boolean>} True when it is listening.
+ * @param {TlsServer} server - Second server.
+ * @param {number} port - Port IPv4 bound.
+ * @returns {Promise<boolean>} True when listening.
  */
 export async function bindLoopbackV6(server: TlsServer, port: number): Promise<boolean> {
   try {

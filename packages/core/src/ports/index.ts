@@ -1,13 +1,11 @@
 /**
  * PAW Core Ports
  *
- * @fileoverview The hexagonal ports `@paw/core` owns — interfaces only. Every
- * side effect PAW performs is behind one of these: core defines the interface,
- * a driven adapter in `packages/adapters/*` implements it, and a consumer wires
- * the adapter to the port at its composition root. Nothing here has a runtime
- * implementation, which is why the coverage gate excludes `src/ports/**` — there
- * is no executable code to cover. Ports start small and grow only as the
- * use-case that needs them is migrated.
+ * @fileoverview Hexagonal ports `@paw/core` own — interfaces only. Every
+ * side effect PAW do sit behind one: core define interface, driven
+ * adapter in `packages/adapters/*` implement it, consumer wire adapter to
+ * port at composition root. No runtime implementation here; coverage gate
+ * exclude `src/ports/**`. Ports grow as use-cases migrate.
  *
  * @module @paw/core/ports
  * @version 0.0.0
@@ -21,18 +19,17 @@ import type { HealthReport } from '../domain/gate.js';
 import type { Violation } from '../domain/violation.js';
 
 /**
- * A host connector — the driving adapter that bolts PAW onto a specific host
- * (the Copilot SDK, the Copilot CLI, a VS Code extension, a future Anthropic or
- * Codex runtime) through translation, not through hardcoded semantics. It turns
- * the host's native payload into a canonical {@link PawEvent} and a canonical
- * {@link PawResponse} back into the host's native output. PAW's loop never sees
- * the host; swapping hosts is a different connector, selected by config.
+ * The driving adapter that connects PAW to a specific host (Copilot SDK,
+ * Copilot CLI, VS Code extension, future Anthropic or Codex runtime) through
+ * translation. Turn host native payload into canonical {@link PawEvent},
+ * and canonical {@link PawResponse} back into host native output. PAW
+ * loop never see host; different connector swap hosts, config pick.
  *
  * @interface HostConnector
  * @property {string} name - Connector id, matched against `PawConfig.connector`.
- * @property {(type: PawEventType) => (string | null)} eventName - This host's native name for a canonical event (e.g. `tool.pre` → `PreToolUse`), or null when the host has no such event. Lets a caller that knows the canonical event feed `toEvent` without the host guessing.
- * @property {(raw: unknown) => (PawEvent | null)} toEvent - Translate a host payload to a canonical event, or null when the payload is not PAW-relevant.
- * @property {(response: PawResponse) => unknown} fromResponse - Translate a canonical response to the host's native output shape.
+ * @property {(type: PawEventType) => (string | null)} eventName - Host native name for canonical event (e.g. `tool.pre` → `PreToolUse`), or null when host have no such event.
+ * @property {(raw: unknown) => (PawEvent | null)} toEvent - Translate host payload to canonical event, or null when payload not PAW-relevant.
+ * @property {(response: PawResponse) => unknown} fromResponse - Translate canonical response to host native output shape.
  */
 export interface HostConnector {
   readonly name: string;
@@ -42,21 +39,17 @@ export interface HostConnector {
 }
 
 /**
- * Persistence for violations. Implementations: a native SQLite binding, a WASM
- * one where that binding is blocked, and an in-memory fake for tests — swapping
- * is one adapter.
- *
- * Deliberately narrow. The enforcement use-cases need violations and nothing
- * else, so widening this to every table PAW stores would make every consumer
- * and every fake carry methods they never call. Other persisted concerns get
- * their own port; see {@link ConfigPort}.
+ * Persistence for violations. Implementations: native SQLite binding, WASM
+ * one where that binding blocked, in-memory fake for tests — swapping is
+ * one adapter. Narrow to violations; other persisted concerns get own
+ * port, see {@link ConfigPort}.
  *
  * @interface StorePort
- * @property {(sessionId: string | null) => Promise<Violation[]>} unresolvedFor - Unresolved violations in scope for a session, plus project-scoped ones.
- * @property {(violations: readonly Violation[], sessionId: string | null) => Promise<void>} raise - Record new violations for a file within a session.
- * @property {(filePath: string, sessionId: string | null) => Promise<number>} resolveForFile - Mark a file's violations resolved; returns the number cleared.
- * @property {() => Promise<Violation[]>} outstanding - Every unresolved violation across all sessions — the operator's whole-repo view, not one session's.
- * @property {(filePath: string | null) => Promise<number>} prune - Resolve outstanding violations across all sessions: one file's when a path is given, otherwise all; returns the number cleared.
+ * @property {(sessionId: string | null) => Promise<Violation[]>} unresolvedFor - Unresolved violations in scope for session, plus project-scoped ones.
+ * @property {(violations: readonly Violation[], sessionId: string | null) => Promise<void>} raise - Record new violations for file within session.
+ * @property {(filePath: string, sessionId: string | null) => Promise<number>} resolveForFile - Mark file violations resolved; return number cleared.
+ * @property {() => Promise<Violation[]>} outstanding - Every unresolved violation across all sessions; operator whole-repo view.
+ * @property {(filePath: string | null) => Promise<number>} prune - Resolve outstanding violations across all sessions: one file when path given, otherwise all; return number cleared.
  */
 export interface StorePort {
   unresolvedFor(sessionId: string | null): Promise<Violation[]>;
@@ -70,11 +63,11 @@ export interface StorePort {
 }
 
 /**
- * Runs a project's quality gates against a set of files and returns the report
- * the detector reasons over. Discovery, dynamic loading, context building, and
- * per-gate execution are all the adapter's concern (the legacy `pawGates` +
- * `gateContext`, ported); the use-case only asks "gate these paths". Bound to a
- * project root at its composition root, so callers pass paths alone.
+ * Run project quality gates against set of files; return report the
+ * detector reason over. Discovery, dynamic loading, context building, and
+ * per-gate execution the adapter concern (legacy `pawGates` +
+ * `gateContext`, ported). Bound to project root at composition root;
+ * callers pass paths alone.
  *
  * @interface GateRunner
  * @property {(relativePaths: readonly string[]) => Promise<HealthReport>} runForFiles - Run every applicable gate against these project-relative paths.
@@ -84,16 +77,13 @@ export interface GateRunner {
 }
 
 /**
- * The persisted key-value settings that outlive a process and belong to the
- * project rather than the machine — the enforcement kill switch above all, which
- * has to survive between two unrelated hook invocations to mean anything.
- *
- * Separate from the engine choice, which cannot live here: a setting that says
- * how to open the store is unreadable until the store is already open.
+ * Persisted key-value settings that outlive process and belong to project
+ * — foremost an enforcement override — persist across unrelated hook
+ * invocations. Exclude engine choice, must be readable before store opens.
  *
  * @interface ConfigPort
- * @property {(key: string) => Promise<string | null>} getConfig - Read a setting, or null when unset.
- * @property {(key: string, value: string) => Promise<void>} setConfig - Write a setting, replacing any current value.
+ * @property {(key: string) => Promise<string | null>} getConfig - Read setting, or null when unset.
+ * @property {(key: string, value: string) => Promise<void>} setConfig - Write setting, replace any current value.
  */
 export interface ConfigPort {
   getConfig(key: string): Promise<string | null>;
@@ -101,12 +91,12 @@ export interface ConfigPort {
 }
 
 /**
- * Reads and writes a repo's `.paw/config.json` document whole. Bound to a repo at
- * its composition root. The one seam through which a binding edit reaches disk.
+ * Read and write repo `.paw/config.json` document whole. Bound to repo at
+ * composition root. The one seam through which binding edit reach disk.
  *
  * @interface ConfigDocumentPort
- * @property {() => Promise<ConfigDocument>} read - Parse the current document; a repo with none reads as an empty document.
- * @property {(config: ConfigDocument) => Promise<void>} write - Replace the document on disk.
+ * @property {() => Promise<ConfigDocument>} read - Parse current document; repo with none reads as empty document.
+ * @property {(config: ConfigDocument) => Promise<void>} write - Replace document on disk.
  */
 export interface ConfigDocumentPort {
   read(): Promise<ConfigDocument>;
@@ -114,27 +104,28 @@ export interface ConfigDocumentPort {
 }
 
 /**
- * The recently-grabbed consumer routes, persisted for the one console overall. A
- * route is a repository the console scoped to; this remembers the last few so an
- * operator can jump back without retyping the path. Bound to `$PAW_HOME` at the
- * composition root, because the console is global rather than per-repository.
+ * Most recent consumer routes, persisted for one console overall. A
+ * route is repository the console scoped to; hold last few. Bound to
+ * `$PAW_HOME` at composition root; console global.
  *
  * @interface RecentRoutesPort
- * @property {() => Promise<string[]>} list - The recent routes, newest first; empty when none has been recorded.
- * @property {(route: string) => Promise<string[]>} record - Promote a route to the front and persist; returns the new list.
+ * @property {() => Promise<string[]>} list - Recent routes, newest first; empty when none recorded.
+ * @property {(route: string) => Promise<string[]>} record - Promote route to front and persist; return new list.
+ * @property {(route: string) => Promise<string[]>} remove - Forget route and persist; return new list.
  */
 export interface RecentRoutesPort {
   list(): Promise<string[]>;
   record(route: string): Promise<string[]>;
+  remove(route: string): Promise<string[]>;
 }
 
 /**
- * Spawn and manage child processes, cross-platform. Wraps the Windows/POSIX
- * detach divergence so the call sites that hand-roll it collapse to one.
+ * Spawn and manage child processes, cross-platform. Wrap Windows/POSIX
+ * detach divergence.
  *
  * @interface ProcessPort
- * @property {(command: string, args: readonly string[], opts?: ProcessRunOptions) => Promise<ProcessResult>} run - Run a command to completion.
- * @property {(command: string, args: readonly string[], opts?: ProcessRunOptions) => Promise<number>} spawnDetached - Spawn a detached, unref'd child that outlives this process; returns its pid.
+ * @property {(command: string, args: readonly string[], opts?: ProcessRunOptions) => Promise<ProcessResult>} run - Run command to completion.
+ * @property {(command: string, args: readonly string[], opts?: ProcessRunOptions) => Promise<number>} spawnDetached - Spawn detached, unref'd child that outlive this process; return pid.
  */
 export interface ProcessPort {
   run(
@@ -150,12 +141,12 @@ export interface ProcessPort {
 }
 
 /**
- * Options for a {@link ProcessPort} invocation.
+ * Options for {@link ProcessPort} invocation.
  *
  * @interface ProcessRunOptions
- * @property {string} [cwd] - Working directory for the child.
- * @property {Readonly<Record<string, string | undefined>>} [env] - Environment for the child; defaults to the parent's.
- * @property {number} [timeoutMs] - Kill the child after this many milliseconds.
+ * @property {string} [cwd] - Working directory for child.
+ * @property {Readonly<Record<string, string | undefined>>} [env] - Environment for child; default to parent.
+ * @property {number} [timeoutMs] - Kill child after this many milliseconds.
  */
 export interface ProcessRunOptions {
   readonly cwd?: string;
@@ -164,7 +155,7 @@ export interface ProcessRunOptions {
 }
 
 /**
- * Outcome of a {@link ProcessPort.run}.
+ * Outcome of {@link ProcessPort.run}.
  *
  * @interface ProcessResult
  * @property {string} stdout - Captured standard output.
@@ -178,38 +169,28 @@ export interface ProcessResult {
 }
 
 /**
- * Reads a file's text. The one seam through which a swarm's attached context
- * enters a prompt: a plan declares paths purely (`contextFiles`), and the
- * application resolves them through this port at dispatch. Fails loud per
- * CONSTRAINTS.md Constraint 3 — a path that cannot be read rejects, because a
- * brief that silently lost its context is a brief that quietly asks the model
- * the wrong question.
+ * Read file text. The one seam through which swarm attached context
+ * enter prompt: plan declare paths purely (`contextFiles`), the
+ * application resolve them through this port at dispatch. Fail loud per
+ * CONSTRAINTS.md Constraint 3; path that cannot read reject.
  *
  * @interface FileReaderPort
- * @property {(path: string) => Promise<string>} read - The file's text; rejects when it cannot be read.
+ * @property {(path: string) => Promise<string>} read - File text; reject when it cannot read.
  */
 export interface FileReaderPort {
   read(path: string): Promise<string>;
 }
 
 /**
- * Reading and writing the filesystem, for the one flow that changes it: attaching
- * PAW to a repository.
- *
- * Kept apart from {@link FileReaderPort} rather than replacing it. Most of PAW
- * only ever reads, and handing those callers a port that can also write and
- * chmod would widen what a fake has to stand in for and what a bug could reach.
- *
- * `readText` answers `''` for a missing file rather than rejecting, because the
- * planners treat absence and emptiness the same and a caller that had to catch
- * would only turn it back into `''`.
+ * Read and write filesystem, for one flow that change it: attach
+ * PAW to repository. Separate from {@link FileReaderPort}.
  *
  * @interface FileSystemPort
- * @property {(path: string) => Promise<string>} readText - Read a file, or `''` when it does not exist.
- * @property {(path: string, content: string) => Promise<void>} writeText - Write a file, creating or overwriting it.
- * @property {(path: string, content: string) => Promise<void>} appendText - Append to a file, creating it if absent.
- * @property {(dir: string) => Promise<void>} ensureDir - Create a directory and its parents if needed.
- * @property {(path: string) => Promise<void>} setExecutable - Set the executable bit; a no-op where the platform has none.
+ * @property {(path: string) => Promise<string>} readText - Read file, or `''` when it not exist.
+ * @property {(path: string, content: string) => Promise<void>} writeText - Write file, create or overwrite it.
+ * @property {(path: string, content: string) => Promise<void>} appendText - Append to file, create it if absent.
+ * @property {(dir: string) => Promise<void>} ensureDir - Create directory and parents if needed.
+ * @property {(path: string) => Promise<void>} setExecutable - Set executable bit; no-op where platform got none.
  */
 export interface FileSystemPort {
   readText(path: string): Promise<string>;
@@ -220,15 +201,15 @@ export interface FileSystemPort {
 }
 
 /**
- * Provider credentials. Never logs, never echoes, and never returns material to
- * any caller outside the daemon's model layer. Backends: OS keychain, encrypted
+ * Provider credentials. Never log, never echo, never return material to
+ * any caller outside daemon model layer. Backends: OS keychain, encrypted
  * vault, external manager — see 13-decision-keyring.
  *
  * @interface SecretPort
- * @property {() => Promise<boolean>} available - Whether material can be read right now (keychain reachable, vault unlocked).
- * @property {(name: string, value: string) => Promise<void>} set - Store or replace a secret under a stable name.
- * @property {(name: string) => Promise<string | null>} get - Retrieve material; only the daemon's model layer may call this.
- * @property {(name: string) => Promise<void>} remove - Remove a secret.
+ * @property {() => Promise<boolean>} available - Whether material can read right now (keychain reachable, vault unlocked).
+ * @property {(name: string, value: string) => Promise<void>} set - Store or replace secret under stable name.
+ * @property {(name: string) => Promise<string | null>} get - Retrieve material; only daemon model layer may call this.
+ * @property {(name: string) => Promise<void>} remove - Remove secret.
  * @property {() => Promise<ReadonlyArray<{ name: string; fingerprint: string; updatedAt: string }>>} list - Names and non-sensitive metadata for display; never material.
  */
 export interface SecretPort {
@@ -242,37 +223,41 @@ export interface SecretPort {
 }
 
 /**
- * Inference, provider-agnostic. A resolved role hands the model layer one of
- * these; the credential is fetched through {@link SecretPort} at egress, never
- * held by the caller. Adapters: copilot-sdk, openai-compatible, ollama.
+ * Inference, provider-agnostic. Resolved role hand model layer one of
+ * these; credential fetch through {@link SecretPort} at egress, never
+ * held by caller. Adapters: copilot-sdk, openai-compatible, ollama.
  *
  * @interface ModelPort
- * @property {(request: ModelRequest) => Promise<ModelResponse>} complete - Run a single completion.
+ * @property {(request: ModelRequest) => Promise<ModelResponse>} complete - Run single completion.
  */
 export interface ModelPort {
   complete(request: ModelRequest): Promise<ModelResponse>;
 }
 
 /**
- * A single model completion request.
+ * Single model completion request.
  *
  * @interface ModelRequest
  * @property {string} model - Provider-local model id to run.
- * @property {string} prompt - The full prompt to send.
+ * @property {string} prompt - Full prompt to send.
  * @property {number} [maxOutputTokens] - Cap on generated tokens.
+ * @property {readonly string[]} [availableTools] - Canonical tool names agent may use; undefined leave port on role default. Port map these to own SDK tool names.
+ * @property {Readonly<Record<string, string>>} [systemSections] - Resolved system-prompt sections (id → content) member run with; undefined/empty leave port on model own system prompt. Port map these to system-message.
  */
 export interface ModelRequest {
   readonly model: string;
   readonly prompt: string;
   readonly maxOutputTokens?: number;
+  readonly availableTools?: readonly string[];
+  readonly systemSections?: Readonly<Record<string, string>>;
 }
 
 /**
- * A single model completion response.
+ * Single model completion response.
  *
  * @interface ModelResponse
- * @property {string} content - The generated text.
- * @property {number} inputTokens - Tokens consumed by the prompt.
+ * @property {string} content - Generated text.
+ * @property {number} inputTokens - Tokens consumed by prompt.
  * @property {number} outputTokens - Tokens generated.
  */
 export interface ModelResponse {
@@ -282,16 +267,16 @@ export interface ModelResponse {
 }
 
 /**
- * Everything PAW says, independent of how it is shown. `cli`, `tui`, and `gui`
- * are the driving adapters that render this — the seam that lets one daemon back
- * three faces (11-decision-electron-twin).
+ * Everything PAW say, independent of how shown. `cli`, `tui`, and `gui`
+ * are driving adapters that render this; one daemon backs three interfaces
+ * (11-decision-electron-twin).
  *
  * @interface PresenterPort
- * @property {(message: string) => void} info - Emit an informational line.
- * @property {(message: string) => void} success - Emit a success line.
- * @property {(message: string) => void} warn - Emit a warning line.
- * @property {(message: string) => void} error - Emit an error line.
- * @property {(rows: ReadonlyArray<Readonly<Record<string, string | number>>>) => void} table - Emit a table, one row per line.
+ * @property {(message: string) => void} info - Emit informational line.
+ * @property {(message: string) => void} success - Emit success line.
+ * @property {(message: string) => void} warn - Emit warning line.
+ * @property {(message: string) => void} error - Emit error line.
+ * @property {(rows: ReadonlyArray<Readonly<Record<string, string | number>>>) => void} table - Emit table, one row per line.
  */
 export interface PresenterPort {
   info(message: string): void;
@@ -304,11 +289,11 @@ export interface PresenterPort {
 }
 
 /**
- * Monotonic time, injected so time-dependent logic (staleness, heartbeats) is
- * deterministic in tests. The real adapter wraps `Date.now`.
+ * Monotonic time, injected. Make time-dependent logic (staleness, heartbeats)
+ * deterministic in tests. Real adapter wrap `Date.now`.
  *
  * @interface ClockPort
- * @property {() => number} now - Current time in milliseconds since the epoch.
+ * @property {() => number} now - Current time in milliseconds since epoch.
  */
 export interface ClockPort {
   now(): number;

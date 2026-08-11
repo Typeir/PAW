@@ -1,11 +1,10 @@
 /**
  * PAW TUI Init Prompt Tests
  *
- * @fileoverview Covers the choice a terminal operator is offered when attaching
- * PAW to a repo that already has a config, and the rendered frame they see. The
- * verdict itself comes from `@paw/core`; what these pin is that the TUI offers
- * exactly the resolutions the CLI's flags offer, defaults to the safe one, and
- * can always be dismissed without writing.
+ * @fileoverview Cover choice terminal operator get when attach PAW to repo
+ * that already have config, and rendered frame they see. Verdict come from
+ * `@paw/core`; these pin TUI offer exactly resolutions CLI flags offer, default
+ * to cancel, and always dismiss without writing.
  *
  * @module @paw/tui/test/initPrompt
  * @version 0.0.0

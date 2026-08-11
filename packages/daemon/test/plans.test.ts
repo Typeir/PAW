@@ -1,10 +1,9 @@
 /**
  * Plan Discovery Tests
  *
- * @fileoverview What the daemon considers a plan, where it looks for a config,
- * and the refusal that keeps a selection inside the repository: a request can
- * only ever name a plan the daemon itself discovered, so no query string can
- * make it import a module from elsewhere on the disk.
+ * @fileoverview Show what daemon call plan, where it look for config, and
+ * refusal keep selection inside repo. Request only ever name plan daemon self
+ * discover, so no query string make it import module from elsewhere on disk.
  *
  * @module @paw/daemon/test/plans
  */

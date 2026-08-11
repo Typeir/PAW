@@ -1,18 +1,14 @@
 /**
  * PAW Scope
  *
- * @fileoverview Which directory a running daemon may be pointed at.
+ * @fileoverview Which directory running daemon may point at.
  *
- * Scoping is a read: it changes what the daemon looks at, the way `watch`
- * changes which plan it reports, and it writes nothing. So it needs no operator
- * approval — but it does need a ceiling, because a console that could name any
- * directory could read any directory through the daemon. The ceiling is the
- * operator's home; the console opens at the working directory `paw ui` was
- * launched from, which makes the common case one click without making the
- * console a filesystem browser for the whole disk.
+ * Scoping read: change what daemon look at, write nothing. No operator
+ * approval, needs ceiling. Ceiling operator home; console open at working
+ * directory `paw ui` launched from.
  *
- * Pure string work over injected paths, so the rules are tested for both
- * separators from either platform.
+ * Pure string work over injected paths; rules test for both separators from
+ * either platform.
  *
  * @module @paw/core/domain/scope
  * @version 0.0.0
@@ -21,12 +17,11 @@
  */
 
 /**
- * Normalise a path for comparison: forward slashes, traversal resolved, no
- * trailing separator. Comparing raw strings would let `..` walk out of a root
- * that a prefix check said it was inside.
+ * Normalise path for comparison: forward slashes, traversal resolved, no
+ * trailing separator.
  *
- * @param {string} path - The path.
- * @returns {string[]} The resolved segments.
+ * @param {string} path - Path.
+ * @returns {string[]} Resolved segments.
  */
 function segments(path: string): string[] {
   const out: string[] = [];
@@ -44,14 +39,12 @@ function segments(path: string): string[] {
 }
 
 /**
- * Whether a candidate directory is the root or lies beneath it.
+ * Whether candidate directory be root or lie beneath it. Compare segment by
+ * segment.
  *
- * Compared segment by segment rather than by string prefix, so `/home/xyz` is
- * not treated as inside `/home/x`.
- *
- * @param {string} candidate - The directory a console named.
- * @param {string} root - The ceiling it must not escape.
- * @returns {boolean} True when the candidate is within the root.
+ * @param {string} candidate - Directory console named.
+ * @param {string} root - Ceiling it must not escape.
+ * @returns {boolean} True when candidate within the root.
  */
 export function withinRoot(candidate: string, root: string): boolean {
   if (candidate.trim() === '' || root.trim() === '') {

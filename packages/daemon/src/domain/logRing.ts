@@ -1,22 +1,10 @@
 /**
  * PAW Daemon Log Ring
  *
- * @fileoverview What the daemon has said recently, bounded.
- *
- * A console that opens ten minutes into a run wants to know what happened
- * before it arrived, and the daemon's stderr is not somewhere a browser can
- * read. So the same lines go into a fixed-size ring: the newest N, and the older
- * ones dropped rather than accumulated.
- *
- * **Bounded is the whole point.** An unbounded buffer on a long-running daemon
- * is a memory leak with a schedule, and the thing most likely to fill it is a
- * source failing in a loop — exactly the situation where the daemon must stay
- * up. Dropping the oldest line is the honest trade, and `dropped` reports how
- * many were lost so a console can say "…and 1,240 earlier lines" rather than
- * implying it has the whole story.
- *
- * Pure over injected time, so ordering and eviction are unit-tested rather than
- * observed.
+ * @fileoverview Bounded record of recent daemon log lines. Lines go into fixed-size
+ * ring, hold newest N; older lines drop. Ring gives browser console recent log lines
+ * daemon stderr does not expose. `dropped` reports how many lines lost. Creation takes
+ * an injected time function; ordering and eviction are unit-tested.
  *
  * @module @paw/daemon/logRing
  * @version 0.0.0
@@ -27,19 +15,18 @@
 import type { LogEntry } from '@paw/core';
 
 /**
- * How many lines the ring holds. Enough to explain a failing source or a run
- * that went wrong, small enough that a console can be handed the lot in one
- * frame without thinking about it.
+ * How many lines ring holds. Enough to cover a failing source or run that went
+ * wrong, small enough that console receives the whole set in one frame.
  */
 export const LOG_CAPACITY = 200;
 
 /**
- * A bounded record of what the daemon has said.
+ * Bounded record of what daemon say.
  *
  * @interface LogRing
- * @property {(level: LogEntry['level'], message: string) => LogEntry} append - Record a line and return it.
- * @property {() => readonly LogEntry[]} entries - The lines held, oldest first.
- * @property {() => number} dropped - How many lines were evicted, ever.
+ * @property {(level: LogEntry['level'], message: string) => LogEntry} append - Record line, return it.
+ * @property {() => readonly LogEntry[]} entries - Lines held, oldest first.
+ * @property {() => number} dropped - How many lines evicted, ever.
  */
 export interface LogRing {
   append(level: LogEntry['level'], message: string): LogEntry;
@@ -48,11 +35,11 @@ export interface LogRing {
 }
 
 /**
- * Build a log ring.
+ * Build log ring.
  *
- * @param {() => string} now - An ISO timestamp for each line.
+ * @param {() => string} now - ISO timestamp for each line.
  * @param {number} [capacity] - How many lines to hold.
- * @returns {LogRing} The ring.
+ * @returns {LogRing} Ring.
  */
 export function createLogRing(now: () => string, capacity: number = LOG_CAPACITY): LogRing {
   const held: LogEntry[] = [];

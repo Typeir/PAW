@@ -1,12 +1,11 @@
 /**
- * PAW CLI — violations command
+ * PAW CLI — violations command.
  *
- * @fileoverview `paw violations list` shows the outstanding violations pawd is
- * holding for this repository; `paw violations prune [<file>]` resolves them — a
- * single file's, or all of them when no path is given. Thin clients of the
- * resident daemon (the store lives there), so both fail open when no daemon
- * answers. The manual escape hatch for a backlog that survived, e.g. a file that
- * was deleted rather than fixed.
+ * @fileoverview `paw violations list` show outstanding violations recorded for
+ * this repository; `paw violations prune [<file>]` clear them — one file's, or
+ * all when no path given. Thin clients of resident daemon (violations store
+ * lives there); both return failure when daemon unreachable. Manual way to clear
+ * stale backlog, e.g. violations of a deleted file.
  *
  * @module @paw/cli/infrastructure/commands/violations
  * @version 0.0.0
@@ -21,11 +20,11 @@ import { rpcCall, socketPath, tokenPath } from '@paw/daemon';
 import { formatPruned, formatViolations } from '../../domain/format.js';
 
 /**
- * Run the `violations` subcommand.
+ * Run `violations` subcommand.
  *
- * @param {string[]} rest - The words after `violations`.
+ * @param {string[]} rest - Words after `violations`.
  * @param {(lines: string[]) => void} print - Line printer.
- * @returns {Promise<number>} 0 when the daemon answered, 1 when none did.
+ * @returns {Promise<number>} 0 when daemon responds, 1 when there is no response.
  */
 export async function runViolations(
   rest: string[],

@@ -1,16 +1,7 @@
 /**
- * PAW node:sqlite Driver
+ * PAW node:sqlite driver.
  *
- * @fileoverview Binds the native `node:sqlite` engine to the {@link SqlDriver}
- * seam. This is the engine PAW prefers: real file locking, incremental writes,
- * no dependency to install, and bundleable into a single artifact — the WASM
- * alternative is none of those. It is not the default everywhere only because
- * some managed machines block the native binding outright.
- *
- * The binding takes an already-opened database rather than opening one, so every
- * branch here is covered by a double on machines where the engine is absent.
- * Loading the engine is separated into {@link loadNodeSqliteCtor} for the same
- * reason.
+ * @fileoverview Bind native `node:sqlite` engine to {@link SqlDriver} seam. Give file locking, incremental writes, no install dependency, single-artifact bundling. Preferred engine; some managed machines block native binding. Takes already-open database; engine loading split into {@link loadNodeSqliteCtor}.
  *
  * @module @paw/adapters/store/sql/nodeSqliteDriver
  * @version 0.0.0
@@ -21,11 +12,11 @@
 import type { SqlDriver, SqlRow, SqlValue } from './driver.js';
 
 /**
- * The prepared-statement surface this driver uses.
+ * Prepared-statement surface this driver use.
  *
  * @interface NodeSqliteStatement
- * @property {(...params: SqlValue[]) => unknown[]} all - Execute a query and return every row.
- * @property {(...params: SqlValue[]) => { changes: number | bigint }} run - Execute a mutation and report the rows changed.
+ * @property {(...params: SqlValue[]) => unknown[]} all - Execute query, return every row.
+ * @property {(...params: SqlValue[]) => { changes: number | bigint }} run - Execute mutation, report rows changed.
  */
 export interface NodeSqliteStatement {
   all(...params: SqlValue[]): unknown[];
@@ -33,12 +24,12 @@ export interface NodeSqliteStatement {
 }
 
 /**
- * The database surface this driver uses, structurally matching `DatabaseSync`.
+ * Database surface this driver use, structurally match `DatabaseSync`.
  *
  * @interface NodeSqliteDatabase
- * @property {(sql: string) => void} exec - Execute statements that return nothing.
- * @property {(sql: string) => NodeSqliteStatement} prepare - Compile a statement.
- * @property {() => void} close - Release the database.
+ * @property {(sql: string) => void} exec - Execute statement, return nothing.
+ * @property {(sql: string) => NodeSqliteStatement} prepare - Compile statement.
+ * @property {() => void} close - Release database.
  */
 export interface NodeSqliteDatabase {
   exec(sql: string): void;
@@ -47,15 +38,15 @@ export interface NodeSqliteDatabase {
 }
 
 /**
- * The `DatabaseSync` constructor.
+ * `DatabaseSync` constructor.
  */
 export type NodeSqliteCtor = new (path: string) => NodeSqliteDatabase;
 
 /**
- * Bind an open `node:sqlite` database to the driver seam.
+ * Bind open `node:sqlite` database to driver seam.
  *
- * @param {NodeSqliteDatabase} db - An open database.
- * @returns {SqlDriver} The driver.
+ * @param {NodeSqliteDatabase} db - Open database.
+ * @returns {SqlDriver} Driver.
  */
 export function createNodeSqliteDriver(db: NodeSqliteDatabase): SqlDriver {
   return {
@@ -77,19 +68,17 @@ export function createNodeSqliteDriver(db: NodeSqliteDatabase): SqlDriver {
   };
 }
 
-/* c8 ignore start -- the engine is absent on machines that block the native
-   SQLite binding, so this import cannot be executed there; every branch of the
-   driver it feeds is covered by a double in drivers.test.ts. */
+/* c8 ignore start -- engine absent on machine that block native SQLite binding,
+   import cannot run there; every branch of driver it feeds covered by double in
+   drivers.test.ts. */
 /**
- * Load the native engine's constructor.
+ * Load native engine constructor.
  *
- * Kept apart from {@link createNodeSqliteDriver} and imported dynamically so a
- * machine without the engine fails when it opens a database, with a message
- * naming the engine, rather than at module load with an import error that would
- * take the whole CLI down.
+ * Separated from {@link createNodeSqliteDriver} and imported dynamically; machine
+ * without engine fail on database open, message name the engine.
  *
- * @returns {Promise<NodeSqliteCtor>} The `DatabaseSync` constructor.
- * @throws {Error} When `node:sqlite` is unavailable on this runtime.
+ * @returns {Promise<NodeSqliteCtor>} `DatabaseSync` constructor.
+ * @throws {Error} When `node:sqlite` unavailable on this runtime.
  */
 export async function loadNodeSqliteCtor(): Promise<NodeSqliteCtor> {
   try {

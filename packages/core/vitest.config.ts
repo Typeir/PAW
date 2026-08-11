@@ -1,14 +1,13 @@
 import { defineConfig } from 'vitest/config';
 
 /**
- * Core test + coverage config. The thresholds are 100 on all four axes, per
- * CONSTRAINTS.md Constraint 1: the build is red at 99.9, not at 80.
+ * Core test + coverage config. Thresholds 100 on all four axes, per CONSTRAINTS.md
+ * Constraint 1.
  *
- * The exclusions are the interfaces/types-only files — `src/ports/**` (the port
- * interfaces) and `src/domain/event.ts` (the canonical event and response types).
- * TypeScript erases them to nothing, so there is no executable code to cover.
- * Any other exclusion must carry the same kind of justification and is reviewed
- * by the hexagonal gate.
+ * Exclusions are the types-only files: `src/ports/**` (port interfaces) and
+ * `src/domain/event.ts` (canonical event and response types). TypeScript erases
+ * them; no executable code to cover. Other exclusions carry the same
+ * justification and are reviewed by the hexagonal gate.
  */
 export default defineConfig({
   test: {

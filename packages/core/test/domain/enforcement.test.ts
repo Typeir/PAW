@@ -1,8 +1,7 @@
 /**
- * @fileoverview Unit tests for the pre-tool-use enforcement decision — the pure
- * heart of PAW. Written test-first: these assertions define the API surface of
- * `decidePreToolUse` before it exists, and every branch of the decision is
- * exercised so the module reaches 100% coverage on its own.
+ * @fileoverview Unit tests for the pre-tool-use enforcement decision. Define
+ * `decidePreToolUse` API surface. Exercise every decision branch. Target 100%
+ * module coverage.
  *
  * @module @paw/core/test/domain/enforcement
  */
@@ -15,9 +14,9 @@ import {
 } from '../../src/index.js';
 
 /**
- * Build a violation with sensible defaults; override only what a case cares about.
+ * Build violation with defaults; override fields per case.
  *
- * @param over - Fields to override on the default violation.
+ * @param over - Fields to override on default violation.
  */
 const V = (over: Partial<Violation> = {}): Violation => ({
   id: 1,
@@ -29,10 +28,10 @@ const V = (over: Partial<Violation> = {}): Violation => ({
 });
 
 /**
- * Build a decision input with a benign default (an edit of a clean file), then
- * override the one axis under test.
+ * Build decision input. Default to edit of clean file; override axis under
+ * test.
  *
- * @param over - Fields to override on the default input.
+ * @param over - Fields to override on default input.
  */
 const input = (over: Partial<PreToolInput> = {}): PreToolInput => ({
   toolName: 'edit',

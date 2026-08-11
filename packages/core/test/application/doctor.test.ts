@@ -1,8 +1,8 @@
 /**
  * PAW Doctor Service Tests
  *
- * @fileoverview Covers the combined verdict across a clean install, a config
- * problem, a blocking role, and both at once — so `doctor.ts` reaches 100%.
+ * @fileoverview Test combined verdict. Clean install, config problem, blocking
+ * role, both at once. Cover `doctor.ts` to 100%.
  *
  * @module @paw/core/test/application/doctor
  * @version 0.0.0

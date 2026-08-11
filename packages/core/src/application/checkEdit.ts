@@ -1,13 +1,11 @@
 /**
  * PAW Post-Tool Detector
  *
- * @fileoverview The `tool.post` half of the enforcement loop — the detector that
- * feeds the pre-tool decision. It runs the project's gates against the files a
- * tool just changed, clears each file's stale violations, records the fresh
- * critical ones, and returns a `block` so the host surfaces them. It does not
- * gate future tools; `decidePreToolUse` does that on the next `tool.pre`, reading
- * exactly what this recorded. Ported from the legacy `postToolUse` hook, wired to
- * the {@link GateRunner} and {@link StorePort} rather than to SQLite directly.
+ * @fileoverview `tool.post` half of enforcement loop. Detector feed pre-tool
+ * decision. Run project gates against files tool just changed, clear each file
+ * stale violations, record fresh critical ones, return `block`.
+ * `decidePreToolUse` consume that record on next `tool.pre`. Port from legacy
+ * `postToolUse` hook, wired to {@link GateRunner} and {@link StorePort}.
  *
  * @module @paw/core/application/checkEdit
  * @version 0.0.0
@@ -24,12 +22,12 @@ const MAX_RULE_LINES = 12;
 const MAX_MESSAGE = 160;
 
 /**
- * What the detector needs.
+ * Detector need these.
  *
  * @interface CheckEditDeps
- * @property {StorePort} store - Where violations are cleared and recorded.
- * @property {GateRunner} gates - Runs the project's gates against the edited files.
- * @property {(path: string) => boolean} isIgnored - Whether a path is pawignored (skipped).
+ * @property {StorePort} store - Clear violation there, record there.
+ * @property {GateRunner} gates - Run project gates against edited files.
+ * @property {(path: string) => boolean} isIgnored - Path pawignored? skip it.
  */
 export interface CheckEditDeps {
   readonly store: StorePort;
@@ -38,11 +36,10 @@ export interface CheckEditDeps {
 }
 
 /**
- * The critical findings from a report — those from a failed gate whose effective
- * severity is critical, mirroring the legacy hook's block condition.
+ * Critical findings from report: failed gate + effective critical severity.
  *
- * @param {Awaited<ReturnType<GateRunner['runForFiles']>>} report - The gate run.
- * @returns {GateFinding[]} The blocking findings.
+ * @param {Awaited<ReturnType<GateRunner['runForFiles']>>} report - Gate run.
+ * @returns {GateFinding[]} Blocking findings.
  */
 function criticalFindings(
   report: Awaited<ReturnType<GateRunner['runForFiles']>>,
@@ -53,10 +50,10 @@ function criticalFindings(
 }
 
 /**
- * A finding as an unrecorded violation the store will assign an id to.
+ * Finding as unrecorded violation: store assign id later.
  *
- * @param {GateFinding} f - The gate finding.
- * @returns {Violation} The violation to raise.
+ * @param {GateFinding} f - Gate finding.
+ * @returns {Violation} Violation to raise.
  */
 function toViolation(f: GateFinding): Violation {
   return {
@@ -69,23 +66,21 @@ function toViolation(f: GateFinding): Violation {
 }
 
 /**
- * A single message, clipped so one rule line stays short.
+ * Clip message; add ellipsis when pass max.
  *
- * @param {string} text - The finding message.
- * @returns {string} The message, clipped with an ellipsis when long.
+ * @param {string} text - Finding message.
+ * @returns {string} Message clipped, ellipsis when long.
  */
 function clip(text: string): string {
   return text.length > MAX_MESSAGE ? `${text.slice(0, MAX_MESSAGE - 1)}…` : text;
 }
 
 /**
- * The block reason as ONE line per rule type — a count and a sample, not every
- * finding. Three hundred `console-log` hits collapse to a single line the agent
- * can actually read and act on, rather than a wall large enough to be redirected
- * to a file it never sees. Capped in both directions (rule lines, total length).
+ * Build block reason, one line per rule: count + sample. Capped both ways
+ * (rule lines, total length).
  *
- * @param {readonly GateFinding[]} findings - The critical findings.
- * @returns {string} A bounded, per-rule block reason.
+ * @param {readonly GateFinding[]} findings - Critical findings.
+ * @returns {string} Bounded per-rule block reason.
  */
 function formatFindings(findings: readonly GateFinding[]): string {
   const byRule = new Map<string, GateFinding[]>();
@@ -113,16 +108,16 @@ function formatFindings(findings: readonly GateFinding[]): string {
 }
 
 /**
- * Run the gates against the files a tool changed and record the outcome.
+ * Run gates against files tool changed; record outcome.
  *
- * @param {CheckEditDeps} deps - The detector dependencies.
- * @param {ToolPostEvent} event - The post-tool event.
- * @returns {Promise<PawResponse>} `block` with the findings, or `noop` when clean.
+ * @param {CheckEditDeps} deps - Detector dependencies.
+ * @param {ToolPostEvent} event - Post-tool event.
+ * @returns {Promise<PawResponse>} `block` with findings, or `noop` when clean.
  *
  * @description
- * Ignored paths are skipped. Each gated file's stale violations are cleared first
- * (a re-run is the fresh truth), then the critical findings are recorded and a
- * `block` is returned; a clean run records nothing and returns `noop`.
+ * Ignored paths skipped. Clear each gated file stale violations first,
+ * then record critical findings and return `block`; clean run record
+ * nothing and return `noop`.
  */
 export async function checkEdit(
   deps: CheckEditDeps,

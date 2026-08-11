@@ -45,13 +45,13 @@ the repo has one, and lists every `*.swarm.mjs`. Which plan is in view is a **se
 request** — `GET /api/state?plan=plans/lore.swarm.mjs` — so a workspace with twenty plans needs one
 console, not twenty daemons.
 
-| Concern | How |
-| ------- | --- |
-| Discovery | `discoverPlans(listing)` — a filename question; nothing is imported until it is picked |
-| Selection | `?plan=` per request; `selectPlan` refuses any path the daemon did not itself discover (404) |
+| Concern   | How                                                                                                           |
+| --------- | ------------------------------------------------------------------------------------------------------------- |
+| Discovery | `discoverPlans(listing)` — a filename question; nothing is imported until it is picked                        |
+| Selection | `?plan=` per request; `selectPlan` refuses any path the daemon did not itself discover (404)                  |
 | Freshness | a picked plan is imported once and cached against its **mtime**; editing the file reloads it on the next poll |
-| No plan | `selectedPlan: null` and an empty plan — the console offers the picker rather than an empty Plan tab |
-| No config | `configPath: ''` — the doctor reports every missing key instead of the daemon inventing one |
+| No plan   | `selectedPlan: null` and an empty plan — the console offers the picker rather than an empty Plan tab          |
+| No config | `configPath: ''` — the doctor reports every missing key instead of the daemon inventing one                   |
 
 Because a plan module is code, this matters: nothing in the repository is executed until an operator
 picks it, and a query string can never reach a module outside the served root.
@@ -61,23 +61,23 @@ picks it, and a query string can never reach a module outside the served root.
 The same bundle runs in a browser tab and in the desktop shell, and it asks which
 one it is in rather than guessing:
 
-| | Browser tab | Desktop shell |
-| --- | --- | --- |
-| Window chrome | **none** — it owns no window | traffic lights that really close/minimise/maximise |
-| Layout | a page: full width, no border, no shadow | a window: max-width, rounded, shadowed |
-| Titlebar | a plain bar (wordmark, daemon pill, theme) | the same bar, and it **drags the window** |
+|               | Browser tab                                | Desktop shell                                      |
+| ------------- | ------------------------------------------ | -------------------------------------------------- |
+| Window chrome | **none** — it owns no window               | traffic lights that really close/minimise/maximise |
+| Layout        | a page: full width, no border, no shadow   | a window: max-width, rounded, shadowed             |
+| Titlebar      | a plain bar (wordmark, daemon pill, theme) | the same bar, and it **drags the window**          |
 
 The signal is the preload's bridge: `windowControls(window)` returns controls only when
 `window.paw` exposes all three as functions, and `detectShell` reports `desktop` only then. A light is
 therefore drawn only where pressing it does something — a painted traffic light on a web page is a
-costume, and the previous version wore one in *both* shells (Electron kept its OS frame and drew a
+costume, and the previous version wore one in _both_ shells (Electron kept its OS frame and drew a
 second, fake one underneath).
 
 The Electron window is `frame: false`, the titlebar carries `-webkit-app-region: drag`, and the three
 actions travel one narrow IPC channel (`paw:window`) that accepts `minimize | maximize | close` and
 throws on anything else.
 
-> **Build trap.** The `import.meta.url` banner that makes `@paw/daemon` work in the CommonJS *main*
+> **Build trap.** The `import.meta.url` banner that makes `@paw/daemon` work in the CommonJS _main_
 > bundle must not be applied to the preload: a sandboxed preload may `require` nothing but `electron`,
 > so `require("node:url")` kills it — and a dead preload means no bridge, no window controls, and not
 > a single line of error in the terminal. `build.mjs` applies it to the main process only.
@@ -88,11 +88,11 @@ throws on anything else.
 import a plan, list processes, read the host, bind a socket, schedule a poll. That is what lets three
 callers run the same daemon:
 
-| Caller | How |
-| ------ | --- |
-| `pawd` | `daemon/src/main.ts` — argv shell, prints the URL |
+| Caller   | How                                                       |
+| -------- | --------------------------------------------------------- |
+| `pawd`   | `daemon/src/main.ts` — argv shell, prints the URL         |
 | `paw ui` | in the CLI's own process, so there is one process to kill |
-| Electron | in the main process, window loads the URL it returns |
+| Electron | in the main process, window loads the URL it returns      |
 
 and it is what lets the whole sequence be unit-tested with no socket. `nodeRuntime.ts` is the one
 file that touches the outside world, and a real-socket integration test covers it — no coverage
@@ -181,11 +181,11 @@ name a path on disk that the daemon did not choose to list.
 
 `gui/build.mjs` emits the same React bundle three ways:
 
-| File | Snapshot | `connect-src` | Used by |
-| ---- | -------- | ------------- | ------- |
-| `dist/index.html` | injected demo | `'none'` | opening the file directly |
-| `dist/artifact.html` | injected demo | (host's) | publishing |
-| `dist/live.html` | **none** — the shell fetches | `'self'` | served by `pawd` |
+| File                 | Snapshot                     | `connect-src` | Used by                   |
+| -------------------- | ---------------------------- | ------------- | ------------------------- |
+| `dist/index.html`    | injected demo                | `'none'`      | opening the file directly |
+| `dist/artifact.html` | injected demo                | (host's)      | publishing                |
+| `dist/live.html`     | **none** — the shell fetches | `'self'`      | served by `pawd`          |
 
 The static page says it is static: the daemon pill reads idle, Overview says `no daemon attached`,
 and the process table is empty rather than populated with a plausible fiction.
@@ -203,7 +203,7 @@ and the process table is empty rather than populated with a plausible fiction.
   not take the process down with it.
 - The daemon's model port refuses to complete anything — `pawd` reports, it does not dispatch.
 - A missing `gui/dist/live.html` degrades to the bootstrap page **and says so on stderr**.
-- A source that throws is reported to the terminal *and* published on the `log` topic, because a
+- A source that throws is reported to the terminal _and_ published on the `log` topic, because a
   console cannot read stderr and a failure reported only to a terminal nobody is watching has been
   reported to nobody. The ring is bounded at 200 lines and says how many it dropped.
 - A daemon that cannot load its TLS identity does not start. There is no plaintext fallback.
@@ -237,6 +237,6 @@ cd packages/electron && npm start
 
 ---
 
-*Companion to the decision record in `.ignore/research/byoksdk/` (docs 09–19) and to
+_Companion to the decision record in `.ignore/research/byoksdk/` (docs 09–19) and to
 [CONSTRAINTS.md](../CONSTRAINTS.md), which this subsystem is held to: TDD at 100%, `core` as a pure
-library its consumers depend on, and no silent failures.*
+library its consumers depend on, and no silent failures._

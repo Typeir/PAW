@@ -1,12 +1,10 @@
 /**
- * @fileoverview Covers the Modal exhaustively: closed it renders nothing and takes
- * no scroll lock; open it portals a labelled dialog, locks the body, and focuses
- * its first focusable (or itself when it has none); it closes on the button, on
- * Escape, and on a backdrop click but not a content click; Tab wraps at both ends
- * and does nothing in the middle or with no focusables; a non-Tab key is ignored;
- * stacked, only the top modal answers Escape; and the scroll lock is released when
- * it closes — so `modal.tsx` reaches 100% in jsdom, where the hand-rolled trap is
- * exactly what makes the keyboard testable.
+ * @fileoverview Test cover Modal full. Closed: render nothing, no scroll lock.
+ * Open: portal labelled dialog, lock body, focus first focusable (or itself when
+ * none). Close on button, Escape, backdrop click — no close on content click.
+ * Tab wrap both ends, no move middle or when no focusables. Non-Tab key ignored.
+ * Stacked: only top modal answer Escape. Scroll lock release on close.
+ * `modal.tsx` reaches 100% line coverage in jsdom.
  *
  * @module @paw/gui/test/unit/presentation/modal
  */

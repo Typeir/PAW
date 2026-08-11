@@ -1,9 +1,8 @@
 /**
- * @fileoverview Covers {@link parseProviderUsage} across the wire formats PAW's
- * BYOK egress spans — OpenAI Chat Completions (`prompt_tokens`/`completion_tokens`)
- * and the OpenAI Responses / Anthropic shape (`input_tokens`/`output_tokens`) —
- * and proves it fails loud rather than reporting a fabricated zero when a response
- * carries no usable usage, per CONSTRAINTS.md Constraint 3.
+ * @fileoverview Test {@link parseProviderUsage} on all wire formats PAW BYOK
+ * egress span — OpenAI Chat Completions (`prompt_tokens`/`completion_tokens`)
+ * and OpenAI Responses / Anthropic shape (`input_tokens`/`output_tokens`).
+ * Throw when response carry no usable usage, per CONSTRAINTS.md Constraint 3.
  *
  * @module @paw/daemon/test/model/providerUsage
  */

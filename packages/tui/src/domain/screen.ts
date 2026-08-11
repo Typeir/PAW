@@ -1,13 +1,13 @@
 /**
  * PAW TUI Renderer
  *
- * @fileoverview Renders a {@link TuiState} into a framed screen — a fixed-width
- * box with a tab bar, a view body, and a footer of keybindings. Pure and
- * deterministic (width is a parameter, no terminal query), so a whole screen is
- * a snapshot test and the regression tier from CONSTRAINTS.md Constraint 1 is a
- * text-buffer diff. The doctor, plan/brief, and herd bodies each read a core
- * report and decorate it; the domain truth (ok, blocking, released) already lives
- * in core, so these only choose glyphs and layout.
+ * @fileoverview Render {@link TuiState} into framed screen — fixed-width
+ * box with tab bar, view body, footer of keybindings. Pure and
+ * deterministic (width be parameter, no terminal query), so whole screen be
+ * snapshot test and regression tier from CONSTRAINTS.md Constraint 1 be
+ * text-buffer diff. Doctor, plan/brief, herd bodies each read core
+ * report and decorate it; domain truth (ok, blocking, released) already live
+ * in core, so these only pick glyphs and layout.
  *
  * @module @paw/tui/domain/screen
  * @version 0.0.0
@@ -30,7 +30,7 @@ const GATE_FINDING_CAP = 8;
 const VIOLATION_FILE_CAP = 8;
 
 /**
- * The key that selects each view, shown in the tab bar.
+ * Key that select each view, shown in tab bar.
  */
 const TAB_KEY: Record<View, string> = {
   doctor: '1',
@@ -43,10 +43,10 @@ const TAB_KEY: Record<View, string> = {
 import { INIT_OPTIONS, type InitPromptState } from './initPrompt.js';
 
 /**
- * A rendered screen: a rectangular block of text lines.
+ * Rendered screen: rectangular block of text lines.
  *
  * @interface Screen
- * @property {string[]} lines - The screen's rows, top to bottom.
+ * @property {string[]} lines - Screen rows, top to bottom.
  */
 export interface Screen {
   readonly lines: string[];
@@ -55,12 +55,12 @@ export interface Screen {
 const WIDTH = 72;
 
 /**
- * Fit a string to an exact width: pad short strings, truncate long ones with an
- * ellipsis so the frame never breaks.
+ * Fit string to exact width: pad short string, truncate long one with
+ * ellipsis so frame never break.
  *
- * @param {string} text - The content.
- * @param {number} width - The target width.
- * @returns {string} The fitted string.
+ * @param {string} text - Content.
+ * @param {number} width - Target width.
+ * @returns {string} Fitted string.
  */
 function fit(text: string, width: number): string {
   if (text.length === width) {
@@ -72,12 +72,12 @@ function fit(text: string, width: number): string {
 }
 
 /**
- * Draw a titled box around body and footer lines.
+ * Draw titled box around body and footer lines.
  *
- * @param {string} title - The box title.
- * @param {string[]} body - The body lines.
- * @param {string[]} footer - The footer lines, below a separator.
- * @returns {string[]} The framed lines.
+ * @param {string} title - Box title.
+ * @param {string[]} body - Body lines.
+ * @param {string[]} footer - Footer lines, below separator.
+ * @returns {string[]} Framed lines.
  */
 function frame(title: string, body: string[], footer: string[]): string[] {
   const inner = WIDTH - 4;
@@ -93,10 +93,10 @@ function frame(title: string, body: string[], footer: string[]): string[] {
 }
 
 /**
- * Describe what was found at the config path, in the words an operator needs to
- * choose between keeping it and replacing it.
+ * Say what found at config path, in words operator need to
+ * choose between keep it and replace it.
  *
- * @param {InitConflict} conflict - What was found.
+ * @param {InitConflict} conflict - What found.
  * @returns {string[]} Body lines.
  */
 function conflictBody(conflict: InitConflict): string[] {
@@ -119,10 +119,10 @@ function conflictBody(conflict: InitConflict): string[] {
 }
 
 /**
- * Render the init conflict prompt: what was found, and the resolutions offered.
+ * Render init conflict prompt: what found, and resolutions offered.
  *
- * @param {InitPromptState} state - The prompt state.
- * @returns {Screen} The framed screen.
+ * @param {InitPromptState} state - Prompt state.
+ * @returns {Screen} Framed screen.
  */
 export function renderInitPrompt(state: InitPromptState): Screen {
   const options = INIT_OPTIONS.map((option, index) => {
@@ -139,10 +139,10 @@ export function renderInitPrompt(state: InitPromptState): Screen {
 }
 
 /**
- * Render the tab bar, marking the active view.
+ * Render tab bar, mark active view.
  *
- * @param {View} view - The active view.
- * @returns {string} The tab line.
+ * @param {View} view - Active view.
+ * @returns {string} Tab line.
  */
 function tabs(view: View): string {
   const names: View[] = ['doctor', 'plan', 'herd', 'gates', 'daemon', 'config'];
@@ -152,9 +152,9 @@ function tabs(view: View): string {
 }
 
 /**
- * Build the doctor view body.
+ * Build doctor view body.
  *
- * @param {DoctorReport} report - The doctor report.
+ * @param {DoctorReport} report - Doctor report.
  * @returns {string[]} Body lines.
  */
 function doctorBody(report: DoctorReport): string[] {
@@ -173,10 +173,10 @@ function doctorBody(report: DoctorReport): string[] {
 }
 
 /**
- * Build the plan view body, including the selected member's brief — the TUI's
+ * Build plan view body, include selected member's brief — TUI's
  * script-editor preview.
  *
- * @param {TuiState} state - The current state.
+ * @param {TuiState} state - Current state.
  * @returns {string[]} Body lines.
  */
 function planBody(state: TuiState): string[] {
@@ -193,9 +193,9 @@ function planBody(state: TuiState): string[] {
 }
 
 /**
- * Build the herd view body.
+ * Build herd view body.
  *
- * @param {DispatchResult | null} herd - The dispatch result, or null before release.
+ * @param {DispatchResult | null} herd - Dispatch result, or null before release.
  * @returns {string[]} Body lines.
  */
 function herdBody(herd: DispatchResult | null): string[] {
@@ -218,10 +218,10 @@ function herdBody(herd: DispatchResult | null): string[] {
 }
 
 /**
- * Build the gates view body: a run in progress, a prompt before the first run,
- * or the last run's report grouped by failing gate.
+ * Build gates view body: run in progress, prompt before first run,
+ * or last run's report grouped by failing gate.
  *
- * @param {TuiState} state - The current state.
+ * @param {TuiState} state - Current state.
  * @returns {string[]} Body lines.
  */
 function gatesBody(state: TuiState): string[] {
@@ -259,7 +259,7 @@ function gatesBody(state: TuiState): string[] {
 /**
  * List outstanding violations grouped by file, capped, with each file's rules.
  *
- * @param {readonly Violation[]} violations - The outstanding violations.
+ * @param {readonly Violation[]} violations - Outstanding violations.
  * @returns {string[]} Body lines.
  */
 function violationLines(violations: readonly Violation[]): string[] {
@@ -281,11 +281,11 @@ function violationLines(violations: readonly Violation[]): string[] {
 }
 
 /**
- * Build the daemon view body: a query in progress, a prompt before the first
- * query, a not-running notice, or the running daemon's status and the violations
- * it is holding.
+ * Build daemon view body: query in progress, prompt before first
+ * query, not-running notice, or running daemon's status and violations
+ * it holding.
  *
- * @param {TuiState} state - The current state.
+ * @param {TuiState} state - Current state.
  * @returns {string[]} Body lines.
  */
 function daemonBody(state: TuiState): string[] {
@@ -313,10 +313,10 @@ function daemonBody(state: TuiState): string[] {
 }
 
 /**
- * Build the config view body: the declared models, then every role and the model
- * it is bound to, with the selected role marked.
+ * Build config view body: declared models, then every role and model
+ * it bound to, selected role marked.
  *
- * @param {TuiState} state - The current state.
+ * @param {TuiState} state - Current state.
  * @returns {string[]} Body lines.
  */
 function configBody(state: TuiState): string[] {
@@ -337,10 +337,10 @@ function configBody(state: TuiState): string[] {
 }
 
 /**
- * Select the body for the active view.
+ * Pick body for active view.
  *
- * @param {TuiState} state - The current state.
- * @returns {string[]} The active view's body.
+ * @param {TuiState} state - Current state.
+ * @returns {string[]} Active view's body.
  */
 function viewBody(state: TuiState): string[] {
   if (state.view === 'doctor') {
@@ -362,10 +362,10 @@ function viewBody(state: TuiState): string[] {
 }
 
 /**
- * The keybinding footer for the active view — the daemon view shows its own
- * actions, every other view the shared navigation.
+ * Keybinding footer for active view — daemon view show own
+ * actions, every other view shared navigation.
  *
- * @param {TuiState} state - The current state.
+ * @param {TuiState} state - Current state.
  * @returns {string[]} Footer lines.
  */
 function footer(state: TuiState): string[] {
@@ -379,10 +379,10 @@ function footer(state: TuiState): string[] {
 }
 
 /**
- * Render a full screen for the given state.
+ * Render full screen for given state.
  *
- * @param {TuiState} state - The current state.
- * @returns {Screen} The framed screen.
+ * @param {TuiState} state - Current state.
+ * @returns {Screen} Framed screen.
  */
 export function render(state: TuiState): Screen {
   const body = [tabs(state.view), '', ...viewBody(state)];

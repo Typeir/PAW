@@ -1,13 +1,11 @@
 /**
  * PAW Daemon Process Ownership
  *
- * @fileoverview Narrows the host process table to the processes PAW actually owns
- * — the daemon itself and the swarm workers descended from it — and nothing else.
- * Exposing the whole machine's process list over the control API, even on
- * loopback, discloses every piece of software running on the host to any local
- * reader; the console only needs its own herd. This computes the daemon's process
- * subtree by walking the parent→child relation, and it is pure and exhaustively
- * tested so the filter can never silently widen.
+ * @fileoverview Process table filtered down to processes PAW own: daemon itself
+ * and swarm workers born from it. Control API shows full machine process list,
+ * even on loopback; any local reader sees every app running on host. Console
+ * shows only processes owned by the daemon. Compute daemon process subtree by
+ * walking parent→child relation.
  *
  * @module @paw/daemon/process
  * @version 0.0.0
@@ -18,13 +16,12 @@
 import type { HostProcess } from '@paw/core';
 
 /**
- * Collect the process subtree rooted at a pid: that process (when present) plus
- * every descendant, following `ppid`. Unrelated processes are excluded, and a
- * `ppid` cycle terminates rather than looping.
+ * Collect process subtree rooted at pid: that process (if there) plus every
+ * descendant, follow `ppid`. Unrelated processes out. `ppid` cycle stop, no loop.
  *
- * @param {readonly HostProcess[]} all - The full host process table.
- * @param {number} rootPid - The pid to root the subtree at (the daemon's own pid).
- * @returns {HostProcess[]} The rooted subtree, in breadth-first order.
+ * @param {readonly HostProcess[]} all - Full host process table.
+ * @param {number} rootPid - Pid to root subtree at (daemon own pid).
+ * @returns {HostProcess[]} Rooted subtree, breadth-first order.
  */
 export function collectSubtree(
   all: readonly HostProcess[],

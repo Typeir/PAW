@@ -1,11 +1,10 @@
 /**
  * Preview Card
  *
- * @fileoverview The rendered brief for the scrubbed member — the `--show`
- * dry-run, in the window. The text is the daemon's own `renderBrief` output, so
- * what an author reads here is byte-for-byte what the model would be sent.
- * Editing it holds a local draft and offers a reset; scrubbing to another member
- * drops that draft rather than carrying one member's edit onto the next.
+ * @fileoverview Render brief for scrubbed member — the `--show` dry-run, in
+ * window. Text be daemon's own `renderBrief` output, so what author read here
+ * be byte-for-byte what model get sent. Editing hold local draft, offer reset;
+ * scrub to another member drop that draft, no carry one member's edit onto next.
  *
  * @module @paw/gui/presentation/views/swarm/previewCard
  * @version 0.0.0
@@ -27,9 +26,9 @@ import { Button } from '../../atoms/button.js';
 import { Card } from '../../atoms/card.js';
 
 /**
- * The brief preview and member scrubber.
+ * Brief preview and member scrubber.
  *
- * @returns {JSX.Element} The card.
+ * @returns {JSX.Element} Card.
  */
 export function PreviewCard() {
   const plan = usePlan();

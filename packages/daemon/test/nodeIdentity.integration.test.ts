@@ -1,17 +1,9 @@
 /**
  * Local Identity Issuance Integration
  *
- * @fileoverview The certificates PAW asks an operator to trust, verified as a
- * skeptic would: parse the issued CA with Node's own X.509 reader, decode its
- * extensions from the DER, and prove the Name Constraints extension is present
- * **and critical** — because a non-critical constraint is one a verifier is
- * permitted to ignore, which would leave a general-purpose CA sitting in a
- * developer's trust store.
+ * @fileoverview PAW CA cert asks operator trust. Parse issued CA with Node X.509 reader, decode extension from DER, prove Name Constraints extension present and critical. A non-critical constraint is ignored by verifiers, so a general-purpose CA would remain in the developer trust store.
  *
- * Then prove the constraint is not decoration: a real TLS handshake against a
- * leaf issued for a non-permitted name must fail, and the loopback one must
- * succeed. Node enforces this in OpenSSL, so this is the only tier that can
- * tell the difference between a correct extension and a plausible one.
+ * Then run TLS handshake against leaf issued for non-permitted name; it must fail, loopback handshake must succeed. Node enforces this in OpenSSL, so the handshake distinguishes a correct extension from a plausible one.
  *
  * @module @paw/daemon/test/nodeIdentity.integration
  * @version 0.0.0
@@ -55,8 +47,7 @@ describe('the local certificate authority', () => {
     expect(new X509Certificate(ca.cert).ca).toBe(true);
     expect(new X509Certificate(ca.cert).subject).toContain('PAW Local CA');
 
-    // pathLen:0 is what stops a stolen key from issuing a CA of its own;
-    // name constraints alone would not.
+    // pathLen:0 blocks the private key from minting sub-CAs; name constraints alone do not.
     const basic = new PeculiarCertificate(ca.cert).getExtension(BasicConstraintsExtension);
     expect(basic?.ca).toBe(true);
     expect(basic?.pathLength).toBe(0);
@@ -83,10 +74,10 @@ describe('the local certificate authority', () => {
     const decoded = AsnConvert.parse(extension!.value, NameConstraints);
 
     // RFC 5280 §4.2.1.10: a permitted subtree constrains only the name forms a
-    // certificate actually carries — "if no name of the type is in the
-    // certificate, the certificate is acceptable". Without these exclusions a
-    // stolen key could mint an S/MIME or URI certificate that satisfies the
-    // loopback subtrees by carrying no DNS or IP name at all.
+    // cert actually carries — "if no name of the type is in the certificate, the
+    // certificate is acceptable". Without these exclusions a compromised key
+    // could mint an S/MIME or URI cert that satisfies loopback subtrees by
+    // carrying no DNS or IP name at all.
     const excluded = (decoded.excludedSubtrees ?? []).map((subtree) =>
       subtree.base.rfc822Name !== undefined
         ? 'rfc822Name'
@@ -101,9 +92,9 @@ describe('the local certificate authority', () => {
     const ca = await issueCa('dtira', 'LAPTOP', NOW);
     const eku = new PeculiarCertificate(ca.cert).getExtension(ExtendedKeyUsageExtension);
 
-    // Belt to the name constraints' braces: a name form can be absent, but an
-    // EKU cannot. Together they leave a stolen key able to mint exactly one
-    // thing — a TLS server certificate for this machine's own loopback.
+    // A name form can be absent from a cert, but EKU cannot. Together the two
+    // extensions let a compromised key mint exactly one thing: a TLS server
+    // certificate for this machine's own loopback addresses.
     expect(eku?.usages).toEqual([ExtendedKeyUsage.serverAuth]);
     expect(eku?.critical).toBe(true);
   });
@@ -176,9 +167,9 @@ describe('the identity directory on this machine', () => {
     const home = await mkdtemp(join(tmpdir(), 'paw-identity-'));
     const identity = await nodeServerIdentity({ PAW_HOME: home }, platform(), NOW);
 
-    // hardenSecret verifies after it acts, so reaching this line means the OS
-    // confirmed the key is restricted to this account — an icacls listing on
-    // Windows, a stat'd mode on POSIX. It is not an assertion about the write.
+    // hardenSecret verifies permissions after acting, so reaching this line
+    // means the OS confirmed the key is restricted to this account — via icacls
+    // listing on Windows, stat'd mode on POSIX. No assertion about write access.
     expect(identity.action).toBe('issue-ca');
     expect(identity.cert).toContain('BEGIN CERTIFICATE');
     expect(identity.key).toContain('BEGIN PRIVATE KEY');
@@ -206,7 +197,7 @@ describe('the identity directory on this machine', () => {
     expect(renewed.caCert).toBe(first.caCert);
     expect(renewed.meta.caFingerprint).toBe(first.meta.caFingerprint);
     expect(renewed.cert).not.toBe(first.cert);
-    // The renewed leaf must still chain to the CA the operator already approved.
+    // Renewed leaf still chains to the CA the operator already approved.
     expect(
       new X509Certificate(renewed.cert).verify(new X509Certificate(first.caCert).publicKey),
     ).toBe(true);
@@ -215,9 +206,9 @@ describe('the identity directory on this machine', () => {
   it('reports a read that failed for any reason other than absence', async () => {
     const home = await mkdtemp(join(tmpdir(), 'paw-identity-'));
     const io = nodeIdentityIo(platform());
-    // A missing file is an identity that has not been issued yet; a directory
-    // where a key should be is a broken install, and saying "absent" to that
-    // would silently reissue over whatever is really there.
+    // A missing file means the identity is not issued yet. A directory where
+    // the key should be means a broken install; reporting it as absent would
+    // silently reissue over whatever is actually there.
     await expect(io.readText(join(home, 'nothing-here'))).resolves.toBeNull();
     await expect(io.readText(home)).rejects.toThrow();
   });

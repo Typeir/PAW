@@ -1,10 +1,8 @@
 /**
- * Log Ring Tests
+ * Log ring tests.
  *
- * @fileoverview Mostly about the bound. An unbounded buffer on a daemon that
- * runs for days is a memory leak with a schedule, and the thing most likely to
- * fill it is a source failing in a loop — which is precisely when the daemon has
- * to stay up.
+ * @fileoverview Mostly bound. Unbounded buffer on daemon run days leak memory
+ * with schedule. Source fail in loop fill it — exact time daemon must stay up.
  *
  * @module @paw/daemon/test/logRing
  * @version 0.0.0
@@ -16,9 +14,9 @@ import { describe, expect, it } from 'vitest';
 import { LOG_CAPACITY, createLogRing } from '../src/domain/logRing.js';
 
 /**
- * A clock that ticks one second per call, so ordering is visible.
+ * Clock tick one second per call. Ordering visible.
  *
- * @returns {() => string} The clock.
+ * @returns {() => string} Clock.
  */
 const ticking = (): (() => string) => {
   let second = 0;
@@ -58,8 +56,8 @@ describe('createLogRing', () => {
     }
 
     expect(ring.entries().map((e) => e.message)).toEqual(['three', 'four', 'five']);
-    // Reported, not hidden: a console can say "and 2 earlier lines" instead of
-    // implying it is showing the whole story.
+    // dropped() reports the count, so a console can show "and 2 earlier
+    // lines" when entries were omitted.
     expect(ring.dropped()).toBe(2);
   });
 

@@ -1,9 +1,9 @@
 /**
  * Check Atom
  *
- * @fileoverview One entry in the doctor bar: a tick or a cross, the check's
- * name, and optionally the value the check is about. Green means the plan's own
- * doctor said so — the glyph is never decoration.
+ * @fileoverview One entry in doctor bar. Tick or cross, check name, maybe value
+ * check about. Green glyph indicates pass, red glyph fails; each is paired with
+ * visually-hidden text so it is not purely decorative.
  *
  * @module @paw/gui/presentation/atoms/check
  * @version 0.0.0
@@ -17,9 +17,9 @@ import { Check as CheckIcon, X as XIcon } from 'lucide-react';
  * Props for {@link Check}.
  *
  * @interface CheckProps
- * @property {string} label - The check name.
- * @property {boolean} ok - Whether the check passes.
- * @property {string} [value] - The emphasised value the check reports.
+ * @property {string} label - Check name.
+ * @property {boolean} ok - Whether check pass.
+ * @property {string} [value] - Emphasised value check report.
  */
 export interface CheckProps {
   readonly label: string;
@@ -28,7 +28,7 @@ export interface CheckProps {
 }
 
 /**
- * A doctor-bar check.
+ * Doctor-bar check.
  *
  * @param {CheckProps} props - The check props.
  * @returns {JSX.Element} The check.

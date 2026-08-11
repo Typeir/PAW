@@ -1,13 +1,7 @@
 /**
  * PAW Console Config Client
  *
- * @fileoverview The binding editor's transport: read the declared models, bind a
- * role to one, unbind a role. Reads go to `GET /api/config`; writes go to the
- * daemon's control verbs, which answer only when the daemon was started with
- * `--control`. A write returns whether it took and, when it did not, the reason
- * the daemon gave, so the view can say why rather than swallow it. The transport
- * is the same authenticated {@link FetchLike} the snapshot source uses, so the
- * credential is never handled here.
+ * @fileoverview Binding editor transport. Read declared models, bind role, unbind role. Read goes to `GET /api/config`; write goes to daemon control verbs, which respond only when the daemon starts with `--control`. Write returns whether it succeeded and, when it did not, the reason the daemon returned, so the view can display why. Transport uses the same authenticated {@link FetchLike} the snapshot source uses, so credentials are never handled here.
  *
  * @module @paw/gui/infrastructure/configClient
  * @version 0.0.0
@@ -18,21 +12,21 @@
 import type { FetchLike, ResponseLike } from './snapshotSource.js';
 
 /**
- * The daemon's config read endpoint.
+ * Daemon config read endpoint.
  */
 export const CONFIG_URL = '/api/config';
 
 /**
- * The daemon's role-binding write endpoint.
+ * Daemon role-binding write endpoint.
  */
 export const CONFIG_ROLES_URL = '/api/config/roles';
 
 /**
- * The outcome of a write.
+ * Outcome of write.
  *
  * @interface ConfigWrite
- * @property {boolean} ok - Whether the edit took.
- * @property {string} [reason] - Why it was refused, when it was.
+ * @property {boolean} ok - Whether edit took.
+ * @property {string} [reason] - Why refused, when be.
  */
 export interface ConfigWrite {
   readonly ok: boolean;
@@ -40,12 +34,12 @@ export interface ConfigWrite {
 }
 
 /**
- * The binding editor's verbs.
+ * Binding editor verbs.
  *
  * @interface ConfigClient
- * @property {() => Promise<readonly string[]>} models - The declared model ids.
- * @property {(role: string, model: string) => Promise<ConfigWrite>} bind - Bind a role to a model.
- * @property {(role: string) => Promise<ConfigWrite>} unbind - Clear a role's binding.
+ * @property {() => Promise<readonly string[]>} models - Declared model ids.
+ * @property {(role: string, model: string) => Promise<ConfigWrite>} bind - Bind role to model.
+ * @property {(role: string) => Promise<ConfigWrite>} unbind - Clear role binding.
  */
 export interface ConfigClient {
   models(): Promise<readonly string[]>;
@@ -56,12 +50,9 @@ export interface ConfigClient {
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
 /**
- * Turn a write response into an outcome. A 2xx took. A refusal carries its reason
- * as JSON (`configControl` — an undeclared model, a bad parameter) or as plain
- * text (a transport refusal — control disabled, a bad token), and a text body is
- * not JSON, so the parse is guarded and falls back to the status.
+ * Turn write response into outcome. 2xx take. Refusal carry reason as JSON (`configControl` — undeclared model, bad parameter) or plain text (transport refusal — control disabled, bad token), and text body not JSON, so parse guarded, fall back to status.
  *
- * @param {ResponseLike} response - The write response.
+ * @param {ResponseLike} response - Write response.
  * @returns {Promise<ConfigWrite>} The outcome.
  */
 async function writeResult(response: ResponseLike): Promise<ConfigWrite> {
@@ -77,9 +68,9 @@ async function writeResult(response: ResponseLike): Promise<ConfigWrite> {
 }
 
 /**
- * Build a config client over an authenticated transport.
+ * Build config client over authenticated transport.
  *
- * @param {FetchLike} fetchFn - The authenticated transport.
+ * @param {FetchLike} fetchFn - Authenticated transport.
  * @returns {ConfigClient} The client.
  */
 export function createConfigClient(fetchFn: FetchLike): ConfigClient {

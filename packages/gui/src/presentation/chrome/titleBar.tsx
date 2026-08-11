@@ -1,14 +1,11 @@
 /**
  * Title Bar
  *
- * @fileoverview The console's top edge, and it is two different things in two
- * shells. In the desktop shell the window is frameless and this **is** its
- * titlebar: the lights close, minimise, and maximise it for real, and the empty
- * space drags it. In a browser tab there is no window to control, so no lights
- * are drawn and nothing is draggable — a painted traffic light on a web page is
- * a costume with no buttons behind it. What both shells share is what is real
- * either way: the wordmark, the daemon pill read from the snapshot, and the
- * theme toggle.
+ * @fileoverview Console top edge. Desktop shell window frameless, this
+ * titlebar renders lights that close, minimise, maximise the window and
+ * empty-space drag. Browser tab has no window to control, so it renders no
+ * lights and no drag region. Both shells render wordmark, daemon pill read
+ * from snapshot, theme toggle.
  *
  * @module @paw/gui/presentation/chrome/titleBar
  * @version 0.0.0
@@ -24,11 +21,11 @@ import type { WindowControls } from '../../infrastructure/shell.js';
 import { PawMark } from '../atoms/pawMark.js';
 
 /**
- * The served repository's short name for the wordmark: the last path segment of
- * the scope, so `C:\Users\me\paw-test` reads as `paw-test`.
+ * Served repo short name for wordmark: last path segment of scope, so
+ * `C:\Users\me\paw-test` read as `paw-test`.
  *
- * @param {string} root - The served repository path.
- * @returns {string} The name to show.
+ * @param {string} root - Served repository path.
+ * @returns {string} Name to show.
  */
 export function scopeName(root: string): string {
   const trimmed = root.replace(/[\\/]+$/, '');
@@ -37,9 +34,9 @@ export function scopeName(root: string): string {
 }
 
 /**
- * The window's own controls — only rendered where they drive a real window.
+ * Window controls — rendered only when a window exists to control.
  *
- * @param {{ controls: WindowControls }} props - The window controls.
+ * @param {{ controls: WindowControls }} props - Window controls.
  * @returns {JSX.Element} The lights.
  */
 function Lights({ controls }: { readonly controls: WindowControls }) {
@@ -63,7 +60,7 @@ function Lights({ controls }: { readonly controls: WindowControls }) {
 }
 
 /**
- * The console's top bar.
+ * Console top bar.
  *
  * @returns {JSX.Element} The bar.
  */

@@ -1,11 +1,10 @@
 /**
  * PAW Daemon — Public API
  *
- * @fileoverview `pawd` as a library: start it in your own process with
- * {@link runDaemon} and the real {@link nodeRuntime}, or with a runtime of your
- * own in a test. The pure pieces it composes — host facts, process ownership,
- * snapshot assembly, routing — are exported too, because the CLI, the Electron
- * shell, and the test suite each need a different slice.
+ * @fileoverview `pawd` as library. Start via {@link runDaemon} with real
+ * {@link nodeRuntime}, or with swapped runtime for tests. Export the building
+ * blocks it composes — host facts, process ownership, snapshot assembly,
+ * routing — for CLI, Electron shell, and test suite.
  *
  * @module @paw/daemon
  * @version 0.0.0
@@ -114,9 +113,13 @@ export { TRUST_NICKNAME, planTrust, trustCommandLine } from './infrastructure/tr
 export type { TrustPlan, TrustStep } from './infrastructure/trustStore.js';
 
 export { meterPort, toRunProgress, trackRun } from './application/run.js';
+export { dispatcherFor } from './application/herdDispatcher.js';
+export type { HerdDeps, HerdDispatcher, HerdWriterLike } from './application/herdDispatcher.js';
 export type { MeteredPort, RunTracker } from './application/run.js';
 
 export { openLiveHerd } from './infrastructure/model/openLiveHerd.js';
+export { COPILOT_SLIM_SECTIONS, slimSectionsOf } from './infrastructure/model/copilotSystemSections.js';
+export type { SystemSectionEntry } from './infrastructure/model/copilotSystemSections.js';
 export type { LiveSdkRegistry } from './infrastructure/model/liveSdkRegistry.js';
 
 export { createSessionRegistry } from './application/sessionRegistry.js';

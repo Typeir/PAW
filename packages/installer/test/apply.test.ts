@@ -1,10 +1,9 @@
 /**
  * PAW Installer Apply Tests
  *
- * @fileoverview Covers the application layer against fake ports: PATH activation on
- * Windows (persist) and when already present (no-op), on POSIX (append) and when
- * already present — so `apply.ts` reaches 100%. Attaching a repository moved to
- * `@paw/core`; its tests moved with it.
+ * @fileoverview Cover app layer with fake ports. PATH activation on Windows
+ * persist, and no-op when present. POSIX appends, no-op when present — so
+ * `apply.ts` hit 100%. Repository move to `@paw/core`; its tests go too.
  *
  * @module @paw/installer/test/apply
  * @version 0.0.0
@@ -18,9 +17,9 @@ import { MARK_BEGIN } from '../src/path.js';
 import type { EnvironmentPort, FileSystemPort } from '../src/ports.js';
 
 /**
- * A filesystem fake that records writes/appends and serves a fixed profile text.
+ * Filesystem fake. Record writes/appends, serve fixed profile text.
  *
- * @param profileText - What `readText` returns.
+ * @param profileText - What `readText` give back.
  */
 function fakeFs(profileText = '') {
   const appendText = vi.fn(async () => {});
@@ -38,7 +37,7 @@ function fakeFs(profileText = '') {
 }
 
 /**
- * An environment fake serving a fixed user Path and recording writes.
+ * Environment fake. Serve fixed user Path, record writes.
  *
  * @param current - The current user Path.
  */
@@ -57,7 +56,7 @@ describe('activatePath (windows)', () => {
     const { env, setUserPath } = fakeEnv('C:\\Windows');
     const edit = await activatePath({ platform: 'win32', shellEnv: undefined, home, binDir }, fs, env);
     expect(edit.kind).toBe('windows-registry');
-    expect(setUserPath).toHaveBeenCalledWith(`${binDir};C:\\Windows`);
+    expect(setUserPath).toHaveBeenCalledWith('\\home\\x\\.paw\\bin;C:\\Windows');
   });
 
   it('does nothing when the bin dir is already on the user Path', async () => {

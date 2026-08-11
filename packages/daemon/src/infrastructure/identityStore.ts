@@ -1,22 +1,9 @@
 /**
  * PAW Identity Store
  *
- * @fileoverview Turning the identity policy into a certificate the daemon can
- * actually serve: read what is on disk, decide, issue what is missing, persist
- * it, and hand back the leaf. Pure over {@link IdentityIo} and
- * {@link IdentityIssuer}, so every path — first boot, leaf renewal, expired CA,
- * a half-deleted directory, a sidecar written by a future version — is a unit
- * test rather than a thing that happens once on someone's machine in November.
+ * @fileoverview Turns identity policy into certificate daemon serve. Read disk, decide, issue what missing, persist, return leaf. Pure over {@link IdentityIo} and {@link IdentityIssuer}. Every path — first boot, leaf renewal, expired CA, half-deleted directory, sidecar from future version — unit-covered.
  *
- * Two invariants this file exists to hold:
- *
- * A reissued CA resets `trusted` to false. The operator trusted a *specific*
- * certificate; a new one carries none of that, and quietly inheriting the flag
- * would suppress the very warning that tells them to approve the replacement.
- *
- * A renewed leaf keeps the CA untouched. That is the whole reason for the two-
- * tier chain: the server certificate rotates every ninety days without ever
- * asking the operator to open their trust store again.
+ * Hold two invariants. Reissued CA reset `trusted` to false; flag no carry from old cert to new. Renewed leaf leave CA untouched; server cert rotate every ninety days, no trust-store change.
  *
  * @module @paw/daemon/identityStore
  * @version 0.0.0
@@ -36,13 +23,13 @@ import {
 import type { IdentityPaths } from '../domain/pawHome.js';
 
 /**
- * A freshly issued certificate and its key.
+ * Freshly issued certificate and key.
  *
  * @interface IssuedCert
  * @property {string} cert - The certificate, PEM.
  * @property {string} key - The private key, PKCS#8 PEM.
  * @property {string} fingerprint - SHA-256 of the certificate, `SHA256:AA:BB:…`.
- * @property {string} notAfter - When it expires, ISO-8601.
+ * @property {string} notAfter - When expire, ISO-8601.
  */
 export interface IssuedCert {
   readonly cert: string;
@@ -52,14 +39,14 @@ export interface IssuedCert {
 }
 
 /**
- * Reading and writing the identity, with secrets written as secrets.
+ * Read and write identity; write secrets with owner-only permissions.
  *
  * @interface IdentityIo
- * @property {(dir: string) => Promise<void>} ensureDir - Create the identity directory, restricted to this account.
- * @property {(path: string) => Promise<string | null>} readText - Read a file, or null when it is absent.
- * @property {(path: string, text: string) => Promise<void>} writeSecret - Write a private key, then prove only this account can read it.
- * @property {(path: string, text: string) => Promise<void>} writePublic - Write a certificate or sidecar.
- * @property {(path: string) => Promise<void>} assertPrivate - Prove an existing key is still readable by this account alone.
+ * @property {(dir: string) => Promise<void>} ensureDir - Create identity directory, restricted to this account.
+ * @property {(path: string) => Promise<string | null>} readText - Read file, or null when absent.
+ * @property {(path: string, text: string) => Promise<void>} writeSecret - Write private key with owner-only permissions, then verify this account can read it.
+ * @property {(path: string, text: string) => Promise<void>} writePublic - Write certificate or sidecar.
+ * @property {(path: string) => Promise<void>} assertPrivate - Assert existing key still readable by this account alone.
  */
 export interface IdentityIo {
   ensureDir(dir: string): Promise<void>;
@@ -70,11 +57,11 @@ export interface IdentityIo {
 }
 
 /**
- * Minting certificates.
+ * Mint certificates.
  *
  * @interface IdentityIssuer
- * @property {(user: string, host: string, now: Date) => Promise<IssuedCert>} issueCa - Mint a name-constrained local CA.
- * @property {(caCert: string, caKey: string, now: Date) => Promise<IssuedCert>} issueLeaf - Mint a loopback server certificate from it.
+ * @property {(user: string, host: string, now: Date) => Promise<IssuedCert>} issueCa - Mint name-constrained local CA.
+ * @property {(caCert: string, caKey: string, now: Date) => Promise<IssuedCert>} issueLeaf - Mint loopback server certificate from it.
  */
 export interface IdentityIssuer {
   issueCa(user: string, host: string, now: Date): Promise<IssuedCert>;
@@ -82,7 +69,7 @@ export interface IdentityIssuer {
 }
 
 /**
- * Who the CA is being issued for, so its subject names the machine it belongs to.
+ * Account and host CA issued for; supply its subject names.
  *
  * @interface Operator
  * @property {string} user - The account name.
@@ -94,14 +81,14 @@ export interface Operator {
 }
 
 /**
- * The identity the daemon serves with.
+ * Identity daemon serve with.
  *
  * @interface ServerIdentity
  * @property {string} cert - The server certificate, PEM.
  * @property {string} key - Its private key, PEM.
- * @property {string} caCert - The CA certificate, PEM — what a client pins or trusts.
- * @property {string} caCertPath - Where that CA sits, for the trust instructions.
- * @property {IdentityMeta} meta - What is now recorded about the identity.
+ * @property {string} caCert - The CA certificate, PEM — what client pin or trust.
+ * @property {string} caCertPath - Where that CA sit, for trust instructions.
+ * @property {IdentityMeta} meta - What now recorded about the identity.
  * @property {IdentityAction} action - What this load had to do to produce it.
  */
 export interface ServerIdentity {
@@ -114,14 +101,9 @@ export interface ServerIdentity {
 }
 
 /**
- * The stored metadata, or null when there is none this daemon can use.
+ * Stored metadata, or null when none this daemon can use.
  *
- * A sidecar that will not parse, or that a future version wrote, is treated as
- * absent — which reissues. The alternative is serving against metadata that does
- * not describe the files on disk, and a fingerprint the operator was told to
- * compare against is worth nothing if it might be stale. The caller is handed
- * the resulting {@link IdentityAction} and reports it, so a reissue is announced
- * rather than silent.
+ * Sidecar that no parse, or future version wrote, treated as absent, which reissue. Caller receive resulting {@link IdentityAction} and report reissue.
  *
  * @param {string | null} raw - The sidecar's contents, or null when absent.
  * @returns {IdentityMeta | null} The metadata, or null.
@@ -141,15 +123,7 @@ export function readMeta(raw: string | null): IdentityMeta | null {
 }
 
 /**
- * What to tell the operator about the identity this boot is using — a CA that
- * was just minted, a certificate that was just renewed, trust that has not been
- * granted, or a CA running out of time.
- *
- * Certificate work happens silently by design, and silence is the right default
- * for a renewal the operator cannot act on. The two things they *can* act on —
- * approving a CA and replacing an expiring one — must be said out loud, and said
- * with the fingerprint, because "click through the warning" is the habit this
- * whole design exists to avoid teaching.
+ * Build operator notice for identity this boot use — CA just minted, certificate just renewed, trust no yet granted, or CA running out time. CA-approval and expiry lines carry fingerprint; renewal operator no act on print nothing.
  *
  * @param {ServerIdentity} identity - The loaded identity.
  * @param {Date} now - The current time.
@@ -177,19 +151,15 @@ export function identityNotice(identity: ServerIdentity, now: Date): string[] {
 }
 
 /**
- * Record that this machine's CA has been installed into a trust store, which is
- * what stops the daemon warning about it on every boot.
+ * Record this machine's CA got installed into trust store, which stop daemon warning about it every boot.
  *
- * Called only after the install commands actually succeeded. Setting the flag on
- * intent rather than on outcome would silence the warning while the browser kept
- * refusing — the operator would be left with a broken console and nothing
- * telling them why.
+ * Called only after the install command actually succeeds. If the flag is set before the install succeeds, it suppresses the warning while the browser keeps refusing the certificate, and the operator has no error to trace.
  *
- * @param {IdentityPaths} paths - Where the identity lives.
+ * @param {IdentityPaths} paths - Where identity live.
  * @param {IdentityIo} io - Reading and writing it.
  * @param {boolean} trusted - The new value.
  * @returns {Promise<IdentityMeta>} The metadata as recorded.
- * @throws {Error} When there is no identity to mark.
+ * @throws {Error} When no identity to mark.
  */
 export async function markTrusted(
   paths: IdentityPaths,
@@ -206,9 +176,9 @@ export async function markTrusted(
 }
 
 /**
- * Load the identity the daemon serves with, issuing whatever is missing.
+ * Load identity daemon serve with, issue whatever missing.
  *
- * @param {IdentityPaths} paths - Where the identity lives.
+ * @param {IdentityPaths} paths - Where identity live.
  * @param {IdentityIo} io - Reading and writing it.
  * @param {IdentityIssuer} issuer - Minting certificates.
  * @param {Operator} who - Whose machine this is.
@@ -241,9 +211,7 @@ export async function loadIdentity(
 
   if (files !== null && meta !== null) {
     if (action === 'reuse') {
-      // Checked on every boot, not only on the one that wrote them. Permissions
-      // are verified after a write, but a key lives for months and anything can
-      // happen to it in between — a restore, a copy, a `chmod` from a script.
+      // Check this on every boot. Permissions are verified after write, but the key lives for months and can change in between — restore, copy, `chmod` from script.
       await io.assertPrivate(paths.caKey);
       await io.assertPrivate(paths.leafKey);
       return {
@@ -256,9 +224,7 @@ export async function loadIdentity(
       };
     }
     if (action === 'issue-leaf') {
-      // Checked before the CA key is used, not only when it is reused verbatim:
-      // this branch *signs with* that key, so a boot that renews the leaf must
-      // prove the key its whole trust chain rests on is still owner-only.
+      // Verify the CA key before signing with it: this branch signs with that key, so a leaf-renewing boot must verify the key is still owner-only.
       await io.assertPrivate(paths.caKey);
       const leaf = await issuer.issueLeaf(files.caCert, files.caKey, now);
       const renewed: IdentityMeta = {

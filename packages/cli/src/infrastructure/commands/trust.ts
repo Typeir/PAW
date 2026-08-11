@@ -1,11 +1,10 @@
 /**
  * PAW CLI — trust command
  *
- * @fileoverview `paw trust [--dry-run]`: install this machine's PAW CA into a
- * trust store so the console loads without a browser warning. The operator must
- * see the whole thing before consenting — `--dry-run` prints the exact commands
- * and the fingerprint, and the identity is marked trusted only once every step
- * actually succeeded, never on intent.
+ * @fileoverview `paw trust [--dry-run]`: install machine PAW CA into trust
+ * store. Console then load without browser warning. `--dry-run` print exact
+ * commands and fingerprint. Mark identity trusted only after every step
+ * succeed.
  *
  * @module @paw/cli/infrastructure/commands/trust
  * @version 0.0.0
@@ -26,7 +25,7 @@ import {
 } from '@paw/daemon';
 
 /**
- * Run a program to completion, capturing what it said.
+ * Run program to completion, capture output.
  *
  * @param {string} command - The program.
  * @param {readonly string[]} args - Its arguments.
@@ -50,8 +49,8 @@ function runCommand(
 }
 
 /**
- * Install this machine's PAW CA into a trust store, so the console loads without
- * a browser warning.
+ * Install machine PAW CA into trust store. Console then load without browser
+ * warning.
  *
  * @param {string[]} rest - The words after `trust`.
  * @param {(lines: string[]) => void} print - Line printer.

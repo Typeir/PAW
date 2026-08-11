@@ -1,14 +1,11 @@
 /**
  * PAW Daemon Startup
  *
- * @fileoverview The composition that brings a resident enforcement daemon up for
- * one project root: it assembles the pieces pawd owns once — the violation store,
- * the warm gate cache, the exempt-tool and ignore policy, and the host
- * connectors — writes the handshake token, and serves them over the socket via
- * {@link serveEnforcement} (doc 10 §2, §8). This is the target an autostart
- * spawns. The store defaults to in-memory: a long-lived owner already fixes the
- * race the cold hooks had; durable sql.js persistence across daemon restarts is
- * the remaining follow-up (doc 10 §8a).
+ * @fileoverview Composition brings one resident enforcement daemon up for one
+ * project root. Assemble the daemon's components once — violation store, warm
+ * gate cache, exempt-tool and ignore policy, host connectors — write handshake
+ * token, serve them over socket via {@link serveEnforcement} (doc 10 §2, §8).
+ * Invoked by an autostart spawn.
  *
  * @module @paw/cli/application/pawdStart
  * @version 0.0.0
@@ -26,8 +23,8 @@ import { toProjectRelative, type DispatchHookDeps, type StorePort } from '@paw/c
 import { serveEnforcement, socketPath, tokenPath, type SocketServerHandle } from '@paw/daemon';
 
 /**
- * Read-only tools never blocked by violations, ported from the legacy
- * `preToolUse` hook — the agent needs these to diagnose and fix.
+ * Read-only tools never block by violations. Port from legacy `preToolUse`
+ * hook.
  */
 const EXEMPT_TOOLS: ReadonlySet<string> = new Set([
   'read_file',
@@ -52,10 +49,10 @@ const IGNORED = /(^|\/)(\.paw|\.git|node_modules|dist|coverage|\.next)(\/|$)/;
  * Injectable seams for testing.
  *
  * @interface StartSeams
- * @property {() => string} [randomToken] - Generate the handshake token; defaults to 32 random bytes hex.
- * @property {() => Promise<StorePort> | StorePort} [makeStore] - Build the store; defaults to the disk-backed sql.js store under `.paw`.
- * @property {{ ms: number; onIdle: () => void }} [idle] - Close and signal after this quiet period; omit to stay resident.
- * @property {{ pid: number; now: () => number; onStop: () => void }} [control] - Enables `daemon.status`/`daemon.stop`; passed through to the service.
+ * @property {() => string} [randomToken] - Generate handshake token; default 32 random bytes hex.
+ * @property {() => Promise<StorePort> | StorePort} [makeStore] - Build store; default disk-backed sql.js store under `.paw`.
+ * @property {{ ms: number; onIdle: () => void }} [idle] - Close and signal after quiet period; omit to stay resident.
+ * @property {{ pid: number; now: () => number; onStop: () => void }} [control] - Enable `daemon.status`/`daemon.stop`; pass through to service.
  */
 export interface StartSeams {
   randomToken?: () => string;
@@ -65,11 +62,11 @@ export interface StartSeams {
 }
 
 /**
- * Bring enforcement up for a project root and return the running server.
+ * Bring enforcement up for project root, return running server.
  *
  * @param {string} root - Absolute project root.
  * @param {StartSeams} [seams] - Optional injectable seams.
- * @returns {Promise<SocketServerHandle>} The running daemon.
+ * @returns {Promise<SocketServerHandle>} Running daemon.
  */
 export async function startEnforcement(
   root: string,

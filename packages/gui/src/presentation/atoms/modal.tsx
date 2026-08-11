@@ -1,15 +1,13 @@
 /**
- * Modal Stack
+ * Modal stack.
  *
- * @fileoverview A dialog that stacks, ported from Ikuisuus's `ui/modal` +
- * `useModalA11y`. It is declarative — `<Modal isOpen onClose>` — and the stack is a
- * module-level registry every open modal joins, so a second modal opened over a
- * first traps focus and answers Escape while the one beneath goes inert, and the
- * body scroll-lock is reference-counted: taken on the first modal, released on the
- * last. Focus is captured on open and returned on close; the trap is a hand-rolled
- * Tab handler (no dependency), which is exactly what makes it testable in jsdom,
- * where Tab does not move focus on its own. It portals to the body and animates in
- * with CSS, so nothing here waits on a real animation event.
+ * @fileoverview Dialog that stack. Port from Ikuisuus `ui/modal` + `useModalA11y`.
+ * Declarative — `<Modal isOpen onClose>` — stack be module-level registry every
+ * open modal join. Second modal open over first trap focus and answer Escape,
+ * one beneath go inert. Body scroll-lock reference-counted: take on first modal,
+ * release on last. Capture focus on open, return on close. Trap be hand-rolled Tab
+ * handler, no dependency, so testable in jsdom, where Tab no move focus alone.
+ * Portal to body, animate with CSS, nothing wait real animation event.
  *
  * @module @paw/gui/presentation/atoms/modal
  * @version 0.0.0
@@ -24,14 +22,14 @@ import { createPortal } from 'react-dom';
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
-/** The open modals, oldest first; the last is on top. */
+/** Open modals, oldest first; last on top. */
 const stack: string[] = [];
 let savedOverflow = '';
 
 /**
- * Register a modal as open, locking body scroll on the first.
+ * Register modal open, lock body scroll on first.
  *
- * @param {string} id - The modal's id.
+ * @param {string} id - Modal id.
  */
 function pushModal(id: string): void {
   if (stack.length === 0) {
@@ -42,9 +40,9 @@ function pushModal(id: string): void {
 }
 
 /**
- * Unregister a modal, restoring body scroll when the last one closes.
+ * Unregister modal, restore body scroll when last close.
  *
- * @param {string} id - The modal's id.
+ * @param {string} id - Modal id.
  */
 function popModal(id: string): void {
   const index = stack.indexOf(id);
@@ -57,18 +55,17 @@ function popModal(id: string): void {
 }
 
 /**
- * Whether a modal is the top of the stack — the only one that traps focus and
- * answers Escape.
+ * Whether modal be top of stack — only one that trap focus and answer Escape.
  *
- * @param {string} id - The modal's id.
- * @returns {boolean} True when it is on top.
+ * @param {string} id - Modal id.
+ * @returns {boolean} True when on top.
  */
 function isTop(id: string): boolean {
   return stack[stack.length - 1] === id;
 }
 
 /**
- * The modal's width tier.
+ * Modal width tier.
  */
 export type ModalSize = 'sm' | 'md' | 'lg';
 
@@ -76,11 +73,11 @@ export type ModalSize = 'sm' | 'md' | 'lg';
  * Props for {@link Modal}.
  *
  * @interface ModalProps
- * @property {boolean} isOpen - Whether the modal is shown.
- * @property {() => void} onClose - Called on Escape, backdrop click, or the close button.
- * @property {string} [title] - An optional heading; when given, a labelled header with a close button is drawn.
- * @property {ModalSize} [size] - Width tier; defaults to `md`.
- * @property {ReactNode} children - The modal body.
+ * @property {boolean} isOpen - Whether modal show.
+ * @property {() => void} onClose - Called on Escape, backdrop click, or close button.
+ * @property {string} [title] - Optional heading; when given, draw labelled header with close button.
+ * @property {ModalSize} [size] - Width tier; default `md`.
+ * @property {ReactNode} children - Modal body.
  */
 export interface ModalProps {
   readonly isOpen: boolean;
@@ -91,10 +88,10 @@ export interface ModalProps {
 }
 
 /**
- * A stacking, focus-trapping modal dialog.
+ * Stacking, focus-trapping modal dialog.
  *
- * @param {ModalProps} props - The modal props.
- * @returns {JSX.Element | null} The modal, or null when closed.
+ * @param {ModalProps} props - Modal props.
+ * @returns {JSX.Element | null} Modal, or null when closed.
  */
 export function Modal({ isOpen, onClose, title, size = 'md', children }: ModalProps) {
   const id = useId();

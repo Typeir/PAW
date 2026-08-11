@@ -1,12 +1,11 @@
 /**
  * PAW SQL Driver Tests
  *
- * @fileoverview Covers both engine bindings. The `node:sqlite` binding is driven
- * against a hand-written double so its every branch is covered on machines where
- * the engine is blocked, and additionally against the real engine when one is
- * present. The sql.js binding is driven against the real engine throughout, and
- * its write-back path is asserted to propagate a failing write rather than
- * swallow it (CONSTRAINTS.md Constraint 3).
+ * @fileoverview Cover both engine bindings. Drive `node:sqlite` binding
+ * against hand-written double, cover every branch on machine where engine
+ * blocked, and against real engine when present. Drive sql.js binding
+ * against real engine throughout; assert write-back path propagate failing
+ * write (CONSTRAINTS.md Constraint 3).
  *
  * @module @paw/adapters/test/store/sql/drivers
  * @version 0.0.0
@@ -31,12 +30,12 @@ import {
 } from './helpers.js';
 
 /**
- * Record of what a {@link NodeSqliteDatabase} double was asked to do.
+ * Record call made to {@link NodeSqliteDatabase} double.
  *
  * @interface DoubleLog
  * @property {string[]} execs - SQL passed to `exec`.
  * @property {Array<{ sql: string; params: readonly SqlValue[] }>} runs - Statements run.
- * @property {number} closed - How many times `close` was called.
+ * @property {number} closed - How many time `close` called.
  */
 interface DoubleLog {
   execs: string[];
@@ -45,7 +44,7 @@ interface DoubleLog {
 }
 
 /**
- * A `node:sqlite` database double whose statements return canned rows.
+ * Build `node:sqlite` database double. Statement return canned rows.
  *
  * @param {Record<string, unknown>[]} rows - Rows every `all` returns.
  * @param {number | bigint} changes - The `changes` every `run` reports.

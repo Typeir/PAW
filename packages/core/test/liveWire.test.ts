@@ -1,15 +1,10 @@
 /**
  * Live Wire Protocol Tests
  *
- * @fileoverview Mostly a parser suite, and mostly about refusal. Everything that
- * reaches `parseClientMessage` came off a socket that anything on the machine
- * could have opened, so the tests are written the way an attacker would write
- * them: prototype keys, arrays where objects belong, right shape with the wrong
- * version, oversize frames, and fields of the wrong type.
- *
- * The other half is the contract itself — close codes must stay distinct and
- * stable, because a console distinguishes "your token is wrong, stop retrying"
- * from "too busy, come back" by nothing else.
+ * @fileoverview Parser suite for `parseClientMessage`. Test refuse untrusted
+ * socket input: prototype keys, arrays where object belong, right shape with
+ * wrong version, oversize frame, wrong type field. Pin contract: close code
+ * stay distinct and stable.
  *
  * @module @paw/core/test/liveWire
  * @version 0.0.0
@@ -54,15 +49,15 @@ describe('the wire form', () => {
     const frame = encodeEnvelope('host', { pid: 1 } as never, 1786060800000);
     expect(frame).toBe('{"v":1,"t":"ho","a":1786060800000,"d":{"pid":1}}');
 
-    // The same frame spelled out. The host slice ticks once a second per open
-    // console, so this difference is paid thousands of times an hour.
+    // Same frame in longhand: full topic name, quoted keys, timestamp as
+    // ISO string. The compact form above is what the daemon sends.
     const spelled = JSON.stringify({
       v: 1,
       topic: 'host',
       at: new Date(1786060800000).toISOString(),
       data: { pid: 1 },
     });
-    // 23 bytes on this frame — and the saving is per frame, not per session.
+    // Saving applies per frame; assertion pins frame gap at 20 bytes or more.
     expect(spelled.length - frame.length).toBeGreaterThanOrEqual(20);
   });
 
@@ -186,8 +181,8 @@ describe('parseClientMessage', () => {
     const parsed = parseClientMessage(
       '{"v":1,"m":"a","k":"secret","admin":true,"__proto__":{"x":1}}',
     );
-    // Everything unrecognised is dropped on the floor. A validator that returned
-    // the caller's object would carry `admin` into the daemon.
+    // Unrecognized fields discarded. A validator returning the caller's
+    // object would carry `admin` into the daemon.
     expect(parsed).toEqual({ v: 1, type: 'auth', token: 'secret' });
     expect(Object.keys(parsed ?? {})).toEqual(['v', 'type', 'token']);
   });
@@ -210,8 +205,7 @@ describe('parseClientMessage', () => {
   it('refuses an unknown message code, including the spelled-out form', () => {
     expect(parseClientMessage('{"v":1,"m":"s","t":"ho"}')).toBeNull();
     expect(parseClientMessage('{"v":1,"m":"eval","c":"1"}')).toBeNull();
-    // The long form is not a second accepted dialect: one wire form, or the
-    // parser becomes two parsers that drift.
+    // Long form rejected. Wire has a single form; the parser accepts none other.
     expect(parseClientMessage('{"v":1,"type":"auth","token":"x"}')).toBeNull();
     expect(parseClientMessage('{"v":1}')).toBeNull();
   });

@@ -1,19 +1,22 @@
 /**
  * Swarm View Tests
  *
- * @fileoverview The Work subsystem panel by panel: the stat strip and run bar
- * over a real run, the plan source beside the brief it renders, the doctor bar
- * reading core's own findings, and the herd — full, empty, and as a way to jump
- * from a failed member to the brief that produced it.
+ * @fileoverview Tests each Swarm view panel in isolation. Stat strip and run
+ * bar reflect the current run. Plan source renders beside the member brief.
+ * Doctor bar reads core's own plan findings. Herd covers a full run, an empty
+ * run, and selecting a failed member.
  *
  * @module @paw/gui/test/unit/presentation/swarm
  */
 
-import { screen, within } from '@testing-library/react';
+import { encodeEnvelope, parseClientMessage } from '@paw/core';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { ConsoleProvider } from '../../../src/application/context/consoleContext.js';
+import type { SocketHandlers, SocketLike } from '../../../src/infrastructure/liveSocket.js';
 import { CodeCard } from '../../../src/presentation/views/swarm/codeCard.js';
-import { CommandBar } from '../../../src/presentation/views/swarm/commandBar.js';
+import { CommandBar, releaseBlocker } from '../../../src/presentation/views/swarm/commandBar.js';
 import { DoctorBar } from '../../../src/presentation/views/swarm/doctorBar.js';
 import { HerdTab } from '../../../src/presentation/views/swarm/herdTab.js';
 import { PreviewCard } from '../../../src/presentation/views/swarm/previewCard.js';
@@ -21,7 +24,23 @@ import { RunBar } from '../../../src/presentation/views/swarm/runBar.js';
 import { StatStrip } from '../../../src/presentation/views/swarm/statStrip.js';
 import { SwarmTabs } from '../../../src/presentation/views/swarm/swarmTabs.js';
 import { SwarmView } from '../../../src/presentation/views/swarm/swarmView.js';
+import { useConsoleActions } from '../../../src/application/hooks/useConsoleActions.js';
 import { makeSnapshot, renderInConsole } from '../../fixtures.js';
+
+/**
+ * Seed the console context selection from inside the provider.
+ *
+ * @param {{ paths: string[] }} props - Paths to toggle on.
+ * @returns {JSX.Element} A seed button.
+ */
+function SeedContext({ paths }: { paths: string[] }) {
+  const { toggleContext } = useConsoleActions();
+  return (
+    <button type='button' onClick={() => toggleContext(paths)}>
+      seed
+    </button>
+  );
+}
 
 describe('StatStrip', () => {
   it('counts members, dispatches, confirmations, and spend', () => {
@@ -128,16 +147,84 @@ describe('DoctorBar', () => {
     renderInConsole(<DoctorBar />);
     expect(screen.getByRole('button', { name: /Dry-run/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Capture/ })).toBeDisabled();
-    // the reason is carried by a Tooltip wrapper, not a browser title
+    // Tooltip wrapper carry reason, not browser title
     expect(screen.getByRole('button', { name: /Capture/ })).not.toHaveAttribute('title');
   });
 });
 
+describe('releaseBlocker', () => {
+  it('names each blocker and clears when live with a plan', () => {
+    expect(releaseBlocker(false, 'plans/x.swarm.mjs')).toBe('release needs a live connection');
+    expect(releaseBlocker(true, null)).toBe('pick a plan to release');
+    expect(releaseBlocker(true, 'plans/x.swarm.mjs')).toBeNull();
+  });
+});
+
 describe('CommandBar', () => {
-  it('hints the scrub keys and disables the run controls', () => {
+  it('hints the scrub keys and disables release until the console is live', () => {
     renderInConsole(<CommandBar />);
     expect(screen.getByText(/scrub member/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Pause herd' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Release herd/ })).toBeDisabled();
+  });
+
+  it('sends a release frame carrying the live toggle over an authenticated socket', async () => {
+    const sent: string[] = [];
+    let handlers: SocketHandlers | null = null;
+    const socket: SocketLike = {
+      send: (text: string) => sent.push(text),
+      close: () => undefined,
+      listen: (registered) => {
+        handlers = registered;
+      },
+    };
+    render(
+      <ConsoleProvider snapshot={makeSnapshot()} connect={() => socket} token='cred'>
+        <CommandBar />
+      </ConsoleProvider>,
+    );
+    act(() => handlers?.open());
+    act(() => handlers?.message(encodeEnvelope('hello', makeSnapshot(), 1)));
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /live model/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Release herd/ }));
+
+    const frame = parseClientMessage(sent[sent.length - 1]);
+    expect(frame).toEqual({
+      v: 1,
+      type: 'release',
+      settings: { plan: 'plans/demo.swarm.mjs', live: true },
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('approve it in the pawd terminal');
+  });
+
+  it('carries the attached-context selection inside the release settings', async () => {
+    const sent: string[] = [];
+    let handlers: SocketHandlers | null = null;
+    const socket: SocketLike = {
+      send: (text: string) => sent.push(text),
+      close: () => undefined,
+      listen: (registered) => {
+        handlers = registered;
+      },
+    };
+    render(
+      <ConsoleProvider snapshot={makeSnapshot()} connect={() => socket} token='cred'>
+        <SeedContext paths={['docs/one.mdx']} />
+        <CommandBar />
+      </ConsoleProvider>,
+    );
+    act(() => handlers?.open());
+    act(() => handlers?.message(encodeEnvelope('hello', makeSnapshot(), 1)));
+
+    await userEvent.click(screen.getByRole('button', { name: 'seed' }));
+    await userEvent.click(screen.getByRole('button', { name: /Release herd · 1 ctx/ }));
+
+    const frame = parseClientMessage(sent[sent.length - 1]);
+    expect(frame).toEqual({
+      v: 1,
+      type: 'release',
+      settings: { plan: 'plans/demo.swarm.mjs', live: false, context: ['docs/one.mdx'] },
+    });
   });
 });
 
@@ -191,7 +278,9 @@ describe('HerdTab', () => {
 
   it('says so before anything has been dispatched', () => {
     renderInConsole(<HerdTab />, makeSnapshot({ run: { ...makeSnapshot().run, members: [] } }));
-    expect(screen.getByText('— no members dispatched yet —')).toBeInTheDocument();
+    expect(
+      screen.getByText('— no run released through this console · release with --run or swarm run --ui —'),
+    ).toBeInTheDocument();
   });
 
   it('selects a member by click, by Enter, and by Space', async () => {

@@ -1,14 +1,7 @@
 /**
  * PAW Swarm Briefing Domain
  *
- * @fileoverview The swarm plan and the pure operations over it — the briefing
- * mechanism from decision doc 16. A plan's `brief(args, member)` is the whole
- * per-member prompting story: an eight-way conditional is just a function, which
- * is why a plan is code, not a template format. This module holds only the pure
- * parts — resolving the member count, rendering a brief, deriving a resume key
- * and a member's target files, and the `doctor` validation that refuses a broken
- * plan before a single token is spent. The `skip` predicate may read files, so
- * it is an application concern, not part of this pure domain.
+ * @fileoverview Swarm plan and pure operations over it — briefing mechanism from decision doc 16. Plan `brief(args, member)` make per-member prompt; plan is code. This module hold pure parts: resolve member count, render brief, derive resume key and member target files, and `doctor` validation that refuse broken plan before dispatch. `skip` predicate may read files; that application concern.
  *
  * @module @paw/core/domain/swarm
  * @version 0.0.0
@@ -17,20 +10,21 @@
  */
 
 /**
- * A swarm plan: everything needed to release a herd, authored as code so `args`
- * can be computed from any source and `brief` can interpolate freely.
+ * Swarm plan: everything needed to dispatch members, authored as code.
  *
  * @interface SwarmPlan
- * @property {string} name - Stable identifier; names the pen directory and manifest.
- * @property {string} role - Role id the bound model must satisfy before release.
- * @property {A} args - The arglist; anything. Frozen into the manifest at release.
- * @property {number | ((args: A) => number)} members - Member count, or a function of args returning it. Members are 0-indexed.
- * @property {(args: A, member: number, members: number) => string} brief - Produces the full prompt for one member. Pure.
- * @property {(args: A, member: number) => (string | string[])} [expectFiles] - The file(s) a member is expected to write; enables the file-conflict check.
- * @property {(args: A, member: number) => (boolean | Promise<boolean>)} [skip] - Cheap predicate run before dispatch; true skips the member with no model call. May read files, so it is applied by the application, not the doctor.
- * @property {(args: A, member: number) => readonly string[]} [contextFiles] - Files whose contents are attached to the member's brief at dispatch. Declares paths only — pure, like `expectFiles`; the reading is an application concern behind a port.
- * @property {(args: A, member: number) => string} [key] - Stable per-member identity for idempotent resume; defaults to the member index.
- * @property {string[]} [tools] - Optional per-member tool allow-list overriding the role default.
+ * @property {string} name - Stable identifier; name pen directory and manifest.
+ * @property {string} role - Role id bound model must satisfy before release.
+ * @property {A} args - Arglist; anything. Frozen into manifest at release.
+ * @property {number | ((args: A) => number)} members - Member count, or function of args return it. Members 0-indexed.
+ * @property {(args: A, member: number, members: number) => string} brief - Produce full prompt for one member. Pure.
+ * @property {(args: A, member: number) => (string | string[])} [expectFiles] - File(s) member expected to write; enable file-conflict check.
+ * @property {(args: A, member: number) => (boolean | Promise<boolean>)} [skip] - Cheap predicate run before dispatch; true skip member with no model call. May read files; application apply it.
+ * @property {(args: A, member: number) => readonly string[]} [contextFiles] - Files whose contents attach to member brief at dispatch. Declare paths only; reading application concern behind port.
+ * @property {(args: A, member: number) => string} [key] - Stable per-member identity for idempotent resume; default to member index.
+ * @property {readonly string[]} [availableTools] - Canonical tool names grant to every member, override role default. SDK-agnostic; each model port map them to own tool names.
+ * @property {(args: A, member: number) => readonly string[]} [resolveTools] - Per-member canonical tool names, override `availableTools` and role default. Run at dispatch.
+ * @property {(sections: Readonly<Record<string, string>>, args: A, member: number) => Readonly<Record<string, string | undefined>>} [system] - Compose member system prompt from port slim baseline. Get baseline sections; return override per id. String → replace; `undefined` → drop to model default; id left out → keep baseline. SDK-agnostic; port map resolved section to system-message.
  */
 export interface SwarmPlan<A = unknown> {
   readonly name: string;
@@ -42,16 +36,22 @@ export interface SwarmPlan<A = unknown> {
   readonly skip?: (args: A, member: number) => boolean | Promise<boolean>;
   readonly contextFiles?: (args: A, member: number) => readonly string[];
   readonly key?: (args: A, member: number) => string;
-  readonly tools?: readonly string[];
+  readonly availableTools?: readonly string[];
+  readonly resolveTools?: (args: A, member: number) => readonly string[];
+  readonly system?: (
+    sections: Readonly<Record<string, string>>,
+    args: A,
+    member: number,
+  ) => Readonly<Record<string, string | undefined>>;
 }
 
 /**
- * A single validation finding from {@link doctorPlan}.
+ * Single validation finding from {@link doctorPlan}.
  *
  * @interface DoctorFinding
- * @property {string} check - The check's name.
- * @property {boolean} ok - Whether it passed.
- * @property {string} [detail] - Why it failed, when it did.
+ * @property {string} check - Check name.
+ * @property {boolean} ok - Whether it pass.
+ * @property {string} [detail] - Why it fail, when it fail.
  */
 export interface DoctorFinding {
   readonly check: string;
@@ -60,10 +60,10 @@ export interface DoctorFinding {
 }
 
 /**
- * Resolve a plan's member count.
+ * Resolve plan member count.
  *
  * @param {SwarmPlan<A>} plan - The plan.
- * @returns {number} The number of members.
+ * @returns {number} Number of members.
  */
 export function memberCount<A>(plan: SwarmPlan<A>): number {
   return typeof plan.members === 'function'
@@ -72,35 +72,35 @@ export function memberCount<A>(plan: SwarmPlan<A>): number {
 }
 
 /**
- * Render the frozen brief for one member.
+ * Render frozen brief for one member.
  *
  * @param {SwarmPlan<A>} plan - The plan.
  * @param {number} member - Zero-based member index.
- * @returns {string} The member's prompt.
+ * @returns {string} Member prompt.
  */
 export function renderBrief<A>(plan: SwarmPlan<A>, member: number): string {
   return plan.brief(plan.args, member, memberCount(plan));
 }
 
 /**
- * The stable resume key for one member — the plan's `key` when present, else the
- * member index as a string.
+ * Stable resume key for one member — plan `key` when present, else member
+ * index as string.
  *
  * @param {SwarmPlan<A>} plan - The plan.
  * @param {number} member - Zero-based member index.
- * @returns {string} The resume key.
+ * @returns {string} Resume key.
  */
 export function planKey<A>(plan: SwarmPlan<A>, member: number): string {
   return plan.key ? plan.key(plan.args, member) : String(member);
 }
 
 /**
- * The file(s) a member is expected to write, normalised to an array (empty when
- * the plan declares no `expectFiles`).
+ * File(s) a member expected to write, normalised to array (empty when plan
+ * declare no `expectFiles`).
  *
  * @param {SwarmPlan<A>} plan - The plan.
  * @param {number} member - Zero-based member index.
- * @returns {string[]} The member's target files.
+ * @returns {string[]} Member target files.
  */
 export function targetsOf<A>(plan: SwarmPlan<A>, member: number): string[] {
   if (!plan.expectFiles) {
@@ -111,20 +111,62 @@ export function targetsOf<A>(plan: SwarmPlan<A>, member: number): string[] {
 }
 
 /**
- * The files a member attaches to its brief as context (empty when the plan
- * declares no `contextFiles`). Declaration only — nothing is read here; the
- * pure domain never touches a filesystem.
+ * Files a member attach to brief as context (empty when plan declare no
+ * `contextFiles`). Declaration only; nothing read here.
  *
  * @param {SwarmPlan<A>} plan - The plan.
  * @param {number} member - Zero-based member index.
- * @returns {string[]} The member's context paths.
+ * @returns {string[]} Member context paths.
  */
 export function contextOf<A>(plan: SwarmPlan<A>, member: number): string[] {
   return plan.contextFiles ? [...plan.contextFiles(plan.args, member)] : [];
 }
 
 /**
- * The zero-based member indices of a plan.
+ * Canonical tool names one member granted: `resolveTools` when present, else
+ * `availableTools`, else undefined — model port fall back to role default.
+ * Names SDK-agnostic; each port map them to own tool names.
+ *
+ * @param {SwarmPlan<A>} plan - The plan.
+ * @param {number} member - Zero-based member index.
+ * @returns {readonly string[] | undefined} Member canonical tools, or undefined for role default.
+ */
+export function toolsOf<A>(plan: SwarmPlan<A>, member: number): readonly string[] | undefined {
+  if (plan.resolveTools) {
+    return plan.resolveTools(plan.args, member);
+  }
+  return plan.availableTools;
+}
+
+/**
+ * System-prompt sections one member run with: port slim `baseline` + plan
+ * `system` override. Override string → replace; override `undefined` → drop
+ * (model keep own default); left out → keep baseline. Section id opaque here;
+ * port map resolved section to system-message. Empty when no baseline and no
+ * `system`.
+ *
+ * @param {SwarmPlan<A>} plan - The plan.
+ * @param {number} member - Zero-based member index.
+ * @param {Readonly<Record<string, string>>} baseline - Port slim section defaults.
+ * @returns {Record<string, string>} Resolved sections, undefined-valued dropped.
+ */
+export function composeSystemSections<A>(
+  plan: SwarmPlan<A>,
+  member: number,
+  baseline: Readonly<Record<string, string>>,
+): Record<string, string> {
+  const overrides = plan.system ? plan.system(baseline, plan.args, member) : {};
+  const resolved: Record<string, string> = {};
+  for (const [id, content] of Object.entries({ ...baseline, ...overrides })) {
+    if (typeof content === 'string') {
+      resolved[id] = content;
+    }
+  }
+  return resolved;
+}
+
+/**
+ * Zero-based member indices of plan.
  *
  * @param {SwarmPlan<A>} plan - The plan.
  * @returns {number[]} `[0, 1, …, count-1]`.
@@ -134,10 +176,10 @@ function memberIndices<A>(plan: SwarmPlan<A>): number[] {
 }
 
 /**
- * Check that the member count is a positive integer.
+ * Check member count is positive integer.
  *
  * @param {SwarmPlan<A>} plan - The plan.
- * @returns {DoctorFinding} The count finding.
+ * @returns {DoctorFinding} Count finding.
  */
 function checkCount<A>(plan: SwarmPlan<A>): DoctorFinding {
   const n = memberCount(plan);
@@ -148,13 +190,11 @@ function checkCount<A>(plan: SwarmPlan<A>): DoctorFinding {
 }
 
 /**
- * Check that every member's brief renders to a non-empty string without
- * throwing — the check that catches the off-by-one that only bites the last
- * member.
+ * Check every member brief render to non-empty string without throw.
  *
  * @param {SwarmPlan<A>} plan - The plan.
- * @param {number[]} members - The member indices.
- * @returns {DoctorFinding} The total-brief finding.
+ * @param {number[]} members - Member indices.
+ * @returns {DoctorFinding} Total-brief finding.
  */
 function checkTotalBrief<A>(
   plan: SwarmPlan<A>,
@@ -179,12 +219,11 @@ function checkTotalBrief<A>(
 }
 
 /**
- * Check that a sample of members render the same brief twice — a cheap guard
- * that `brief` is pure and thus reproducible at release and at validation.
+ * Check sample of members render same brief twice, confirm `brief` pure.
  *
  * @param {SwarmPlan<A>} plan - The plan.
- * @param {number[]} members - The member indices.
- * @returns {DoctorFinding} The purity finding.
+ * @param {number[]} members - Member indices.
+ * @returns {DoctorFinding} Purity finding.
  */
 function checkPurity<A>(plan: SwarmPlan<A>, members: number[]): DoctorFinding {
   const sample = [members[0], members[members.length - 1]];
@@ -197,13 +236,12 @@ function checkPurity<A>(plan: SwarmPlan<A>, members: number[]): DoctorFinding {
 }
 
 /**
- * Check that no two members target the same file — two members editing one file
- * is a write race the release must refuse. Skipped when the plan declares no
+ * Check no two members target same file. Skip when plan declare no
  * `expectFiles`.
  *
  * @param {SwarmPlan<A>} plan - The plan.
- * @param {number[]} members - The member indices.
- * @returns {DoctorFinding} The file-conflict finding.
+ * @param {number[]} members - Member indices.
+ * @returns {DoctorFinding} File-conflict finding.
  */
 function checkFileConflict<A>(
   plan: SwarmPlan<A>,
@@ -225,23 +263,16 @@ function checkFileConflict<A>(
 }
 
 /**
- * Check that no two members share a resume key.
+ * Check no two members share resume key.
  *
- * A key is a member's identity across runs: `alreadyDone(key)` is the whole
- * resume mechanism, and a duplicate makes it answer for the wrong member. The
- * failure is silent and asymmetric — the first member with a given key runs, and
- * every later member sharing it is reported `skipped`, which reads exactly like
- * a legitimate resume. A plan that derives keys from a filename will collide the
- * moment two of its inputs are named alike in different directories, and nothing
- * downstream can tell that apart from work already done.
- *
- * This is the resume-dimension twin of {@link checkFileConflict}: that one
- * refuses two members writing one file, this one refuses two members *being* the
- * same member.
+ * Key is member identity across runs; `alreadyDone(key)` is resume mechanism,
+ * duplicate make it answer for wrong member. Failure silent: first member with
+ * given key run, every later member share it reported `skipped`. Same
+ * conflict check as {@link checkFileConflict}, over resume keys.
  *
  * @param {SwarmPlan<A>} plan - The plan.
- * @param {number[]} members - The member indices.
- * @returns {DoctorFinding} The key-collision finding.
+ * @param {number[]} members - Member indices.
+ * @returns {DoctorFinding} Key-collision finding.
  */
 function checkKeyCollision<A>(
   plan: SwarmPlan<A>,
@@ -264,15 +295,12 @@ function checkKeyCollision<A>(
 }
 
 /**
- * Check that every path a member attaches as context is a real path — a
- * non-empty string. Existence cannot be checked here (the domain reads no
- * filesystem), but a plan that computes a blank or missing path is a defect
- * worth catching before the first member is dispatched rather than after the
- * tokens for the members ahead of it are already spent.
+ * Check every path a member attach as context is non-empty string. Existence
+ * not checked here; domain read no filesystem.
  *
  * @param {SwarmPlan<A>} plan - The plan.
- * @param {number[]} members - The member indices.
- * @returns {DoctorFinding} The context-paths finding.
+ * @param {number[]} members - Member indices.
+ * @returns {DoctorFinding} Context-paths finding.
  */
 function checkContextPaths<A>(
   plan: SwarmPlan<A>,
@@ -296,11 +324,11 @@ function checkContextPaths<A>(
 }
 
 /**
- * Validate a plan before release. Returns one finding per check; a release is
- * refused when any finding is not ok.
+ * Validate plan before release. Return one finding per check; release refuse
+ * when any finding not ok.
  *
  * @param {SwarmPlan<A>} plan - The plan.
- * @returns {DoctorFinding[]} The findings, in check order.
+ * @returns {DoctorFinding[]} Findings, in check order.
  */
 export function doctorPlan<A>(plan: SwarmPlan<A>): DoctorFinding[] {
   const count = checkCount(plan);

@@ -1,13 +1,11 @@
 /**
- * PAW Daemon Router Tests
+ * PAW daemon router test.
  *
- * @fileoverview Every route arm and — more importantly — every refusal. The
- * gates are tested from the attacker's side: a rebinding `Host`, a page's
- * `Origin`, a missing or wrong bearer token, a preflight from a stranger. The
- * page stays reachable without a credential because it carries no data; nothing
- * under `/api/` does. The last group is the one that matters most in review: the
- * token must never appear in a response, and a refusal must never leak whether
- * the resource behind it exists.
+ * @fileoverview Test every route branch. Test every refusal most. Test gate from
+ * attacker side: rebind `Host`, page `Origin`, miss or wrong bearer token,
+ * stranger preflight. Page stay reachable without credential, carry no data;
+ * nothing under `/api/` carry data. Last group matter most in review: token never
+ * appear in response, refusal never leak whether resource behind it exist.
  *
  * @module @paw/daemon/test/router
  * @version 0.0.0
@@ -50,11 +48,11 @@ const deps: RouterDeps = {
 };
 
 /**
- * A request as the console's own page would send it.
+ * Request, same way console own page send it.
  *
  * @param {string} path - The path.
- * @param {Partial<HttpRequest>} [over] - Overrides.
- * @returns {HttpRequest} The request.
+ * @param {Partial<HttpRequest>} [over] - Override.
+ * @returns {HttpRequest} The request, built.
  */
 const req = (path: string, over: Partial<HttpRequest> = {}): HttpRequest => ({
   method: 'GET',
@@ -76,9 +74,8 @@ describe('the page', () => {
       expect(res.headers['content-type']).toContain('text/html');
       expect(res.headers['content-security-policy']).toContain(`wss://127.0.0.1:${PORT}`);
       expect(res.body).toBe(deps.page);
-      // The grant names the bundle by digest rather than permitting inline
-      // scripts in general, so a script injected through a rendering bug is
-      // refused by the browser rather than run.
+      // Grant name bundle by digest, no allow inline script general. Script
+      // injected via rendering bug — browser refuse, no run it.
       expect(res.headers['content-security-policy']).toContain("script-src 'sha256-");
       expect(res.headers['content-security-policy']).not.toContain("script-src 'unsafe-inline'");
     }
@@ -298,6 +295,65 @@ describe('the routes themselves', () => {
     expect(JSON.parse(res.body)).toEqual([]);
   });
 
+  it('forgets a recent route on an authorized DELETE, returning the new list', async () => {
+    const forgotten: string[] = [];
+    const res = await route(
+      req('/api/recent', { method: 'DELETE', query: new URLSearchParams('route=/repo/a') }),
+      {
+        ...deps,
+        forgetRecent: async (target) => {
+          forgotten.push(target);
+          return ['/repo/b'];
+        },
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual(['/repo/b']);
+    expect(forgotten).toEqual(['/repo/a']);
+  });
+
+  it('404s a recent DELETE that names no route or has no store behind it', async () => {
+    const withStore = { ...deps, forgetRecent: async () => [] };
+    expect((await route(req('/api/recent', { method: 'DELETE' }), withStore)).status).toBe(404);
+    expect(
+      (
+        await route(
+          req('/api/recent', { method: 'DELETE', query: new URLSearchParams('route=/x') }),
+          deps,
+        )
+      ).status,
+    ).toBe(404);
+  });
+
+  it('gates a recent DELETE on origin and token like every API call', async () => {
+    const withStore = { ...deps, forgetRecent: async () => [] };
+    const q = new URLSearchParams('route=/repo/a');
+    expect(
+      (
+        await route(
+          req('/api/recent', {
+            method: 'DELETE',
+            query: q,
+            headers: { origin: 'https://evil.example' },
+          }),
+          withStore,
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await route(
+          req('/api/recent', {
+            method: 'DELETE',
+            query: q,
+            headers: { authorization: 'Bearer wrong' },
+          }),
+          withStore,
+        )
+      ).status,
+    ).toBe(401);
+  });
+
   it('rejects a write, wherever it is aimed', async () => {
     expect((await route(req('/', { method: 'POST' }), deps)).status).toBe(405);
     expect((await route(req('/api/state', { method: 'DELETE' }), deps)).status).toBe(405);
@@ -359,13 +415,13 @@ const control = {
 const cdeps: RouterDeps = { ...deps, control };
 
 /**
- * A write request as the console's own page would send it: a bearer token, the
- * daemon's origin, and a JSON body.
+ * Write request, same way console own page send it: bearer token, daemon origin,
+ * JSON body.
  *
  * @param {string} method - The write method.
  * @param {string} path - The path.
- * @param {Partial<HttpRequest>} [over] - Overrides.
- * @returns {HttpRequest} The request.
+ * @param {Partial<HttpRequest>} [over] - Override.
+ * @returns {HttpRequest} The request, built.
  */
 const write = (method: string, path: string, over: Partial<HttpRequest> = {}): HttpRequest =>
   req(path, {

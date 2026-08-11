@@ -1,29 +1,22 @@
 /**
  * PAW Store Schema
  *
- * @fileoverview The tables the hex store owns, as SQL both supported engines
- * accept. This is deliberately not the legacy nine-table schema: PAW has one
- * operator and no deployed copies, so the schema is written for the domain that
- * exists today rather than migrated from the one that accreted. `Violation`
- * carries five fields, so the table carries five columns plus the two the store
- * needs to scope and retire a row — no `severity`, no `hook_event`, and no
- * mandatory `memory_type_id` foreign key into a table nothing reads.
+ * @fileoverview Tables hex store own, SQL both supported engines accept.
+ * `Violation` carry five fields; table carry those five columns plus two store
+ * need to scope and retire row. No `severity`, no `hook_event`, no
+ * `memory_type_id` foreign key.
  *
- * @todo Not the destination shape. Three known pieces of future work, recorded
- * here so the shortcuts are deliberate rather than forgotten:
+ * @todo Not destination shape. Three piece future work:
  *
- * 1. **Migrations.** This applies idempotent DDL and nothing else, which works
- *    only while every column is additive and no deployed database exists. Once
- *    a column changes type or meaning, this needs a real versioned migration
- *    path — a `schema_version` row and ordered steps — not `IF NOT EXISTS`.
- * 2. **Modularisation into a pseudo-ORM.** Table definitions, the SQL that
- *    reads them, and the row-to-domain mapping are currently spread across this
- *    file and `sqlStore.ts`. They belong together per aggregate, so adding a
- *    table is one module rather than an edit in three places.
- * 3. **The nine columns return.** `severity`, `hook_event`, `memory_type_id`
- *    and the rest were dropped because nothing in the hex domain reads them
- *    yet, not because they are unwanted. They come back with the surfaces that
- *    need them, and `Violation` grows to match.
+ * 1. **Migrations.** Apply idempotent DDL only; work while every column
+ *    additive and no deployed database exist. Column type or meaning change
+ *    need versioned migration path: `schema_version` row and ordered steps.
+ * 2. **Modularisation into pseudo-ORM.** Table definitions, SQL that read
+ *    them, row-to-domain mapping span this file and `sqlStore.ts`. Group
+ *    them per aggregate; adding table become one module.
+ * 3. **The nine columns return.** `severity`, `hook_event`, `memory_type_id` and
+ *    the rest dropped; nothing in hex domain read them yet. They return
+ *    with surfaces that need them, and `Violation` grow to match.
  *
  * @module @paw/adapters/store/sql/schema
  * @version 0.0.0
@@ -32,8 +25,8 @@
  */
 
 /**
- * Idempotent DDL for the store. Applied on every open, so a fresh database and
- * an existing one converge to the same shape.
+ * Idempotent DDL for store. Applied on every open; fresh database and
+ * existing one converge to same shape.
  */
 export const STORE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS violations (

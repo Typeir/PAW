@@ -1,9 +1,7 @@
 /**
  * Crumb Atom
  *
- * @fileoverview The heading every subsystem view opens with: the section name as
- * the page's one `h1`, with an optional monospace subtitle for the path or run
- * the view is showing.
+ * @fileoverview Heading open every subsystem view. Section name be page one `h1`. Optional monospace subtitle show path or run in view.
  *
  * @module @paw/gui/presentation/atoms/crumb
  * @version 0.0.0
@@ -17,9 +15,9 @@ import type { ReactNode } from 'react';
  * Props for {@link Crumb}.
  *
  * @interface CrumbProps
- * @property {string} title - The section title.
- * @property {string} [sub] - An optional monospace subtitle.
- * @property {ReactNode} [children] - Controls that belong to the heading, e.g. a plan picker.
+ * @property {string} title - Section title.
+ * @property {string} [sub] - Optional monospace subtitle.
+ * @property {ReactNode} [children] - Controls belong to heading, e.g. plan picker.
  */
 export interface CrumbProps {
   readonly title: string;
@@ -28,9 +26,9 @@ export interface CrumbProps {
 }
 
 /**
- * A view heading.
+ * View heading.
  *
- * @param {CrumbProps} props - The crumb props.
+ * @param {CrumbProps} props - Crumb props.
  * @returns {JSX.Element} The heading.
  */
 export function Crumb({ title, sub, children }: CrumbProps) {

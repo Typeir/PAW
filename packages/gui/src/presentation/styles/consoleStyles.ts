@@ -1,15 +1,14 @@
 /**
  * PAW GUI Styles
  *
- * @fileoverview The console's stylesheet as a string, mounted by the React tree
- * itself so the page a test renders is the page a user sees. It is the
- * instrument-panel design from the pawd-console mockup: a dark home lit from
- * within, an amber brand/running accent, and teal / gold / brick / slate
- * semantic colours for done / warn / fail / idle. Colour lives only in CSS
- * custom properties, redefined for dark and light under both
- * `prefers-color-scheme` and an explicit `data-theme`, so the viewer's OS
- * preference and the in-titlebar toggle both win. Typography leans monospace —
- * this is a control surface, not prose.
+ * @fileoverview Console stylesheet as string, mounted by React tree. Tests
+ * render the same page a user sees. Instrument-panel design from pawd-console
+ * mockup: dark page with translucent glow, amber brand/running accent,
+ * teal/gold/brick/slate semantic colours for done/warn/fail/idle. Colours
+ * defined only in CSS custom properties, redefined for dark and light under
+ * both `prefers-color-scheme` and explicit `data-theme`. Viewer OS preference
+ * and in-titlebar toggle each select a theme. Monospace typography, matching
+ * a control surface.
  *
  * @module @paw/gui/presentation/styles/consoleStyles
  * @version 0.0.0
@@ -18,7 +17,7 @@
  */
 
 /**
- * The full stylesheet, injected into the page and asserted by tests.
+ * Full stylesheet. Inject into page, assert by tests.
  *
  * @constant
  * @type {string}
@@ -79,8 +78,8 @@ body {
   line-height: 1.5;
 }
 
-/* One grid for the whole console: the bar spans both columns, the rail is the
-   first column and stretches to the bottom because its row is the free space. */
+/* One grid for whole console: bar spans both columns, rail is first column,
+   main area stretches to bottom over the free row. */
 [data-shell] {
   display: grid;
   grid-template-columns: 216px 1fr;
@@ -90,7 +89,7 @@ body {
 }
 [data-shell] > header { grid-column: 1 / -1; }
 
-/* A real window in the desktop shell, whose frame this draws. */
+/* Desktop shell renders a window; this block draws its frame. */
 [data-shell="desktop"] {
   max-width: 1180px; margin: clamp(12px, 3vw, 40px) auto;
   min-height: min(640px, calc(100vh - 2 * clamp(12px, 3vw, 40px)));
@@ -294,9 +293,13 @@ dl, dd { margin: 0; }
 .scope-route:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .scope-route:disabled { opacity: .5; cursor: not-allowed; }
 .scope-recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.scope-recent-item { width: 100%; text-align: left; font-family: var(--mono); font-size: 11px;
+.scope-recent li { display: flex; align-items: center; gap: 4px; }
+.scope-recent-item { flex: 1; min-width: 0; text-align: left; font-family: var(--mono); font-size: 11px;
   padding: 6px 10px; border-radius: var(--r); border: 1px solid var(--line-soft); background: var(--panel-2);
   color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.scope-remove { flex-shrink: 0; padding: 4px 7px; border-radius: var(--r); border: 1px solid transparent;
+  background: none; color: var(--ink-faint); font-size: 11px; cursor: pointer; }
+.scope-remove:hover { color: var(--crit); border-color: var(--line); }
 .scope-recent-item:hover:not([disabled]) { color: var(--ink); border-color: var(--line); }
 .scope-recent-item:active:not([disabled]) { transform: translateY(1px); }
 .scope-recent-item[disabled] { opacity: .5; cursor: not-allowed; }
@@ -387,6 +390,9 @@ pre .i { color: var(--accent); }
 .cmdbar { margin-top: 14px; display: flex; align-items: center; gap: 12px; padding: 10px 14px;
   background: var(--rail); border: 1px solid var(--line); border-radius: var(--r);
   font-family: var(--mono); font-size: 11px; color: var(--ink-faint); overflow-x: auto; }
+.cmdbar-live { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-dim);
+  cursor: pointer; user-select: none; }
+.cmdbar-live input { accent-color: var(--accent); }
 .cmdbar kbd { background: var(--panel); border: 1px solid var(--line); border-bottom-width: 2px;
   border-radius: 5px; padding: 1px 6px; color: var(--ink-dim); font-family: var(--mono); font-size: 10.5px; }
 .cmdbar .sep { color: var(--line); }
@@ -424,7 +430,7 @@ pre .i { color: var(--accent); }
   transition: transform .2s ease; }
 .treeselect .chevron.open { transform: rotate(180deg); }
 
-.treedropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50;
+.treedropdown { position: fixed; z-index: 60;
   max-height: 280px; overflow-y: auto; padding: 4px 0;
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--r);
   box-shadow: 0 14px 34px -18px rgba(0,0,0,.75); }
@@ -477,6 +483,26 @@ pre .i { color: var(--accent); }
 .selectdropdown { position: absolute; top: calc(100% + 4px); left: 0; z-index: 2500;
   min-width: 100%; max-height: 260px; overflow-y: auto; background: var(--panel);
   border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 12px 32px -12px rgba(0,0,0,.6); }
+
+/* Themed thin scrollbars, the Ikuisuus 6px pattern in PAW's palette: transparent
+   track, line-colour thumb; Firefox uses the same via scrollbar-color. */
+.treedropdown, .selectdropdown, .modal, pre, .brieftext, .herd-groups {
+  scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.treedropdown::-webkit-scrollbar, .selectdropdown::-webkit-scrollbar,
+.modal::-webkit-scrollbar, pre::-webkit-scrollbar,
+.brieftext::-webkit-scrollbar, .herd-groups::-webkit-scrollbar {
+  width: 6px; height: 6px; }
+.treedropdown::-webkit-scrollbar-track, .selectdropdown::-webkit-scrollbar-track,
+.modal::-webkit-scrollbar-track, pre::-webkit-scrollbar-track,
+.brieftext::-webkit-scrollbar-track, .herd-groups::-webkit-scrollbar-track {
+  background: transparent; }
+.treedropdown::-webkit-scrollbar-thumb, .selectdropdown::-webkit-scrollbar-thumb,
+.modal::-webkit-scrollbar-thumb, pre::-webkit-scrollbar-thumb,
+.brieftext::-webkit-scrollbar-thumb, .herd-groups::-webkit-scrollbar-thumb {
+  background-color: var(--line); border-radius: 3px; }
+.treedropdown:hover, .selectdropdown:hover { scrollbar-color: var(--ink-faint) transparent; }
+.treedropdown:hover::-webkit-scrollbar-thumb, .selectdropdown:hover::-webkit-scrollbar-thumb {
+  background-color: var(--ink-faint); }
 .selectsearch { width: 100%; box-sizing: border-box; padding: 7px 10px; background: var(--panel-2);
   color: var(--ink); border: 0; border-bottom: 1px solid var(--line-soft); font-family: var(--mono); font-size: 12px; }
 .selectdropdown ul { list-style: none; margin: 0; padding: 4px; }

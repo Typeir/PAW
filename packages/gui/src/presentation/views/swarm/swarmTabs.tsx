@@ -1,10 +1,9 @@
 /**
  * Swarm Tabs
  *
- * @fileoverview The Plan / Herd / Logs tab bar, wired as a real ARIA tablist so
- * the panel below is announced as the tab's content. The Herd tab carries the
- * confirmed-over-dispatched badge, which is the one number an operator watching
- * a run keeps an eye on.
+ * @fileoverview Plan / Herd / Logs tab bar. ARIA tablist. Panel below
+ * announce as tab content. Herd tab carry confirmed-over-dispatched badge.
+ * Operator watching run reads that number.
  *
  * @module @paw/gui/presentation/views/swarm/swarmTabs
  * @version 0.0.0
@@ -22,8 +21,8 @@ import type { Tab } from '../../../domain/console.types.js';
  * Props for {@link TabButton}.
  *
  * @interface TabButtonProps
- * @property {Tab} id - The tab this button selects.
- * @property {React.ReactNode} children - The tab label.
+ * @property {Tab} id - Tab button select.
+ * @property {React.ReactNode} children - Tab label.
  */
 interface TabButtonProps {
   readonly id: Tab;
@@ -33,8 +32,8 @@ interface TabButtonProps {
 /**
  * One tab button.
  *
- * @param {TabButtonProps} props - The button props.
- * @returns {JSX.Element} The tab.
+ * @param {TabButtonProps} props - Button props.
+ * @returns {JSX.Element} Tab.
  */
 function TabButton({ id, children }: TabButtonProps) {
   const tab = useTab();
@@ -55,9 +54,9 @@ function TabButton({ id, children }: TabButtonProps) {
 }
 
 /**
- * The Swarm view's tab bar.
+ * Swarm view tab bar.
  *
- * @returns {JSX.Element} The tabs.
+ * @returns {JSX.Element} Tabs.
  */
 export function SwarmTabs() {
   const { run } = useConsoleData();

@@ -1,16 +1,15 @@
 /**
  * PAW Daemon (pawd)
  *
- * @fileoverview The process shell: parse `argv`, start {@link runDaemon} on the
- * real node runtime, print the URL, and stay up. It serves a repository —
- * `pawd` with no arguments serves the working directory, discovering its config
- * and every plan in it; a plan path is only the one to open on. It holds no
- * rules, and is excluded from unit coverage as the argv/stdout shell; what it
- * composes is unit- and integration-tested to 100%. Fails loud: a plan the repo
- * does not hold, or a plan-less module, exits non-zero.
+ * @fileoverview Process shell. Parse `argv`, start {@link runDaemon} on real
+ * node runtime, print URL, stay up. Serve repo. `pawd` no argument serve
+ * working dir, find its config and every plan in it. Plan path open only
+ * that one. Hold no rules. Exclude from unit coverage as argv/stdout shell;
+ * compose test to 100% unit and integration. Exit non-zero: plan the repo
+ * does not hold, or plan-less module.
  *
- *   pawd                                  serve the repo you are standing in
- *   pawd --root=../other --port=8971      serve another repo, on a chosen port
+ *   pawd                                  serve repo you stand in
+ *   pawd --root=../other --port=8971      serve another repo, on chosen port
  *   pawd plans/lore.swarm.mjs             serve this repo, open on that plan
  *
  * @module @paw/daemon/main

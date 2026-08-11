@@ -1,11 +1,10 @@
 /**
- * @fileoverview End-to-end tests for the `doctor` and `swarm` commands. These
- * spawn `main.ts` as a real process against fixture files on disk — a config the
- * doctor validates and a `.swarm.mjs` plan the router dynamically imports — and
- * assert the printed report and the exit code. This is the E2E tier from
- * CONSTRAINTS.md Constraint 1: it, not a unit test, covers the process shell, the
- * file loaders, and the dynamic import in `main.ts`. Fails loud is asserted too —
- * an unknown command and a plan-less module both exit non-zero.
+ * @fileoverview E2E test for `doctor` and `swarm` command. Spawn `main.ts` as
+ * real process on fixture files — config doctor validates and `.swarm.mjs`
+ * plan router import dynamic — then check printed report and exit code. E2E
+ * tier from CONSTRAINTS.md Constraint 1, cover process shell, file loaders,
+ * dynamic import in `main.ts`. Fail-loud assert: unknown command and plan-less
+ * module both exit non-zero.
  *
  * @module @paw/cli/test/e2e/cli
  */
@@ -22,8 +21,8 @@ const MAIN = join(PKG, 'src', 'infrastructure', 'main.ts');
 const FIX = join(HERE, '..', 'fixtures');
 
 /**
- * Run the CLI as a child process with the given argv, resolving with its stdout,
- * stderr, and exit code.
+ * Run CLI as child process with given argv, resolve with stdout, stderr, exit
+ * code.
  *
  * @param args - The argv after the script path.
  */

@@ -1,11 +1,10 @@
 /**
- * PAW Live Session Contracts
+ * PAW live session contract.
  *
- * @fileoverview The shapes a live console session is described by — the socket it
- * needs, what the daemon around it supplies, where it is in its life, and the
- * registry that holds them all. Pure types over `@paw/core`: the behaviour lives
- * in `application/session*`, and lifting the contracts here lets the socket
- * adapter and the daemon reference them without pulling the machine in.
+ * @fileoverview Shape of live console session: socket it need, what daemon
+ * supply, its life state, registry that hold them. Pure type over
+ * `@paw/core`; behavior live in `application/session*`. Socket adapter and
+ * daemon reference these contract. No import machine.
  *
  * @module @paw/daemon/domain/session
  * @version 0.0.0
@@ -22,12 +21,12 @@ import type {
 } from '@paw/core';
 
 /**
- * The socket, as a session needs it.
+ * Socket, as session need it.
  *
  * @interface WsSessionPort
- * @property {(text: string) => void} send - Send one frame of text.
- * @property {(code: number, reason: string) => void} close - Close with a code.
- * @property {() => number} bufferedAmount - Bytes queued and not yet written.
+ * @property {(text: string) => void} send - Send one frame text.
+ * @property {(code: number, reason: string) => void} close - Close with code.
+ * @property {() => number} bufferedAmount - Byte queued, not yet write.
  */
 export interface WsSessionPort {
   send(text: string): void;
@@ -36,18 +35,18 @@ export interface WsSessionPort {
 }
 
 /**
- * What a session needs from the daemon around it.
+ * What session need from daemon around it.
  *
  * @interface SessionDeps
- * @property {string} token - The credential a client must present.
- * @property {() => number} clock - Epoch milliseconds; stamps frames and drives windows and staleness.
- * @property {(plan: string | null) => Promise<PawSnapshot>} snapshot - The full state for a plan.
- * @property {() => readonly string[]} plans - The plans the repository holds.
- * @property {(message: string) => void} warn - Report something without dying of it.
- * @property {(path: string, mode: InitMode) => void} [onAttach] - Hand an attach request to whoever started the daemon; omit to refuse it.
- * @property {(path: string) => void} [onScope] - Point the daemon at a repository; omit when it is already scoped.
- * @property {(settings: RunSettings) => void} [onRelease] - Hand a release request to whoever started the daemon; omit to refuse it. Like attach, nothing runs and nothing is spent until the operator approves in the terminal.
- * @property {string} [scopeCeiling] - The directory a scope request may not escape; a missing ceiling refuses every request.
+ * @property {string} token - Credential client must show.
+ * @property {() => number} clock - Epoch millisecond; stamp frame, drive window and staleness.
+ * @property {(plan: string | null) => Promise<PawSnapshot>} snapshot - Full state for plan.
+ * @property {() => readonly string[]} plans - Plans repository hold.
+ * @property {(message: string) => void} warn - Report non-fatal condition.
+ * @property {(path: string, mode: InitMode) => void} [onAttach] - Hand attach request to whoever start daemon; omit and refuse it.
+ * @property {(path: string) => void} [onScope] - Point daemon at repository; omit when already scoped.
+ * @property {(settings: RunSettings) => void} [onRelease] - Hand release request to whoever start daemon; omit and refuse it. Like attach, nothing run, nothing spend, til operator approve in terminal.
+ * @property {string} [scopeCeiling] - Directory scope request no escape; missing ceiling refuse every request.
  */
 export interface SessionDeps {
   readonly token: string;
@@ -62,7 +61,7 @@ export interface SessionDeps {
 }
 
 /**
- * Where a session is in its life.
+ * Phase of session lifecycle.
  *
  * @typedef {'pre-auth' | 'live' | 'closed'} SessionState
  */
@@ -72,11 +71,11 @@ export type SessionState = 'pre-auth' | 'live' | 'closed';
  * One connected client.
  *
  * @interface LiveSession
- * @property {() => SessionState} state - Where it is.
- * @property {() => string | null} watching - Which plan it is watching.
+ * @property {() => SessionState} state - Where it sit.
+ * @property {() => string | null} watching - Which plan it watch.
  * @property {(raw: string) => Promise<void>} receive - Handle one client frame.
- * @property {Function} emit - Offer it a published slice.
- * @property {(nowMs: number) => void} tick - Advance its timers.
+ * @property {Function} emit - Offer published slice.
+ * @property {(nowMs: number) => void} tick - Advance timer.
  * @property {(code: number, reason: string) => void} close - Close it.
  */
 export interface LiveSession {
@@ -89,13 +88,13 @@ export interface LiveSession {
 }
 
 /**
- * Told when a session authenticates or fails to, so the registry can hold the
- * counts one socket cannot see.
+ * Notified when session authenticates or fails to. Registry holds count; the
+ * socket cannot read it.
  *
  * @interface SessionWatcher
- * @property {() => void} onAuthenticated - The session proved itself.
- * @property {() => void} onAuthFailed - It did not.
- * @property {() => void} onClosed - It is gone.
+ * @property {() => void} onAuthenticated - Session authenticated.
+ * @property {() => void} onAuthFailed - Session failed to authenticate.
+ * @property {() => void} onClosed - Session closed.
  */
 export interface SessionWatcher {
   onAuthenticated(): void;
@@ -104,17 +103,17 @@ export interface SessionWatcher {
 }
 
 /**
- * Every open session, and the counts the upgrade gate reads.
+ * Every open session, plus the live count the upgrade gate reads.
  *
  * @interface SessionRegistry
- * @property {Function} open - Register a new socket as a session.
- * @property {() => number} live - How many have authenticated.
- * @property {() => number} preAuth - How many have not yet.
- * @property {() => number} failedAuths - How many credentials have been refused, for reporting.
- * @property {() => readonly string[]} watched - Every plan a live session is watching, deduplicated.
- * @property {Function} broadcast - Offer a slice to every live session.
- * @property {(nowMs: number) => void} tick - Advance every session's timers.
- * @property {() => void} shutdown - Close every session, because the daemon is going away.
+ * @property {Function} open - Register new socket as session.
+ * @property {() => number} live - How many authenticate.
+ * @property {() => number} preAuth - How many no yet.
+ * @property {() => number} failedAuths - How many credential refuse, for report.
+ * @property {() => readonly string[]} watched - Every plan live session watch, dedup.
+ * @property {Function} broadcast - Offer slice to every live session.
+ * @property {(nowMs: number) => void} tick - Advance every session timer.
+ * @property {() => void} shutdown - Close every session on daemon shutdown.
  */
 export interface SessionRegistry {
   open(port: WsSessionPort, openedOn: string | null): LiveSession;

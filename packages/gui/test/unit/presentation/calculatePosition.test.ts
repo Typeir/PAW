@@ -1,7 +1,6 @@
 /**
- * @fileoverview Covers `calculatePosition` on every placement, each viewport flip,
- * and both horizontal clamps — so the pure tooltip math reaches 100% with
- * fabricated rects and no real layout.
+ * @fileoverview Exercise `calculatePosition` on every placement, each viewport flip,
+ * and both horizontal clamps, passing fabricated rects.
  *
  * @module @paw/gui/test/unit/presentation/calculatePosition
  */
@@ -9,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { calculatePosition } from '../../../src/presentation/lib/calculatePosition.js';
 
-/** jsdom's default viewport is 1024×768. */
+/** jsdom default viewport 1024×768. */
 const rect = (left: number, top: number, width: number, height: number): DOMRect =>
   ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top } as DOMRect);
 

@@ -1,8 +1,8 @@
 /**
- * @fileoverview Unit tests for the thin hook bridge. With the RPC call injected,
- * they pin the only logic left in the client: a valid payload is forwarded and
- * the daemon's answer written; a null (fail-open) answer becomes a bare continue;
- * a malformed or non-object payload is sent as empty. So `hook.ts` reaches 100%.
+ * @fileoverview Unit tests for thin hook bridge. Inject RPC call, pin client
+ * logic: forward valid payload, write daemon answer; null (fail-open) answer
+ * become bare continue; malformed or non-object payload send empty. `hook.ts`
+ * reach 100%.
  *
  * @module @paw/cli/test/unit/hook
  */
@@ -15,7 +15,7 @@ const io = (stdin: string): HookIo & { out: string[] } => {
   return { out, readStdin: async () => stdin, writeStdout: (t) => out.push(t) };
 };
 
-/** A fake RPC call that records the params it was given and returns `ret`. */
+/** Fake RPC call. Record params it get. Return `ret`. */
 const fakeCall = (ret: unknown | null) => {
   const params: unknown[] = [];
   const call: typeof import('@paw/daemon').rpcCall = async (_s, _t, _m, p) => {

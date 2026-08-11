@@ -1,11 +1,8 @@
 /**
  * Nav Item Atom
  *
- * @fileoverview A rail entry. It reads the active section and the navigation
- * action straight from context, so the rail is a list of what exists rather than
- * a component that threads selection state and a callback down from the shell.
- * The active item carries `aria-current`, so the rail announces where the
- * operator is rather than only colouring it.
+ * @fileoverview Rail entry. Reads active section and nav action from
+ * context. Active item sets `aria-current`. Clicking calls goto(id).
  *
  * @module @paw/gui/presentation/atoms/navItem
  * @version 0.0.0
@@ -22,12 +19,12 @@ import type { Section } from '../../domain/console.types.js';
  * Props for {@link NavItem}.
  *
  * @interface NavItemProps
- * @property {Section} id - The section this item selects.
- * @property {LucideIcon} icon - The leading icon component.
- * @property {string} label - The item label.
- * @property {number} [count] - A trailing count.
- * @property {boolean} [crit] - Colour the count critical.
- * @property {boolean} [dot] - Show an active dot instead of a count.
+ * @property {Section} id - Section this item pick.
+ * @property {LucideIcon} icon - Leading icon component.
+ * @property {string} label - Item label.
+ * @property {number} [count] - Trailing count.
+ * @property {boolean} [crit] - Colour count critical.
+ * @property {boolean} [dot] - Show active dot, no count.
  */
 export interface NavItemProps {
   readonly id: Section;
@@ -39,9 +36,9 @@ export interface NavItemProps {
 }
 
 /**
- * A rail navigation item.
+ * Rail navigation item.
  *
- * @param {NavItemProps} props - The item props.
+ * @param {NavItemProps} props - Item props.
  * @returns {JSX.Element} The item.
  */
 export function NavItem({ id, icon: Icon, label, count, crit, dot }: NavItemProps) {

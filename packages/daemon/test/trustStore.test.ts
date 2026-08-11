@@ -1,10 +1,9 @@
 /**
- * Trust Store Plan Tests
+ * Trust store plan tests.
  *
- * @fileoverview What `paw trust` will run, checked per platform from any
- * platform. The assertions that matter are not "does it call certutil" but the
- * two properties the plans exist to hold: nothing asks for elevation, and
- * anything that cannot be automated is stated instead of skipped.
+ * @fileoverview Checks the `paw trust` plan runs on any platform. Asserts no
+ * step requires elevation and anything not automated is spelled out in the
+ * manual text.
  *
  * @module @paw/daemon/test/trustStore
  * @version 0.0.0
@@ -36,10 +35,10 @@ describe('planTrust', () => {
     const plan = planTrust('darwin', CA, HOME);
     expect(plan.steps).toHaveLength(1);
     expect(plan.steps[0].command).toBe('security');
-    // Asserted exactly, not by `toContain`. Without `-p ssl`,
-    // Security.framework treats the trust setting as unrestricted and the CA
-    // becomes trusted for code signing and S/MIME too — and a containment
-    // assertion stays green when someone deletes the flag.
+    // Assert exact with `toEqual`, not `toContain`. Without `-p ssl` the
+    // Security.framework trust setting is unrestricted, so the CA is trusted
+    // for code signing and S/MIME too. A containment assertion stays green if
+    // that flag is removed.
     expect(plan.steps[0].args).toEqual([
       'add-trusted-cert',
       '-r',
@@ -56,9 +55,8 @@ describe('planTrust', () => {
   it('discloses on Windows that the root cannot be scoped, and how to remove it', () => {
     const manual = planTrust('win32', 'C:/paw/identity/ca.crt', 'C:/Users/x').manual.join(' ');
 
-    // certutil has no scoping flag. Saying nothing would leave the operator
-    // believing the grant is as narrow as the macOS one; the honest answer is
-    // to name the gap and what actually bounds it.
+    // certutil has no scoping flag. The manual must state the grant is not
+    // narrowed like the macOS one: it names the gap and what bounds it.
     expect(manual).toContain('no flag to scope');
     expect(manual).toContain('name constraints');
     expect(manual).toContain('-delstore Root');

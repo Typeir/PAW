@@ -1,29 +1,25 @@
 /**
- * PAW Local Identity Issuance
+ * PAW local identity issuance.
  *
- * @fileoverview The effects behind {@link identity}: generating keys, signing a
- * name-constrained CA and its server certificate, writing them to the machine's
- * PAW home, and locking the private keys down to their owner. Every constant it
- * uses — the permitted subtrees, the validity windows, the rotation rule — comes
- * from the pure policy module; this file is the hands, not the head.
+ * @fileoverview Effects behind {@link identity}: generate keys, sign name-
+ * constrained CA and its server cert, write em to machine's PAW home, lock
+ * private keys to owner. Every constant it use — permitted subtrees, validity
+ * windows, rotation rule — come from pure policy module.
  *
- * The Name Constraints extension is assembled by hand because
- * `@peculiar/x509` ships no class for it: the value is an ASN.1 `NameConstraints`
- * structure serialised with `@peculiar/asn1-schema` and wrapped in the library's
- * generic `Extension`, marked **critical** so any conforming verifier must honour
- * it or reject the chain. Inside a `GeneralSubtree` an IP is encoded as
- * address-plus-mask, which is why the subtrees carry CIDR prefixes and the SAN
- * entries do not.
+ * Assemble Name Constraints extension by hand cause `@peculiar/x509` ship no
+ * class for it: value ASN.1 `NameConstraints` structure serialised with
+ * `@peculiar/asn1-schema`, wrapped in library's generic `Extension`, marked
+ * **critical** so any conforming verifier must honour it or reject chain.
+ * Inside `GeneralSubtree` encode IP as address-plus-mask, so subtrees carry
+ * CIDR prefixes; SAN entries carry addresses.
  *
- * Private keys are written and then **verified** to be owner-only. A key that
- * cannot be locked down is not a key this daemon will serve with, because on a
- * shared machine a readable key is another user's licence to impersonate the
- * operator's console.
+ * Write private keys then **verify** owner-only. On a shared machine, a
+ * readable key lets another user sign as the operator.
  *
- * This is the one file in the package whose types come from `lib.dom` rather
- * than from `@types/node`: WebCrypto's `CryptoKey`, `EcKeyGenParams` and friends
- * are declared there, and `@peculiar/x509`'s public API is written against them.
- * Every tsconfig that compiles this package's sources therefore lists `DOM`.
+ * This the only file in package whose types come from `lib.dom` not
+ * `@types/node`: WebCrypto's `CryptoKey`, `EcKeyGenParams` and friends declared
+ * there, and `@peculiar/x509`'s public API written against em. Every tsconfig
+ * that compiles this package's sources therefore list `DOM`.
  *
  * @module @paw/daemon/nodeIdentity
  * @version 0.0.0
@@ -88,24 +84,24 @@ import {
 cryptoProvider.set(webcrypto as unknown as Crypto);
 
 /**
- * The key algorithm. P-256 is universally supported by browsers and by Node's
- * TLS stack, and is small enough that issuance is imperceptible.
+ * Key algorithm. P-256 universally supported by browsers and Node's TLS
+ * stack, small enough issuance imperceptible.
  */
 const ALGORITHM: EcKeyGenParams = { name: 'ECDSA', namedCurve: 'P-256' };
 
 /**
- * The signature algorithm; the hash lives here, not on the key parameters.
+ * Signature algorithm; hash specified here, on the signing params.
  */
 const SIGNING: EcdsaParams = { name: 'ECDSA', hash: 'SHA-256' } as EcdsaParams;
 
 /**
- * A certificate and the private key that belongs to it, as PEM.
+ * Certificate and the private key belong to it, as PEM.
  *
  * @interface KeyPairPem
- * @property {string} cert - The certificate, PEM.
- * @property {string} key - The private key, PKCS8 PEM.
- * @property {string} fingerprint - SHA-256 of the certificate, formatted for an operator.
- * @property {string} notAfter - When it expires, ISO-8601.
+ * @property {string} cert - Certificate, PEM.
+ * @property {string} key - Private key, PKCS8 PEM.
+ * @property {string} fingerprint - SHA-256 of certificate, formatted for operator.
+ * @property {string} notAfter - When expire, ISO-8601.
  */
 export interface KeyPairPem {
   readonly cert: string;
@@ -115,11 +111,11 @@ export interface KeyPairPem {
 }
 
 /**
- * Wrap an exported PKCS8 key as PEM. `@peculiar/x509` serialises certificates
- * but not private keys, so this is the one piece of encoding done by hand.
+ * Wrap exported PKCS8 key as PEM. `@peculiar/x509` serialise certificates
+ * only; private-key encoding handled here.
  *
- * @param {ArrayBuffer} der - The exported key.
- * @returns {string} The PEM document.
+ * @param {ArrayBuffer} der - Exported key.
+ * @returns {string} PEM document.
  */
 function pkcs8Pem(der: ArrayBuffer): string {
   const body = Buffer.from(der)
@@ -130,21 +126,20 @@ function pkcs8Pem(der: ArrayBuffer): string {
 }
 
 /**
- * The fingerprint of a certificate, as an operator will see it.
+ * Fingerprint of certificate, as operator see it.
  *
- * @param {X509Certificate} cert - The certificate.
- * @returns {Promise<string>} The formatted digest.
+ * @param {X509Certificate} cert - Certificate.
+ * @returns {Promise<string>} Formatted digest.
  */
 async function fingerprintOf(cert: X509Certificate): Promise<string> {
   return formatFingerprint(new Uint8Array(await cert.getThumbprint('SHA-256')));
 }
 
 /**
- * The critical Name Constraints extension that makes this CA safe to trust: it
- * may vouch for loopback and nothing else, so a stolen key cannot forge an
- * identity for any site on the internet.
+ * Critical Name Constraints extension: permits loopback names only, so a
+ * stolen key cannot forge identity for any site on the internet.
  *
- * @returns {Extension} The extension.
+ * @returns {Extension} Extension.
  */
 export function loopbackNameConstraints(): Extension {
   const value = AsnConvert.serialize(
@@ -154,15 +149,14 @@ export function loopbackNameConstraints(): Extension {
         new GeneralSubtree({ base: new AsnGeneralName({ iPAddress: LOOPBACK_V4_SUBTREE }) }),
         new GeneralSubtree({ base: new AsnGeneralName({ iPAddress: LOOPBACK_V6_SUBTREE }) }),
       ]),
-      // Permitted subtrees alone are not enough, and this is the subtle part of
-      // RFC 5280 §4.2.1.10: a subtree constrains only the name forms that are
-      // actually *present* in a certificate — "if no name of the type is in the
-      // certificate, the certificate is acceptable". A leaf carrying only an
-      // email address, a URI, or a directory name therefore satisfies the DNS
-      // and IP subtrees above by having none of them, and a stolen CA key could
-      // mint an S/MIME or code-signing certificate that escapes the constraint
-      // entirely. Excluding those forms with an empty base — which matches every
-      // name of that type — is what closes it.
+      // Permitted subtrees alone not enough, per RFC 5280 §4.2.1.10: subtree
+      // constrain only name forms actually *present* in certificate — "if no
+      // name of the type in the certificate, the certificate acceptable".
+      // A leaf carrying only an email address, URI, or directory name would
+      // satisfy the DNS and IP subtrees above by having none of them, so a
+      // stolen CA key could mint an S/MIME or code-signing certificate that
+      // escapes the constraint. Excluding those forms with an empty base
+      // matches every name of that type, closing that gap.
       excludedSubtrees: new GeneralSubtrees([
         new GeneralSubtree({ base: new AsnGeneralName({ rfc822Name: '' }) }),
         new GeneralSubtree({ base: new AsnGeneralName({ uniformResourceIdentifier: '' }) }),
@@ -173,12 +167,12 @@ export function loopbackNameConstraints(): Extension {
 }
 
 /**
- * Issue the local certificate authority.
+ * Issue local certificate authority.
  *
- * @param {string} user - The operator's username, for the subject.
- * @param {string} host - The machine's hostname, for the subject.
- * @param {Date} now - The issuing time.
- * @returns {Promise<KeyPairPem>} The CA certificate and key.
+ * @param {string} user - Operator's username, for subject.
+ * @param {string} host - Machine's hostname, for subject.
+ * @param {Date} now - Issuing time.
+ * @returns {Promise<KeyPairPem>} CA cert and key.
  */
 export async function issueCa(user: string, host: string, now: Date): Promise<KeyPairPem> {
   const keys = (await webcrypto.subtle.generateKey(ALGORITHM, true, [
@@ -197,12 +191,11 @@ export async function issueCa(user: string, host: string, now: Date): Promise<Ke
       new BasicConstraintsExtension(true, 0, true),
       new KeyUsagesExtension(KeyUsageFlags.keyCertSign | KeyUsageFlags.cRLSign, true),
       loopbackNameConstraints(),
-      // Name constraints bind only the name forms a certificate actually
-      // carries: RFC 5280 says a subtree is satisfied when no name of that type
-      // is present. A certificate with no SAN at all — a code-signing or S/MIME
-      // certificate — is therefore *unconstrained* by the subtrees above. This
-      // EKU is what closes that: every certificate under this CA is for TLS
-      // server authentication or it is nothing.
+      // Name constraints bind only name forms a certificate actually carries:
+      // per RFC 5280 a subtree is satisfied when no name of that type is
+      // present. A certificate with no SAN at all — a code-signing or S/MIME
+      // certificate — would be *unconstrained* by the subtrees above. This EKU
+      // restricts every certificate under this CA to TLS server auth.
       new ExtendedKeyUsageExtension([ExtendedKeyUsage.serverAuth], true),
       await SubjectKeyIdentifierExtension.create(keys.publicKey),
     ],
@@ -216,12 +209,12 @@ export async function issueCa(user: string, host: string, now: Date): Promise<Ke
 }
 
 /**
- * Issue a server certificate from the CA, valid for loopback only.
+ * Issue server certificate from CA, valid for loopback only.
  *
- * @param {string} caCertPem - The CA certificate.
- * @param {string} caKeyPem - The CA private key.
- * @param {Date} now - The issuing time.
- * @returns {Promise<KeyPairPem>} The server certificate and key.
+ * @param {string} caCertPem - CA certificate.
+ * @param {string} caKeyPem - CA private key.
+ * @param {Date} now - Issuing time.
+ * @returns {Promise<KeyPairPem>} Server certificate and key.
  */
 export async function issueLeaf(
   caCertPem: string,
@@ -276,9 +269,9 @@ export async function issueLeaf(
 }
 
 /**
- * A random 64-bit positive serial number, as the hex string the generator wants.
+ * Random 64-bit positive serial number, as hex string generator want.
  *
- * @returns {string} The serial.
+ * @returns {string} Serial.
  */
 function randomSerial(): string {
   const bytes = webcrypto.getRandomValues(new Uint8Array(8));
@@ -287,12 +280,12 @@ function randomSerial(): string {
 }
 
 /**
- * Decode a PEM document's base64 body.
+ * Decode PEM document's base64 body.
  *
- * @param {string} pem - The PEM document.
- * @returns {Uint8Array} The DER bytes, over their own `ArrayBuffer` rather than
- * Node's shared pool — WebCrypto takes a `BufferSource`, and a pooled `Buffer`
- * is typed over `ArrayBufferLike`, which may be shared memory.
+ * @param {string} pem - PEM document.
+ * @returns {Uint8Array} DER bytes over a dedicated `ArrayBuffer`, never Node's
+ * shared pool — WebCrypto take `BufferSource`, and pooled `Buffer` typed over
+ * `ArrayBufferLike`, which may be shared memory.
  */
 export function pemToDer(pem: string): Uint8Array<ArrayBuffer> {
   const raw = Buffer.from(pem.replace(/-----[^-]+-----|\s/g, ''), 'base64');
@@ -302,16 +295,16 @@ export function pemToDer(pem: string): Uint8Array<ArrayBuffer> {
 }
 
 /**
- * Run a program and return its stdout, without a shell — the arguments carry
- * `(OI)(CI)` and a path that may hold spaces, and a shell would be one quoting
- * mistake away from executing part of a filename.
+ * Run program, return stdout, no shell — arguments carry `(OI)(CI)` and path
+ * that may hold spaces, and shell one quoting mistake away from execute part
+ * of filename.
  */
 const run = promisify(execFile);
 
 /**
- * The real permission effects.
+ * System permission effects.
  *
- * @returns {SecretOps} The ops, over this process's account.
+ * @returns {SecretOps} Ops, over this process's account.
  */
 export function nodeSecretOps(): SecretOps {
   return {
@@ -324,11 +317,11 @@ export function nodeSecretOps(): SecretOps {
 }
 
 /**
- * The real identity directory: create it private, read what is there, and write
- * private keys with their permissions proven rather than assumed.
+ * Node identity directory: create private, read what is there, write private
+ * keys, then enforce permissions via hardenSecret and hardenSecretDir.
  *
- * @param {string} platform - The platform, as `os.platform()` reports it.
- * @returns {IdentityIo} The io.
+ * @param {string} platform - Platform, as `os.platform()` report it.
+ * @returns {IdentityIo} Io.
  */
 export function nodeIdentityIo(platform: string): IdentityIo {
   const ops = nodeSecretOps();
@@ -361,18 +354,18 @@ export function nodeIdentityIo(platform: string): IdentityIo {
 }
 
 /**
- * The real issuer.
+ * Issuer backed by WebCrypto certificate generation.
  */
 export const nodeIssuer: IdentityIssuer = { issueCa, issueLeaf };
 
 /**
- * Load — issuing on first run, renewing when due — the identity this machine
- * serves TLS with.
+ * Load — issue on first run, renew when due — identity this machine serve TLS
+ * with.
  *
- * @param {HomeEnv} env - The environment, for locating PAW's home.
- * @param {string} platform - The platform.
- * @param {Date} now - The current time.
- * @returns {Promise<ServerIdentity>} The certificate, its key, and what had to happen.
+ * @param {HomeEnv} env - Environment, for locating PAW's home.
+ * @param {string} platform - Platform.
+ * @param {Date} now - Current time.
+ * @returns {Promise<ServerIdentity>} Certificate, its key, and what had to happen.
  */
 export function nodeServerIdentity(
   env: HomeEnv,

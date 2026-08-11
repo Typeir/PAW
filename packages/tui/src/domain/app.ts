@@ -1,14 +1,12 @@
 /**
  * PAW TUI State
  *
- * @fileoverview The pure heart of the terminal UI: the view state and the
- * reducer. A reducer step takes a message — a keypress or the result of an async
- * action — and returns the next state plus any effects the shell should run. The
- * effects carry no I/O themselves; `main.ts` runs them and feeds their results
- * back as messages. This keeps every transition a snapshot test while letting the
- * TUI drive the same verbs the CLI does: gates on the working tree, and the
- * daemon verbs (status, violations, prune, stop) over the same socket the CLI
- * uses.
+ * @fileoverview DOM-free UI state module: view state and reducer. Reducer step
+ * take message — keypress or result of async action — and hand back next state plus
+ * any effects shell must run. Effect carry no I/O; `main.ts` run them and feed
+ * result back as message. Snapshot test every transition while TUI drive same
+ * verbs CLI do: gates on working tree, daemon verbs (status, violations, prune,
+ * stop) over same socket CLI use.
  *
  * @module @paw/tui/domain/app
  * @version 0.0.0
@@ -26,18 +24,18 @@ import {
 } from '@paw/core';
 
 /**
- * The views the TUI cycles between.
+ * Views TUI cycle between.
  */
 export type View = 'doctor' | 'plan' | 'herd' | 'gates' | 'daemon' | 'config';
 
 /**
- * The resident daemon's self-report, as returned by `daemon.status`.
+ * Resident daemon self-report, same shape as `daemon.status` return.
  *
  * @interface DaemonStatus
- * @property {number} pid - The daemon's process id.
- * @property {number} uptimeMs - Milliseconds since the daemon started.
- * @property {string} health - The daemon's health word.
- * @property {string} projectRoot - The repository the daemon serves.
+ * @property {number} pid - Daemon process id.
+ * @property {number} uptimeMs - Milliseconds since daemon start.
+ * @property {string} health - Daemon health word.
+ * @property {string} projectRoot - Repository daemon serve.
  */
 export interface DaemonStatus {
   readonly pid: number;
@@ -47,12 +45,12 @@ export interface DaemonStatus {
 }
 
 /**
- * One look at the daemon: whether it is running, and the violations it holds. A
- * null status means no daemon answered for this repository.
+ * One look at daemon: running or not, plus violations it hold. Null status mean
+ * no daemon answer for this repository.
  *
  * @interface DaemonSnapshot
- * @property {DaemonStatus | null} status - The daemon's self-report, or null when none is running.
- * @property {Violation[]} violations - The outstanding violations it is holding.
+ * @property {DaemonStatus | null} status - Daemon self-report, or null when none run.
+ * @property {Violation[]} violations - Violations it hold.
  */
 export interface DaemonSnapshot {
   readonly status: DaemonStatus | null;
@@ -60,11 +58,11 @@ export interface DaemonSnapshot {
 }
 
 /**
- * One role and the model it is bound to, or null when unbound.
+ * One role and model it bound to, or null when unbound.
  *
  * @interface ConfigBinding
- * @property {string} role - The role id.
- * @property {string | null} bound - The model it is bound to, or null.
+ * @property {string} role - Role id.
+ * @property {string | null} bound - Model it bound to, or null.
  */
 export interface ConfigBinding {
   readonly role: string;
@@ -72,11 +70,11 @@ export interface ConfigBinding {
 }
 
 /**
- * The repo's model bindings as the config view edits them: the declared models
- * and every role's binding.
+ * Repo model bindings as config view edit them: declared models and every
+ * role binding.
  *
  * @interface ConfigSnapshot
- * @property {string[]} models - The declared model ids.
+ * @property {string[]} models - Declared model ids.
  * @property {ConfigBinding[]} bindings - One entry per role.
  */
 export interface ConfigSnapshot {
@@ -85,12 +83,12 @@ export interface ConfigSnapshot {
 }
 
 /**
- * Data loaded once by the shell for the read-only views.
+ * Data shell load once for read-only views.
  *
  * @interface TuiData
- * @property {DoctorReport} doctor - The unified doctor report.
- * @property {SwarmPlan<unknown>} plan - The loaded swarm plan.
- * @property {DispatchResult | null} herd - The dispatch result, or null before a release.
+ * @property {DoctorReport} doctor - Unified doctor report.
+ * @property {SwarmPlan<unknown>} plan - Loaded swarm plan.
+ * @property {DispatchResult | null} herd - Dispatch result, or null before release.
  */
 export interface TuiData {
   readonly doctor: DoctorReport;
@@ -99,18 +97,18 @@ export interface TuiData {
 }
 
 /**
- * The full UI state.
+ * Full UI state.
  *
  * @interface TuiState
- * @property {View} view - The active view.
- * @property {number} member - The selected member index in the plan view.
- * @property {TuiData} data - The loaded data the read-only views render.
- * @property {HealthReport | null} gates - The last gate run, or null before one.
- * @property {DaemonSnapshot | null} daemon - The last daemon look, or null before one.
- * @property {ConfigSnapshot | null} config - The loaded bindings, or null before the config view is opened.
- * @property {number} role - The selected role index in the config view.
- * @property {boolean} busy - True while an action is running.
- * @property {boolean} quit - True once the user has asked to exit.
+ * @property {View} view - Active view.
+ * @property {number} member - Selected member index in plan view.
+ * @property {TuiData} data - Loaded data read-only views render.
+ * @property {HealthReport | null} gates - Last gate run, or null before one.
+ * @property {DaemonSnapshot | null} daemon - Last daemon look, or null before one.
+ * @property {ConfigSnapshot | null} config - Loaded bindings, or null before config view open.
+ * @property {number} role - Selected role index in config view.
+ * @property {boolean} busy - True while action run.
+ * @property {boolean} quit - True once user ask to exit.
  */
 export interface TuiState {
   readonly view: View;
@@ -125,7 +123,7 @@ export interface TuiState {
 }
 
 /**
- * A message the reducer folds: a keypress, or the result of an action.
+ * Message reducer fold: keypress, or result of action.
  */
 export type Msg =
   | { readonly kind: 'key'; readonly key: string }
@@ -134,11 +132,10 @@ export type Msg =
   | { readonly kind: 'config'; readonly snapshot: ConfigSnapshot };
 
 /**
- * An action the shell runs, feeding its result back as a {@link Msg}. The daemon
- * actions all resolve to a fresh {@link DaemonSnapshot}: refresh reads it, prune
- * clears violations then re-reads, stop asks the daemon to exit, and restart
- * shells out to `paw daemon restart` to bring pawd back (or start it when none is
- * running) before re-reading.
+ * Action shell run, feed result back as {@link Msg}. Daemon action all resolve
+ * to fresh {@link DaemonSnapshot}: refresh read it, prune clear violations then
+ * re-read, stop ask daemon to exit, restart shell out to `paw daemon restart` to
+ * bring pawd back (or start it when none run) before re-read.
  */
 export type Effect =
   | { readonly kind: 'run-gates' }
@@ -151,11 +148,11 @@ export type Effect =
   | { readonly kind: 'config-unbind'; readonly role: string };
 
 /**
- * A reducer step: the next state and any effects to run.
+ * Reducer step: next state and any effects to run.
  *
  * @interface Step
- * @property {TuiState} state - The next state.
- * @property {Effect[]} effects - Effects the shell should run.
+ * @property {TuiState} state - Next state.
+ * @property {Effect[]} effects - Effects shell should run.
  */
 export interface Step {
   readonly state: TuiState;
@@ -163,10 +160,10 @@ export interface Step {
 }
 
 /**
- * The initial state: the doctor view, first member selected, nothing running.
+ * Initial state: doctor view, first member chosen, nothing run.
  *
- * @param {TuiData} data - The loaded data.
- * @returns {TuiState} The starting state.
+ * @param {TuiData} data - Loaded data.
+ * @returns {TuiState} Starting state.
  */
 export function initialState(data: TuiData): TuiState {
   return {
@@ -183,11 +180,11 @@ export function initialState(data: TuiData): TuiState {
 }
 
 /**
- * Clamp a member index to the plan's valid range.
+ * Clamp member index to plan valid range.
  *
- * @param {TuiState} state - The current state.
- * @param {number} next - The proposed index.
- * @returns {number} The clamped index.
+ * @param {TuiState} state - Current state.
+ * @param {number} next - Proposed index.
+ * @returns {number} Clamped index.
  */
 function clampMember(state: TuiState, next: number): number {
   const last = Math.max(0, memberCount(state.data.plan) - 1);
@@ -195,11 +192,11 @@ function clampMember(state: TuiState, next: number): number {
 }
 
 /**
- * Clamp a role index to the loaded bindings' range.
+ * Clamp role index to loaded binding range.
  *
- * @param {TuiState} state - The current state.
- * @param {number} next - The proposed index.
- * @returns {number} The clamped index.
+ * @param {TuiState} state - Current state.
+ * @param {number} next - Proposed index.
+ * @returns {number} Clamped index.
  */
 function clampRole(state: TuiState, next: number): number {
   const last = Math.max(0, (state.config?.bindings.length ?? 1) - 1);
@@ -207,11 +204,11 @@ function clampRole(state: TuiState, next: number): number {
 }
 
 /**
- * The next model in the cycle for a role: unbound → first → … → last → unbound.
+ * Next model in cycle for role: unbound → first → … → last → unbound.
  *
- * @param {string | null} current - The role's current binding.
- * @param {readonly string[]} models - The declared models.
- * @returns {string | null} The next model, or null to unbind.
+ * @param {string | null} current - Role current binding.
+ * @param {readonly string[]} models - Declared models.
+ * @returns {string | null} Next model, or null to unbind.
  */
 function nextBinding(current: string | null, models: readonly string[]): string | null {
   const next = (current === null ? -1 : models.indexOf(current)) + 1;
@@ -219,11 +216,11 @@ function nextBinding(current: string | null, models: readonly string[]): string 
 }
 
 /**
- * The effect that cycles the selected role's binding, or null when there is
- * nothing loaded or no model to bind to.
+ * Effect that cycle selected role binding, or null when nothing load or no
+ * model to bind to.
  *
- * @param {TuiState} state - The current state.
- * @returns {Effect | null} The bind or unbind effect, or null.
+ * @param {TuiState} state - Current state.
+ * @returns {Effect | null} Bind or unbind effect, or null.
  */
 function bindEffect(state: TuiState): Effect | null {
   if (state.config === null || state.config.models.length === 0) {
@@ -237,9 +234,9 @@ function bindEffect(state: TuiState): Effect | null {
 }
 
 /**
- * A step with no effects.
+ * Step with no effect.
  *
- * @param {TuiState} state - The next state.
+ * @param {TuiState} state - Next state.
  * @returns {Step} The step.
  */
 function stay(state: TuiState): Step {
@@ -247,13 +244,13 @@ function stay(state: TuiState): Step {
 }
 
 /**
- * Open a view and start the action that populates it, unless one is already
- * running. Shared by the gates and daemon verbs.
+ * Open view and start action that populate it, unless one already run.
+ * Shared by gates and daemon verbs.
  *
- * @param {TuiState} state - The current state.
- * @param {View} view - The view to open.
- * @param {Effect} effect - The action to run.
- * @returns {Step} The next step.
+ * @param {TuiState} state - Current state.
+ * @param {View} view - View to open.
+ * @param {Effect} effect - Action to run.
+ * @returns {Step} Next step.
  */
 function open(state: TuiState, view: View, effect: Effect): Step {
   return state.busy
@@ -262,12 +259,12 @@ function open(state: TuiState, view: View, effect: Effect): Step {
 }
 
 /**
- * Run a daemon action, but only from the daemon view and only when idle — so a
- * stray `p` or `s` on another view does nothing.
+ * Run daemon action, but only from daemon view and only when idle — so stray
+ * `p` or `s` on other view do nothing.
  *
- * @param {TuiState} state - The current state.
- * @param {Effect} effect - The daemon action to run.
- * @returns {Step} The next step.
+ * @param {TuiState} state - Current state.
+ * @param {Effect} effect - Daemon action to run.
+ * @returns {Step} Next step.
  */
 function daemonAction(state: TuiState, effect: Effect): Step {
   return state.view === 'daemon' && !state.busy
@@ -276,11 +273,11 @@ function daemonAction(state: TuiState, effect: Effect): Step {
 }
 
 /**
- * Fold a keypress into the next step.
+ * Fold keypress into next step.
  *
- * @param {TuiState} state - The current state.
- * @param {string} key - The pressed key.
- * @returns {Step} The next step.
+ * @param {TuiState} state - Current state.
+ * @param {string} key - Pressed key.
+ * @returns {Step} Next step.
  */
 function onKey(state: TuiState, key: string): Step {
   switch (key) {
@@ -325,12 +322,12 @@ function onKey(state: TuiState, key: string): Step {
 }
 
 /**
- * Advance the state by one message. Pure: an unknown key returns the state
- * unchanged with no effects.
+ * Advance state by one message. Pure: unknown key return state unchanged, no
+ * effect.
  *
- * @param {TuiState} state - The current state.
- * @param {Msg} msg - The message to fold.
- * @returns {Step} The next state and any effects.
+ * @param {TuiState} state - Current state.
+ * @param {Msg} msg - Message to fold.
+ * @returns {Step} Next state and any effect.
  */
 export function reduce(state: TuiState, msg: Msg): Step {
   if (msg.kind === 'gates') {

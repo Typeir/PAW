@@ -1,13 +1,7 @@
 /**
  * PAW Console Context Selection
  *
- * @fileoverview The rules of "which files ride along with every brief". A
- * selection is a set of repository paths, kept sorted so the console, the flag
- * it prints, and any two operators looking at the same screen agree on order.
- * Toggling is all-or-nothing over whatever was handed in, which is what lets one
- * checkbox act on a file and the next act on a folder's entire subtree: the
- * caller collects the paths, this decides what the click means. Pure — the tree
- * these paths come from is fetched elsewhere.
+ * @fileoverview Rules of which files ship with every brief. Selection be set of repo paths, kept sorted so console, printed flag, and two operators on same screen agree on order. Toggle all-or-nothing over what handed in. That let one checkbox act on a file, next on folder whole subtree: caller collect paths, this decide what click mean. No I/O — this module computes from caller-supplied tree paths.
  *
  * @module @paw/gui/domain/context
  * @version 0.0.0
@@ -18,12 +12,10 @@
 import type { TreeNode } from '@paw/core';
 
 /**
- * Every file path at or beneath a node — a folder's whole subtree, or the file
- * itself. Directories are not selectable in their own right: a plan attaches
- * file contents, and a directory has none.
+ * Every file path at or beneath a node — folder whole subtree, or file itself. Directory no select alone: plan attach file contents, directory got none.
  *
- * @param {TreeNode} node - The node to collect from.
- * @returns {string[]} The file paths beneath it, in tree order.
+ * @param {TreeNode} node - Node to collect from.
+ * @returns {string[]} File paths beneath it, in tree order.
  */
 export function filesUnder(node: TreeNode): string[] {
   if (node.isFile) {
@@ -33,11 +25,11 @@ export function filesUnder(node: TreeNode): string[] {
 }
 
 /**
- * How much of a set of paths a selection already holds.
+ * How much of a set of paths a selection already hold.
  *
- * @param {readonly string[]} selection - The current selection.
- * @param {readonly string[]} paths - The paths in question.
- * @returns {'none' | 'some' | 'all'} The coverage; an empty `paths` is `none`.
+ * @param {readonly string[]} selection - Current selection.
+ * @param {readonly string[]} paths - Paths in question.
+ * @returns {'none' | 'some' | 'all'} Coverage; empty `paths` be `none`.
  */
 export function coverage(
   selection: readonly string[],
@@ -55,14 +47,11 @@ export function coverage(
 }
 
 /**
- * Toggle a group of paths: drop them all when every one is already selected,
- * otherwise add the ones that are missing. Half-selected folders therefore fill
- * in rather than empty out, which is what an operator means by clicking a folder
- * they can see is partly chosen.
+ * Toggle a group of paths: drop all when every one already selected, add missing ones. Half-selected folders fill in with the missing paths.
  *
- * @param {readonly string[]} selection - The current selection.
- * @param {readonly string[]} paths - The paths the click covers.
- * @returns {string[]} The next selection, sorted.
+ * @param {readonly string[]} selection - Current selection.
+ * @param {readonly string[]} paths - Paths the click cover.
+ * @returns {string[]} Next selection, sorted.
  */
 export function toggleContext(
   selection: readonly string[],
@@ -85,12 +74,10 @@ export function toggleContext(
 }
 
 /**
- * The CLI argument that reproduces a selection — the bridge between picking
- * files in the console and running the plan with them, until a control API can
- * carry the selection itself. Empty when nothing is selected.
+ * Reproduce a selection as a CLI argument: pick files in console, pass them to plan run, until control API carry the selection itself. Empty when nothing selected.
  *
- * @param {readonly string[]} selection - The selected paths.
- * @returns {string} The `--context` argument, or an empty string.
+ * @param {readonly string[]} selection - Selected paths.
+ * @returns {string} The `--context` argument, or empty string.
  */
 export function contextArgument(selection: readonly string[]): string {
   return selection.length === 0 ? '' : `--context ${selection.join(',')}`;

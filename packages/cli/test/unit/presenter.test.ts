@@ -1,6 +1,6 @@
 /**
- * @fileoverview Unit tests for the console presenter adapter. The injected sink
- * captures lines so the adapter is verified with no real stdout, reaching 100%.
+ * @fileoverview Unit tests for console presenter adapter. Injected sink
+ * capture lines; adapter run with no real stdout. Reach 100% coverage.
  *
  * @module @paw/cli/test/unit/presenter
  */

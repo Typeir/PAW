@@ -1,9 +1,8 @@
 /**
  * Tree Loading Tests
  *
- * @fileoverview The tree hook's three states — no daemon, a load in flight, and
- * a load that failed — and the guarantee that a tree arriving after the panel
- * closed updates nothing.
+ * @fileoverview Tree hook have three state — no daemon, load in flight, load
+ * failed. Guarantee: tree arrive after panel close update nothing.
  *
  * @module @paw/gui/test/unit/application/useTree
  */
@@ -20,16 +19,16 @@ const TREE: TreeNode[] = [{ name: 'a.md', path: 'a.md', isFile: true, children: 
  * Props for {@link Probe}.
  *
  * @interface ProbeProps
- * @property {TreeSource | null} source - The source under test.
+ * @property {TreeSource | null} source - Source under test.
  */
 interface ProbeProps {
   readonly source: TreeSource | null;
 }
 
 /**
- * A probe that shows what the hook reports.
+ * Probe show what hook report.
  *
- * @param {ProbeProps} props - The probe props.
+ * @param {ProbeProps} props - Probe props.
  * @returns {JSX.Element} The probe.
  */
 function Probe({ source }: ProbeProps) {

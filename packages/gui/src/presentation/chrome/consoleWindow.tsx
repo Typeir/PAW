@@ -1,14 +1,7 @@
 /**
  * Console Window
  *
- * @fileoverview The console's frame, and the only layout element in it: one grid
- * whose banner spans both columns, whose first column is the rail, and whose
- * second is the main pane. The rail therefore reaches the bottom of whatever it
- * is in — a viewport in the browser, a window in the desktop shell — because its
- * row is the grid's free space rather than a hardcoded height. Everything inside
- * is a landmark (`header`, `nav`, `main`), so a screen reader can jump between
- * them and there is no tower of `div`s to read through. In the desktop shell it
- * takes the window's chrome; in a browser it is simply the page.
+ * @fileoverview Console frame. Single-layout element: one grid. Banner spans both columns; first column is the rail, second is the main pane. Rail reaches bottom of its container — viewport in browser, window in desktop shell — because its grid row uses free space, not a hardcoded height. Everything lives inside a landmark (`header`, `nav`, `main`), so a screen reader moves between them instead of through nested `div`s. Desktop shell displays window chrome; browser displays page only.
  *
  * @module @paw/gui/presentation/chrome/consoleWindow
  * @version 0.0.0

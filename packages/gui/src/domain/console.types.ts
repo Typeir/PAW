@@ -1,13 +1,11 @@
 /**
  * PAW Console Domain Types
  *
- * @fileoverview The console's own vocabulary: the subsystem a rail item selects,
- * the tab a swarm view shows, the plan as the console needs it, and the whole of
- * what a console renders. These are the module's domain types, not the wire
- * contract — `@paw/core`'s {@link PawSnapshot} crosses the HTTP boundary and the
- * application layer maps it here once, so no component ever touches a transport
- * shape. A plan arrives with its briefs and slugs already rendered to arrays,
- * which is what makes the whole view a pure function of plain data.
+ * @fileoverview Console domain types. Rail item pick subsystem, swarm view pick tab,
+ * plan consumed by console, whole console render. Console domain types separate from
+ * wire contract. `@paw/core` {@link PawSnapshot} serialized over HTTP; app layer maps
+ * it here. No component touches transport shape. Plan arrives with briefs and slugs
+ * already in arrays.
  *
  * @module @paw/gui/domain/console.types
  * @version 0.0.0
@@ -28,7 +26,7 @@ import type {
 } from '@paw/core';
 
 /**
- * A subsystem in the left rail.
+ * Subsystem in left rail.
  */
 export type Section =
   | 'overview'
@@ -40,22 +38,22 @@ export type Section =
   | 'logs';
 
 /**
- * A tab within the Swarm view.
+ * Tab inside Swarm view.
  */
 export type Tab = 'plan' | 'herd' | 'logs';
 
 /**
- * The plan as the console renders it: identity, source, and the per-member text
- * the daemon pre-rendered so nothing needs a live closure on this side.
+ * Plan as console render: identity, source, per-member text. Daemon pre-render
+ * it. No live closure needed on this side.
  *
  * @interface PlanView
- * @property {string} name - The plan's name.
- * @property {string} role - The role the plan's model must satisfy.
- * @property {number} total - The member count.
- * @property {string} source - The plan module's source text.
- * @property {number} highlightLine - 1-based source line to accent.
- * @property {string[]} briefs - The rendered brief per member.
- * @property {string[]} slugs - The resume key per member.
+ * @property {string} name - Plan name.
+ * @property {string} role - Role plan model must satisfy.
+ * @property {number} total - Member count.
+ * @property {string} source - Plan module source text.
+ * @property {number} highlightLine - Source line to accent, 1-based.
+ * @property {string[]} briefs - Rendered brief per member.
+ * @property {string[]} slugs - Resume key per member.
  */
 export interface PlanView {
   readonly name: string;
@@ -68,22 +66,22 @@ export interface PlanView {
 }
 
 /**
- * Everything a console renders, in the console's own terms.
+ * Everything console render, in console own terms.
  *
  * @interface ConsoleData
- * @property {HostInfo} host - Real facts about the host the daemon runs on.
- * @property {HostProcess[]} processes - The processes PAW owns.
- * @property {string} root - The served repository — the scope the console currently holds.
- * @property {string} configPath - Where the served repository's config was found; empty when it has none.
- * @property {string[]} plans - Every plan the served repository holds.
- * @property {string | null} selectedPlan - Which of them `plan` describes; null when none is selected.
- * @property {PlanView} plan - The selected plan; an empty plan when none is selected.
- * @property {DoctorReport} doctor - The unified doctor (config + roles).
- * @property {DoctorFinding[]} checks - The swarm plan's doctor findings.
+ * @property {HostInfo} host - Facts about host daemon run on.
+ * @property {HostProcess[]} processes - Host processes PAW runs.
+ * @property {string} root - Served repository; current console scope.
+ * @property {string} configPath - Where served repo config found; empty when none.
+ * @property {string[]} plans - Every plan served repo provides.
+ * @property {string | null} selectedPlan - Which plan `plan` describe; null when none.
+ * @property {PlanView} plan - Selected plan; empty plan when none.
+ * @property {DoctorReport} doctor - Unified doctor (config + roles).
+ * @property {DoctorFinding[]} checks - Swarm plan doctor findings.
  * @property {RunProgress} run - Run identity and progress split.
- * @property {BudgetSummary} budget - The spend meter.
+ * @property {BudgetSummary} budget - Spend meter.
  * @property {Violation[]} violations - Open enforcement violations.
- * @property {DaemonStatus} daemon - The daemon status pill.
+ * @property {DaemonStatus} daemon - Daemon status pill.
  * @property {RailChrome} chrome - Gates/Keys rail counts.
  */
 export interface ConsoleData {
@@ -104,16 +102,16 @@ export interface ConsoleData {
 }
 
 /**
- * The full console state.
+ * Full console state.
  *
  * @interface ConsoleState
- * @property {Section} section - The active rail subsystem.
- * @property {Tab} tab - The active tab within the Swarm view.
- * @property {number} member - The scrubbed member index.
- * @property {string | null} draft - The editor's edited brief, or null when it shows the rendered brief.
- * @property {string | null} plan - The plan the operator picked; what the next poll asks the daemon for.
- * @property {string[]} context - Repository files selected to be attached to every member's brief.
- * @property {ConsoleData} data - The loaded data.
+ * @property {Section} section - Active rail subsystem.
+ * @property {Tab} tab - Active tab inside Swarm view.
+ * @property {number} member - Scrubbed member index.
+ * @property {string | null} draft - Editor edited brief, or null when show rendered brief.
+ * @property {string | null} plan - Plan operator pick; next poll ask daemon for it.
+ * @property {string[]} context - Repo files pick to attach to every member brief.
+ * @property {ConsoleData} data - Loaded data.
  */
 export interface ConsoleState {
   readonly section: Section;
@@ -126,7 +124,7 @@ export interface ConsoleState {
 }
 
 /**
- * An action a user — or a live snapshot arriving from the daemon — can take.
+ * Action user — or live snapshot from daemon — can take.
  *
  * @typedef {object} ConsoleAction
  */

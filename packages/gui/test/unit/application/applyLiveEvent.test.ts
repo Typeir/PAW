@@ -1,10 +1,7 @@
 /**
  * Live Event Application Tests
  *
- * @fileoverview That a slice replaces exactly its own fields and touches nothing
- * else, and that a topic the console has no arm for changes nothing at all —
- * which is what lets a newer daemon talk to an older console without corrupting
- * it.
+ * @fileoverview Check slice replace own field only, touch nothing else. Topic console does not render as data: state unchanged. New daemon topic ignored by console that does not know it.
  *
  * @module @paw/gui/test/unit/application/applyLiveEvent
  * @version 0.0.0
@@ -21,7 +18,7 @@ import { makeSnapshot } from '../../fixtures.js';
 const DATA = hydrate(makeSnapshot());
 
 /**
- * An envelope carrying a topic's new value.
+ * Envelope carry topic new value.
  *
  * @param {LiveTopic} topic - The topic.
  * @param {unknown} data - Its value.
@@ -31,15 +28,14 @@ const frame = (topic: LiveTopic, data: unknown): LiveEnvelope =>
   ({ v: 1, topic, at: 1786060800000, data }) as LiveEnvelope;
 
 describe('applyLiveEvent', () => {
-  it('replaces the whole state on hello, through the same door a poll uses', () => {
+  it('replaces the whole state on hello, through the same apply path a poll event uses', () => {
     const next = applyLiveEvent(DATA, frame('hello', makeSnapshot({ planName: 'moved-on' })));
     expect(next.plan.name).toBe('moved-on');
   });
 
   it('enforces the producer contract on hello, exactly as hydration does', () => {
     const broken = makeSnapshot({ memberTotal: 9 });
-    // A daemon that sends nine members and four briefs is a producer defect, and
-    // a console that rendered four of nine members would hide it.
+    // Daemon sends nine members but four briefs: producer defect. Console renders the four received and so would not surface the nine-member declaration, so applyLiveEvent throws instead.
     expect(() => applyLiveEvent(DATA, frame('hello', broken))).toThrow('declares 9 members');
   });
 
@@ -114,15 +110,14 @@ describe('applyLiveEvent', () => {
     expect(
       applyLiveEvent(DATA, frame('attach', { status: 'unconfigured', path: '/work/raw' })).root,
     ).toBe('/work/raw');
-    // A request in flight or refused, or an idle with no path, changes nothing.
+    // Request in flight or refused, or idle with no path, change nothing.
     expect(applyLiveEvent(DATA, frame('attach', { status: 'failed', path: '/nope' }))).toBe(DATA);
     expect(applyLiveEvent(DATA, frame('attach', { status: 'idle', path: null }))).toBe(DATA);
   });
 
   it('changes nothing for a topic the console does not render as data', () => {
     for (const topic of ['tree', 'log', 'error'] as const) {
-      // Returning the input identically is what stops a future daemon topic from
-      // corrupting an older console, and lets the reducer skip a re-render.
+      // Return input identical so an unknown daemon topic cannot alter data a console does not render; reducer then skips re-render.
       expect(applyLiveEvent(DATA, frame(topic, { anything: true }))).toBe(DATA);
     }
   });

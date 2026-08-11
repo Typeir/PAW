@@ -1,11 +1,10 @@
 /**
  * PAW TUI Reducer Tests
  *
- * @fileoverview Drives every transition of the pure effect-reducer — the view
- * switches, member selection with both clamps, quit, the unknown-key no-op, the
- * gates action, and the daemon verbs (open + refresh, the busy guard, folding a
- * snapshot, and prune/stop gated to the idle daemon view) — so `app.ts` reaches
- * 100%.
+ * @fileoverview Covers every transition of the pure effect-reducer. View switch,
+ * member select with both clamps, quit, unknown-key no-op, gates action, daemon
+ * verbs (open + refresh, busy guard, fold snapshot, prune/stop gated to idle
+ * daemon view).
  *
  * @module @paw/tui/test/unit/app
  * @version 0.0.0
@@ -61,11 +60,11 @@ const configSnapshot: ConfigSnapshot = {
 
 const key = (state: TuiState, k: string) => reduce(state, { kind: 'key', key: k });
 
-/** The idle daemon view: opened with d, then a snapshot folded to clear busy. */
+/** Idle daemon view. Open with d, fold snapshot to clear busy. */
 const idleDaemon = (): TuiState =>
   reduce(key(initialState(data), 'd').state, { kind: 'daemon', snapshot }).state;
 
-/** The idle config view: opened with c, then a snapshot folded to clear busy. */
+/** Idle config view. Open with c, fold snapshot to clear busy. */
 const idleConfig = (over: ConfigSnapshot = configSnapshot): TuiState =>
   reduce(key(initialState(data), 'c').state, { kind: 'config', snapshot: over }).state;
 

@@ -1,9 +1,9 @@
 /**
  * PAW Installer Shell Tests
  *
- * @fileoverview Covers `detectShell` (Windows override, no `$SHELL`, zsh/bash/fish,
- * and an unrecognised shell) and `profileTarget` (every shell arm), so `shell.ts`
- * reaches 100%.
+ * @fileoverview Cover `detectShell` (Windows override, no `$SHELL`, zsh/bash/fish,
+ * and unrecognised shell) and `profileTarget` (every shell arm), so `shell.ts`
+ * reach 100%.
  *
  * @module @paw/installer/test/shell
  * @version 0.0.0

@@ -1,10 +1,7 @@
 /**
  * Console App
  *
- * @fileoverview The whole console as one component: the stylesheet, the state
- * provider, and the window. A shell — browser, Electron, or a test — mounts this
- * with a snapshot and, when a daemon is behind the page, a source to keep it
- * live. Nothing above it needs to know how the console is put together.
+ * @fileoverview Whole console one component: stylesheet, state provider, window. A shell — browser, Electron, or test — mount this with snapshot and, when daemon sit behind page, source keep it live. Callers pass snapshot and dependencies, mount; internal wiring not exposed.
  *
  * @module @paw/gui/presentation/consoleApp
  * @version 0.0.0
@@ -27,14 +24,14 @@ import { ConsoleWindow } from './chrome/consoleWindow.js';
  * Props for {@link ConsoleApp}.
  *
  * @interface ConsoleAppProps
- * @property {PawSnapshot} snapshot - The snapshot to boot from.
- * @property {SnapshotSource | null} [source] - The polling source used while the socket is down; omit for a static page.
- * @property {SocketFactory | null} [connect] - Opens the live socket; omit for a static page.
- * @property {string | null} [token] - The credential this tab adopted.
- * @property {TreeSource | null} [treeSource] - The repository tree source; omit for a static page.
- * @property {ConfigClient | null} [config] - The binding editor's client; omit for a static page.
- * @property {RecentClient | null} [recent] - The scope picker's recent-routes client; omit for a static page.
- * @property {WindowControls | null} [controls] - The desktop window's controls; omit in a browser.
+ * @property {PawSnapshot} snapshot - Snapshot to boot from.
+ * @property {SnapshotSource | null} [source] - Polling source use while socket down; omit for static page.
+ * @property {SocketFactory | null} [connect] - Open live socket; omit for static page.
+ * @property {string | null} [token] - Credential this tab adopt.
+ * @property {TreeSource | null} [treeSource] - Repository tree source; omit for static page.
+ * @property {ConfigClient | null} [config] - Binding editor client; omit for static page.
+ * @property {RecentClient | null} [recent] - Scope picker recent-routes client; omit for static page.
+ * @property {WindowControls | null} [controls] - Desktop window controls; omit in browser.
  * @property {number} [intervalMs] - Poll period in milliseconds, for degraded mode.
  */
 export interface ConsoleAppProps {

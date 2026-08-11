@@ -1,14 +1,13 @@
 /**
  * PAW Installer Windows Environment Adapter
  *
- * @fileoverview The real {@link EnvironmentPort} for the Windows per-user PATH,
- * over PowerShell's `[Environment]::(Get|Set)EnvironmentVariable(...,'User')`. That
- * API writes the full value to `HKCU\Environment` (no truncation) and broadcasts
- * `WM_SETTINGCHANGE` itself, so new shells see the change without a logout — which
- * is why this uses it rather than `setx` (which truncates PATH at 1024 chars). The
- * new value is passed through a child environment variable, never interpolated into
- * the command, so a path with quotes cannot break or inject. I/O — excluded from
- * coverage, driven only by the installer shell on Windows.
+ * @fileoverview {@link EnvironmentPort} for Windows per-user PATH, over
+ * PowerShell `[Environment]::(Get|Set)EnvironmentVariable(...,'User')`. That API
+ * write full value to `HKCU\Environment` (no truncation) and broadcast
+ * `WM_SETTINGCHANGE` itself, so new shell see change without logout. `setx`
+ * truncate PATH at 1024 chars. New value pass through child environment variable,
+ * never interpolated into command, so path with quotes no break or inject. I/O —
+ * excluded from coverage, driven only by installer shell on Windows.
  *
  * @module @paw/installer/adapters/windowsEnv
  * @version 0.0.0
@@ -23,9 +22,9 @@ const PS = 'powershell';
 const NO_PROFILE = ['-NoProfile', '-NonInteractive', '-Command'];
 
 /**
- * Create the Windows environment adapter.
+ * Create Windows environment adapter.
  *
- * @returns {EnvironmentPort} An environment port over PowerShell.
+ * @returns {EnvironmentPort} Environment port over PowerShell.
  */
 export function createWindowsEnv(): EnvironmentPort {
   const proc = createNodeProcess();

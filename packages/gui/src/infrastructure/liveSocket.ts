@@ -1,19 +1,17 @@
 /**
  * PAW Console Live Socket
  *
- * @fileoverview The one file in the console that says `new WebSocket`.
+ * @fileoverview Only file in console that calls `new WebSocket`.
  *
- * Everything above this is written against {@link SocketLike}, which is four
- * methods wide, so the provider's state machine — connect, authenticate, watch,
- * degrade, retry — is unit-tested against a scripted fake rather than against a
- * browser's socket and a real daemon. That is the difference between testing the
- * transitions and testing that a connection happened to work once.
+ * Code above this writes against {@link SocketLike}, which exposes four
+ * methods. Provider state machine — connect, authenticate, watch, degrade,
+ * retry — unit-tested against a scripted fake socket, not against a browser
+ * socket and real daemon.
  *
- * The URL is derived from the page's own origin, and only ever as `wss:`. There
- * is no configuration hook for the host and no fallback to `ws:`: the console is
- * served by the daemon it talks to, so anything else would be a page pointed at
- * a daemon it was not served by, which is precisely the situation the daemon's
- * origin gate exists to refuse.
+ * URL built from page own origin, scheme fixed to `wss:`. No config hook for
+ * host, no fallback to `ws:`. Console is served by the daemon it connects to;
+ * pointing the page at any other host connects to a daemon that did not serve
+ * it, which the daemon origin gate rejects.
  *
  * @module @paw/gui/infrastructure/liveSocket
  * @version 0.0.0
@@ -24,17 +22,17 @@
 import { LIVE_SUBPROTOCOL } from '@paw/core';
 
 /**
- * The path the daemon serves the live wire on.
+ * Path daemon serve live wire on.
  */
 export const LIVE_PATH = '/live';
 
 /**
- * The slice of `WebSocket` the console uses.
+ * Slice of `WebSocket` console use.
  *
  * @interface SocketLike
  * @property {(text: string) => void} send - Send one text frame.
  * @property {(code?: number, reason?: string) => void} close - Close the socket.
- * @property {(handlers: SocketHandlers) => void} listen - Register the four callbacks.
+ * @property {(handlers: SocketHandlers) => void} listen - Register four callbacks.
  */
 export interface SocketLike {
   send(text: string): void;
@@ -43,13 +41,13 @@ export interface SocketLike {
 }
 
 /**
- * What the console wants to be told about a socket.
+ * What console want to be told about socket.
  *
  * @interface SocketHandlers
- * @property {() => void} open - The socket connected.
- * @property {(raw: string) => void} message - A text frame arrived.
- * @property {(code: number) => void} close - The socket ended; the code says why.
- * @property {() => void} error - The socket failed. A close always follows.
+ * @property {() => void} open - Socket connected.
+ * @property {(raw: string) => void} message - Text frame arrived.
+ * @property {(code: number) => void} close - Socket ended; code say why.
+ * @property {() => void} error - Socket failed. Close always follow.
  */
 export interface SocketHandlers {
   open(): void;
@@ -59,30 +57,29 @@ export interface SocketHandlers {
 }
 
 /**
- * Opens sockets. Injected so the provider can be driven by a fake.
+ * Open sockets. Inject so provider can drive by fake.
  */
 export type SocketFactory = () => SocketLike;
 
 /**
- * The window fields the URL is derived from.
+ * Window fields URL derive from.
  *
  * @interface SocketWindow
- * @property {{ host: string; protocol: string }} location - The page's own location.
+ * @property {{ host: string; protocol: string }} location - Page own location.
  */
 export interface SocketWindow {
   readonly location: { readonly host: string; readonly protocol: string };
 }
 
 /**
- * The live-wire URL for a page, or null when the page was not served over TLS.
+ * Live-wire URL for page, or null when page not served over TLS.
  *
- * A console opened from `file://` or served over plain `http:` gets null rather
- * than a `ws:` URL. Downgrading here would send the session's credential over a
- * connection anything on the machine can read, and "it works on http too" is how
- * that ends up shipping.
+ * Console opened from `file://` or served over plain `http:` gets null rather
+ * than a `ws:` URL. A `ws:` connection sends the session credential in
+ * cleartext readable by anything on the machine.
  *
- * @param {SocketWindow} win - The window to read the location from.
- * @returns {string | null} The `wss:` URL, or null when the page is not on https.
+ * @param {SocketWindow} win - Window to read location from.
+ * @returns {string | null} `wss:` URL, or null when page not on https.
  */
 export function liveUrl(win: SocketWindow): string | null {
   if (win.location.protocol !== 'https:' || win.location.host === '') {
@@ -92,19 +89,19 @@ export function liveUrl(win: SocketWindow): string | null {
 }
 
 /**
- * The browser API this module needs, so the constructor itself is injectable in
- * an environment that has no `WebSocket` — or has one, and should not be used.
+ * Browser API this module need, so constructor itself injectable in environment
+ * with no `WebSocket` — or has one, and should not use it.
  *
  * @typedef {Function} WebSocketConstructor
  */
 export type WebSocketConstructor = new (url: string, protocols?: string | string[]) => WebSocket;
 
 /**
- * Build a factory that opens the real socket.
+ * Build factory that open real socket.
  *
- * @param {string} url - The `wss:` URL to open.
- * @param {WebSocketConstructor} ctor - The `WebSocket` constructor.
- * @returns {SocketFactory} The factory.
+ * @param {string} url - `wss:` URL to open.
+ * @param {WebSocketConstructor} ctor - `WebSocket` constructor.
+ * @returns {SocketFactory} Factory.
  */
 export function createSocketFactory(url: string, ctor: WebSocketConstructor): SocketFactory {
   return () => {

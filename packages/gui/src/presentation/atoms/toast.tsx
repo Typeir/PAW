@@ -1,16 +1,13 @@
 /**
  * Toast System
  *
- * @fileoverview Transient notifications, ported from Ikuisuus's `ui/pushNotification`
- * — the bread-and-butter "it worked / it did not" surface the console lacks. A
- * {@link ToastProvider} holds the queue and portals it to the body; anything below
- * fires one through {@link useToast}. Each type has a sensible default lifetime,
- * the stack is capped so a burst cannot bury the screen, and dismissal animates out
- * on a timer rather than an animation event — so the whole thing is deterministic
- * under fake timers and needs no real layout. It is client-only (PAW ships a
- * bundle, not SSR), so it portals straight to `document.body` with no mount guard,
- * and it throws rather than no-ops when used outside a provider, because a
- * notification that silently goes nowhere is worse than a loud mistake.
+ * @fileoverview Transient notice. Port from Ikuisuus `ui/pushNotification`; shows
+ * success/error feedback the console does not display. {@link ToastProvider} hold queue, portal
+ * to body. Anything below fire one through {@link useToast}. Each type get a default
+ * lifetime. Stack capped at max; excess toasts are dropped. Dismiss animate out on timer,
+ * not animation event — so whole thing deterministic under fake timers, need no real
+ * layout. Client-only (PAW ship bundle, not SSR), portal straight to `document.body`
+ * with no mount guard. Throw, not no-op, when used outside provider.
  *
  * @module @paw/gui/presentation/atoms/toast
  * @version 0.0.0
@@ -32,22 +29,22 @@ import {
 import { createPortal } from 'react-dom';
 
 /**
- * The severity of a toast, which sets its icon, colour, and default lifetime.
+ * Severity of toast. Set icon, colour, default lifetime.
  */
 export type ToastType = 'info' | 'success' | 'warning' | 'error';
 
 /**
- * Where the toaster sits.
+ * Where toaster sit.
  */
 export type ToastPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
 
 /**
- * Options when firing a toast.
+ * Options when fire toast.
  *
  * @interface ToastOptions
- * @property {string} [title] - An optional bold heading above the message.
- * @property {number} [duration] - Milliseconds before auto-dismiss; 0 keeps it until dismissed.
- * @property {boolean} [dismissible] - Whether to show the close button; defaults to true.
+ * @property {string} [title] - Optional bold heading above message.
+ * @property {number} [duration] - Milliseconds before auto-dismiss; 0 keep it till dismissed.
+ * @property {boolean} [dismissible] - Show close button? Default true.
  */
 export interface ToastOptions {
   readonly title?: string;
@@ -60,12 +57,12 @@ export interface ToastOptions {
  *
  * @interface Toast
  * @property {string} id - Stable id.
- * @property {ToastType} type - The severity.
- * @property {ReactNode} message - The body.
- * @property {string} [title] - The heading.
- * @property {number} duration - Lifetime in ms; 0 is sticky.
- * @property {boolean} dismissible - Whether it shows a close button.
- * @property {boolean} [exiting] - True while animating out before removal.
+ * @property {ToastType} type - Severity.
+ * @property {ReactNode} message - Body.
+ * @property {string} [title] - Heading.
+ * @property {number} duration - Lifetime in ms; 0 sticky.
+ * @property {boolean} dismissible - Shows close button?
+ * @property {boolean} [exiting] - True while animate out before removal.
  */
 export interface Toast {
   readonly id: string;
@@ -78,16 +75,16 @@ export interface Toast {
 }
 
 /**
- * The imperative surface {@link useToast} returns.
+ * Imperative surface {@link useToast} return.
  *
  * @interface ToastApi
- * @property {(type: ToastType, message: ReactNode, options?: ToastOptions) => string} push - Fire a toast; returns its id.
+ * @property {(type: ToastType, message: ReactNode, options?: ToastOptions) => string} push - Fire toast; return id.
  * @property {(id: string) => void} dismiss - Dismiss one by id.
  * @property {() => void} dismissAll - Dismiss every toast.
- * @property {(message: ReactNode, options?: ToastOptions) => string} info - Shorthand for an info toast.
- * @property {(message: ReactNode, options?: ToastOptions) => string} success - Shorthand for a success toast.
- * @property {(message: ReactNode, options?: ToastOptions) => string} warning - Shorthand for a warning toast.
- * @property {(message: ReactNode, options?: ToastOptions) => string} error - Shorthand for an error toast.
+ * @property {(message: ReactNode, options?: ToastOptions) => string} info - Shorthand for info toast.
+ * @property {(message: ReactNode, options?: ToastOptions) => string} success - Shorthand for success toast.
+ * @property {(message: ReactNode, options?: ToastOptions) => string} warning - Shorthand for warning toast.
+ * @property {(message: ReactNode, options?: ToastOptions) => string} error - Shorthand for error toast.
  */
 export interface ToastApi {
   readonly push: (type: ToastType, message: ReactNode, options?: ToastOptions) => string;
@@ -119,9 +116,9 @@ const DEFAULT_MAX = 5;
 let sequence = 0;
 
 /**
- * Mint a unique, deterministic toast id.
+ * Generate unique, deterministic toast id.
  *
- * @returns {string} The next id.
+ * @returns {string} Next id.
  */
 function nextId(): string {
   sequence += 1;
@@ -131,10 +128,9 @@ function nextId(): string {
 const ToastContext = createContext<ToastApi | null>(null);
 
 /**
- * Access the toast API. Throws when used outside a {@link ToastProvider}, because a
- * notification with nowhere to go is a bug, not a no-op.
+ * Access toast API. Throw when used outside {@link ToastProvider}.
  *
- * @returns {ToastApi} The toast API.
+ * @returns {ToastApi} Toast API.
  */
 export function useToast(): ToastApi {
   const context = useContext(ToastContext);
@@ -147,8 +143,8 @@ export function useToast(): ToastApi {
 /**
  * One rendered toast.
  *
- * @param {{ toast: Toast; onDismiss: () => void }} props - The toast and its dismiss handler.
- * @returns {JSX.Element} The toast.
+ * @param {{ toast: Toast; onDismiss: () => void }} props - Toast and dismiss handler.
+ * @returns {JSX.Element} Toast.
  */
 function ToastItem({ toast, onDismiss }: { readonly toast: Toast; readonly onDismiss: () => void }) {
   const Icon = ICON[toast.type];
@@ -172,8 +168,8 @@ function ToastItem({ toast, onDismiss }: { readonly toast: Toast; readonly onDis
  * Props for {@link ToastProvider}.
  *
  * @interface ToastProviderProps
- * @property {ReactNode} children - The subtree that can fire toasts.
- * @property {ToastPosition} [position] - Where the stack sits; defaults to top-right.
+ * @property {ReactNode} children - Subtree that can fire toasts.
+ * @property {ToastPosition} [position] - Where stack sit; default top-right.
  * @property {number} [max] - Most toasts kept at once; older ones drop.
  */
 export interface ToastProviderProps {
@@ -183,10 +179,10 @@ export interface ToastProviderProps {
 }
 
 /**
- * Provide the toast API to a subtree and render the stack.
+ * Provide toast API to subtree, render stack.
  *
- * @param {ToastProviderProps} props - The provider props.
- * @returns {JSX.Element} The provider.
+ * @param {ToastProviderProps} props - Provider props.
+ * @returns {JSX.Element} Provider.
  */
 export function ToastProvider({ children, position = 'top-right', max = DEFAULT_MAX }: ToastProviderProps) {
   const [toasts, setToasts] = useState<readonly Toast[]>([]);

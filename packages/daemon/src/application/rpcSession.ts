@@ -1,15 +1,15 @@
 /**
  * PAW Daemon RPC Session
  *
- * @fileoverview One connection's protocol state, pure and socket-free: it buffers
- * NDJSON, requires a `connect` handshake carrying the daemon's token and a new
- * enough protocol before anything else, then routes method calls to handlers and
- * frames the results. Doc 10 §4–6. The transport ({@link module:@paw/daemon/infrastructure/socketServer})
- * only moves bytes; every decision — refuse a bad token, reject an old protocol,
- * answer or fault a method — is here, so all of it is tested without a pipe.
+ * @fileoverview One connection's protocol state; buffers NDJSON, holds no
+ * socket. Require `connect` handshake with daemon token and new-enough
+ * protocol before anything else. Then route method calls to handlers and frame
+ * results. Doc 10 §4–6. Transport ({@link module:@paw/daemon/infrastructure/socketServer})
+ * moves bytes; every call — refuse bad token, reject old protocol, answer or
+ * fault method — happens here.
  *
- * A refused handshake closes the connection: `close` rides back with the fault
- * frame, and the session goes dead so a client cannot keep talking past a refusal.
+ * Refused handshake closes connection: `close` flag returns true with a fault
+ * frame; session becomes dead.
  *
  * @module @paw/daemon/application/rpcSession
  * @version 0.0.0
@@ -28,13 +28,13 @@ import {
 } from '@paw/core';
 
 /**
- * What a session needs to serve one connection.
+ * What session need to serve one connection.
  *
  * @interface RpcSessionContext
- * @property {string} token - The handshake token every client must present.
- * @property {number} protocolVersion - The daemon's protocol; older clients are refused.
+ * @property {string} token - The handshake token every client must show.
+ * @property {number} protocolVersion - Daemon's protocol; older clients get refused.
  * @property {unknown} hello - The `connect` result payload (version, root, capabilities, health).
- * @property {Record<string, (params: unknown) => Promise<unknown>>} methods - The method catalogue, post-handshake.
+ * @property {Record<string, (params: unknown) => Promise<unknown>>} methods - Method catalogue, post-handshake.
  */
 export interface RpcSessionContext {
   readonly token: string;
@@ -44,11 +44,11 @@ export interface RpcSessionContext {
 }
 
 /**
- * The lines to write back for a chunk, and whether to close afterwards.
+ * Lines to write back for a chunk, and whether to close after.
  *
  * @interface SessionPush
  * @property {string[]} lines - NDJSON lines to send.
- * @property {boolean} close - Destroy the connection after writing.
+ * @property {boolean} close - Destroy connection after writing.
  */
 export interface SessionPush {
   readonly lines: string[];
@@ -59,17 +59,17 @@ export interface SessionPush {
  * One connection's session.
  *
  * @interface RpcSession
- * @property {(chunk: string) => Promise<SessionPush>} push - Feed received bytes; get lines to write and whether to close.
+ * @property {(chunk: string) => Promise<SessionPush>} push - Feed received bytes; get lines to write, and close flag.
  */
 export interface RpcSession {
   push(chunk: string): Promise<SessionPush>;
 }
 
 /**
- * Create a session over a context.
+ * Create session over a context.
  *
- * @param {RpcSessionContext} ctx - The token, protocol, hello, and methods.
- * @returns {RpcSession} A stateful, single-connection session.
+ * @param {RpcSessionContext} ctx - Token, protocol, hello, methods.
+ * @returns {RpcSession} Stateful, single-connection session.
  */
 export function createRpcSession(ctx: RpcSessionContext): RpcSession {
   let buffer = '';

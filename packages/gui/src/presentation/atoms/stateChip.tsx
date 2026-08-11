@@ -1,10 +1,9 @@
 /**
  * State Chip Atom
  *
- * @fileoverview The pill that carries a member's state in the herd. The mapping
- * from state to colour and label lives here alone, so `running` is amber and
- * blinking in every place a member state is shown and nowhere gets its own idea
- * of what failure looks like.
+ * @fileoverview Pill carry member state in herd. State-to-colour and label map
+ * live here alone. `running` show amber and blink in every place member state
+ * show. Nowhere else get own idea what failure look like.
  *
  * @module @paw/gui/presentation/atoms/stateChip
  * @version 0.0.0
@@ -15,7 +14,7 @@
 import type { MemberViewState } from '@paw/core';
 
 /**
- * The chip class and label for each member state.
+ * Chip class and label for each member state.
  */
 const CHIP: Record<MemberViewState, { readonly cls: string; readonly label: string }> = {
   done: { cls: 'done', label: 'done' },
@@ -28,17 +27,17 @@ const CHIP: Record<MemberViewState, { readonly cls: string; readonly label: stri
  * Props for {@link StateChip}.
  *
  * @interface StateChipProps
- * @property {MemberViewState} state - The member state to show.
+ * @property {MemberViewState} state - Member state to show.
  */
 export interface StateChipProps {
   readonly state: MemberViewState;
 }
 
 /**
- * A member-state pill.
+ * Member-state pill.
  *
- * @param {StateChipProps} props - The chip props.
- * @returns {JSX.Element} The chip.
+ * @param {StateChipProps} props - Chip props.
+ * @returns {JSX.Element} Chip.
  */
 export function StateChip({ state }: StateChipProps) {
   const chip = CHIP[state];

@@ -1,10 +1,9 @@
 /**
  * Card Atom
  *
- * @fileoverview The console's one panel container: a bordered surface with an
- * optional header carrying a title on the left and a monospace meta note on the
- * right. Every view in the console is built from these, so the chrome is defined
- * once and a new panel cannot drift from the instrument-panel look.
+ * @fileoverview Console one panel container. Bordered surface with optional
+ * header. Title sit left, monospace meta note sit right. Every console view build
+ * from these. Card chrome defined once and shared by every panel.
  *
  * @module @paw/gui/presentation/atoms/card
  * @version 0.0.0
@@ -18,10 +17,10 @@ import type { ReactNode } from 'react';
  * Props for {@link Card}.
  *
  * @interface CardProps
- * @property {string} [title] - The header title; omit for a headerless card.
- * @property {ReactNode} [meta] - The right-aligned header note.
- * @property {string} [variant] - An extra class, e.g. `preview`.
- * @property {ReactNode} children - The card body.
+ * @property {string} [title] - Header title. Omit for headerless card.
+ * @property {ReactNode} [meta] - Right-aligned header note.
+ * @property {string} [variant] - Extra class, e.g. `preview`.
+ * @property {ReactNode} children - Card body.
  */
 export interface CardProps {
   readonly title?: string;
@@ -31,9 +30,9 @@ export interface CardProps {
 }
 
 /**
- * A bordered panel with an optional header.
+ * Bordered panel with optional header.
  *
- * @param {CardProps} props - The card props.
+ * @param {CardProps} props - Card props.
  * @returns {JSX.Element} The card.
  */
 export function Card({ title, meta, variant, children }: CardProps) {

@@ -1,12 +1,11 @@
 /**
  * PAW Console Server Body-Handling Tests
  *
- * @fileoverview The two functions that stand between a socket and the router:
- * `readBody`, which buffers a body and refuses at the cap, and `answerRequest`,
- * which reads a write's body, routes it, and answers — a read never waiting on a
- * stream, an oversized body a 413 the router never sees, a thrown error a silent
- * 500. Driven with a fake request stream and a fake response so every arm is
- * covered without binding a socket.
+ * @fileoverview Test two function between socket and router. `readBody`
+ * buffer body, refuse at cap. `answerRequest` read write's body, route it,
+ * answer: read never wait on stream, oversized body get 413 router never see,
+ * thrown error get silent 500. Use fake request stream and fake
+ * response, cover every branch, no socket bind.
  *
  * @module @paw/daemon/test/consoleServer
  * @version 0.0.0
@@ -21,7 +20,7 @@ import { CONTROL_BODY_CAP } from '../src/domain/control.js';
 import { answerRequest, readBody } from '../src/infrastructure/http/consoleServer.js';
 
 /**
- * A fake request: an async-iterable body plus the fields `toRequest` reads.
+ * Build fake request: async-iterable body plus fields `toRequest` read.
  *
  * @param method - The HTTP method.
  * @param opts - The url, headers, and body chunks.
@@ -43,7 +42,7 @@ function fakeReq(
   } as unknown as IncomingMessage;
 }
 
-/** A fake response that records what was written to it. */
+/** Build fake response that record each write. */
 function fakeRes(): ServerResponse & { sent: { status: number; headers: unknown; body: string } } {
   const sent = { status: 0, headers: {} as unknown, body: '' };
   return {
@@ -59,7 +58,7 @@ function fakeRes(): ServerResponse & { sent: { status: number; headers: unknown;
 }
 
 /**
- * Feed an array of chunks as an async iterable.
+ * Feed array of chunks as async iterable.
  *
  * @param chunks - The chunks to yield.
  */

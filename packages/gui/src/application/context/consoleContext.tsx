@@ -1,15 +1,7 @@
 /**
  * PAW Console Context
  *
- * @fileoverview The composition root of the React tree and the reason no panel
- * takes a prop it does not own: state and dispatch live in context, and a rail
- * item, a scrubber, or a herd row reads exactly the slice it needs through a
- * hook. State and dispatch are separate contexts so a component that only
- * dispatches does not re-render when unrelated state moves. The provider also
- * owns the live wire: given a snapshot source it polls `pawd`, folds each new
- * snapshot in through the reducer's `refresh`, and publishes any failure as a
- * visible error the shell renders — a poll that died quietly would leave a stale
- * console looking live.
+ * @fileoverview Composition root of React tree. Panels take no props they do not own. State and dispatch live in context. Rail item, scrubber, herd row read exact slice via hook. State and dispatch are separate contexts so component that only dispatches does not re-render when unrelated state changes. Provider given a snapshot source polls `pawd`, applies each new snapshot through reducer's `refresh`, and surfaces any failure as an error the shell renders; an unreported polling failure would leave stale snapshot data shown as current.
  *
  * @module @paw/gui/application/context/consoleContext
  * @version 0.0.0
@@ -30,6 +22,7 @@ import {
   type Context,
   type ReactNode,
 } from 'react';
+import type { RunSettings } from '@paw/core';
 import type { ConsoleAction, ConsoleData, ConsoleState } from '../../domain/console.types.js';
 import { initialState, reduce } from '../../domain/consoleState.js';
 import { applyLiveEvent } from '../applyLiveEvent.js';
@@ -43,27 +36,26 @@ import type { RecentClient } from '../../infrastructure/recentClient.js';
 import type { Shell, WindowControls } from '../../infrastructure/shell.js';
 
 /**
- * The dispatch function the reducer exposes to the tree.
+ * Dispatch function reducer expose to tree.
  */
 export type ConsoleDispatch = ActionDispatch<[action: ConsoleAction]>;
 
 /**
- * The live-wire error, boxed so that "no provider" (null) stays distinguishable
- * from "provider present, nothing wrong" (a box holding null).
+ * Live-wire error, boxed so "no provider" (null) stay distinct from "provider present, nothing wrong" (box holding null).
  *
  * @interface LiveError
- * @property {string | null} message - The last refresh failure, or null when healthy.
+ * @property {string | null} message - Last refresh failure, or null when healthy.
  */
 export interface LiveError {
   readonly message: string | null;
 }
 
 /**
- * How the console is connected, and what it can do about it.
+ * How console connected. What it can do about it.
  *
  * @interface LiveStatus
- * @property {LiveMode} mode - Where the connection is.
- * @property {string | null} message - The last polling failure, or null.
+ * @property {LiveMode} mode - Where connection is.
+ * @property {string | null} message - Last polling failure, or null.
  * @property {() => void} retryNow - Reconnect immediately.
  */
 export interface LiveStatus {
@@ -73,47 +65,47 @@ export interface LiveStatus {
 }
 
 /**
- * The tree source, boxed so that "no provider" (null) stays distinguishable
- * from "provider present, static page with no repository" (a box holding null).
+ * Tree source, boxed so "no provider" (null) stay distinct from "provider present, static page with no repository" (box holding null).
  *
  * @interface TreeAccess
- * @property {TreeSource | null} source - The repository tree source, or null when static.
+ * @property {TreeSource | null} source - Repository tree source, or null when static.
  */
 export interface TreeAccess {
   readonly source: TreeSource | null;
 }
 
 /**
- * The binding editor's client, boxed so "no provider" (null) stays distinct from
- * "provider present, static page with no daemon to edit" (a box holding null).
+ * Binding editor's client, boxed so "no provider" (null) stay distinct from "provider present, static page with no daemon to edit" (box holding null).
  *
  * @interface ConfigAccess
- * @property {ConfigClient | null} client - The config client, or null when static.
+ * @property {ConfigClient | null} client - Config client, or null when static.
  */
 export interface ConfigAccess {
   readonly client: ConfigClient | null;
 }
 
 /**
- * The scope picker's surface: the recent-routes client for the list, and the
- * grab that switches the daemon to a route over the live socket. Both are boxed
- * so "no provider" (null client) stays distinct from a static page.
+ * Operator verbs over live socket, plus recent-routes client: grab switches daemon
+ * to a route, release asks daemon run a herd (operator approve in terminal). All
+ * boxed so "no provider" (null client) stay distinct from static page.
  *
  * @interface ScopeAccess
- * @property {RecentClient | null} recent - The recent-routes client, or null when static.
- * @property {(path: string) => void} grab - Switch the daemon to a route; a no-op until the socket is live.
+ * @property {RecentClient | null} recent - Recent-routes client, or null when static.
+ * @property {(path: string) => void} grab - Switch daemon to a route; no-op until socket live.
+ * @property {(settings: RunSettings) => void} release - Ask daemon release herd; no-op until socket live.
  */
 export interface ScopeAccess {
   readonly recent: RecentClient | null;
   grab(path: string): void;
+  release(settings: RunSettings): void;
 }
 
 /**
- * The shell the console is running in, and the window it may control.
+ * Shell console run in. Window it may control.
  *
  * @interface ShellAccess
- * @property {Shell} shell - `desktop` when the console owns the window, else `web`.
- * @property {WindowControls | null} controls - The window controls, or null in a browser.
+ * @property {Shell} shell - `desktop` when console own window, else `web`.
+ * @property {WindowControls | null} controls - Window controls, or null in browser.
  */
 export interface ShellAccess {
   readonly shell: Shell;
@@ -130,12 +122,11 @@ const ScopeContext = createContext<ScopeAccess | null>(null);
 const ShellContext = createContext<ShellAccess | null>(null);
 
 /**
- * Read a required context, failing loud when a component is mounted outside the
- * provider rather than rendering an empty console.
+ * Read required context. Throw when component mounts outside a provider.
  *
- * @param {Context<T | null>} context - The context to read.
- * @param {string} hook - The calling hook's name, for the error message.
- * @returns {T} The context value.
+ * @param {Context<T | null>} context - Context to read.
+ * @param {string} hook - Calling hook's name, for error message.
+ * @returns {T} Context value.
  */
 function useRequired<T>(context: Context<T | null>, hook: string): T {
   const value = useContext(context);
@@ -149,16 +140,16 @@ function useRequired<T>(context: Context<T | null>, hook: string): T {
  * Props for {@link ConsoleProvider}.
  *
  * @interface ConsoleProviderProps
- * @property {PawSnapshot} snapshot - The snapshot to boot from.
- * @property {SnapshotSource | null} [source] - The polling source, used only while the socket is down; omit for a static page.
- * @property {SocketFactory | null} [connect] - Opens the live socket; omit for a static page.
- * @property {string | null} [token] - The credential this tab adopted.
- * @property {TreeSource | null} [treeSource] - The repository tree source; omit for a static page.
- * @property {ConfigClient | null} [config] - The binding editor's client; omit for a static page.
- * @property {RecentClient | null} [recent] - The scope picker's recent-routes client; omit for a static page.
- * @property {WindowControls | null} [controls] - The desktop window's controls; omit in a browser.
+ * @property {PawSnapshot} snapshot - Snapshot to boot from.
+ * @property {SnapshotSource | null} [source] - Polling source. Use only while socket down. Omit for static page.
+ * @property {SocketFactory | null} [connect] - Open live socket. Omit for static page.
+ * @property {string | null} [token] - Credential this tab adopt.
+ * @property {TreeSource | null} [treeSource] - Repository tree source. Omit for static page.
+ * @property {ConfigClient | null} [config] - Binding editor's client. Omit for static page.
+ * @property {RecentClient | null} [recent] - Scope picker's recent-routes client. Omit for static page.
+ * @property {WindowControls | null} [controls] - Desktop window's controls. Omit in browser.
  * @property {number} [intervalMs] - Poll period in milliseconds, for degraded mode.
- * @property {ReactNode} children - The console tree.
+ * @property {ReactNode} children - Console tree.
  */
 export interface ConsoleProviderProps {
   readonly snapshot: PawSnapshot;
@@ -174,16 +165,16 @@ export interface ConsoleProviderProps {
 }
 
 /**
- * The default poll period: fast enough that uptime, memory, and the process
- * table visibly move, slow enough to stay free next to a real run.
+ * Default poll period in degraded mode. 3000 ms refreshes uptime, memory, and
+ * process-table displays while leaving CPU cycles free for an active run.
  */
 export const DEFAULT_POLL_MS = 3000;
 
 /**
- * Provide console state, dispatch, and live-refresh health to the tree.
+ * Provide console state, dispatch, live-refresh health to tree.
  *
- * @param {ConsoleProviderProps} props - The provider props.
- * @returns {JSX.Element} The provided tree.
+ * @param {ConsoleProviderProps} props - Provider props.
+ * @returns {JSX.Element} Provided tree.
  */
 export function ConsoleProvider({
   snapshot,
@@ -203,9 +194,9 @@ export function ConsoleProvider({
     [dispatch],
   );
 
-  // The live wire delivers one slice at a time, so folding needs the data as it
-  // is *now*, not as it was when React last rendered: two frames can arrive in a
-  // single tick, and reading state there would silently drop the first.
+  // Socket events deliver one slice per message. Reducer folds each snapshot from
+  // data as it now stands, not from React's last render; two events arriving in
+  // the same tick drop the first if read from state.
   const dataRef = useRef(state.data);
   useEffect(() => {
     dataRef.current = state.data;
@@ -222,13 +213,13 @@ export function ConsoleProvider({
 
   const wire = useLiveWire({ connect, token, plan: state.plan, onEvent });
 
-  // `static` means no daemon behind the page at all. A page that has a daemon
-  // but no socket to it — an environment without WebSocket — is degraded, not
-  // static, or it would sit there showing its boot snapshot forever.
+  // `static` mean no daemon behind page at all. Page with daemon but no socket to
+  // it — env without WebSocket — degraded, no static. Otherwise show boot snapshot
+  // unchanged.
   const mode = connect === null && source !== null ? 'degraded' : wire.mode;
 
-  // Polling is the degraded mode and nothing else: while the socket is live the
-  // console makes no requests at all, which is the whole point of the exercise.
+  // Polling runs only in degraded mode. While the socket is live the console makes
+  // no polling requests.
   const message = useLiveRefresh(
     mode === 'degraded' ? source : null,
     intervalMs,
@@ -243,8 +234,8 @@ export function ConsoleProvider({
   const tree = useMemo<TreeAccess>(() => ({ source: treeSource }), [treeSource]);
   const configAccess = useMemo<ConfigAccess>(() => ({ client: config }), [config]);
   const scopeAccess = useMemo<ScopeAccess>(
-    () => ({ recent, grab: wire.scope }),
-    [recent, wire.scope],
+    () => ({ recent, grab: wire.scope, release: wire.release }),
+    [recent, wire.scope, wire.release],
   );
   const shell = useMemo<ShellAccess>(
     () => ({ shell: controls === null ? 'web' : 'desktop', controls }),
@@ -271,73 +262,72 @@ export function ConsoleProvider({
 }
 
 /**
- * The whole console state.
+ * Whole console state.
  *
- * @returns {ConsoleState} The current state.
+ * @returns {ConsoleState} Current state.
  */
 export function useConsoleState(): ConsoleState {
   return useRequired(StateContext, 'useConsoleState');
 }
 
 /**
- * The console's dispatch.
+ * Console's dispatch.
  *
- * @returns {ConsoleDispatch} The dispatch function.
+ * @returns {ConsoleDispatch} Dispatch function.
  */
 export function useConsoleDispatch(): ConsoleDispatch {
   return useRequired(DispatchContext, 'useConsoleDispatch');
 }
 
 /**
- * The last live-refresh failure, or null when the wire is healthy.
+ * Last live-refresh failure, or null when wire healthy.
  *
- * @returns {string | null} The error message.
+ * @returns {string | null} Error message.
  */
 export function useLiveError(): string | null {
   return useRequired(ErrorContext, 'useLiveError').message;
 }
 
 /**
- * How the console is connected, and how to reconnect it.
+ * How console connected. How to reconnect it.
  *
- * @returns {LiveStatus} The connection status.
+ * @returns {LiveStatus} Connection status.
  */
 export function useLiveStatus(): LiveStatus {
   return useRequired(LiveContext, 'useLiveStatus');
 }
 
 /**
- * The repository tree source, or null when the page has no daemon behind it.
+ * Repository tree source, or null when page have no daemon behind it.
  *
- * @returns {TreeSource | null} The tree source.
+ * @returns {TreeSource | null} Tree source.
  */
 export function useTreeSource(): TreeSource | null {
   return useRequired(TreeContext, 'useTreeSource').source;
 }
 
 /**
- * The binding editor's client, or null when the page has no daemon behind it.
+ * Binding editor's client, or null when page have no daemon behind it.
  *
- * @returns {ConfigClient | null} The config client.
+ * @returns {ConfigClient | null} Config client.
  */
 export function useConfigClient(): ConfigClient | null {
   return useRequired(ConfigContext, 'useConfigClient').client;
 }
 
 /**
- * The scope picker's surface: the recent-routes client and the grab that
- * switches the daemon to a route.
+ * Scope picker's client and grab action that switches daemon to a route.
  *
- * @returns {ScopeAccess} The recent client and the grab.
+ * @returns {ScopeAccess} Recent client and grab.
  */
 export function useScope(): ScopeAccess {
   return useRequired(ScopeContext, 'useScope');
 }
 
 /**
- * The shell the console is running in, and the window it may control.
+ * Shell console run in. Window it may control.
  *
- * @returns {ShellAccess} The shell and its window controls.
+ * @returns {ShellAccess} Shell and its window controls.
  */
 export function useShell(): ShellAccess {
   return useRequired(ShellContext, 'useShell');

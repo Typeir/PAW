@@ -1,15 +1,10 @@
 /**
- * PAW Store Durability Tests
+ * PAW store durability tests
  *
- * @fileoverview Proves the thing the in-memory suites cannot: that a violation
- * raised by one process is still there for the next one. Every PAW hook is a
- * separate short-lived process, so a store that only holds state within a
- * process would report zero unresolved violations on every invocation — an
- * enforcement gate that silently always passes. These tests open a real file,
- * close it, reopen it, and assert the rows survived, for both engines.
- *
- * The `node:sqlite` case skips when the engine is unavailable, which is a
- * supported machine state rather than a failure — see the WASM engine.
+ * @fileoverview A write from one process survives process exit. Every PAW
+ * hook runs in a separate short-lived process. Open a file, close it, reopen it,
+ * assert rows remain. Both engines. `node:sqlite` case skips when engine
+ * unavailable.
  *
  * @module @paw/adapters/test/store/sql/durability
  * @version 0.0.0
@@ -33,11 +28,11 @@ afterAll(() => {
 });
 
 /**
- * Open a file-backed sql.js driver, loading any existing database and writing
- * the whole file back after each mutation.
+ * Open file-backed sql.js driver. Load existing database, dump whole file
+ * back after mutation.
  *
- * @param {string} path - The database file.
- * @returns {Promise<SqlDriver>} The driver.
+ * @param {string} path - Database file path.
+ * @returns {Promise<SqlDriver>} Driver.
  */
 async function openWasm(path: string): Promise<SqlDriver> {
   const initSqlJs = (await import('sql.js')).default;
@@ -51,10 +46,10 @@ async function openWasm(path: string): Promise<SqlDriver> {
 }
 
 /**
- * Open a file-backed `node:sqlite` driver, or null when the engine is blocked.
+ * Open file-backed `node:sqlite` driver, or null when engine blocked.
  *
- * @param {string} path - The database file.
- * @returns {Promise<SqlDriver | null>} The driver, or null when unavailable.
+ * @param {string} path - Database file path.
+ * @returns {Promise<SqlDriver | null>} Driver, or null when unavailable.
  */
 async function openNative(path: string): Promise<SqlDriver | null> {
   try {

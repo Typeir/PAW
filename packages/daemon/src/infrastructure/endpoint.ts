@@ -1,15 +1,13 @@
 /**
  * PAW Daemon Endpoint
  *
- * @fileoverview Where the one resident `pawd` listens and hooks/CLI connect
- * (doc 10 §4). `node:net` speaks Windows named pipes and Unix domain sockets
- * through one API, so a single {@link socketPath} covers both — a pipe in the
- * kernel namespace on win32, a short filesystem socket under the runtime dir on
- * POSIX (kept short because `sun_path` is capped at ~104 bytes). The project id
- * is a hash of the root, so two checkouts never share a daemon or a token.
- *
- * Pure and parameterised: the platform and runtime dirs are inputs, not reads of
- * `process`, so both platforms are covered on either host.
+ * @fileoverview One `pawd` listens; hooks and CLI connect
+ * (doc 10 §4). `node:net` exposes Windows named pipes and Unix domain sockets
+ * through one API; single {@link socketPath} covers both — pipe in
+ * kernel namespace on win32, short filesystem socket under runtime dir on
+ * POSIX (`sun_path` cap ~104 bytes). Project id be hash of root;
+ * two checkouts share no daemon, no token. Pure and parameterised: platform and
+ * runtime dirs be inputs.
  *
  * @module @paw/daemon/infrastructure/endpoint
  * @version 0.0.0
@@ -21,12 +19,12 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 
 /**
- * The platform-and-runtime inputs {@link socketPath} needs.
+ * Platform-and-runtime inputs {@link socketPath} need.
  *
  * @interface EndpointEnv
- * @property {NodeJS.Platform} platform - The OS, deciding pipe vs socket.
- * @property {string | undefined} xdgRuntimeDir - `$XDG_RUNTIME_DIR`, preferred on POSIX.
- * @property {string} tmpdir - Fallback directory for the POSIX socket.
+ * @property {NodeJS.Platform} platform - OS, decide pipe vs socket.
+ * @property {string | undefined} xdgRuntimeDir - `$XDG_RUNTIME_DIR`, prefer on POSIX.
+ * @property {string} tmpdir - Fallback dir for POSIX socket.
  */
 export interface EndpointEnv {
   readonly platform: NodeJS.Platform;
@@ -35,11 +33,11 @@ export interface EndpointEnv {
 }
 
 /**
- * A short, stable identifier for a project root — the first 12 hex of the
- * SHA-256 of the case-normalised, forward-slashed root.
+ * Short, stable id for project root — first 12 hex of
+ * SHA-256 of case-normalised, forward-slashed root.
  *
  * @param {string} projectRoot - Absolute project root.
- * @returns {string} The 12-char id used to name the socket and namespace state.
+ * @returns {string} 12-char id name socket and namespace state.
  */
 export function projectId(projectRoot: string): string {
   return createHash('sha256')
@@ -49,11 +47,11 @@ export function projectId(projectRoot: string): string {
 }
 
 /**
- * The endpoint the daemon binds and clients connect to.
+ * Endpoint daemon bind, client connect.
  *
  * @param {string} projectRoot - Absolute project root.
  * @param {EndpointEnv} env - Platform and runtime directories.
- * @returns {string} A named pipe on win32, a `.sock` path on POSIX.
+ * @returns {string} Named pipe on win32, `.sock` path on POSIX.
  */
 export function socketPath(projectRoot: string, env: EndpointEnv): string {
   const id = projectId(projectRoot);
@@ -64,22 +62,22 @@ export function socketPath(projectRoot: string, env: EndpointEnv): string {
 }
 
 /**
- * The handshake token file — 32 random bytes pawd writes at `0600` and every
- * client must present in its first frame (doc 10 §4).
+ * Handshake token file — 32 random bytes pawd write at `0600`, every
+ * client must present in first frame (doc 10 §4).
  *
- * @param {string} pawDir - The project's `.paw` directory.
- * @returns {string} The token path.
+ * @param {string} pawDir - Project's `.paw` directory.
+ * @returns {string} Token path.
  */
 export function tokenPath(pawDir: string): string {
   return join(pawDir, 'daemon.token');
 }
 
 /**
- * The autostart lock file — the exclusive-create seam that lets only one hook of
- * a thundering herd spawn the daemon (doc 10 §9a).
+ * Autostart lock file — exclusive-create, let only one of many
+ * concurrent hooks spawn daemon (doc 10 §9a).
  *
- * @param {string} pawDir - The project's `.paw` directory.
- * @returns {string} The lock path.
+ * @param {string} pawDir - Project's `.paw` directory.
+ * @returns {string} Lock path.
  */
 export function lockPath(pawDir: string): string {
   return join(pawDir, 'daemon.lock');

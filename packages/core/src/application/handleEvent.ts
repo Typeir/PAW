@@ -1,12 +1,11 @@
 /**
  * PAW Event Router
  *
- * @fileoverview The input boundary of PAW's loop. A connector hands a canonical
- * {@link PawEvent} here; this routes it to the right use-case and returns a
- * canonical {@link PawResponse}. The loop is host-agnostic: the same routing runs
- * whether the event came from the Copilot CLI, the SDK, VS Code, or a future
- * host. Only `tool.pre` (enforcement) and `prompt.submitted` (L1 context) act
- * today; the rest return `noop`, ready to grow without the connectors changing.
+ * @fileoverview Input boundary of PAW loop. Connector hand canonical
+ * {@link PawEvent} here; route to right use-case, return canonical
+ * {@link PawResponse}. Host-agnostic: same routing run whether event come from
+ * Copilot CLI, SDK, VS Code, or future host. Only `tool.pre` (enforcement) and
+ * `prompt.submitted` (L1 context) act today; rest return `noop`.
  *
  * @module @paw/core/application/handleEvent
  * @version 0.0.0
@@ -21,15 +20,15 @@ import { checkEdit } from './checkEdit.js';
 import { checkTool, type CheckToolRequest } from './checkTool.js';
 
 /**
- * What the router needs to serve events.
+ * Router dependencies for serving events.
  *
  * @interface HandleDeps
- * @property {StorePort} store - The violation store, for the enforcement decision.
- * @property {ReadonlySet<string>} exemptTools - Read-only tools never blocked by violations.
- * @property {(path: string) => boolean} isIgnored - Whether a path is pawignored.
- * @property {GateRunner} [gates] - Runs gates on edited files for `tool.post`; omit to skip detection.
- * @property {(sessionId: string | null) => Promise<string>} [loadL1] - Produces the L1 context block for a prompt; omit to inject nothing.
- * @property {(path: string) => string} [toRelative] - Normalise a host path (possibly absolute) to project-relative before the loop reasons over it; omit to leave paths as given.
+ * @property {StorePort} store - Violation store, for enforcement decision.
+ * @property {ReadonlySet<string>} exemptTools - Read-only tools no violate ever block.
+ * @property {(path: string) => boolean} isIgnored - Say if path pawignored.
+ * @property {GateRunner} [gates] - Run gates on edited files for `tool.post`; omit to skip detection.
+ * @property {(sessionId: string | null) => Promise<string>} [loadL1] - Make L1 context block for prompt; omit to inject nothing.
+ * @property {(path: string) => string} [toRelative] - Normalise host path (maybe absolute) to project-relative; omit to leave paths as given.
  */
 export interface HandleDeps {
   readonly store: StorePort;
@@ -41,7 +40,7 @@ export interface HandleDeps {
 }
 
 /**
- * Map an enforcement {@link Decision} to a canonical {@link PawResponse}.
+ * Map enforcement {@link Decision} to canonical {@link PawResponse}.
  *
  * @param {Decision} d - The decision.
  * @returns {PawResponse} The canonical response.
@@ -56,11 +55,11 @@ function decisionToResponse(d: Decision): PawResponse {
 }
 
 /**
- * Route a canonical event to its use-case and return a canonical response.
+ * Route canonical event to use-case, return canonical response.
  *
- * @param {PawEvent} event - The canonical event from a connector.
- * @param {HandleDeps} deps - The router dependencies.
- * @returns {Promise<PawResponse>} The canonical response for the connector to translate.
+ * @param {PawEvent} event - Canonical event from connector.
+ * @param {HandleDeps} deps - Router dependencies.
+ * @returns {Promise<PawResponse>} Canonical response for connector to translate.
  */
 export async function handleEvent(
   event: PawEvent,

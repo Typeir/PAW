@@ -1,10 +1,10 @@
 /**
  * Context Card Tests
  *
- * @fileoverview The card that turns a file selection into something an operator
- * can run: it browses the daemon's tree, holds the selection in console state,
- * prints the `--context` argument that reproduces it, and says plainly when
- * there is no daemon to ask or the tree could not be fetched.
+ * @fileoverview Card turns selected files into a `--context` argument passed to
+ * a thing operator run. Browse daemon tree, hold selection in console state,
+ * print `--context` argument when a selection exists, show a message when no
+ * daemon answers or tree fails to load.
  *
  * @module @paw/gui/test/unit/presentation/contextCard
  */
@@ -29,11 +29,11 @@ const TREE: TreeNode[] = [
 ];
 
 /**
- * Mount the card with a tree source behind it.
+ * Mount card with the given tree source.
  *
- * @param {TreeSource} source - The source to serve the tree.
- * @param {PawSnapshot} [snapshot] - The snapshot to boot from.
- * @returns {ReturnType<typeof render>} The render result.
+ * @param {TreeSource} source - Source that serves the tree.
+ * @param {PawSnapshot} [snapshot] - Snapshot to boot from.
+ * @returns {ReturnType<typeof render>} Render result.
  */
 function renderCard(source: TreeSource, snapshot: PawSnapshot = makeSnapshot()) {
   return render(
@@ -80,7 +80,7 @@ describe('ContextCard', () => {
     expect(screen.getByText('nothing attached')).toBeInTheDocument();
   });
 
-  it('says the tree is unavailable rather than showing an empty repository', async () => {
+  it('shows an alert when the tree fails to load', async () => {
     renderCard(async () => {
       throw new Error('connection refused');
     });

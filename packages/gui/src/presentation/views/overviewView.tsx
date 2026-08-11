@@ -1,12 +1,11 @@
 /**
  * Overview View
  *
- * @fileoverview The proof the console is wired to something real. Every figure
- * here was read from the machine by `pawd` at the moment of the last poll: the
- * daemon's pid and parent, its uptime and resident memory, the hostname,
- * platform, CPU count and Node version, and the process subtree PAW owns. The
- * daemon narrows that table to its own descendants before serving it, so the
- * console shows PAW's workers and never the rest of the operator's machine.
+ * @fileoverview Console wired to `pawd` daemon. `pawd` read every figure
+ * here from machine at last poll moment: daemon pid and parent, uptime and
+ * resident memory, hostname, platform, CPU count and Node version, and process
+ * subtree owned by PAW. Daemon narrows table to own descendants before serving
+ * it. Console shows PAW workers, never the rest of the operator machine.
  *
  * @module @paw/gui/presentation/views/overviewView
  * @version 0.0.0
@@ -31,17 +30,17 @@ const PROCESS_COLUMNS: readonly Column[] = [
 ];
 
 /**
- * Format a byte count as whole megabytes.
+ * Format byte count as whole megabytes.
  *
  * @param {number} bytes - The byte count.
- * @returns {string} A label like `96 MB`.
+ * @returns {string} Label like `96 MB`.
  */
 export function formatMb(bytes: number): string {
   return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
 /**
- * The Overview subsystem — real host facts and PAW's owned processes.
+ * Overview subsystem — host facts and PAW-owned processes.
  *
  * @returns {JSX.Element} The view.
  */

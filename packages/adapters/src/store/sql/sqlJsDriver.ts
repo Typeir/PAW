@@ -1,16 +1,11 @@
 /**
  * PAW sql.js Driver
  *
- * @fileoverview Binds the WASM sql.js engine to the {@link SqlDriver} seam, for
- * machines where the native binding is blocked. sql.js holds the database in
- * memory and has no concept of a file, so durability is this adapter's job: it
- * hands the serialised database to an injected writer after every mutation.
+ * @fileoverview Bind WASM sql.js engine to {@link SqlDriver} seam. Use for machine
+ * where native binding blocked. sql.js keep database in memory, no file
+ * concept. Durability adapter job: hand serialised database to injected writer after every mutation.
  *
- * That write is whole-file and therefore the expensive part of this engine — it
- * is the reason `sqlite` is the default. The writer is injected rather than
- * imported so the failure path is testable, and a failing write propagates
- * (CONSTRAINTS.md Constraint 3: a store that cannot write throws, because a
- * violation that was silently not persisted is a gate that silently passed).
+ * Write whole-file, expensive; `sqlite` default. Writer injected; failing write propagate (CONSTRAINTS.md Constraint 3: store that cannot write throw).
  *
  * @module @paw/adapters/store/sql/sqlJsDriver
  * @version 0.0.0
@@ -21,13 +16,13 @@
 import type { SqlDriver, SqlRow, SqlValue } from './driver.js';
 
 /**
- * A value sql.js can return. Wider than {@link SqlValue} because SQLite has a
- * BLOB type that PAW's schema never declares — see {@link narrow}.
+ * Value sql.js can return. Wider than {@link SqlValue}: SQLite have BLOB type
+ * PAW schema never declare. See {@link narrow}.
  */
 export type SqlJsValue = SqlValue | Uint8Array;
 
 /**
- * One result set as sql.js returns it.
+ * One result set as sql.js return it.
  *
  * @interface SqlJsExecResult
  * @property {string[]} columns - Column names, in order.
@@ -39,17 +34,14 @@ export interface SqlJsExecResult {
 }
 
 /**
- * Narrow an engine value to one PAW's schema can hold.
+ * Narrow engine value to one PAW schema can hold.
  *
- * No table PAW creates declares a BLOB column, so a binary value means the file
- * is not the database PAW thinks it is. That is reported rather than coerced,
- * because silently stringifying someone else's data would hide the mix-up until
- * it surfaced as a nonsense violation message.
+ * No table PAW create declare BLOB column; binary value mean file not PAW database.
  *
- * @param {SqlJsValue} value - The value the engine returned.
- * @param {string} column - The column it came from, for the error message.
+ * @param {SqlJsValue} value - The value engine return.
+ * @param {string} column - The column it came from, for error message.
  * @returns {SqlValue} The narrowed value.
- * @throws {Error} When the value is binary.
+ * @throws {Error} When value be binary.
  */
 function narrow(value: SqlJsValue, column: string): SqlValue {
   if (value instanceof Uint8Array) {
@@ -61,14 +53,14 @@ function narrow(value: SqlJsValue, column: string): SqlValue {
 }
 
 /**
- * The sql.js database surface this driver uses.
+ * The sql.js database surface this driver use.
  *
  * @interface SqlJsDatabase
- * @property {(sql: string, params?: SqlValue[]) => void} run - Execute statements, discarding results.
- * @property {(sql: string, params?: SqlValue[]) => SqlJsExecResult[]} exec - Execute a query and return result sets.
- * @property {() => number} getRowsModified - Rows changed by the last mutation.
- * @property {() => Uint8Array} export - Serialise the whole database.
- * @property {() => void} close - Release the database.
+ * @property {(sql: string, params?: SqlValue[]) => void} run - Execute statements, discard results.
+ * @property {(sql: string, params?: SqlValue[]) => SqlJsExecResult[]} exec - Execute query, return result sets.
+ * @property {() => number} getRowsModified - Rows changed by last mutation.
+ * @property {() => Uint8Array} export - Serialise whole database.
+ * @property {() => void} close - Release database.
  */
 export interface SqlJsDatabase {
   run(sql: string, params?: SqlValue[]): void;
@@ -79,26 +71,25 @@ export interface SqlJsDatabase {
 }
 
 /**
- * Writes the serialised database somewhere durable.
+ * Write serialised database somewhere durable.
  */
 export type SqlJsPersist = (data: Uint8Array) => void;
 
 /**
- * Bind an open sql.js database to the driver seam.
+ * Bind open sql.js database to driver seam.
  *
- * @param {SqlJsDatabase} db - An open in-memory database.
- * @param {SqlJsPersist} persist - Receives the serialised database after every mutation.
+ * @param {SqlJsDatabase} db - Open in-memory database.
+ * @param {SqlJsPersist} persist - Receive serialised database after every mutation.
  * @returns {SqlDriver} The driver.
  */
 export function createSqlJsDriver(
   db: SqlJsDatabase,
   persist: SqlJsPersist,
 ): SqlDriver {
-  // The whole-file write is deferred while a transaction is open: `export()`
-  // serialises the database, and doing that mid-transaction ends the transaction
-  // out from under the caller. So a `begin` raises the depth, a `commit`/
-  // `rollback` lowers it, and the persist happens only once the outermost
-  // transaction has closed — the committed (or rolled-back) state, written once.
+  // Defer whole-file write while transaction open: `export()` serialise database,
+  // doing that mid-transaction end transaction out from under caller. So `begin`
+  // raise depth, `commit`/`rollback` lower it, persist happen only once outermost
+  // transaction close — the committed (or rolled-back) state, write once.
   let txDepth = 0;
   const track = (sql: string): void => {
     if (/^\s*begin\b/i.test(sql)) {

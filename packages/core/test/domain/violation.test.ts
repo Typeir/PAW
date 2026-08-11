@@ -1,9 +1,9 @@
 /**
- * PAW Violation Domain Tests
+ * PAW Violation domain tests.
  *
- * @fileoverview Exercises every pure operation over a violation set so
- * `violation.ts` reaches 100% on its own, independent of the enforcement
- * decision that consumes it.
+ * @fileoverview Test every pure op on violation set. Reach 100%
+ * coverage of `violation.ts`. Do not depend on enforcement decision
+ * code that consumes it.
  *
  * @module @paw/core/test/domain/violation
  * @version 0.0.0
@@ -22,7 +22,7 @@ import {
 } from '../../src/domain/violation.js';
 
 /**
- * Build a violation with defaults, overriding only what a case needs.
+ * Build violation with defaults. Overrides replace named fields.
  *
  * @param {Partial<Violation>} over - Fields to override.
  * @returns {Violation} A violation.

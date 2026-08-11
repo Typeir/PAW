@@ -1,10 +1,9 @@
 /**
- * @fileoverview Unit tests for the daemon's per-hook handler. Core must not
- * depend on adapters or connectors, so these use an inline fake store and a
- * minimal fake connector — enough to pin the whole translate → decide →
- * translate path: an unknown host or an unplaceable payload yields a bare
- * continue, and a placeable one flows through handleEvent to allow / deny / block.
- * The real Copilot connector is exercised end-to-end in the cli and daemon tiers.
+ * @fileoverview Unit tests for daemon per-hook handler. Use inline fake store
+ * and minimal fake connector to run translate → decide → translate path:
+ * unknown host or unplaceable payload yield bare continue; placeable one flow
+ * through handleEvent to allow / deny / block. Real Copilot connector tested
+ * end-to-end in cli and daemon tiers.
  *
  * @module @paw/core/test/application/dispatchHook
  */
@@ -63,8 +62,8 @@ const failingGates: GateRunner = {
 };
 
 /**
- * A minimal connector: it names `tool.pre`/`tool.post`, builds the matching
- * event from `{ paths }`, and tags the response kind for assertion.
+ * Minimal connector. Name `tool.pre`/`tool.post`, build matching event from
+ * `{ paths }`, tag response kind for assertion.
  */
 const testConnector: HostConnector = {
   name: 'test',

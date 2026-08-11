@@ -1,10 +1,5 @@
 /**
- * @fileoverview Covers {@link liveSdkRegistryFor}: it opens the SDK model against
- * the DeepSeek-by-default BYOK provider, binds the plan's role to that model in a
- * registry, and forwards the client's close hook. The SDK shell is injected, so
- * the wiring — provider block, the key read from the environment at egress, the
- * role binding — is proven without spawning the runtime. The key is read lazily
- * inside the egress token callback and throws when unset, never defaulting.
+ * @fileoverview Cover {@link liveSdkRegistryFor}. Open SDK model against DeepSeek-by-default BYOK provider. Bind plan role to model in registry. Forward client close hook. Covers provider block, key read from env at egress, role binding, without spawning a runtime process. Key read lazy inside egress token callback. Throw when unset, never default.
  *
  * @module @paw/daemon/test/model/liveSdkRegistry
  */
@@ -37,10 +32,16 @@ afterEach(() => {
 
 describe('liveSdkRegistryFor', () => {
   it('opens the DeepSeek provider by default and binds the plan role, forwarding close', async () => {
-    const { registry, close } = await liveSdkRegistryFor(PLAN, openModel, { baseDirectory: '/tmp/home' });
+    const { registry, close } = await liveSdkRegistryFor(PLAN, openModel, {
+      baseDirectory: '/tmp/home',
+      workingDirectory: '/repo',
+      safemode: true,
+    });
 
     expect(captured?.provider).toEqual({ type: 'openai', baseUrl: 'https://api.deepseek.com' });
     expect(captured?.baseDirectory).toBe('/tmp/home');
+    expect(captured?.workingDirectory).toBe('/repo');
+    expect(captured?.safemode).toBe(true);
     const binding = registry.bindings.get('lore.author');
     expect(binding?.modelId).toBe('deepseek-chat');
     expect(binding?.port).toBe(fakePort);
@@ -50,7 +51,7 @@ describe('liveSdkRegistryFor', () => {
   });
 
   it('reads the key from the environment at egress, and throws when it is unset', async () => {
-    await liveSdkRegistryFor(PLAN, openModel, { baseDirectory: '/tmp/home' });
+    await liveSdkRegistryFor(PLAN, openModel, { baseDirectory: '/tmp/home', workingDirectory: '/repo', safemode: false });
     const authToken = captured!.authToken;
 
     expect(() => authToken()).toThrow(/DEEPSEEK_KEY/);
@@ -61,6 +62,8 @@ describe('liveSdkRegistryFor', () => {
   it('honours baseUrl and model overrides', async () => {
     const { registry } = await liveSdkRegistryFor(PLAN, openModel, {
       baseDirectory: '/tmp/home',
+      workingDirectory: '/repo',
+      safemode: false,
       baseUrl: 'http://localhost:11434/v1',
       model: 'qwen',
     });

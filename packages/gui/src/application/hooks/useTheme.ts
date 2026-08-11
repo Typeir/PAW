@@ -1,11 +1,10 @@
 /**
  * PAW Console Theme
  *
- * @fileoverview Owns the one piece of state that lives outside React: the
- * `data-theme` attribute on the document element, which the stylesheet's token
- * blocks key off and which a boot script sets before first paint to avoid a
- * flash. The hook reads that attribute rather than keeping a duplicate, so the
- * toggle can never disagree with the page it is toggling.
+ * @fileoverview Single source of truth for theme is `data-theme` attribute on
+ * document element. Stylesheet token blocks key off it. Boot script sets it
+ * before first paint to avoid flash. Hook reads that attribute and keeps no
+ * duplicate state.
  *
  * @module @paw/gui/application/hooks/useTheme
  * @version 0.0.0
@@ -16,7 +15,7 @@
 import { useCallback, useState } from 'react';
 
 /**
- * The two themes the stylesheet defines.
+ * Two themes stylesheet define.
  */
 export type Theme = 'dark' | 'light';
 
@@ -24,7 +23,7 @@ export type Theme = 'dark' | 'light';
  * The theme control.
  *
  * @interface ThemeControl
- * @property {Theme} theme - The theme in force.
+ * @property {Theme} theme - Theme in force.
  * @property {() => void} toggle - Flip between dark and light.
  */
 export interface ThemeControl {
@@ -33,9 +32,8 @@ export interface ThemeControl {
 }
 
 /**
- * Read the theme currently stamped on the document, defaulting to dark — the
- * console's home state, and what the boot script writes when it cannot ask the
- * OS.
+ * Read theme currently stamped on document. Default dark — value boot
+ * script writes when it cannot ask OS.
  *
  * @returns {Theme} The stamped theme.
  */
@@ -44,9 +42,9 @@ function readTheme(): Theme {
 }
 
 /**
- * Track and flip the document theme.
+ * Track and flip document theme.
  *
- * @returns {ThemeControl} The current theme and its toggle.
+ * @returns {ThemeControl} Current theme and its toggle.
  */
 export function useTheme(): ThemeControl {
   const [theme, setTheme] = useState<Theme>(readTheme);

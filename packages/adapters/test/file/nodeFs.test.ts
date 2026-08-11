@@ -1,12 +1,7 @@
 /**
  * PAW Node Filesystem Adapter Tests
  *
- * @fileoverview Drives the adapter against a real temporary directory rather
- * than a mock of `node:fs`, because what is worth pinning is the behaviour the
- * filesystem actually has: a missing file reading as empty, a write creating its
- * parents, and — the one that matters for CONSTRAINTS.md Constraint 3 — a read
- * that fails for any reason other than absence propagating instead of being
- * answered with an empty string.
+ * @fileoverview Run adapter against a temp dir. Missing file read back empty. Write create parents. Per CONSTRAINTS.md Constraint 3, read that fail for anything but absence propagate.
  *
  * @module @paw/adapters/test/file/nodeFs
  * @version 0.0.0

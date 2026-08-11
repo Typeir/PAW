@@ -1,9 +1,9 @@
 /**
  * Plan Picker Tests
  *
- * @fileoverview One console, many plans: the picker lists what the repository
- * holds, switching moves the console's selection (which is what the next poll
- * asks the daemon for), and a repository with no plans says so rather than
+ * @fileoverview The picker lists every plan the repository holds. Selecting one
+ * moves the console's selection; the next poll asks the daemon for that plan.
+ * When the repository holds no plans, the picker reports that instead of
  * offering an empty control.
  *
  * @module @paw/gui/test/unit/presentation/planPicker
@@ -17,7 +17,7 @@ import { SwarmView } from '../../../src/presentation/views/swarm/swarmView.js';
 import { makeSnapshot, renderInConsole } from '../../fixtures.js';
 
 /**
- * Shows which plan the console will ask the daemon for next.
+ * Show which plan console ask daemon for next.
  *
  * @returns {JSX.Element} The probe.
  */

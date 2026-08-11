@@ -1,15 +1,12 @@
 /**
- * PAW GUI Syntax Highlighter
+ * PAW GUI syntax highlighter.
  *
- * @fileoverview A tiny, dependency-free JavaScript tokenizer that renders a swarm
- * plan's source into the console's code view — the mockup's centrepiece, where a
- * `brief(args, member)` function is read at a glance. A self-contained page under
- * a strict CSP cannot pull in a highlighter library, so this hand-rolled scanner
- * covers exactly what a plan uses: keywords, strings, line comments, template
- * literals, and — the point of the whole view — `${…}` interpolations shown in the
- * accent colour, because that is where per-member data enters the brief. Pure and
- * exhaustively tested; it emits the `.code` row markup the stylesheet numbers and
- * colours, escaping every character it did not tokenize.
+ * @fileoverview Tiny tokenizer, no dep. Converts swarm plan source to console
+ * code view. Page runs under strict CSP and cannot pull a highlighter library,
+ * so the scanner is hand-rolled. Covers only what the plan uses: keywords,
+ * strings, line comments, template literals, and `${…}` interpolations in accent
+ * colour, where per-member data enters the brief. Emits `.code` row markup with
+ * line number and colour; escapes every char not tokenized.
  *
  * @module @paw/gui/presentation/lib/highlight
  * @version 0.0.0
@@ -32,21 +29,21 @@ const ESC: Record<string, string> = {
 };
 
 /**
- * Escape a string for safe HTML text.
+ * Escape string for safe HTML text.
  *
- * @param {string} text - The raw string.
- * @returns {string} The escaped string.
+ * @param {string} text - Raw string.
+ * @returns {string} Escaped string.
  */
 function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (ch) => ESC[ch]);
 }
 
 /**
- * A classified run of source text.
+ * Classified run of source text.
  *
  * @interface Token
- * @property {string} cls - The token class (`k`/`s`/`c`/`f`/`i`), or empty for plain text.
- * @property {string} text - The raw source, possibly spanning newlines (templates).
+ * @property {string} cls - Token class (`k`/`s`/`c`/`f`/`i`), or empty for plain text.
+ * @property {string} text - Raw source, possibly span newlines (templates).
  */
 interface Token {
   readonly cls: string;
@@ -57,10 +54,10 @@ const IDENT = /[A-Za-z0-9_$]/;
 const IDENT_START = /[A-Za-z_$]/;
 
 /**
- * Scan JavaScript source into a flat list of classified tokens.
+ * Scan JavaScript source into flat list of classified tokens.
  *
- * @param {string} src - The source.
- * @returns {Token[]} The tokens in source order.
+ * @param {string} src - Source.
+ * @returns {Token[]} Tokens in source order.
  */
 function scan(src: string): Token[] {
   const tokens: Token[] = [];
@@ -129,13 +126,13 @@ function scan(src: string): Token[] {
 }
 
 /**
- * Scan a template literal starting at a backtick, emitting the string parts as
- * `s` and each `${…}` interpolation as `i`.
+ * Scan template literal from backtick. Emit string parts as `s`, each `${…}`
+ * interpolation as `i`.
  *
- * @param {string} src - The source.
- * @param {number} start - Index of the opening backtick.
+ * @param {string} src - Source.
+ * @param {number} start - Index of opening backtick.
  * @param {(cls: string, text: string) => void} push - Token sink.
- * @returns {number} Index just past the closing backtick.
+ * @returns {number} Index just past closing backtick.
  */
 function scanTemplate(
   src: string,
@@ -183,13 +180,13 @@ function scanTemplate(
 }
 
 /**
- * Highlight a swarm plan's source into `.code` row markup — one `.row` per line,
- * with an optional line highlighted. Tokens that span newlines (templates) close
- * and reopen their span at each line boundary so every row is valid on its own.
+ * Highlight swarm plan source into `.code` row markup — one `.row` per line,
+ * with optional line highlighted. Token span newlines (template) close and
+ * reopen span at each line boundary, so every row valid on own.
  *
- * @param {string} source - The plan source.
- * @param {number} [highlightLine] - 1-based line to mark with the accent wash.
- * @returns {string} The `.code` inner HTML.
+ * @param {string} source - Plan source.
+ * @param {number} [highlightLine] - 1-based line to mark with accent wash.
+ * @returns {string} `.code` inner HTML.
  */
 export function highlightJs(source: string, highlightLine?: number): string {
   const rows: string[] = [''];

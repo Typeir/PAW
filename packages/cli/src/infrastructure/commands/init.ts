@@ -1,13 +1,13 @@
 /**
  * PAW CLI — init / sync commands
  *
- * @fileoverview `paw init` attaches PAW to the repository you are in — it writes
- * `.paw/config.json` (the host-agnostic descriptor: gates dir, connector) and a
- * `.git/hooks/pre-commit` that defers to `paw check --staged`. `paw sync` is the
- * same in merge mode: re-apply non-destructively, keeping whatever the repo has
- * already declared. Both are the process shell around core's `applyInit` — the
- * one attach use-case that `paw`, `paw-setup`, and the console all share, so they
- * cannot drift. `--dry-run` plans and writes nothing.
+ * @fileoverview `paw init` attach PAW to current repo: write
+ * `.paw/config.json` (host-agnostic descriptor: gates dir, connector) and a
+ * `.git/hooks/pre-commit` that defer to `paw check --staged`. `paw sync` be
+ * same in merge mode: re-apply non-destructively, keep whatever repo already
+ * declare. Both be process shell around core's `applyInit`, the
+ * attach use-case shared by `paw`, `paw-setup`, and console. `--dry-run`
+ * plan and write nothing.
  *
  * @module @paw/cli/infrastructure/commands/init
  * @version 0.0.0
@@ -21,10 +21,10 @@ import { applyInit, configPathFor, planInit, type InitMode } from '@paw/core';
 import { createNodeFs } from '@paw/adapters';
 
 /**
- * Walk up from a directory to the nearest git repository root.
+ * Walk up from directory to nearest git repository root.
  *
  * @param {string} start - Where to start looking.
- * @returns {string | null} The repo root, or null when not inside one.
+ * @returns {string | null} Repo root, or null when not inside one.
  */
 function findRepoRoot(start: string): string | null {
   let dir = resolve(start);
@@ -41,12 +41,12 @@ function findRepoRoot(start: string): string | null {
 }
 
 /**
- * Attach or re-sync PAW to the current repository.
+ * Attach or re-sync PAW to current repository.
  *
- * @param {string[]} rest - The words after `init` / `sync`.
+ * @param {string[]} rest - Words after `init` / `sync`.
  * @param {(lines: string[]) => void} print - Line printer.
  * @param {InitMode} mode - `create` for init, `merge` for sync, `override` to replace.
- * @returns {Promise<number>} 0 on success, 1 when the plan refused.
+ * @returns {Promise<number>} 0 on success, 1 when plan refused.
  */
 export async function runInit(
   rest: string[],

@@ -1,10 +1,9 @@
 /**
- * Shell Detection Tests
+ * Shell detection tests.
  *
- * @fileoverview Which shell the console thinks it is in, and the rule that keeps
- * it honest: a bridge counts only when every window control it claims is
- * actually callable, so window chrome is never drawn over buttons that do
- * nothing.
+ * @fileoverview Tell what shell console live in. Bridge count only when every
+ * window control it claim actually callable, so window chrome never draw over
+ * dead button.
  *
  * @module @paw/gui/test/unit/infrastructure/shell
  */

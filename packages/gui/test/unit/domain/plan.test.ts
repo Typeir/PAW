@@ -1,9 +1,8 @@
 /**
- * Plan Domain Tests
+ * Plan domain tests.
  *
- * @fileoverview Covers the plan's behaviour: clamping a scrub to the members
- * that exist, and the loud failure when the producer's per-member arrays do not
- * cover the member being read.
+ * @fileoverview Test plan behaviour. Clamp scrub to members that exist. Fail
+ * loud when producer per-member arrays no cover member being read.
  *
  * @module @paw/gui/test/unit/domain/plan
  */

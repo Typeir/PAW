@@ -1,9 +1,9 @@
 /**
- * @fileoverview End-to-end tests for the CLI consumer. These spawn `main.ts` as
- * a real process, pipe a JSON decision-input on stdin, and assert the printed
- * output and exit code — proving the whole path works: consumer → @paw/core →
- * decision → render → exit. This is the E2E tier from CONSTRAINTS.md Constraint 1;
- * it, not a unit test, is what covers the process shell in `main.ts`.
+ * @fileoverview End-to-end test for CLI consumer. Spawn `main.ts` as real
+ * process, pipe JSON decision-input on stdin, assert printed output and
+ * exit code across whole path: consumer → @paw/core → decision → render →
+ * exit. E2E tier from CONSTRAINTS.md Constraint 1, cover process shell in
+ * `main.ts`.
  *
  * @module @paw/cli/test/e2e/decide
  */
@@ -18,10 +18,10 @@ const TSX = join(PKG, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 const MAIN = join(PKG, 'src', 'infrastructure', 'main.ts');
 
 /**
- * Run the CLI as a child process with the given stdin, resolving with its
- * stdout, stderr, and exit code.
+ * Run CLI as child process with given stdin, resolve with its
+ * stdout, stderr, exit code.
  *
- * @param stdin - The JSON payload to pipe in.
+ * @param stdin - JSON payload to pipe in.
  */
 function runCli(stdin: string): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve) => {

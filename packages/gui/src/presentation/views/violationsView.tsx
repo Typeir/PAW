@@ -1,11 +1,10 @@
 /**
  * Violations View
  *
- * @fileoverview The enforcement ledger. Severity is derived from the violation
- * itself: a direct violation blocks the file it names and reads critical, while
- * one whose fix lives in another file (`indirectFix`) is a warning that does not
- * hold the agent hostage. Nothing here is scored or ranked by the console — it
- * shows the store's rows as the store holds them.
+ * @fileoverview Lists enforcement results from the console store. Severity comes
+ * from violation itself: direct violation block in same file reads critical, one
+ * with fix in another file (`indirectFix`) reads warning. Component renders store
+ * rows in the order the store holds them.
  *
  * @module @paw/gui/presentation/views/violationsView
  * @version 0.0.0
@@ -20,7 +19,7 @@ import { Crumb } from '../atoms/crumb.js';
 import { Placeholder } from '../atoms/placeholder.js';
 
 /**
- * The Violations subsystem.
+ * Violations subsystem.
  *
  * @returns {JSX.Element} The view.
  */

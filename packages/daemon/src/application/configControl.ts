@@ -1,12 +1,10 @@
 /**
  * PAW Config Control Port
  *
- * @fileoverview The console's config-editing verbs, applied in the daemon that
- * holds filesystem authority — the browser sends the request, the daemon owns the
- * write. Each verb reads the document, runs a core edit, and on success writes it
- * back; a refused edit is a 422 with its reason. Unlike the enforcement verbs
- * these need no round trip: the config lives beside the daemon, not in a resident
- * pawd.
+ * @fileoverview Console config-editing verbs, apply in daemon. Daemon hold
+ * filesystem authority. Browser send; daemon write. Every verb read document,
+ * run core edit, write back on good. Refused edit be 422 with reason. No round
+ * trip needed: config live beside daemon.
  *
  * @module @paw/daemon/configControl
  * @version 0.0.0
@@ -25,9 +23,9 @@ import {
 import type { ControlPort, ControlResult } from '../domain/control.js';
 
 /**
- * A 422 carrying why an edit was refused.
+ * Build 422, carry refusal reason.
  *
- * @param {string} reason - The refusal reason.
+ * @param {string} reason - Refusal reason.
  * @returns {ControlResult} The result.
  */
 function refuse(reason: string): ControlResult {
@@ -35,21 +33,21 @@ function refuse(reason: string): ControlResult {
 }
 
 /**
- * A value as a string, or null.
+ * Return value when string, else null.
  *
  * @param {unknown} value - The value.
- * @returns {string | null} The string, or null.
+ * @returns {string | null} The string, else null.
  */
 function asString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
 /**
- * The control port that edits a repo's config document: bind a role, declare a
- * model, clear a binding.
+ * Build control port. Port edit repo config document: bind role, declare model,
+ * clear binding.
  *
- * @param {ConfigDocumentPort} configDoc - The document to read and write.
- * @returns {ControlPort} The registered writes.
+ * @param {ConfigDocumentPort} configDoc - Document to read and write.
+ * @returns {ControlPort} Registered writes.
  */
 export function configControl(configDoc: ConfigDocumentPort): ControlPort {
   const commit = async (edit: ConfigEdit): Promise<ControlResult> => {

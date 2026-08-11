@@ -1,13 +1,13 @@
 /**
  * Node Runtime Integration
  *
- * @fileoverview The adapter against the real world: a real repository walked off
- * disk, a real config and plan read from it, the real host process table, a real
- * socket on an ephemeral loopback port, and real HTTP fetches. This is the tier
- * that proves `/api/state` carries the machine's own numbers — it asserts the
- * served pid is this process's pid, which no fixture could fake — and that
- * switching plans, editing a plan, and asking for one outside the repository all
- * behave over the wire, not just against fakes.
+ * @fileoverview Integration adapter against a running system: real repo read
+ * from disk, real config and plan read from it, real host process table, real
+ * socket on ephemeral loopback port, real HTTP fetches. This tier proves
+ * `/api/state` serves the host's own values — asserts served pid is this
+ * process's pid, no fixture fake that — and that switching plans, editing a
+ * plan, asking for one outside repository all behave over wire, not just
+ * against fakes.
  *
  * @module @paw/daemon/test/nodeRuntime.integration
  */
@@ -65,8 +65,8 @@ let daemon: DaemonHandle | null = null;
 let previousHome: string | undefined;
 
 /**
- * Socket hooks that accept nothing, for the tests that only exercise the HTTP
- * half of a bound server.
+ * Socket hooks accept nothing. For tests that only exercise HTTP half of bound
+ * server.
  */
 const REFUSING_HOOKS: SocketHooks = {
   check: () => ({ status: 403, message: 'no live wire here' }),
@@ -74,9 +74,9 @@ const REFUSING_HOOKS: SocketHooks = {
 };
 
 beforeAll(async () => {
-  // The identity belongs to the machine, so the runtime writes it into PAW's
-  // home. Point that at a temporary directory: these tests must issue a real CA
-  // and lock down a real key file without touching the operator's own.
+  // Identity belong to machine, runtime write it into PAW's home. Point that at
+  // temporary directory: these tests must issue real CA and lock down real key
+  // file without touching operator's own.
   previousHome = process.env.PAW_HOME;
   process.env.PAW_HOME = await mkdtemp(join(tmpdir(), 'paw-home-'));
 });
@@ -95,10 +95,10 @@ afterEach(async () => {
 });
 
 /**
- * Start a daemon over the fixture repository.
+ * Start daemon over fixture repository.
  *
- * @param {string | undefined} planPath - The plan to open on, if any.
- * @returns {Promise<DaemonHandle>} The running daemon.
+ * @param {string | undefined} planPath - Plan to open on, if any.
+ * @returns {Promise<DaemonHandle>} Running daemon.
  */
 async function serveFixtures(planPath?: string): Promise<DaemonHandle> {
   daemon = await runDaemon(
@@ -109,13 +109,13 @@ async function serveFixtures(planPath?: string): Promise<DaemonHandle> {
 }
 
 /**
- * A response, in the shape the assertions below read it.
+ * A response, in shape assertions below read it.
  *
  * @interface Wire
- * @property {number} status - The status code.
- * @property {{ get(name: string): string | null }} headers - The response headers.
- * @property {() => string} text - The body.
- * @property {() => unknown} json - The body, parsed.
+ * @property {number} status - Status code.
+ * @property {{ get(name: string): string | null }} headers - Response headers.
+ * @property {() => string} text - Body.
+ * @property {() => unknown} json - Body, parsed.
  */
 interface Wire {
   readonly status: number;
@@ -125,19 +125,19 @@ interface Wire {
 }
 
 /**
- * Call the daemon over TLS, verifying its certificate against the CA it issued
- * itself from.
+ * Call daemon over TLS, verify its certificate against the CA it issued itself
+ * from.
  *
- * `fetch` cannot do this job: it ignores a `ca` option, and it refuses to send a
- * forged `Host` — the one header a DNS-rebinding page controls and the first one
- * the daemon's gates read. Going through `node:https` directly means the chain is
- * genuinely verified (`rejectUnauthorized` is on by default), so every call here
- * doubles as proof that the issued leaf validates.
+ * `fetch` cannot do this job: it ignore a `ca` option, refuse to send forged
+ * `Host` — the one header a DNS-rebinding page control and the first one
+ * daemon's gates read. Go through `node:https` directly so chain genuinely
+ * verified (`rejectUnauthorized` on by default). Every call here also verifies
+ * the issued leaf.
  *
- * @param {string} url - The absolute URL.
- * @param {string} ca - The CA certificate to verify against.
- * @param {{ headers?: Record<string, string>; method?: string; servername?: string }} [init] - Method, headers, and the name to validate the certificate against.
- * @returns {Promise<Wire>} The response.
+ * @param {string} url - Absolute URL.
+ * @param {string} ca - CA certificate to verify against.
+ * @param {{ headers?: Record<string, string>; method?: string; servername?: string }} [init] - Method, headers, and name to validate certificate against.
+ * @returns {Promise<Wire>} Response.
  */
 function call(
   url: string,
@@ -180,12 +180,12 @@ function call(
 }
 
 /**
- * Call as an authenticated console would.
+ * Call as authenticated console would.
  *
- * @param {string} url - The absolute URL.
- * @param {DaemonHandle} running - The daemon whose token and CA to use.
+ * @param {string} url - Absolute URL.
+ * @param {DaemonHandle} running - Daemon whose token and CA to use.
  * @param {{ headers?: Record<string, string>; method?: string }} [init] - Extra request options.
- * @returns {Promise<Wire>} The response.
+ * @returns {Promise<Wire>} Response.
  */
 function authed(
   url: string,
@@ -304,9 +304,9 @@ describe('the daemon on the real runtime', () => {
 
   it('refuses a rebinding Host over the real socket', async () => {
     const running = await serveFixtures();
-    // Reaching the Host gate at all takes forcing the client to validate against
-    // the real name, because TLS refuses the rebind first (asserted below). The
-    // gate is still tested: it is the layer that survives if TLS is ever relaxed.
+    // Reaching Host gate at all take forcing client to validate against real
+    // name, because TLS refuse the rebind first (asserted below). Gate still
+    // tested: it the layer that survive if TLS ever relaxed.
     const res = await authed(`${running.url}api/state`, running, {
       headers: { host: 'evil.example' },
       servername: '127.0.0.1',
@@ -317,9 +317,9 @@ describe('the daemon on the real runtime', () => {
 
   it('never completes a handshake for a name the certificate does not carry', async () => {
     const running = await serveFixtures();
-    // This is DNS rebinding, and it dies at the handshake: the leaf is valid for
-    // loopback only, so a page that re-points its own name at 127.0.0.1 cannot
-    // establish a session to inherit an origin from.
+    // This DNS rebinding, die at handshake: leaf valid for loopback only, so
+    // page that re-points own name at 127.0.0.1 cannot establish session to
+    // inherit an origin from.
     await expect(
       authed(`${running.url}api/state`, running, { headers: { host: 'evil.example' } }),
     ).rejects.toThrow(/does not match certificate's altnames/);
@@ -423,13 +423,12 @@ describe('the daemon on the real runtime', () => {
 
 describe('the live wire, over a real socket', () => {
   /**
-   * Open a real `wss` connection to the daemon, verifying its certificate
-   * against the CA it issued. Nothing here is faked: real TLS, real `ws`, real
-   * upgrade gate.
+   * Open real `wss` connection to daemon, verify its certificate against the CA
+   * it issued. Nothing here faked: real TLS, real `ws`, real upgrade gate.
    *
-   * @param {DaemonHandle} running - The daemon.
-   * @param {{ protocols?: string[]; origin?: string; host?: string }} [over] - What to send instead of the defaults.
-   * @returns {Promise<Wire>} The socket, its frames, and its close code.
+   * @param {DaemonHandle} running - Daemon.
+   * @param {{ protocols?: string[]; origin?: string; host?: string }} [over] - What to send instead of defaults.
+   * @returns {Promise<Wire>} Socket, its frames, and its close code.
    */
   const dial = (
     running: DaemonHandle,
@@ -503,8 +502,8 @@ describe('the live wire, over a real socket', () => {
     const { code } = await wire.ended;
 
     expect(code).toBe(CLOSE_AUTH);
-    // Not one frame crossed the wire. Anything on this machine can open this
-    // socket; until it proves it read the printed URL it learns nothing.
+    // Not one frame cross the wire. Any local process can open this socket;
+    // only a client that authenticates receives data.
     expect(wire.frames).toEqual([]);
   }, 30000);
 
@@ -610,8 +609,8 @@ describe('the live wire, over a real socket', () => {
 
     const { code } = await wire.ended;
 
-    // Not 4401: a slow socket is not a rejected credential, and a console told
-    // 4401 stops retrying for the life of the page.
+    // Not 4401: slow socket not rejected credential, console told 4401 stop
+    // retrying for life of page.
     expect(code).toBe(CLOSE_MALFORMED);
     expect(wire.frames).toEqual([]);
   }, 30000);
@@ -627,7 +626,7 @@ describe('the live wire, over a real socket', () => {
     daemon = null;
     const { code } = await wire.ended;
 
-    // A console told 1001 stops retrying; an abrupt drop reconnects forever.
+    // Console told 1001 stop retrying; abrupt drop reconnect forever.
     expect(code).toBe(CLOSE_SHUTDOWN);
   }, 30000);
 });
@@ -646,8 +645,8 @@ describe('request plumbing', () => {
   });
 
   it('takes the first of a repeated header rather than merging it', () => {
-    // A doubled Host or Origin is smuggling, not a list to concatenate: judging
-    // one unambiguous value is the only safe reading.
+    // Only the first value of a repeated Host or Origin header is read; a
+    // repeated header is not concatenated.
     expect(firstHeader(['127.0.0.1:8971', 'evil.example'])).toBe('127.0.0.1:8971');
     expect(firstHeader('127.0.0.1:8971')).toBe('127.0.0.1:8971');
     expect(firstHeader(undefined)).toBeUndefined();
@@ -691,8 +690,8 @@ describe('request plumbing', () => {
     const res = await call(`https://127.0.0.1:${server.port}/`, identity.caCert);
 
     expect(res.status).toBe(500);
-    // The operator gets the detail on stderr; the caller gets nothing to work
-    // with — an error body is a disclosure channel, not a courtesy.
+    // Operator get detail on stderr; caller get nothing to work with. Error
+    // body is a disclosure channel.
     expect(res.text()).toBe('internal error');
     expect(res.text()).not.toContain(detail);
     await server.close();
@@ -702,8 +701,8 @@ describe('request plumbing', () => {
 describe('the daemon’s TLS', () => {
   it('serves a certificate that verifies against the CA it issued, with no exception made', async () => {
     const running = await serveFixtures();
-    // `call` runs with rejectUnauthorized on: reaching a 200 here IS the
-    // assertion that the chain validates. Nothing below is reached otherwise.
+    // `call` runs with rejectUnauthorized on: reaching 200 here means the
+    // certificate chain validated; otherwise nothing below executes.
     const page = await call(running.url, running.identity.caCert);
     expect(page.status).toBe(200);
     expect(running.identity.meta.leafFingerprint).toMatch(/^SHA256(:[0-9A-F]{2}){32}$/);
@@ -711,8 +710,8 @@ describe('the daemon’s TLS', () => {
 
   it('is refused by a client that does not know that CA — no daemon is universally trusted', async () => {
     const running = await serveFixtures();
-    // A CA from another install must not vouch for this one. This is the check
-    // that fails first if the leaf were ever self-signed or the CA ever shipped.
+    // CA from another install must not vouch for this one. This the check that
+    // fail first if leaf ever self-signed or CA ever shipped.
     const stranger = await issueCa('someone', 'ELSEWHERE', new Date());
     await expect(call(running.url, stranger.cert)).rejects.toThrow(
       /self-signed|unable to verify|UNABLE/i,
@@ -750,14 +749,14 @@ describe('the daemon’s TLS', () => {
     );
     await bindServer(server, 0, '127.0.0.1', false);
 
-    // With no listener, Node throws this and pawd dies. The daemon must survive.
+    // With no listener, Node throw this and pawd die. Daemon must survive.
     expect(() => server.emit('error', new Error('connection reset'))).not.toThrow();
     await closeServer(server);
   });
 
   it('reports a bind that failed with something that is not an Error', async () => {
-    // Node emits Errors, but a stack that rejects with a string would otherwise
-    // print "[object Object]" and leave the operator with nothing to search for.
+    // Node emit Errors, but stack that reject with string would otherwise print
+    // "[object Object]" and leave operator with nothing to search for.
     const throwing = {
       once: (event: string, cb: (err: unknown) => void) => {
         if (event === 'error') {
@@ -777,8 +776,7 @@ describe('the daemon’s TLS', () => {
     await first.close();
 
     const second = await serveFixtures();
-    // Reissuing per boot would ask the operator to approve a new CA every time,
-    // which trains them to approve CAs without looking.
+    // Reissuing per boot would ask the operator to approve a new CA every time.
     expect(second.identity.action).toBe('reuse');
     expect(second.identity.meta.caFingerprint).toBe(fingerprint);
     expect(second.identity.meta.leafFingerprint).toBe(first.identity.meta.leafFingerprint);

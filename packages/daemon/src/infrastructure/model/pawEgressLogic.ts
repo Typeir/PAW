@@ -1,16 +1,7 @@
 /**
  * PAW Egress Logic
  *
- * @fileoverview The pure core of PAW's daemon-owned BYOK egress. The Copilot SDK
- * lets a consumer own the outbound model call through a `CopilotRequestHandler`;
- * this is the logic that handler runs, factored out so it needs neither the SDK
- * nor the network to test. It stamps the provider key onto the outbound request
- * (so the credential is added by PAW at the last hop and never travels in a
- * config object or reaches the runtime), performs the call through an injected
- * fetch, and — only for a successful response attributed to a session — reads
- * token usage from the body and reports it, because the SDK surfaces no usage of
- * its own. A non-2xx response is returned untouched for the SDK to handle; usage
- * is never invented for it.
+ * @fileoverview Pure core of PAW daemon-owned BYOK egress. Copilot SDK lets consumer own outbound model call through `CopilotRequestHandler`; this is the logic that handler runs, factored out so it needs neither SDK nor network to test. It writes provider key onto outbound request (PAW adds the credential at the last hop, so it never travels in a config object nor reaches runtime), calls through injected fetch, and — only for a successful response tied to a session — reads token usage from the body and reports it, because the SDK shows no usage of its own. Non-2xx responses return untouched for the SDK to handle; usage is never read for them.
  *
  * @module @paw/daemon/model/pawEgressLogic
  * @version 0.0.0
@@ -21,13 +12,13 @@
 import { parseProviderUsage, type TokenUsage } from './providerUsage.js';
 
 /**
- * The collaborators {@link handleEgress} needs, injected so the logic is pure.
+ * Collaborators {@link handleEgress} takes as arguments; injected so the logic depends on none of them directly.
  *
  * @interface EgressDeps
- * @property {() => string | Promise<string>} authToken - Yields the provider bearer token at call time.
- * @property {(request: Request) => Promise<Response>} fetchImpl - Performs the upstream call.
- * @property {(sessionId: string, usage: TokenUsage) => void} onUsage - Records usage for a completed session request.
- * @property {(sessionId: string | undefined) => number | undefined} maxTokensFor - The output ceiling to stamp onto this session's chat-completion body, or undefined to leave it unbounded.
+ * @property {() => string | Promise<string>} authToken - Give provider bearer token at call time.
+ * @property {(request: Request) => Promise<Response>} fetchImpl - Do upstream call.
+ * @property {(sessionId: string, usage: TokenUsage) => void} onUsage - Record usage for done session request.
+ * @property {(sessionId: string | undefined) => number | undefined} maxTokensFor - Output ceiling to write onto this session chat-completion body, or undefined to leave unbounded.
  */
 export interface EgressDeps {
   readonly authToken: () => string | Promise<string>;
@@ -37,16 +28,12 @@ export interface EgressDeps {
 }
 
 /**
- * Rebuild the outbound request with the auth header, stamping `max_tokens` onto a
- * chat-completion body when a cap applies to this session. The SDK forwards no
- * `max_tokens` of its own, so this is the only place the provider learns the
- * ceiling; a non-completion body, a non-JSON request, or an absent cap passes
- * through unchanged.
+ * Rebuild outbound request with auth header; write `max_tokens` onto chat-completion body when cap applies to this session. SDK forwards no `max_tokens` of its own, so this is the only place the provider learns the ceiling; non-completion body, non-JSON request, or absent cap pass through unchanged.
  *
- * @param {Request} request - The runtime's outbound request.
- * @param {Headers} headers - Headers already carrying the provider key.
- * @param {number | undefined} cap - The output ceiling for this session, or undefined.
- * @returns {Promise<Request>} The request to send upstream.
+ * @param {Request} request - Runtime outbound request.
+ * @param {Headers} headers - Headers already carry provider key.
+ * @param {number | undefined} cap - Output ceiling for this session, or undefined.
+ * @returns {Promise<Request>} Request to send upstream.
  */
 async function capRequest(request: Request, headers: Headers, cap: number | undefined): Promise<Request> {
   const isJsonPost =
@@ -62,13 +49,12 @@ async function capRequest(request: Request, headers: Headers, cap: number | unde
 }
 
 /**
- * Stamp the provider key onto the request, apply the session's output cap,
- * perform the call, and report usage for a successful session request.
+ * Write provider key onto request, apply session output cap, do call, and report usage for successful session request.
  *
- * @param {Request} request - The outbound model-layer request the runtime issued.
- * @param {string | undefined} sessionId - The SDK session this request belongs to, when known.
+ * @param {Request} request - Outbound model-layer request runtime issued.
+ * @param {string | undefined} sessionId - SDK session this request belong to, when known.
  * @param {EgressDeps} deps - Injected token source, fetch, usage sink, and cap source.
- * @returns {Promise<Response>} The provider response, returned to the runtime unchanged.
+ * @returns {Promise<Response>} Provider response, returned to runtime unchanged.
  */
 export async function handleEgress(
   request: Request,

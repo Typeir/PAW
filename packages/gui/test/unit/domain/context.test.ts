@@ -1,9 +1,9 @@
 /**
  * Context Selection Tests
  *
- * @fileoverview What a checkbox means: collecting the files under a node,
- * reading how much of a group is already attached, and toggling a group as a
- * whole — including the half-selected folder that fills in rather than empties.
+ * @fileoverview Checkbox marks a node selected. filesUnder collects files under a
+ * node. coverage reads how much of a group is already attached. toggleContext
+ * toggles a group as a whole; a half-selected folder fills in.
  *
  * @module @paw/gui/test/unit/domain/context
  */

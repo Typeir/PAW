@@ -1,15 +1,15 @@
 /**
  * Daemon Rescope Tests
  *
- * @fileoverview Covers pointing a running daemon at another repository. It is
- * the read half of attaching a project: everything derived from the root is
- * already re-derived when files change, so re-scoping reuses that rather than
- * restarting, and an open console keeps its socket and is told the new state.
+ * @fileoverview Run daemon scoped to one repository, rescope to another.
+ * Attach state reports the project root. Values derived from root re-derive
+ * when a file changes, so rescope reuses that without restarting. Open
+ * console socket keeps connection, receives new state.
  *
- * What these pin is that the derived slices actually follow the root, that a
- * root without a PAW config reports itself as such rather than being inferred
- * from an empty plan list, and that a listing which cannot be read surfaces as
- * a failure a console can see instead of leaving it on stale data.
+ * Tests assert derived slices follow root, that root with no PAW config
+ * reports itself unconfigured only when config file missing (empty plan
+ * list does not infer it), and that unreadable listing surfaces console
+ * failure and leaves no stale data.
  *
  * @module @paw/daemon/test/rescope
  * @version 0.0.0
@@ -70,7 +70,7 @@ const HOST: HostInfo = {
 };
 
 /**
- * Listings keyed by root, so a rescope changes what the runtime reports.
+ * Listings keyed by root; rescope changes the listings the runtime reports.
  */
 const LISTINGS: Record<string, FileEntry[]> = {
   '/home/x/bare': [{ path: 'README.md', isFile: true }],
@@ -81,10 +81,10 @@ const LISTINGS: Record<string, FileEntry[]> = {
 };
 
 /**
- * A daemon over a fake runtime whose listing follows the requested root.
+ * Daemon over fake runtime. Listing follow requested root.
  *
- * @param {Partial<DaemonRuntime>} over - Runtime overrides.
- * @returns {object} The runtime plus captured socket hooks.
+ * @param {Partial<DaemonRuntime>} over - Runtime override.
+ * @returns {object} Runtime plus captured socket hooks.
  */
 function makeRuntime(over: Partial<DaemonRuntime> = {}) {
   const captured = { hooks: null as SocketHooks | null };
@@ -115,10 +115,10 @@ function makeRuntime(over: Partial<DaemonRuntime> = {}) {
 }
 
 /**
- * Open an authenticated console socket against a daemon.
+ * Open authenticated console socket against daemon.
  *
- * @param {SocketHooks} hooks - The daemon's socket hooks.
- * @returns {Promise<object>} The socket fake and its frames.
+ * @param {SocketHooks} hooks - Daemon socket hooks.
+ * @returns {Promise<object>} Socket fake and its frames.
  */
 async function openConsole(hooks: SocketHooks) {
   const sent: string[] = [];
@@ -134,10 +134,10 @@ async function openConsole(hooks: SocketHooks) {
 }
 
 /**
- * The most recent frame of a topic, decoded.
+ * Most recent frame of topic, decoded.
  *
- * @param {string[]} sent - Frames the socket received.
- * @param {string} topic - The topic wanted.
+ * @param {string[]} sent - Frames socket receive.
+ * @param {string} topic - Topic wanted.
  * @returns {unknown} Its data, or undefined.
  */
 function latest(sent: string[], topic: string): unknown {

@@ -1,9 +1,9 @@
 /**
  * Chrome Tests
  *
- * @fileoverview The window's frame: the titlebar's daemon pill and theme toggle,
- * and the rail's counts and daemon foot. The pill's `live` state comes from the
- * snapshot, so an idle daemon must not pulse.
+ * @fileoverview Window frame. Titlebar daemon pill and theme toggle. Rail show
+ * counts and daemon foot. Pill `live` state come from snapshot. Idle daemon no
+ * pulse.
  *
  * @module @paw/gui/test/unit/presentation/chrome
  */

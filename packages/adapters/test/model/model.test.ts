@@ -1,9 +1,9 @@
 /**
- * PAW Model Adapter Tests
+ * PAW model adapter tests.
  *
- * @fileoverview Covers the Copilot-SDK adapter's request/response mapping via an
- * injected fake runner, and the recording fake model — so both model adapters
- * reach 100% with no real provider or key.
+ * @fileoverview Test Copilot-SDK adapter request/response mapping through fake
+ * injected runner, and recording fake model. Both hit 100%; no real provider or
+ * key.
  *
  * @module @paw/adapters/test/model/model
  * @version 0.0.0

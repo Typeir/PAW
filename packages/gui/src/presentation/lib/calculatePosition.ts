@@ -1,11 +1,7 @@
 /**
  * Tooltip Position Calculation
  *
- * @fileoverview Computes absolute screen-space coordinates for a tooltip relative
- * to its trigger, with viewport-aware flip and clamp. Ported verbatim from
- * Ikuisuus's `ui/tooltip/calculatePosition` — a pure function of two rects, so it
- * is unit-tested to 100% with fabricated `DOMRect`s and needs no real layout (jsdom
- * reports zero rects, which is fine: the math still runs and clamps).
+ * @fileoverview Compute absolute screen-space coords for tooltip against trigger, with viewport-aware flip and clamp. Port verbatim from Ikuisuus `ui/tooltip/calculatePosition` — pure function of two rects, unit-tested to 100% with fake `DOMRect`s. jsdom reports zero rects, but rectangular math still runs and clamps.
  *
  * @module @paw/gui/presentation/lib/calculatePosition
  * @version 0.0.0
@@ -14,19 +10,18 @@
  */
 
 /**
- * Which side of the trigger a tooltip prefers.
+ * Which side of trigger tooltip prefer.
  */
 export type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
 
 /**
- * Compute the fixed-position coordinates for a tooltip, flipping to the opposite
- * side when it would overflow the viewport and clamping horizontally.
+ * Compute fixed-position coords for tooltip, flip to opposite side when overflow viewport, clamp horizontal.
  *
- * @param {DOMRect} triggerRect - The trigger's bounding rect.
- * @param {DOMRect} tooltipRect - The tooltip's bounding rect.
- * @param {TooltipPlacement} placement - The preferred placement.
+ * @param {DOMRect} triggerRect - Trigger bounding rect.
+ * @param {DOMRect} tooltipRect - Tooltip bounding rect.
+ * @param {TooltipPlacement} placement - Preferred placement.
  * @param {number} [offset] - Gap between trigger and tooltip.
- * @returns {{ x: number; y: number; actualPlacement: TooltipPlacement }} The resolved position.
+ * @returns {{ x: number; y: number; actualPlacement: TooltipPlacement }} Resolved position.
  */
 export function calculatePosition(
   triggerRect: DOMRect,

@@ -18,6 +18,7 @@ const entry = join(
   'packages',
   'cli',
   'src',
+  'infrastructure',
   'main.ts',
 );
 spawn(process.execPath, ['--import', 'tsx', entry, ...process.argv.slice(2)], {

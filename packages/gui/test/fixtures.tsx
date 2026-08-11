@@ -1,14 +1,13 @@
 /**
  * PAW GUI Test Fixtures
  *
- * @fileoverview A representative {@link PawSnapshot} — the exact shape `pawd`
- * serves — plus the two render helpers the suite uses: one that mounts a single
- * panel inside a provider, and one that mounts the whole console. The fixture is
- * shaped to exercise every branch: a four-member plan, doctor roles covering
- * bound / unbound-optional / blocking, plan findings covering pass and fail, a
- * herd covering all four member states with a null level, and violations
- * covering direct (critical) and indirect (warning). Not a `.test.tsx`, so it
- * never runs as a suite and never counts toward coverage.
+ * @fileoverview One {@link PawSnapshot} represents the exact snapshot shape
+ * `pawd` sends to the GUI. Two render helpers: one mounts a single panel inside
+ * the provider, one mounts the whole console. Fixture covers every branch:
+ * four-member plan, doctor roles bound / unbound-optional / blocking, plan
+ * findings pass and fail, run members cover all four state values with null
+ * level, violations direct (critical) and indirect (warning). No `.test.tsx`,
+ * so the file never runs as a suite and never counts toward coverage.
  *
  * @module @paw/gui/test/fixtures
  */
@@ -21,7 +20,7 @@ import type { SnapshotSource } from '../src/application/hooks/useLiveRefresh.js'
 import { ConsoleApp } from '../src/presentation/consoleApp.js';
 
 /**
- * The base snapshot every test starts from.
+ * Base snapshot each test start from.
  */
 const BASE: PawSnapshot = {
   host: {
@@ -115,33 +114,33 @@ const BASE: PawSnapshot = {
 };
 
 /**
- * Build a snapshot with optional overrides.
+ * Build snapshot. Optionally override fields.
  *
  * @param {Partial<PawSnapshot>} [over] - Fields to override.
- * @returns {PawSnapshot} The snapshot.
+ * @returns {PawSnapshot} Snapshot result.
  */
 export function makeSnapshot(over: Partial<PawSnapshot> = {}): PawSnapshot {
   return { ...BASE, ...over };
 }
 
 /**
- * Mount a panel inside a console provider.
+ * Mount panel inside console provider.
  *
- * @param {ReactNode} ui - The panel under test.
- * @param {PawSnapshot} [snapshot] - The snapshot to provide.
- * @returns {RenderResult} The render result.
+ * @param {ReactNode} ui - UI to mount.
+ * @param {PawSnapshot} [snapshot] - Snapshot to provide.
+ * @returns {RenderResult} Render result.
  */
 export function renderInConsole(ui: ReactNode, snapshot: PawSnapshot = makeSnapshot()): RenderResult {
   return render(<ConsoleProvider snapshot={snapshot}>{ui}</ConsoleProvider>);
 }
 
 /**
- * Mount the whole console.
+ * Mount whole console.
  *
- * @param {PawSnapshot} [snapshot] - The snapshot to boot from.
- * @param {SnapshotSource | null} [source] - A live source to poll.
- * @param {number} [intervalMs] - The poll period.
- * @returns {RenderResult} The render result.
+ * @param {PawSnapshot} [snapshot] - Snapshot to boot from.
+ * @param {SnapshotSource | null} [source] - Live source to poll.
+ * @param {number} [intervalMs] - Poll period.
+ * @returns {RenderResult} Render result.
  */
 export function renderConsole(
   snapshot: PawSnapshot = makeSnapshot(),

@@ -1,9 +1,9 @@
 /**
  * PAW Attach Prompt Tests
  *
- * @fileoverview Pins what an operator is told and what their keystroke means.
- * The bias is the point: only an explicit yes approves, so every other input —
- * a stray key, an empty line, a closed stdin — leaves the repository alone.
+ * @fileoverview Test attach prompt text and keystroke parse. Only explicit
+ * yes approve; every other input — stray key, empty line, closed stdin —
+ * refuse and leave repository unchanged.
  *
  * @module @paw/cli/test/attachPrompt
  * @version 0.0.0

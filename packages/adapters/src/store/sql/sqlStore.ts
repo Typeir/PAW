@@ -1,19 +1,15 @@
 /**
  * PAW SQL Store Adapter
  *
- * @fileoverview A {@link StorePort} and {@link ConfigPort} over any
- * {@link SqlDriver}, built on Kysely — the typed query builder is the store's
- * default interface now, so the SQL is generated from a schema Kysely checks
- * rather than hand-written strings, and both supported engines still share one
- * implementation and cannot drift. The semantics are the ones
- * {@link createMemoryStore} defines as canonical: a session sees its own rows
- * plus the project-scoped ones, and resolution matches a scope exactly rather
- * than by that same visibility rule — clearing a file in one session must not
- * retire another session's row for it.
+ * @fileoverview {@link StorePort} and {@link ConfigPort} over any
+ * {@link SqlDriver}, build on Kysely. SQL come from schema Kysely
+ * check; both engines share one implementation. Same semantics as
+ * {@link createMemoryStore}: session see own
+ * rows plus project-scoped ones, resolution match scope exactly —
+ * clear file in one session must not retire other session's row for it.
  *
- * Session scope is expressed as `where('session_id', 'is', null)` for the
- * project rows and `= sessionId` for a session's own — NULL-safe by construction,
- * where the raw form needed `IS ?` to avoid `= NULL` silently matching nothing.
+ * Session scope use `where('session_id', 'is', null)` for project rows and
+ * `= sessionId` for own; NULL-safe.
  *
  * @module @paw/adapters/store/sql/sqlStore
  * @version 0.0.0
@@ -27,21 +23,21 @@ import type { SqlDriver } from './driver.js';
 import { createKysely, type Database } from './kyselyDialect.js';
 import { STORE_SCHEMA_SQL } from './schema.js';
 
-/** A selected violation row, before it is mapped back to the domain shape. */
+/** Selected violation row, before map back to domain shape. */
 type ViolationRow = Pick<
   Database['violations'],
   'file_path' | 'rule' | 'message' | 'indirect_fix'
 > & { id: number };
 
-/** The columns a violation query reads. */
+/** Columns violation query read. */
 const VIOLATION_COLUMNS = ['id', 'file_path', 'rule', 'message', 'indirect_fix'] as const;
 
 /**
- * Rebuild a {@link Violation} from its stored row, restoring `indirectFix` to a
- * boolean from the integer SQLite stores it as.
+ * Rebuild {@link Violation} from stored row, put `indirectFix` back to
+ * boolean from integer SQLite store it as.
  *
- * @param {ViolationRow} row - The stored row.
- * @returns {Violation} The domain violation.
+ * @param {ViolationRow} row - Stored row.
+ * @returns {Violation} Domain violation.
  */
 function toViolation(row: ViolationRow): Violation {
   return {
@@ -54,11 +50,11 @@ function toViolation(row: ViolationRow): Violation {
 }
 
 /**
- * Create a store backed by a SQL engine. The schema is applied on creation, so
- * a fresh database and an existing one are both ready to use on return.
+ * Create store backed by SQL engine. Schema apply on creation; fresh
+ * database and existing one both ready to use on return.
  *
- * @param {SqlDriver} driver - The engine binding to execute against.
- * @returns {StorePort & ConfigPort} The store.
+ * @param {SqlDriver} driver - Engine binding to execute against.
+ * @returns {StorePort & ConfigPort} Store.
  */
 export function createSqlStore(driver: SqlDriver): StorePort & ConfigPort {
   driver.exec(STORE_SCHEMA_SQL);

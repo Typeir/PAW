@@ -1,10 +1,7 @@
 /**
  * Binding Editor Hook Tests
  *
- * @fileoverview The Roles view's editing state through a small probe: no client
- * is not editable and does nothing; a client loads the models and reports a read
- * failure; a write clears any prior error, and a refusal surfaces its reason or a
- * default when it gives none.
+ * @fileoverview Roles view edit state through small probe. No client, not editable, does nothing. Client load models, report read failure. Write clear prior error. Refusal show reason, or default when none.
  *
  * @module @paw/gui/test/unit/application/useBindingEditor
  */
@@ -16,9 +13,9 @@ import { useBindingEditor } from '../../../src/application/hooks/useBindingEdito
 import type { ConfigClient } from '../../../src/infrastructure/configClient.js';
 
 /**
- * A probe over the hook, exposing its surface and two write buttons.
+ * Probe over hook. Expose surface and two write buttons.
  *
- * @param {{ client: ConfigClient | null }} props - The client to drive.
+ * @param {{ client: ConfigClient | null }} props - Client to drive.
  * @returns {JSX.Element} The probe.
  */
 function Probe({ client }: { readonly client: ConfigClient | null }) {

@@ -1,17 +1,15 @@
 /**
  * PAW Daemon Node Runtime
  *
- * @fileoverview The real effects behind {@link DaemonRuntime}: the filesystem, a
- * dynamic import, the live host process table via `ps-list`, `process`/`os`, and
- * the loopback TLS server (in `./http`). It is the driven adapter for the daemon
- * — the composition of the outside world — and thin by design, because everything
- * worth deciding was decided in `serve`. It is covered by an integration test
- * that binds a real port and fetches real state rather than by an exclusion.
+ * @fileoverview Real effects behind {@link DaemonRuntime}: filesystem, dynamic
+ * import, live host process table via `ps-list`, `process`/`os`, and loopback
+ * TLS server (in `./http`). Adapter from daemon to host primitives; decisions
+ * are made in `serve`. Integration tests cover it: bind real port, fetch real
+ * state, no exclusion.
  *
- * The page it serves is `@paw/gui`'s `dist/live.html` — the React console with no
- * snapshot injected, so it fetches `/api/state` and keeps polling. When the GUI
- * has not been built, a dependency-free bootstrap page proves the data is real in
- * a browser instead.
+ * Console is `@paw/gui`'s `dist/live.html` — React console with no snapshot
+ * injected, so it fetches `/api/state` and polls. When the GUI is not built,
+ * a dependency-free bootstrap page renders the state in the browser.
  *
  * @module @paw/daemon/infrastructure/nodeRuntime
  * @version 0.0.0
@@ -42,8 +40,8 @@ import {
 import { boundPort, toHostProcess } from './http/httpMessage.js';
 
 /**
- * Report a line to the operator, the one place a daemon-level failure is written
- * so every source reports identically and there is no second reporter to drift.
+ * Report line to operator. Daemon-level failures are only written here, so
+ * every source uses the same report format.
  *
  * @param {string} message - What happened.
  */
@@ -52,8 +50,8 @@ export function report(message: string): void {
 }
 
 /**
- * A no-framework page that fetches `/api/state` and shows the real host, the
- * owned processes, and the doctor — served when `@paw/gui` has not been built.
+ * No-framework page that fetch `/api/state` and show real host, owned
+ * processes, and doctor — served when `@paw/gui` no built.
  */
 export const BOOTSTRAP = `<!doctype html><html><head><meta charset="utf-8"><title>pawd</title>
 <style>body{background:#0b0e13;color:#e7ecf3;font:13px ui-monospace,monospace;margin:0;padding:24px}
@@ -75,9 +73,9 @@ fetch('/api/state').then(function(r){return r.json()}).then(function(s){
 </script></body></html>`;
 
 /**
- * Walk a directory tree into the flat listing the file tree nests, pruning the
- * directories nobody browses so a repository with a `node_modules` is not read
- * into memory to be thrown away. Paths come back relative and always with `/`.
+ * Walk directory tree into a flat listing of file tree entries. Directories in
+ * IGNORED_DIRS are skipped, so large excluded trees (e.g. `node_modules`) are
+ * not read into memory. Paths are returned relative and always use `/`.
  *
  * @param {string} root - The absolute directory to walk.
  * @param {string} [prefix] - The relative prefix accumulated so far.
@@ -104,10 +102,9 @@ export async function walkFiles(root: string, prefix = ''): Promise<FileEntry[]>
 }
 
 /**
- * Build the real runtime. The console page is required rather than defaulted: PAW
- * runs in a source checkout and a built artifact, so any path constant is wrong
- * in one of them silently — requiring it makes the omission a compile error and
- * leaves the choice with the shell that knows how it was started.
+ * Build the node-backed runtime. `pagePath` is required, no default; the
+ * caller supplies the console page path because PAW runs both from a source
+ * checkout and from a built artifact.
  *
  * @param {string} pagePath - Path to the console page.
  * @returns {DaemonRuntime} The node-backed runtime.

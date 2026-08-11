@@ -1,10 +1,9 @@
 /**
- * Pending View
+ * Pending view.
  *
- * @fileoverview The honest stand-in for a subsystem the daemon does not yet
- * report — Gates, Keys, and the log stream. It says what is missing instead of
- * filling the panel with a convincing table, because a console that invents
- * gates is worse than one that admits it has none to show.
+ * @fileoverview Stand-in view rendered until daemon control API returns a
+ * report for the subsystem. Lists the missing subsystems: Gates, Keys, log
+ * stream. Renders placeholder text; daemon control API data replaces it.
  *
  * @module @paw/gui/presentation/views/pendingView
  * @version 0.0.0
@@ -20,17 +19,17 @@ import { Placeholder } from '../atoms/placeholder.js';
  * Props for {@link PendingView}.
  *
  * @interface PendingViewProps
- * @property {string} title - The subsystem's name.
+ * @property {string} title - Name of subsystem.
  */
 export interface PendingViewProps {
   readonly title: string;
 }
 
 /**
- * A subsystem awaiting a daemon control API.
+ * Subsystem wait on daemon control API.
  *
- * @param {PendingViewProps} props - The view props.
- * @returns {JSX.Element} The view.
+ * @param {PendingViewProps} props - View props.
+ * @returns {JSX.Element} View.
  */
 export function PendingView({ title }: PendingViewProps) {
   return (

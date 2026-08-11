@@ -1,10 +1,5 @@
 /**
- * @fileoverview Unit tests for one connection's RPC session, driven by pushing
- * NDJSON chunks — no socket. They pin the handshake gate (refuse a non-connect
- * first frame, a bad token, an old or missing protocol; accept a good one), the
- * post-handshake routing (unknown method, a served method, a throwing method),
- * the ignored non-request frames, buffering across a split, and that a refusal
- * goes dead. So `rpcSession.ts` reaches 100%.
+ * @fileoverview Unit test for one connection RPC session. Push NDJSON chunk, no socket. Pin handshake gate: refuse non-connect first frame, bad token, old or missing protocol; accept good one. Pin post-handshake routing: unknown method, served method, throwing method. Ignore non-request frames. Buffer across split. Refusal go dead. So `rpcSession.ts` reach 100%.
  *
  * @module @paw/daemon/test/rpcSession
  */
@@ -27,13 +22,13 @@ const ctx = (): RpcSessionContext => ({
   },
 });
 
-/** Encode one client frame as an NDJSON line. */
+/** Encode one client frame as one NDJSON line. */
 const line = (obj: unknown): string => `${JSON.stringify(obj)}\n`;
 
 const connect = (over: Record<string, unknown> = {}) =>
   line({ jsonrpc: '2.0', id: 1, method: 'connect', params: { token: 'secret-token', protocolVersion: 1, ...over } });
 
-/** Decode the single result/error of a push's first line. */
+/** Decode single result/error of push's first line. */
 const decode = (lines: string[]) => JSON.parse(lines[0]) as { result?: unknown; error?: { code: number; message: string } };
 
 describe('rpcSession — handshake gate', () => {

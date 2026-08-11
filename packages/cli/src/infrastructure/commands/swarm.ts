@@ -1,10 +1,10 @@
 /**
  * PAW CLI — swarm command
  *
- * @fileoverview `paw swarm doctor|show|run`: validate a plan, print a member's
- * rendered brief, or dispatch the plan against the deterministic fake model (or
- * the live provider under `--live`). Also home to the herd helpers the `ui`
- * command shares — plan loading, `--context` expansion, and the fake registry.
+ * @fileoverview `paw swarm doctor|show|run`: validate plan, print member brief,
+ * or dispatch plan against deterministic fake model (or live provider under
+ * `--live`). Provide helpers shared with the `ui` command: plan loading,
+ * `--context` expansion, fake registry.
  *
  * @module @paw/cli/infrastructure/commands/swarm
  * @version 0.0.0
@@ -26,7 +26,7 @@ import {
   type SwarmPlan,
 } from '@paw/core';
 import { createNodeFileReader, createNodeFs } from '@paw/adapters';
-import { openLiveHerd, walkFiles } from '@paw/daemon';
+import { COPILOT_SLIM_SECTIONS, openLiveHerd, walkFiles } from '@paw/daemon';
 import { createHerdWriter } from '../../application/herdWriter.js';
 import {
   concurrencyFrom,
@@ -39,7 +39,7 @@ import {
 import { formatBrief, formatHerd, formatPlanDoctor } from '../../domain/format.js';
 
 /**
- * The capabilities a fake or noop model advertises — everything on, cost trivial.
+ * Capabilities fake or noop model advertise: everything on, cost trivial.
  */
 export const FULL_CAPS: ModelCapabilities = {
   contextTokens: 200_000,
@@ -52,9 +52,9 @@ export const FULL_CAPS: ModelCapabilities = {
 };
 
 /**
- * Dynamically import a swarm plan module, failing loud when it does not export one.
+ * Import swarm plan module. Throw when module export no plan.
  *
- * @param {string} path - Path to the `.swarm.mjs` plan.
+ * @param {string} path - Path to `.swarm.mjs` plan.
  * @returns {Promise<SwarmPlan<unknown>>} The plan.
  */
 export async function loadPlan(path: string): Promise<SwarmPlan<unknown>> {
@@ -70,12 +70,12 @@ export async function loadPlan(path: string): Promise<SwarmPlan<unknown>> {
 }
 
 /**
- * Expand a `--context` value against the repository the CLI is standing in. The
- * walk is the daemon's own, so the files a glob can reach here are exactly the
- * files the console's selector can offer, and neither can reach outside the repo.
+ * Expand `--context` value relative to the current working directory. Walk
+ * the repo with daemon's `walkFiles`; globs resolve only to files inside
+ * the repo.
  *
- * @param {string | undefined} value - The raw `--context` value, if given.
- * @returns {Promise<string[]>} The resolved paths.
+ * @param {string | undefined} value - Raw `--context` value, if given.
+ * @returns {Promise<string[]>} Resolved paths.
  */
 export async function resolveContextArg(value: string | undefined): Promise<string[]> {
   const patterns = splitPatterns(value);
@@ -90,9 +90,9 @@ export async function resolveContextArg(value: string | undefined): Promise<stri
 }
 
 /**
- * Build a registry that binds a plan's role to a deterministic fake model.
+ * Build registry binding plan role to deterministic fake model.
  *
- * @param {SwarmPlan<unknown>} plan - The plan being run.
+ * @param {SwarmPlan<unknown>} plan - Plan being run.
  * @returns {RoleRegistry} The registry.
  */
 export function fakeRegistryFor(plan: SwarmPlan<unknown>): RoleRegistry {
@@ -110,11 +110,11 @@ export function fakeRegistryFor(plan: SwarmPlan<unknown>): RoleRegistry {
 }
 
 /**
- * Run a `swarm` subcommand.
+ * Run `swarm` subcommand.
  *
- * @param {string[]} rest - The words after `swarm`.
+ * @param {string[]} rest - Words after `swarm`.
  * @param {(lines: string[]) => void} print - Line printer.
- * @returns {Promise<number>} The exit code: 0 when ok, 1 when the plan is refused.
+ * @returns {Promise<number>} Exit code: 0 when ok, 1 when plan refused.
  */
 export async function runSwarm(
   rest: string[],
@@ -122,6 +122,7 @@ export async function runSwarm(
 ): Promise<number> {
   const args = parseArgs(rest, ['context', 'concurrency', 'max-tokens']);
   const live = args.flags.has('live');
+  const full = args.flags.has('full');
   const [sub, planPath, memberArg] = args.positional;
   const plan = await loadPlan(planPath);
   if (sub === 'doctor') {
@@ -149,21 +150,26 @@ export async function runSwarm(
       ? await openLiveHerd(plan)
       : { registry: fakeRegistryFor(plan), close: async () => {} };
     try {
-      const writer = createHerdWriter(plan, createNodeFs(), existsSync);
+      const writer = live ? null : createHerdWriter(plan, createNodeFs(), existsSync);
       const result = await dispatchSwarm(withContext(plan, attached), {
         registry,
         files: createNodeFileReader(process.cwd()),
         concurrency: concurrencyFrom(args),
         maxOutputTokens: maxTokensFrom(args),
-        onProgress: (event) => writer.onProgress(event),
+        onProgress: writer ? (event) => writer.onProgress(event) : undefined,
+        systemBaseline: live && !full ? COPILOT_SLIM_SECTIONS : undefined,
       });
       print(formatHerd(result));
-      const wrote = writer.written();
-      print([
-        wrote.length === 0
-          ? 'wrote nothing — the plan declares no expectFiles'
-          : `wrote ${wrote.length} file(s), first ${wrote[0]}`,
-      ]);
+      if (writer) {
+        const wrote = writer.written();
+        print([
+          wrote.length === 0
+            ? 'wrote nothing — the plan declares no expectFiles'
+            : `wrote ${wrote.length} file(s), first ${wrote[0]}`,
+        ]);
+      } else {
+        print(['live herd: members edited their files in place through the agent tools']);
+      }
       return result.released ? 0 : 1;
     } finally {
       await close();

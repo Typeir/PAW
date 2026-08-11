@@ -1,12 +1,7 @@
 /**
  * PAW Session Registry
  *
- * @fileoverview Every open session and the counts the upgrade gate reads: how
- * many have authenticated, how many have not, how many credentials have been
- * refused. It holds what one socket cannot see — a failed-auth tally reported but
- * never turned into a lockout, and the set of plans live sessions watch, which the
- * plan source must keep fresh. Fans a published slice out to every session, and
- * closes them all when the daemon goes away.
+ * @fileoverview Hold every open session. Upgrade gate read count: plenty authed, plenty not, plenty credentials refused. Keep failed-auth tally, report it but never lockout. Track plans live sessions watch. Fan published slice out to every session. Close all when daemon die.
  *
  * @module @paw/daemon/application/sessionRegistry
  * @version 0.0.0

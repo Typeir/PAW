@@ -1,11 +1,10 @@
 /**
  * PAW Installer Repo Discovery
  *
- * @fileoverview Finds the repository PAW is being attached to, from anywhere
- * inside it, by walking up to the nearest `.git`. Pure: the existence check is
- * injected, so the walk is a unit test and `main.ts` supplies the real
- * `fs.existsSync`. This is what lets `paw init` be run from any subdirectory and
- * still attach PAW at the repo root — without PAW itself living in the repo.
+ * @fileoverview Find repo PAW attach to, from anywhere inside it. Walk up to
+ * nearest `.git`. Pure: existence check injected. Unit test injects `exists`;
+ * `main.ts` passes `fs.existsSync`. `paw init` runs from any subdirectory and
+ * attaches PAW at repo root — PAW not live in the repo.
  *
  * @module @paw/installer/repo
  * @version 0.0.0
@@ -16,11 +15,11 @@
 import { dirname, join } from 'node:path';
 
 /**
- * Walk up from a starting directory to the nearest ancestor containing `.git`.
+ * Walk up from starting dir to nearest ancestor hold `.git`.
  *
- * @param {string} start - The directory to begin from (e.g. `process.cwd()`).
- * @param {(path: string) => boolean} exists - Existence predicate for a path.
- * @returns {string | null} The repo root, or null when none is found.
+ * @param {string} start - Dir to begin from (e.g. `process.cwd()`).
+ * @param {(path: string) => boolean} exists - Existence predicate for path.
+ * @returns {string | null} Repo root, or null when none found.
  */
 export function findRepoRoot(
   start: string,

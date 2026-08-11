@@ -1,12 +1,10 @@
 /**
  * PAW Doctor Service
  *
- * @fileoverview The unified pre-flight check the CLI, TUI, and GUI all render —
- * one service, three faces. It composes the config validation and the role
- * doctor into a single report and a single `ok` verdict: PAW is ready to run
- * only when the config resolves and no required role is unbound or unsatisfied.
- * Pure over its inputs, so it is exhaustively testable and every surface shows
- * the same truth.
+ * @fileoverview Unified pre-flight check CLI, TUI, GUI render. Combine config
+ * validation with role doctor into one report and one `ok` verdict: PAW ready
+ * to run only when config resolve and no required role unbound or unsatisfied.
+ * Pure over its inputs.
  *
  * @module @paw/core/application/doctor
  * @version 0.0.0
@@ -25,12 +23,12 @@ import {
 } from './roleRegistry.js';
 
 /**
- * The combined health of a PAW installation.
+ * Combined health of PAW installation.
  *
  * @interface DoctorReport
- * @property {ConfigProblem[]} config - Config validation problems; empty when the config is sound.
+ * @property {ConfigProblem[]} config - Config validation problems; empty when config sound.
  * @property {RoleDoctorRow[]} roles - One row per declared role.
- * @property {boolean} ok - True only when the config is sound and no required role is blocking.
+ * @property {boolean} ok - True only when config sound and no required role block.
  */
 export interface DoctorReport {
   readonly config: ConfigProblem[];
@@ -39,12 +37,12 @@ export interface DoctorReport {
 }
 
 /**
- * Run the unified doctor.
+ * Run unified doctor.
  *
- * @param {unknown} config - The parsed config object to validate.
- * @param {RoleRegistry} registry - The role declarations and bindings.
+ * @param {unknown} config - Parsed config object to validate.
+ * @param {RoleRegistry} registry - Role declarations and bindings.
  * @param {readonly string[]} knownConnectors - Connector names PAW can resolve.
- * @returns {DoctorReport} The combined report and readiness verdict.
+ * @returns {DoctorReport} Combined report and readiness verdict.
  */
 export function runDoctor(
   config: unknown,

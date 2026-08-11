@@ -1,9 +1,9 @@
 /**
  * Paw Mark Atom
  *
- * @fileoverview The wordmark glyph, inline as SVG because a self-contained page
- * under a strict CSP fetches no image. Decorative, so it is hidden from the
- * accessibility tree — the wordmark's text carries the name.
+ * @fileoverview Wordmark glyph. Inline SVG. Page self-contained, strict CSP
+ * fetch no image. Decorative. Hide from accessibility tree — wordmark text
+ * carry name.
  *
  * @module @paw/gui/presentation/atoms/pawMark
  * @version 0.0.0
@@ -14,7 +14,7 @@
 /**
  * The paw glyph.
  *
- * @returns {JSX.Element} The inline mark.
+ * @returns {JSX.Element} Inline mark.
  */
 export function PawMark() {
   return (
