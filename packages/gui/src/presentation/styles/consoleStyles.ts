@@ -16,8 +16,12 @@
  * @since 5.0.0
  */
 
+import { cssVariables } from '@paw/cosmetics';
+
 /**
- * Full stylesheet. Inject into page, assert by tests.
+ * Full stylesheet. Inject into page, assert by tests. Semantic `--sem-*`
+ * variables come from the shared palette, so cli, tui, and gui carry one color
+ * language.
  *
  * @constant
  * @type {string}
@@ -31,6 +35,7 @@ export const STYLES = `
   --good: #40b498; --good-soft: #10241f; --warn: #d8b54a; --warn-soft: #2a2412;
   --crit: #d75c55; --crit-soft: #2a1613; --idle: #5c6b7e; --idle-soft: #171d26;
   --tok-key: #8ea9de; --tok-str: #86c2a6; --tok-fn: #d9b46a;
+${cssVariables()}
   --mono: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --r: 7px; --r-lg: 12px;
@@ -415,7 +420,7 @@ pre .i { color: var(--accent); }
 .srcline { display: flex; align-items: center; gap: 8px; padding: 9px 0 0;
   margin: 10px 0 0; border-top: 1px solid var(--line-soft); font-family: var(--mono);
   font-size: 10.5px; color: var(--ink-faint); flex-wrap: wrap; }
-.srcline code { color: var(--accent); overflow-wrap: anywhere; }
+.srcline code { color: var(--sem-flag); overflow-wrap: anywhere; }
 
 .treeselect { position: relative; width: 100%; }
 .treetrigger { display: flex; align-items: center; justify-content: space-between; width: 100%;
@@ -477,7 +482,8 @@ pre .i { color: var(--accent); }
 .selecttrigger:hover { border-color: var(--accent); }
 .selecttrigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .selecttrigger[disabled] { opacity: .5; cursor: not-allowed; }
-.selecttrigger .selectlabel { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selecttrigger .selectlabel { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--sem-concept); }
 .selecttrigger .chevron { color: var(--ink-faint); transition: transform .15s; flex: none; }
 .selecttrigger .chevron.open { transform: rotate(180deg); }
 .selectdropdown { position: absolute; top: calc(100% + 4px); left: 0; z-index: 2500;

@@ -42,6 +42,23 @@ function runCli(
   });
 }
 
+describe('cli help (e2e)', () => {
+  it('prints the command list for bare paw and for help, exit 0', async () => {
+    for (const argv of [[], ['help'], ['--help']] as string[][]) {
+      const { stdout, code } = await runCli(...argv);
+      expect(code).toBe(0);
+      expect(stdout).toContain('usage: paw <command> [args]');
+      expect(stdout).toContain('swarm doctor|show|run');
+    }
+  });
+
+  it('tells doctor callers the config argument it needs, exit 1', async () => {
+    const { stderr, code } = await runCli('doctor');
+    expect(code).toBe(1);
+    expect(stderr).toContain('paw doctor <config.json>');
+  });
+});
+
 describe('cli doctor (e2e)', () => {
   it('reports a ready install, exit 0', async () => {
     const { stdout, code } = await runCli('doctor', join(FIX, 'ready.config.json'));
@@ -130,10 +147,11 @@ describe('cli swarm (e2e)', () => {
 });
 
 describe('cli routing (e2e)', () => {
-  it('rejects an unknown command, exit 1', async () => {
+  it('rejects an unknown command, exit 1, pointing at help', async () => {
     const { stderr, code } = await runCli('gallop');
     expect(code).toBe(1);
     expect(stderr).toContain('unknown command "gallop"');
+    expect(stderr).toContain('paw help');
   });
 
   it('fails loud when a module exports no plan, exit 1', async () => {

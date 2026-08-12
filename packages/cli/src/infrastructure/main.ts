@@ -23,10 +23,12 @@
  * @since 5.0.0
  */
 
+import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildRegistry, runDoctor, type ModelPort } from '@paw/core';
-import { formatDoctor } from '../domain/format.js';
+import { formatDoctor, formatHelp } from '../domain/format.js';
 import { runCheck } from './commands/check.js';
 import { runConfig } from './commands/config.js';
 import { runDaemonCommand } from './commands/daemonCommand.js';
@@ -66,6 +68,10 @@ async function main(): Promise<number> {
     process.stdout.write(`${lines.join('\n')}\n`);
   };
 
+  if (command === undefined || command === 'help' || command === '--help' || command === '-h') {
+    print(formatHelp(process.stdout.isTTY === true && process.env.NO_COLOR === undefined));
+    return 0;
+  }
   if (command === 'check') {
     await runCheck();
     return 0;
@@ -100,6 +106,9 @@ async function main(): Promise<number> {
     return runConfig(rest, print);
   }
   if (command === 'doctor') {
+    if (rest[0] === undefined) {
+      throw new Error('doctor needs a config: paw doctor <config.json>');
+    }
     const config = await loadConfig(rest[0]);
     const registry = buildRegistry(config, () => NOOP_PORT);
     const report = runDoctor(config, registry, KNOWN_CONNECTORS);
@@ -119,10 +128,30 @@ async function main(): Promise<number> {
   if (command === 'ui') {
     return runUi(rest, print);
   }
+  if (command === 'tui') {
+    // The TUI is its own shell package with a raw-mode stdin loop; spawn it
+    // with inherited stdio and carry its exit code.
+    const entry = join(
+      dirname(fileURLToPath(import.meta.url)),
+      '..',
+      '..',
+      '..',
+      'tui',
+      'src',
+      'infrastructure',
+      'main.ts',
+    );
+    return new Promise<number>((resolveCode) => {
+      spawn(process.execPath, ['--import', 'tsx', entry, ...rest], { stdio: 'inherit' }).on(
+        'exit',
+        (code) => resolveCode(code ?? 0),
+      );
+    });
+  }
   if (command === 'trust') {
     return runTrust(rest, print);
   }
-  throw new Error(`unknown command "${command ?? '(none)'}"`);
+  throw new Error(`unknown command "${command}" — run \`paw help\` for the command list`);
 }
 
 main()

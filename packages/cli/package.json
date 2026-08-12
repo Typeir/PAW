@@ -13,10 +13,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@paw/daemon": "file:../daemon",
     "@paw/adapters": "file:../adapters",
     "@paw/connectors": "file:../connectors",
-    "@paw/core": "file:../core"
+    "@paw/core": "file:../core",
+    "@paw/cosmetics": "file:../cosmetics",
+    "@paw/daemon": "file:../daemon"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^2.1.9",

@@ -15,6 +15,7 @@
   "dependencies": {
     "@paw/adapters": "file:../adapters",
     "@paw/core": "file:../core",
+    "@paw/cosmetics": "file:../cosmetics",
     "@paw/daemon": "file:../daemon"
   },
   "devDependencies": {

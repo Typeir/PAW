@@ -24,6 +24,7 @@ import {
   type RoleRegistry,
   type SwarmPlan,
 } from '@paw/core';
+import type { ProviderProfile } from './providerEnv.js';
 import type { OpenSdkModelOptions } from './sdkModel.js';
 
 const DEFAULT_BASE = 'https://api.deepseek.com';
@@ -75,23 +76,35 @@ export interface LiveSdkRegistry {
  * @param {string} opts.baseDirectory - Where runtime write session state.
  * @param {string} opts.workingDirectory - Absolute root members built-in tools operate within; served repository.
  * @param {boolean} opts.safemode - When true, members denied shell — option-A surface.
- * @param {string} [opts.baseUrl] - Provider base URL; default `DEEPSEEK_BASE_URL` or public endpoint.
- * @param {string} [opts.model] - Model id; default `DEEPSEEK_MODEL` or `deepseek-chat`.
+ * @param {ProviderProfile} [opts.provider] - Provider from a `.paw/<name>.provider.env`; sets wire type, endpoint, default model, and key. Absent, the legacy `DEEPSEEK_*` environment drives all four.
+ * @param {string} [opts.baseUrl] - Base URL override; else the provider's, else `DEEPSEEK_BASE_URL`, else the public DeepSeek endpoint.
+ * @param {string} [opts.model] - Model id override; else the provider's, else `DEEPSEEK_MODEL`, else `deepseek-chat`.
  * @returns {Promise<LiveSdkRegistry>} Registry and its close hook.
  */
 export async function liveSdkRegistryFor(
   plan: SwarmPlan<unknown>,
   openModel: OpenModel,
-  opts: { baseDirectory: string; workingDirectory: string; safemode: boolean; baseUrl?: string; model?: string },
+  opts: {
+    baseDirectory: string;
+    workingDirectory: string;
+    safemode: boolean;
+    provider?: ProviderProfile;
+    baseUrl?: string;
+    model?: string;
+  },
 ): Promise<LiveSdkRegistry> {
-  const baseUrl = opts.baseUrl ?? process.env.DEEPSEEK_BASE_URL ?? DEFAULT_BASE;
-  const modelId = opts.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_MODEL;
+  const profile = opts.provider;
+  const baseUrl =
+    opts.baseUrl ?? profile?.baseUrl ?? process.env.DEEPSEEK_BASE_URL ?? DEFAULT_BASE;
+  const modelId = opts.model ?? profile?.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_MODEL;
   const { port, close } = await openModel({
-    provider: { type: 'openai', baseUrl },
+    provider: { type: profile?.type ?? 'openai', baseUrl },
     authToken: () => {
-      const key = process.env.DEEPSEEK_KEY;
+      const key = profile?.key ?? process.env.DEEPSEEK_KEY;
       if (key === undefined || key === '') {
-        throw new Error('DEEPSEEK_KEY is not set; cannot run a live herd');
+        throw new Error(
+          'no provider key: add .paw/<name>.provider.env with KEY and BASE_URL, or set DEEPSEEK_KEY',
+        );
       }
       return key;
     },

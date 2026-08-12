@@ -70,4 +70,25 @@ describe('liveSdkRegistryFor', () => {
     expect(captured?.provider.baseUrl).toBe('http://localhost:11434/v1');
     expect(registry.bindings.get('lore.author')?.modelId).toBe('qwen');
   });
+
+  it('drives wire type, endpoint, model, and key from a provider profile', async () => {
+    const { registry } = await liveSdkRegistryFor(PLAN, openModel, {
+      baseDirectory: '/tmp/home',
+      workingDirectory: '/repo',
+      safemode: false,
+      provider: {
+        name: 'gemini',
+        type: 'openai',
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        model: 'gemini-2.5-flash',
+        key: 'AIza-secret',
+      },
+    });
+    expect(captured?.provider).toEqual({
+      type: 'openai',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    });
+    expect(registry.bindings.get('lore.author')?.modelId).toBe('gemini-2.5-flash');
+    expect(captured!.authToken()).toBe('AIza-secret');
+  });
 });

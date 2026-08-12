@@ -11,6 +11,8 @@
  */
 
 import { execFile } from 'node:child_process';
+import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -68,10 +70,33 @@ describe('tui (e2e)', () => {
     expect(stdout).toContain('2 done · 0 skipped');
   });
 
-  it('exits 1 with usage when arguments are missing', async () => {
+  it('exits 1 with usage when run bare outside an attached repository', async () => {
     const { stderr, code } = await runTui('q', []);
     expect(code).toBe(1);
+    expect(stderr).toContain('no config at');
     expect(stderr).toContain('usage:');
+  });
+
+  it('discovers .paw/config.json and the first plan when run bare in a repository', async () => {
+    const repo = await mkdtemp(join(tmpdir(), 'paw-tui-e2e-'));
+    await mkdir(join(repo, '.paw'), { recursive: true });
+    await copyFile(CONFIG, join(repo, '.paw', 'config.json'));
+    await copyFile(PLAN, join(repo, 'demo.swarm.mjs'));
+    try {
+      const { stdout, code } = await new Promise<{ stdout: string; code: number }>(
+        (resolveRun) => {
+          const child = execFile(process.execPath, [TSX, MAIN], { cwd: repo }, (err, stdout) => {
+            resolveRun({ stdout, code: err && typeof err.code === 'number' ? err.code : 0 });
+          });
+          child.stdin?.end('q');
+        },
+      );
+      expect(code).toBe(0);
+      expect(stdout).toContain('▸1 doctor◂');
+      expect(stdout).toContain('PAW is ready.');
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
   });
 
   it('exits 1 when the plan module exports no plan', async () => {

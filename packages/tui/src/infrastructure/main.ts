@@ -17,9 +17,10 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   BUILTIN_ROLES,
@@ -330,15 +331,56 @@ async function runBatch(start: TuiState, root: string): Promise<void> {
 }
 
 /**
- * TUI entrypoint.
+ * First `.swarm.mjs` under a root, alphabetical, skipping dependency and
+ * output directories. Null when the tree holds none.
+ *
+ * @param {string} root - Directory to walk.
+ * @returns {string | null} Plan path, or null.
+ */
+function discoverPlan(root: string): string | null {
+  const skip = new Set(['node_modules', '.git', 'dist', 'coverage']);
+  const queue = [root];
+  const found: string[] = [];
+  while (queue.length > 0) {
+    const dir = queue.shift() as string;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!skip.has(entry.name)) {
+          queue.push(join(dir, entry.name));
+        }
+      } else if (entry.name.endsWith('.swarm.mjs')) {
+        found.push(join(dir, entry.name));
+      }
+    }
+  }
+  found.sort();
+  return found[0] ?? null;
+}
+
+/**
+ * TUI entrypoint. With no arguments it works like the other verbs: config from
+ * `.paw/config.json` under the working directory, plan the first `.swarm.mjs`
+ * found in the tree. Explicit arguments override either.
  */
 async function main(): Promise<void> {
-  const [configPath, planPath] = process.argv.slice(2);
-  if (!configPath || !planPath) {
-    throw new Error('usage: paw-tui <config.json> <plan.mjs>');
+  const [configArg, planArg] = process.argv.slice(2);
+  const cwd = process.cwd();
+  const configPath = configArg ?? join(cwd, '.paw', 'config.json');
+  if (!existsSync(configPath)) {
+    throw new Error(
+      `no config at ${configPath} — run \`paw init\` to attach this repository, ` +
+        'or pass one: usage: paw tui [config.json] [plan.swarm.mjs]',
+    );
+  }
+  const planPath = planArg ?? discoverPlan(cwd);
+  if (planPath === null) {
+    throw new Error(
+      'no .swarm.mjs plan found under this directory — ' +
+        'pass one: usage: paw tui [config.json] [plan.swarm.mjs]',
+    );
   }
   const state = initialState(await loadData(configPath, planPath));
-  const root = process.cwd();
+  const root = cwd;
   if (process.stdin.isTTY) {
     runInteractive(state, root);
   } else {

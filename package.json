@@ -18,7 +18,7 @@
   "scripts": {
     "paw": "node bin/paw.mjs",
     "pawd": "node bin/paw.mjs __pawd .",
-    "paw-tui": "node --import tsx packages/tui/src/main.ts",
+    "paw-tui": "node bin/paw.mjs tui",
     "paw-setup": "node bin/paw-setup.mjs",
     "init": "node bin/paw.mjs init",
     "sync": "node bin/paw.mjs sync",

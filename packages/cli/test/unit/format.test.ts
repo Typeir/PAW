@@ -22,11 +22,63 @@ import {
   formatBrief,
   formatDoctor,
   formatGateReport,
+  formatHelp,
   formatHerd,
   formatPlanDoctor,
   formatPruned,
   formatViolations,
 } from '../../src/domain/format.js';
+
+describe('formatHelp', () => {
+  it('lists every routed command with a usage line', () => {
+    const lines = formatHelp();
+    expect(lines[0]).toContain('paw');
+    expect(lines).toContain('usage: paw <command> [args]');
+    for (const verb of [
+      'check',
+      'hook',
+      'daemon',
+      'gates',
+      'init',
+      'sync',
+      'violations',
+      'config',
+      'doctor',
+      'swarm',
+      'ui',
+      'tui',
+      'trust',
+    ]) {
+      expect(lines.some((line) => line.trimStart().startsWith(verb))).toBe(true);
+    }
+  });
+
+  it('is plain by default, so pipes and logs carry no escape codes', () => {
+    expect(formatHelp().join('\n')).not.toContain('\x1b[');
+  });
+
+  it('paints verbs bold, flags grey, params sage, optionals amber, events cyan', () => {
+    const painted = formatHelp(true).join('\n');
+    expect(painted).toContain('  \x1b[1mcheck\x1b[0m');
+    expect(painted).toContain('\x1b[38;5;245m--copilot\x1b[0m');
+    expect(painted).toContain('\x1b[3;38;5;108m<event>\x1b[0m');
+    expect(painted).toContain('\x1b[3;38;5;179m[--dry-run]\x1b[0m');
+    expect(painted).toContain('\x1b[1;38;5;73mtool.pre\x1b[0m');
+    expect(painted).toContain('\x1b[1mpaw\x1b[0m — agent enforcement');
+  });
+
+  it('paints PAW concepts cyan and tech terms magenta, longest path first', () => {
+    const painted = formatHelp(true).join('\n');
+    expect(painted).toContain('\x1b[38;5;73mpawd\x1b[0m');
+    expect(painted).toContain('\x1b[38;5;73m.paw/\x1b[0m');
+    expect(painted).toContain('\x1b[38;5;73m.paw/config.json\x1b[0m');
+    expect(painted).toContain('\x1b[38;5;73m.swarm.mjs\x1b[0m');
+    expect(painted).toContain('\x1b[38;5;175mTLS\x1b[0m');
+    expect(painted).toContain('\x1b[38;5;175mJSON\x1b[0m');
+    // The config.json path never splits into a .paw/ prefix + bare json.
+    expect(painted).not.toContain('.paw/\x1b[0mconfig');
+  });
+});
 
 describe('formatViolations', () => {
   it('reports no daemon on a null result', () => {

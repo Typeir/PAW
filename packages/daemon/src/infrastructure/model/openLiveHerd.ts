@@ -19,12 +19,18 @@
  * @since 5.0.0
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import type { SwarmPlan } from '@paw/core';
 import { parseDeepseekEnv } from './envLocal.js';
+import {
+  chooseProvider,
+  parseProviderEnv,
+  providerNameOf,
+  type ProviderProfile,
+} from './providerEnv.js';
 import { liveSdkRegistryFor, type LiveSdkRegistry } from './liveSdkRegistry.js';
 import { openSdkModel } from './sdkModel.js';
 
@@ -66,17 +72,43 @@ async function loadEnvLocal(startDir: string): Promise<void> {
  * @param {boolean} [opts.safemode] - When true, deny members the shell — option-A surface. Default false, full built-in set.
  * @returns {Promise<LiveSdkRegistry>} Registry and close hook that stop client and clean runtime home.
  */
+/**
+ * Providers configured in `<root>/.paw/*.provider.env`, parsed, by name. An
+ * empty map when the directory holds none.
+ *
+ * @param {string} root - Consumer repo root.
+ * @returns {Promise<Map<string, ProviderProfile>>} Providers by name.
+ */
+async function loadProviders(root: string): Promise<Map<string, ProviderProfile>> {
+  const providers = new Map<string, ProviderProfile>();
+  const pawDir = join(root, '.paw');
+  if (!existsSync(pawDir)) {
+    return providers;
+  }
+  for (const file of readdirSync(pawDir)) {
+    const name = providerNameOf(basename(file));
+    if (name !== null) {
+      providers.set(name, parseProviderEnv(name, await readFile(join(pawDir, file), 'utf8')));
+    }
+  }
+  return providers;
+}
+
 export async function openLiveHerd(
   plan: SwarmPlan<unknown>,
   cwd: string = process.cwd(),
   opts: { safemode?: boolean } = {},
 ): Promise<LiveSdkRegistry> {
   await loadEnvLocal(cwd);
+  const providers = await loadProviders(cwd);
+  const provider =
+    providers.size === 0 ? undefined : chooseProvider(providers, process.env.PAW_PROVIDER);
   const baseDirectory = await mkdtemp(join(tmpdir(), 'paw-herd-'));
   const { registry, close } = await liveSdkRegistryFor(plan, openSdkModel, {
     baseDirectory,
     workingDirectory: cwd,
     safemode: opts.safemode ?? false,
+    ...(provider === undefined ? {} : { provider }),
   });
   return {
     registry,
