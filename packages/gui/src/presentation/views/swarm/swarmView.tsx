@@ -20,6 +20,7 @@ import { CommandBar } from './commandBar.js';
 import { ContextCard } from './contextCard.js';
 import { DoctorBar } from './doctorBar.js';
 import { HerdTab } from './herdTab.js';
+import { PlanActions } from './planActions.js';
 import { PreviewCard } from './previewCard.js';
 import { RunBar } from './runBar.js';
 import { StatStrip } from './statStrip.js';
@@ -89,6 +90,7 @@ export function SwarmView() {
       <>
         <Crumb title='Swarm'>
           <PlanPicker />
+          <PlanActions />
         </Crumb>
         <Card title='No plan selected' meta={`${plans.length} in this repository`}>
           <Placeholder>
@@ -105,6 +107,7 @@ export function SwarmView() {
     <>
       <Crumb title='Swarm' sub={`run ${run.startedAt}`}>
         <PlanPicker />
+        <PlanActions />
       </Crumb>
       <StatStrip />
       <SwarmTabs />

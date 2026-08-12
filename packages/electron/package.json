@@ -8,6 +8,7 @@
   "scripts": {
     "build:gui": "npm --prefix ../gui run build",
     "build": "node build.mjs",
+    "build:icons": "node build-icons.mjs",
     "start": "npm run build:gui && npm run build && electron dist/main.cjs --root=../cli/test/fixtures --config=ready.config.json",
     "capture": "npm run build:gui && npm run build && electron dist/main.cjs --root=../cli/test/fixtures --config=ready.config.json demo.swarm.mjs --capture",
     "typecheck": "tsc --noEmit"
@@ -20,6 +21,7 @@
     "@types/node": "^22.20.1",
     "electron": "^33.0.0",
     "esbuild": "^0.25.0",
+    "sharp": "^0.35.3",
     "typescript": "^5.6.3"
   }
 }

@@ -60,7 +60,7 @@ import {
   type UpgradeContext,
 } from './daemonContracts.js';
 import { createBus, type LiveBus } from '../domain/bus.js';
-import { createLogRing } from '../domain/logRing.js';
+import { LOG_CAPACITY, createLogRing } from '../domain/logRing.js';
 import {
   buildPlanSlice,
   composeSnapshot,
@@ -115,6 +115,7 @@ export async function runDaemon(
 ): Promise<DaemonHandle> {
   let root = options.root ?? '.';
   const log = createLogRing(() => runtime.now());
+  log.seed(options.logSink?.load(LOG_CAPACITY) ?? []);
 
   /**
    * Current root attach state. A repo without PAW config makes the state
@@ -145,7 +146,9 @@ export async function runDaemon(
    */
   const report = (message: string, level: LogEntry['level'] = 'warn'): void => {
     runtime.warn(message);
-    bus.publish('log', [log.append(level, message)]);
+    const entry = log.append(level, message);
+    options.logSink?.append(entry);
+    bus.publish('log', [entry]);
   };
 
   const recentRoutes = options.recent;
@@ -464,6 +467,7 @@ export async function runDaemon(
       socket,
       gates: 0,
       keys: modelCount(config),
+      logs: log.entries(),
     });
   };
 

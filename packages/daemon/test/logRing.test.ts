@@ -40,6 +40,22 @@ describe('createLogRing', () => {
     expect(ring.dropped()).toBe(0);
   });
 
+  it('seeds restored entries with their own timestamps, evicting to capacity without counting drops', () => {
+    const ring = createLogRing(ticking(), 3);
+    ring.seed([
+      { at: '2026-08-10T00:00:00.000Z', level: 'info', message: 'old-1' },
+      { at: '2026-08-10T00:00:01.000Z', level: 'warn', message: 'old-2' },
+      { at: '2026-08-10T00:00:02.000Z', level: 'info', message: 'old-3' },
+      { at: '2026-08-10T00:00:03.000Z', level: 'error', message: 'old-4' },
+    ]);
+    expect(ring.entries().map((e) => e.message)).toEqual(['old-2', 'old-3', 'old-4']);
+    expect(ring.entries()[0].at).toBe('2026-08-10T00:00:01.000Z');
+    expect(ring.dropped()).toBe(0);
+
+    ring.append('info', 'fresh');
+    expect(ring.entries().map((e) => e.message)).toEqual(['old-3', 'old-4', 'fresh']);
+  });
+
   it('returns the line it recorded', () => {
     const ring = createLogRing(() => 'then');
     expect(ring.append('warn', 'careful')).toEqual({

@@ -57,6 +57,7 @@ export function hydrate(snapshot: PawSnapshot): ConsoleData {
     run: snapshot.run,
     budget: snapshot.budget,
     violations: snapshot.violations,
+    logs: snapshot.logs,
     daemon: snapshot.daemon,
     chrome: snapshot.chrome,
   };

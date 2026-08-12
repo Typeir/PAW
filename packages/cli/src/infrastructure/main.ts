@@ -118,10 +118,7 @@ async function main(): Promise<number> {
   if (command === 'swarm') {
     const [sub, ...swarmRest] = rest;
     if (sub === 'run' && swarmRest.includes('--ui')) {
-      return runUi(
-        [...swarmRest.filter((word) => word !== '--ui'), '--run', '--open'],
-        print,
-      );
+      return runUi([...swarmRest.filter((word) => word !== '--ui'), '--run'], print);
     }
     return runSwarm(rest, print);
   }

@@ -15,6 +15,7 @@ import type { SnapshotSource } from '../application/hooks/useLiveRefresh.js';
 import type { SocketFactory } from '../infrastructure/liveSocket.js';
 import type { TreeSource } from '../infrastructure/snapshotSource.js';
 import type { ConfigClient } from '../infrastructure/configClient.js';
+import type { PlansClient } from '../infrastructure/plansClient.js';
 import type { RecentClient } from '../infrastructure/recentClient.js';
 import type { WindowControls } from '../infrastructure/shell.js';
 import { GlobalStyles } from './atoms/globalStyles.js';
@@ -30,6 +31,7 @@ import { ConsoleWindow } from './chrome/consoleWindow.js';
  * @property {string | null} [token] - Credential this tab adopt.
  * @property {TreeSource | null} [treeSource] - Repository tree source; omit for static page.
  * @property {ConfigClient | null} [config] - Binding editor client; omit for static page.
+ * @property {PlansClient | null} [plans] - Plan-file write client; omit for static page.
  * @property {RecentClient | null} [recent] - Scope picker recent-routes client; omit for static page.
  * @property {WindowControls | null} [controls] - Desktop window controls; omit in browser.
  * @property {number} [intervalMs] - Poll period in milliseconds, for degraded mode.
@@ -41,6 +43,7 @@ export interface ConsoleAppProps {
   readonly token?: string | null;
   readonly treeSource?: TreeSource | null;
   readonly config?: ConfigClient | null;
+  readonly plans?: PlansClient | null;
   readonly recent?: RecentClient | null;
   readonly controls?: WindowControls | null;
   readonly intervalMs?: number;
@@ -59,6 +62,7 @@ export function ConsoleApp({
   token,
   treeSource,
   config,
+  plans,
   recent,
   controls,
   intervalMs,
@@ -71,6 +75,7 @@ export function ConsoleApp({
       token={token}
       treeSource={treeSource}
       config={config}
+      plans={plans}
       recent={recent}
       controls={controls}
       intervalMs={intervalMs}>

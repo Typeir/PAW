@@ -15,6 +15,7 @@ import { ConsoleProvider } from '../../../src/application/context/consoleContext
 import type { ConfigClient } from '../../../src/infrastructure/configClient.js';
 import { Rail } from '../../../src/presentation/chrome/rail.js';
 import { OverviewView, formatMb } from '../../../src/presentation/views/overviewView.js';
+import { LogsView } from '../../../src/presentation/views/logsView.js';
 import { PendingView } from '../../../src/presentation/views/pendingView.js';
 import { RolesView } from '../../../src/presentation/views/rolesView.js';
 import { SectionOutlet } from '../../../src/presentation/views/sectionOutlet.js';
@@ -159,6 +160,50 @@ describe('PendingView', () => {
     expect(
       screen.getByText('— Gates — a live pawd control API will back this view —'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('LogsView', () => {
+  it('lists the ring with clock, level, and message', () => {
+    renderInConsole(<LogsView />);
+    expect(screen.getByText('3 of 3 entries')).toBeInTheDocument();
+    expect(screen.getByText('15:40:00')).toBeInTheDocument();
+    expect(screen.getByText('pawd listening on 127.0.0.1:8971')).toBeInTheDocument();
+    expect(screen.getByText('request failed: handler exploded')).toBeInTheDocument();
+  });
+
+  it('filters by level chip', async () => {
+    renderInConsole(<LogsView />);
+    await userEvent.click(screen.getByRole('button', { name: 'warn' }));
+    expect(screen.getByText('could not record recent route /x')).toBeInTheDocument();
+    expect(screen.queryByText('pawd listening on 127.0.0.1:8971')).toBeNull();
+    expect(screen.getByText('1 of 3 entries')).toBeInTheDocument();
+  });
+
+  it('filters by substring, case-insensitively', async () => {
+    renderInConsole(<LogsView />);
+    await userEvent.type(screen.getByLabelText('Filter messages'), 'EXPLODED');
+    expect(screen.getByText('request failed: handler exploded')).toBeInTheDocument();
+    expect(screen.queryByText('pawd listening on 127.0.0.1:8971')).toBeNull();
+  });
+
+  it('says when nothing matches, and when nothing was logged at all', async () => {
+    renderInConsole(<LogsView />);
+    await userEvent.type(screen.getByLabelText('Filter messages'), 'zzz');
+    expect(screen.getByText('— nothing matches —')).toBeInTheDocument();
+
+    renderInConsole(<LogsView />, makeSnapshot({ logs: [] }));
+    expect(screen.getByText('— the daemon has logged nothing yet —')).toBeInTheDocument();
+  });
+
+  it('counts a single entry in the singular', () => {
+    renderInConsole(
+      <LogsView />,
+      makeSnapshot({
+        logs: [{ at: '2026-08-05T15:40:00.000Z', level: 'info', message: 'one' }],
+      }),
+    );
+    expect(screen.getByText('1 of 1 entry')).toBeInTheDocument();
   });
 });
 

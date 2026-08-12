@@ -23,6 +23,7 @@ import {
   type DoctorReport,
   type HostInfo,
   type HostProcess,
+  type LogEntry,
   type PawSnapshot,
   type PlanSlice,
   type PlansSlice,
@@ -133,6 +134,7 @@ export function buildPlanSlice<Args>(
  * @property {string} socket - Bound address.
  * @property {number} gates - Gate count for the rail.
  * @property {number} keys - Provider key count for the rail.
+ * @property {LogEntry[]} logs - Log ring entries, oldest first.
  */
 export interface SnapshotParts {
   readonly host: HostInfo;
@@ -147,6 +149,7 @@ export interface SnapshotParts {
   readonly socket: string;
   readonly gates: number;
   readonly keys: number;
+  readonly logs: readonly LogEntry[];
 }
 
 /**
@@ -185,6 +188,7 @@ export function composeSnapshot(parts: SnapshotParts): PawSnapshot {
       proto: 'v1',
       storeWriters: 1,
     },
+    logs: parts.logs,
     chrome: { gates: parts.gates, keys: parts.keys },
   };
 }

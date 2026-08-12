@@ -11,6 +11,7 @@
  */
 
 import { useSection } from '../../application/hooks/useConsole.js';
+import { LogsView } from './logsView.js';
 import { OverviewView } from './overviewView.js';
 import { PendingView } from './pendingView.js';
 import { RolesView } from './rolesView.js';
@@ -20,10 +21,9 @@ import { ViolationsView } from './violationsView.js';
 /**
  * Titles for subsystem no daemon report back yet.
  */
-const PENDING: Record<'gates' | 'keys' | 'logs', string> = {
+const PENDING: Record<'gates' | 'keys', string> = {
   gates: 'Gates',
   keys: 'Keys',
-  logs: 'Logs',
 };
 
 /**
@@ -42,6 +42,8 @@ export function SectionOutlet() {
       return <RolesView />;
     case 'violations':
       return <ViolationsView />;
+    case 'logs':
+      return <LogsView />;
     default:
       return <PendingView title={PENDING[section]} />;
   }

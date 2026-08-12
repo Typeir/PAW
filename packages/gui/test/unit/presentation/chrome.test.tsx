@@ -50,6 +50,11 @@ describe('TitleBar', () => {
       </ConsoleProvider>,
     );
     expect(container.querySelector('.lights')).toBeInTheDocument();
+    expect(container.querySelector('header')?.lastElementChild).toHaveClass('lights');
+    expect(
+      [...container.querySelectorAll('.lights .slight')].map((el) => el.getAttribute('aria-label')),
+    ).toEqual(['Minimise window', 'Maximise window', 'Close window']);
+    expect(container.querySelectorAll('.lights .slight svg')).toHaveLength(3);
 
     await userEvent.click(screen.getByRole('button', { name: 'Close window' }));
     await userEvent.click(screen.getByRole('button', { name: 'Minimise window' }));

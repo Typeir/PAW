@@ -54,6 +54,90 @@ export function findConfig(
 }
 
 /**
+ * Directory new plans are scaffolded into, repo-relative.
+ */
+export const PLANS_DIR = 'plans';
+
+const PLAN_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/**
+ * Whether name can title a new plan file: kebab-case, 1-64 chars, no path
+ * characters. The name becomes a filename, so the rule is the safety boundary.
+ *
+ * @param {string} name - Proposed plan name.
+ * @returns {boolean} True when the name is usable.
+ */
+export function planNameValid(name: string): boolean {
+  return PLAN_NAME.test(name);
+}
+
+/**
+ * Repo-relative path a named plan scaffolds to.
+ *
+ * @param {string} name - Valid plan name.
+ * @returns {string} `plans/<name>.swarm.mjs`.
+ */
+export function planPathFor(name: string): string {
+  return `${PLANS_DIR}/${name}${PLAN_SUFFIX}`;
+}
+
+/**
+ * Normalise a plan path for deletion, or null when it must be refused: empty,
+ * absolute, drive-lettered, traversing (`..`), or not a `*.swarm.mjs`. The
+ * suffix check bounds what a delete verb can ever remove to plan files.
+ *
+ * @param {string} asked - Plan path as the client sent it.
+ * @returns {string | null} Normalised repo-relative path, or null.
+ */
+export function safePlanPath(asked: string): string | null {
+  const path = asked.replace(/\\/g, '/').replace(/^\.\//, '');
+  if (path === '' || !path.endsWith(PLAN_SUFFIX)) {
+    return null;
+  }
+  if (path.startsWith('/') || /^[A-Za-z]:/.test(path)) {
+    return null;
+  }
+  if (path.split('/').some((segment) => segment === '..' || segment === '')) {
+    return null;
+  }
+  return path;
+}
+
+/**
+ * Starter plan file body: one member per entry in `args.files`, read and edit
+ * tools, resume keyed by file path.
+ *
+ * @param {string} name - Valid plan name.
+ * @returns {string} `.swarm.mjs` source.
+ */
+export function planTemplate(name: string): string {
+  return [
+    '/**',
+    ` * @fileoverview Swarm plan \`${name}\`. One member per entry in \`args.files\`.`,
+    ' * Fill `files`, adjust the brief, then run:',
+    ' *',
+    ` *   paw swarm run ${planPathFor(name)}`,
+    ' */',
+    '',
+    'export default {',
+    `  name: '${name}',`,
+    "  role: 'edit.apply',",
+    '  args: { files: [] },',
+    '  members: (a) => a.files.length,',
+    "  availableTools: ['read', 'edit'],",
+    '  brief: (a, m) =>',
+    '    [',
+    '      `Open ${a.files[m]} and read it fully.`,',
+    "      'State the change to make, then make it in place with your tools.',",
+    "      'When done, reply with one short line naming what you changed.',",
+    "    ].join('\\n'),",
+    '  key: (a, m) => a.files[m],',
+    '};',
+    '',
+  ].join('\n');
+}
+
+/**
  * Raised when selection name plan served repo do not hold. Distinct type; router answer 404 for it while other failure propagate.
  */
 export class UnknownPlanError extends Error {

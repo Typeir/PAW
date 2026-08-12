@@ -15,9 +15,9 @@
  * @since 5.0.0
  */
 
-import { X } from 'lucide-react';
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { CloseLight } from './closeLight.js';
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
@@ -164,9 +164,7 @@ export function Modal({ isOpen, onClose, title, size = 'md', children }: ModalPr
         {title !== undefined && (
           <header className='modal-head'>
             <h2 id={`${id}-title`}>{title}</h2>
-            <button type='button' className='modal-x' aria-label='Close' onClick={onClose}>
-              <X size={16} aria-hidden='true' />
-            </button>
+            <CloseLight label='Close' onClick={onClose} />
           </header>
         )}
         <div className='modal-body'>{children}</div>

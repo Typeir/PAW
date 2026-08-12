@@ -22,6 +22,15 @@ export { formatUptime } from './domain/snapshot.js';
 export { LOG_CAPACITY, createLogRing } from './domain/logRing.js';
 export type { LogRing } from './domain/logRing.js';
 
+export {
+  LOG_FILE_CAP,
+  TRIM_EVERY,
+  createNodeLogSink,
+  parseLogFile,
+  parseLogLine,
+} from './infrastructure/logSink.js';
+export type { LogSink } from './infrastructure/logSink.js';
+
 export { createBus } from './domain/bus.js';
 export type { BusErrorReporter, LiveBus, LiveListener } from './domain/bus.js';
 
@@ -56,16 +65,23 @@ export type {
 export { enforcementControl } from './application/enforcementControl.js';
 export type { EnforcementControlSeams } from './application/enforcementControl.js';
 export { configControl } from './application/configControl.js';
+export { plansControl } from './application/plansControl.js';
+export type { PlansControlSeams } from './application/plansControl.js';
 
 export { IGNORED_DIRS, buildFileTree, findSubtree } from './domain/tree.js';
 export type { FileEntry } from './domain/tree.js';
 
 export {
   CONFIG_PATH,
+  PLANS_DIR,
   PLAN_SUFFIX,
   UnknownPlanError,
   discoverPlans,
   findConfig,
+  planNameValid,
+  planPathFor,
+  planTemplate,
+  safePlanPath,
   selectPlan,
 } from './domain/plans.js';
 

@@ -25,11 +25,13 @@ export const LOG_CAPACITY = 200;
  *
  * @interface LogRing
  * @property {(level: LogEntry['level'], message: string) => LogEntry} append - Record line, return it.
+ * @property {(restored: readonly LogEntry[]) => void} seed - Load persisted entries with their own timestamps, evicting to capacity. Boot restore; not counted as drops.
  * @property {() => readonly LogEntry[]} entries - Lines held, oldest first.
  * @property {() => number} dropped - How many lines evicted, ever.
  */
 export interface LogRing {
   append(level: LogEntry['level'], message: string): LogEntry;
+  seed(restored: readonly LogEntry[]): void;
   entries(): readonly LogEntry[];
   dropped(): number;
 }
@@ -54,6 +56,12 @@ export function createLogRing(now: () => string, capacity: number = LOG_CAPACITY
         evicted += 1;
       }
       return entry;
+    },
+    seed: (restored: readonly LogEntry[]): void => {
+      held.push(...restored);
+      while (held.length > capacity) {
+        held.shift();
+      }
     },
     entries: (): readonly LogEntry[] => [...held],
     dropped: (): number => evicted,

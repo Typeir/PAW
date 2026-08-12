@@ -13,11 +13,14 @@
  * States, each one a distinct mode tracked in state:
  *
  * - `static` — artifact page with no daemon. No recovery; nothing attempted.
- * - `connecting` — socket opening.
+ * - `connecting` — first socket opening. Never re-entered from `degraded`.
  * - `authenticating` — open, credential sent, waiting for first frame.
  * - `live` — receiving slices.
  * - `degraded` — socket down and console polls instead; a retry is
- *   scheduled underneath.
+ *   scheduled underneath. Latched: retry attempts stay `degraded` until a
+ *   `hello` frame proves the wire up. An attempt in flight is not a wire
+ *   up, and publishing it flickers the banner and stops the poll on every
+ *   retry tick.
  * - `locked-out` — daemon rejected the credential. Polling is refused
  *   too, so retry is pointless; operator must re-open the printed URL.
  *
@@ -215,7 +218,7 @@ export function useLiveWire(deps: LiveWireDeps): LiveWire {
       );
     };
 
-    setMode('connecting');
+    setMode((prev) => (prev === 'degraded' ? 'degraded' : 'connecting'));
     const socket = open();
     socketRef.current = socket;
 
@@ -224,7 +227,7 @@ export function useLiveWire(deps: LiveWireDeps): LiveWire {
         if (!live) {
           return;
         }
-        setMode('authenticating');
+        setMode((prev) => (prev === 'degraded' ? 'degraded' : 'authenticating'));
         socket.send(authFrame(token));
       },
 

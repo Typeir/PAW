@@ -16,6 +16,7 @@ import type {
   HostInfo,
   HostProcess,
   InitMode,
+  LogEntry,
   ModelPort,
   PawSnapshot,
   RecentRoutesPort,
@@ -210,6 +211,7 @@ export type Dispatcher = (
  * @property {(path: string, mode: InitMode) => void} [onAttach] - Receive attach requests. Daemon never write.
  * @property {(settings: RunSettings) => void} [onRelease] - Receive release requests. Daemon never run them itself.
  * @property {(settings: RunSettings) => Dispatcher} [dispatcherFor] - Build dispatcher for approved release settings. Shell own live registry and writers; omit and {@link DaemonHandle.release} throw.
+ * @property {LogSinkLike} [logSink] - Log persistence: every report appends one entry, boot seeds the ring from the persisted tail. Omit and logs stay per-boot.
  */
 export interface DaemonOptions {
   readonly root?: string;
@@ -223,9 +225,22 @@ export interface DaemonOptions {
   readonly scopeCeiling?: string;
   readonly control?: ControlPort;
   readonly recent?: RecentRoutesPort;
+  readonly logSink?: LogSinkLike;
   onAttach?(path: string, mode: InitMode): void;
   onRelease?(settings: RunSettings): void;
   dispatcherFor?(settings: RunSettings): Dispatcher;
+}
+
+/**
+ * Log persistence a daemon writes through and boots from.
+ *
+ * @interface LogSinkLike
+ * @property {(entry: LogEntry) => void} append - Persist one entry, best effort.
+ * @property {(limit: number) => LogEntry[]} load - The newest `limit` persisted entries, oldest first.
+ */
+export interface LogSinkLike {
+  append(entry: LogEntry): void;
+  load(limit: number): LogEntry[];
 }
 
 /**

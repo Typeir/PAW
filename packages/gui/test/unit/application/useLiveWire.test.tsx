@@ -295,6 +295,36 @@ describe('the live wire', () => {
     expect(connect).toHaveBeenCalledTimes(2);
   });
 
+  it('stays degraded through a retry attempt until a hello proves the wire up', () => {
+    const socket = scripted();
+    const connect = vi.fn(() => socket.socket);
+    const { result } = renderHook(() =>
+      useLiveWire({
+        connect,
+        token: TOKEN,
+        plan: null,
+        onEvent: () => undefined,
+        random: () => 0.5,
+      }),
+    );
+    socket.open();
+    socket.deliver(hello());
+    socket.end(1006);
+    expect(result.current.mode).toBe('degraded');
+
+    act(() => {
+      vi.advanceTimersByTime(RETRY_CAP_MS);
+    });
+    expect(connect).toHaveBeenCalledTimes(2);
+    expect(result.current.mode).toBe('degraded');
+
+    socket.open();
+    expect(result.current.mode).toBe('degraded');
+
+    socket.deliver(hello());
+    expect(result.current.mode).toBe('live');
+  });
+
   it('retries from the top of the backoff when the daemon says it is shutting down', () => {
     const socket = scripted();
     const delays: number[] = [];

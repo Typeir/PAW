@@ -2,9 +2,11 @@
  * Title Bar
  *
  * @fileoverview Console top edge. Desktop shell window frameless, this
- * titlebar renders lights that close, minimise, maximise the window and
+ * titlebar renders the window controls — right-aligned in Windows order
+ * (minimise, maximise, close), each a stoplight-coloured disc with an
+ * always-visible glyph, so the action reads without relying on colour — and
  * empty-space drag. Browser tab has no window to control, so it renders no
- * lights and no drag region. Both shells render wordmark, daemon pill read
+ * controls and no drag region. Both shells render wordmark, daemon pill read
  * from snapshot, theme toggle.
  *
  * @module @paw/gui/presentation/chrome/titleBar
@@ -13,11 +15,12 @@
  * @since 5.0.0
  */
 
-import { SunMoon } from 'lucide-react';
+import { Minus, Square, SunMoon } from 'lucide-react';
 import { useShell } from '../../application/context/consoleContext.js';
 import { useConsoleData } from '../../application/hooks/useConsole.js';
 import { useTheme } from '../../application/hooks/useTheme.js';
 import type { WindowControls } from '../../infrastructure/shell.js';
+import { CloseLight } from '../atoms/closeLight.js';
 import { PawMark } from '../atoms/pawMark.js';
 
 /**
@@ -34,27 +37,31 @@ export function scopeName(root: string): string {
 }
 
 /**
- * Window controls — rendered only when a window exists to control.
+ * Window controls — rendered only when a window exists to control. Windows
+ * order with macOS stoplight colours; the glyph carries the meaning when the
+ * colour cannot.
  *
  * @param {{ controls: WindowControls }} props - Window controls.
- * @returns {JSX.Element} The lights.
+ * @returns {JSX.Element} The controls.
  */
 function Lights({ controls }: { readonly controls: WindowControls }) {
   return (
     <div className='lights'>
-      <button type='button' className='light close' aria-label='Close window' onClick={controls.close} />
       <button
         type='button'
-        className='light minimise'
+        className='slight minimise'
         aria-label='Minimise window'
-        onClick={controls.minimize}
-      />
+        onClick={controls.minimize}>
+        <Minus size={10} strokeWidth={3} aria-hidden='true' />
+      </button>
       <button
         type='button'
-        className='light zoom'
+        className='slight zoom'
         aria-label='Maximise window'
-        onClick={controls.maximize}
-      />
+        onClick={controls.maximize}>
+        <Square size={8} strokeWidth={3} aria-hidden='true' />
+      </button>
+      <CloseLight label='Close window' onClick={controls.close} />
     </div>
   );
 }
@@ -71,7 +78,6 @@ export function TitleBar() {
 
   return (
     <header>
-      {controls !== null && <Lights controls={controls} />}
       <p className='wordmark'>
         <PawMark />
         <b>PAW</b>
@@ -93,6 +99,7 @@ export function TitleBar() {
         onClick={toggle}>
         <SunMoon size={13} aria-hidden='true' /> theme
       </button>
+      {controls !== null && <Lights controls={controls} />}
     </header>
   );
 }

@@ -6,10 +6,13 @@
  * optional type-to-filter, full keyboard operation, ARIA
  * `combobox`→`listbox`/`option` wiring. Announces to screen reader,
  * works without mouse, matches platform `<select>` semantics, styled to
- * match rest of instrument panel. Positions with plain absolute CSS (no
- * floating-ui). Closes on outside click or Escape — unit-testable in
- * jsdom. No `scrollIntoView`: untestable in jsdom, unnecessary for the
- * short lists this control renders.
+ * match rest of instrument panel. The list renders through a portal at
+ * body, anchored at a fixed position under the trigger, so a parent
+ * card's `overflow: hidden` never clips it; the anchor re-measures on
+ * resize and capture-phase scroll — same machinery as the file tree
+ * picker. Closes on outside click or Escape — unit-testable in jsdom.
+ * No `scrollIntoView`: untestable in jsdom, unnecessary for the short
+ * lists this control renders.
  *
  * @module @paw/gui/presentation/atoms/select
  * @version 0.0.0
@@ -26,6 +29,21 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
+
+/**
+ * Where the portal dropdown sits, in viewport coordinates.
+ *
+ * @interface DropAnchor
+ * @property {number} top - Viewport top, under the trigger.
+ * @property {number} left - Viewport left, flush with the trigger.
+ * @property {number} width - Trigger width, the list's minimum width.
+ */
+interface DropAnchor {
+  readonly top: number;
+  readonly left: number;
+  readonly width: number;
+}
 
 /**
  * One selectable option.
@@ -82,9 +100,18 @@ export function Select({
   const rid = useId();
   const listboxId = `${id ?? rid}-listbox`;
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropRef = useRef<HTMLDivElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(0);
+  const [anchor, setAnchor] = useState<DropAnchor | null>(null);
+
+  const measure = useCallback((): void => {
+    const rect = containerRef.current?.querySelector('.selecttrigger')?.getBoundingClientRect();
+    if (rect) {
+      setAnchor({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+  }, []);
 
   const filtered =
     searchable && query !== ''
@@ -102,14 +129,22 @@ export function Select({
     if (!isOpen) {
       return undefined;
     }
+    measure();
     const onPointerDown = (event: MouseEvent): void => {
-      if (!containerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!containerRef.current?.contains(target) && !dropRef.current?.contains(target)) {
         close();
       }
     };
     document.addEventListener('mousedown', onPointerDown);
-    return () => document.removeEventListener('mousedown', onPointerDown);
-  }, [isOpen, close]);
+    window.addEventListener('resize', measure);
+    document.addEventListener('scroll', measure, true);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      window.removeEventListener('resize', measure);
+      document.removeEventListener('scroll', measure, true);
+    };
+  }, [isOpen, close, measure]);
 
   const pick = (next: string): void => {
     onChange(next);
@@ -177,35 +212,45 @@ export function Select({
         <span className='selectlabel'>{selectedLabel}</span>
         <ChevronDown size={13} className={isOpen ? 'chevron open' : 'chevron'} aria-hidden='true' />
       </button>
-      {isOpen && (
-        <div className='selectdropdown'>
-          {searchable && (
-            <input
-              className='selectsearch'
-              aria-label='Filter options'
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setHighlight(0);
-              }}
-            />
-          )}
-          <ul role='listbox' id={listboxId} aria-label={ariaLabel}>
-            {filtered.length === 0 && <li className='selectempty'>no matches</li>}
-            {filtered.map((option, index) => (
-              <li
-                key={option.value}
-                role='option'
-                aria-selected={option.value === value}
-                className={index === highlight ? 'selectoption hl' : 'selectoption'}
-                onMouseEnter={() => setHighlight(index)}
-                onClick={() => pick(option.value)}>
-                {option.label}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {isOpen &&
+        createPortal(
+          <div
+            className='selectdropdown'
+            style={
+              anchor === null
+                ? undefined
+                : { top: anchor.top, left: anchor.left, minWidth: anchor.width }
+            }
+            ref={dropRef}
+            onKeyDown={onKeyDown}>
+            {searchable && (
+              <input
+                className='selectsearch'
+                aria-label='Filter options'
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setHighlight(0);
+                }}
+              />
+            )}
+            <ul role='listbox' id={listboxId} aria-label={ariaLabel}>
+              {filtered.length === 0 && <li className='selectempty'>no matches</li>}
+              {filtered.map((option, index) => (
+                <li
+                  key={option.value}
+                  role='option'
+                  aria-selected={option.value === value}
+                  className={index === highlight ? 'selectoption hl' : 'selectoption'}
+                  onMouseEnter={() => setHighlight(index)}
+                  onClick={() => pick(option.value)}>
+                  {option.label}
+                </li>
+              ))}
+            </ul>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

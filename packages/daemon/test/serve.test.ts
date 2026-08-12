@@ -592,6 +592,38 @@ describe('runDaemon', () => {
     const daemon = await runDaemon({ root: '/work/repo', recent }, rig.runtime);
     expect(daemon.root).toBe('/work/repo');
     expect(rig.warnings.some((w) => w.includes('could not record recent route'))).toBe(true);
+    // The same report lands in the log ring the snapshot serves, so the
+    // console Logs view shows it as backlog.
+    const { logs } = await daemon.snapshot();
+    expect(logs.some((entry) => entry.message.includes('could not record recent route'))).toBe(
+      true,
+    );
+  });
+
+  it('persists reports through the log sink and boots the ring from its tail', async () => {
+    const persisted: LogEntry[] = [
+      { at: '2026-08-10T00:00:00.000Z', level: 'info', message: 'from the last boot' },
+    ];
+    const logSink = {
+      append: (entry: LogEntry): void => {
+        persisted.push(entry);
+      },
+      load: (): LogEntry[] => [...persisted],
+    };
+    const recent = {
+      list: async (): Promise<string[]> => [],
+      record: async (): Promise<string[]> => {
+        throw new Error('disk full');
+      },
+      remove: async (): Promise<string[]> => [],
+    };
+    const rig = makeRig();
+    const daemon = await runDaemon({ root: '/work/repo', recent, logSink }, rig.runtime);
+    const { logs } = await daemon.snapshot();
+    expect(logs[0].message).toBe('from the last boot');
+    expect(
+      persisted.some((entry) => entry.message.includes('could not record recent route')),
+    ).toBe(true);
   });
 
   it('re-reads the process table, tree, and plan list on every poll', async () => {

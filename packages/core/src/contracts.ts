@@ -191,6 +191,7 @@ export interface RailChrome {
  * @property {RunProgress} run - Run identity and progress split.
  * @property {BudgetSummary} budget - Spend meter.
  * @property {Violation[]} violations - Open enforcement violations.
+ * @property {LogEntry[]} logs - Daemon log ring, oldest first — the backlog a console shows before live frames arrive.
  * @property {DaemonStatus} daemon - Daemon status pill.
  * @property {RailChrome} chrome - Gates/Keys rail counts.
  */
@@ -213,6 +214,7 @@ export interface PawSnapshot {
   readonly run: RunProgress;
   readonly budget: BudgetSummary;
   readonly violations: readonly Violation[];
+  readonly logs: readonly LogEntry[];
   readonly daemon: DaemonStatus;
   readonly chrome: RailChrome;
 }

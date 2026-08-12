@@ -2,9 +2,10 @@
  * PAW CLI — ui command
  *
  * @fileoverview `paw ui [plan.swarm.mjs]`: start pawd in this process, serve
- * console for repository till operator interrupt. Run `--run` dispatcher that
- * meters a real swarm release; attach approval: console request over socket,
- * operator answer here.
+ * console for repository till operator interrupt. Opens the console by
+ * default — desktop shell first, browser as fallback; `--headless` skips both
+ * and only prints the URL. Run `--run` dispatcher that meters a real swarm
+ * release; attach approval: console request over socket, operator answer here.
  *
  * @module @paw/cli/infrastructure/commands/ui
  * @version 0.0.0
@@ -14,9 +15,11 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
+import { fileURLToPath } from 'node:url';
 import {
   applyInit,
   dispatchSwarm,
@@ -35,6 +38,7 @@ import {
   configControl,
   consolePage,
   COPILOT_SLIM_SECTIONS,
+  createNodeLogSink,
   dispatcherFor,
   enforcementControl,
   identityNotice,
@@ -42,6 +46,7 @@ import {
   meterPort,
   nodeRuntime,
   openLiveHerd,
+  plansControl,
   runDaemon,
   type DaemonHandle,
   type Dispatcher,
@@ -51,6 +56,7 @@ import {
   attachPromptLines,
   readAttachAnswer,
 } from '../../domain/attachPrompt.js';
+import { openConsole } from '../../application/electronLauncher.js';
 import { createHerdWriter } from '../../application/herdWriter.js';
 import { concurrencyFrom, maxTokensFrom, parseArgs, withContext } from '../../domain/context.js';
 import { fakeRegistryFor, resolveContextArg } from './swarm.js';
@@ -123,6 +129,43 @@ function openBrowser(url: string): void {
         ? ['open', [url]]
         : ['xdg-open', [url]];
   spawn(cmd, cmdArgs, { stdio: 'ignore', detached: true }).unref();
+}
+
+/**
+ * CLI package root, resolved from this module's own location.
+ */
+const CLI_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+/**
+ * Electron binary path resolved from the shell package's own dependencies —
+ * the `electron` npm package exports its binary path when required from plain
+ * node. Null when the shell has no electron installed.
+ *
+ * @param {string} electronDir - The shell package directory.
+ * @returns {string | null} Binary path, or null.
+ */
+function electronBinOf(electronDir: string): string | null {
+  try {
+    const bin: unknown = createRequire(join(electronDir, 'package.json'))('electron');
+    return typeof bin === 'string' ? bin : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Spawn the desktop shell detached. `ELECTRON_RUN_AS_NODE` is cleared: with it
+ * set — editor extension hosts set it — the binary boots as plain node and
+ * `app` is undefined.
+ *
+ * @param {string} bin - Electron binary.
+ * @param {readonly string[]} shellArgs - Bundle path and viewer flags.
+ * @returns {import('../../application/electronLauncher.js').ChildLike} The spawned child.
+ */
+function spawnShell(bin: string, shellArgs: readonly string[]) {
+  const env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+  return spawn(bin, shellArgs, { stdio: 'ignore', detached: true, env });
 }
 
 /**
@@ -285,7 +328,11 @@ export async function runUi(
   let handle: DaemonHandle | null = null;
   const scope = (): string => handle?.root ?? root;
   const control = args.flags.has('control')
-    ? mergeControl(enforcementControl(scope), configControl(createNodeConfigDocument(scope)))
+    ? mergeControl(
+        enforcementControl(scope),
+        configControl(createNodeConfigDocument(scope)),
+        plansControl(scope),
+      )
     : undefined;
   const daemon = await runDaemon(
     {
@@ -295,6 +342,7 @@ export async function runUi(
       port: portValue === undefined ? 0 : Number(portValue),
       scopeCeiling: homedir(),
       recent: createNodeRecentRoutes(pawHome(process.platform, process.env)),
+      logSink: createNodeLogSink(resolve(root, '.paw', 'daemon.log')),
       onAttach: (path, mode) => {
         void approveAttach(path, mode, () => handle);
       },
@@ -326,12 +374,21 @@ export async function runUi(
     control
       ? 'control enabled · the console may edit bindings, prune violations, and stop enforcement'
       : 'observational · pass --control to let the console write',
-    args.flags.has('open')
-      ? 'opening the console in your browser'
-      : 'open that URL for the console · ctrl-c to stop · pass --open to launch it',
+    args.flags.has('headless')
+      ? 'headless · open that URL for the console yourself · ctrl-c to stop'
+      : 'opening the console · desktop shell first, browser as fallback · pass --headless to skip',
   ]);
-  if (args.flags.has('open')) {
-    openBrowser(`${daemon.url}#t=${daemon.token}`);
+  if (!args.flags.has('headless')) {
+    void openConsole(
+      `${daemon.url}#t=${daemon.token}`,
+      daemon.identity.meta.leafFingerprint,
+      CLI_ROOT,
+      { exists: existsSync, electronBinOf, spawnShell, openWeb: openBrowser },
+    ).then((surface) => {
+      if (surface === 'web') {
+        process.stdout.write('desktop shell unavailable · opened the console in your browser\n');
+      }
+    });
   }
   daemon.dispatched?.catch((err: unknown) => {
     process.stderr.write(

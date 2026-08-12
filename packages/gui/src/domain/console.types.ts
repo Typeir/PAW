@@ -20,6 +20,7 @@ import type {
   DoctorReport,
   HostInfo,
   HostProcess,
+  LogEntry,
   RailChrome,
   RunProgress,
   Violation,
@@ -82,6 +83,7 @@ export interface PlanView {
  * @property {BudgetSummary} budget - Spend meter.
  * @property {Violation[]} violations - Open enforcement violations.
  * @property {DaemonStatus} daemon - Daemon status pill.
+ * @property {LogEntry[]} logs - Daemon log entries, oldest first, capped at the ring size.
  * @property {RailChrome} chrome - Gates/Keys rail counts.
  */
 export interface ConsoleData {
@@ -97,6 +99,7 @@ export interface ConsoleData {
   readonly run: RunProgress;
   readonly budget: BudgetSummary;
   readonly violations: readonly Violation[];
+  readonly logs: readonly LogEntry[];
   readonly daemon: DaemonStatus;
   readonly chrome: RailChrome;
 }

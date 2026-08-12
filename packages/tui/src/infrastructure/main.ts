@@ -1,14 +1,14 @@
 /**
  * PAW TUI
  *
- * @fileoverview Process shell. Load config and plan, run doctor and deterministic
- * herd for read-only views, then run effect-reducer against stdin. Keypress
- * become message. Reducer returns next state and any effects. Shell runs each
- * effect (verb — gates on working tree, daemon verbs over socket, restart shell
- * out to `paw daemon restart`) and feeds result back as message. Two input modes
- * share loop — raw keypress stream on TTY, batch fold over piped input for E2E —
- * snapshot tests exercise the same transitions as keyboard input. Holds no rules and
- * excluded from unit coverage (process I/O, dynamic import); E2E spawns it.
+ * @fileoverview Process shell: a clack-driven menu over the same loaders the
+ * CLI verbs use. The TUI is a guided front for people learning the CLI — each
+ * action prints its result and then the CLI command that does the same thing.
+ * Two input modes: interactive clack prompts on a TTY; on piped stdin, action
+ * ids (`doctor plan herd gates daemon config quit`) fold in order and print
+ * plain — the path E2E drives. Excluded from unit coverage (process I/O,
+ * dynamic import, prompts); the line builders it prints are covered in
+ * `domain/menu.ts`.
  *
  * @module @paw/tui/infrastructure/main
  * @version 0.0.0
@@ -22,11 +22,14 @@ import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { intro, isCancel, log, note, outro, select, spinner } from '@clack/prompts';
 import {
   BUILTIN_ROLES,
   buildRegistry,
   clearBinding,
   dispatchSwarm,
+  memberCount,
+  planKey,
   runDoctor,
   setBinding,
   type ConfigDocumentPort,
@@ -37,20 +40,24 @@ import {
   type SwarmPlan,
   type Violation,
 } from '@paw/core';
+import { ansiPaint } from '@paw/cosmetics';
 import { createNodeConfigDocument, createNodeFileReader, createNodeGateRunner } from '@paw/adapters';
 import { rpcCall, socketPath, tokenPath } from '@paw/daemon';
 import {
-  initialState,
-  reduce,
+  MENU,
+  configLines,
+  daemonLines,
+  doctorLines,
+  gatesLines,
+  herdLines,
+  planLines,
+  type ActionId,
   type ConfigSnapshot,
   type DaemonSnapshot,
   type DaemonStatus,
-  type Effect,
-  type Msg,
+  type MenuEntry,
   type TuiData,
-  type TuiState,
-} from '../domain/app.js';
-import { render } from '../domain/screen.js';
+} from '../domain/menu.js';
 
 const KNOWN_CONNECTORS = ['copilot-hooks'];
 
@@ -114,7 +121,7 @@ function fakeRegistryFor(plan: SwarmPlan<unknown>): RoleRegistry {
 }
 
 /**
- * Load everything read-only views render: doctor report and herd.
+ * Load everything read-only actions print: doctor report and dry-run herd.
  *
  * @param {string} configPath - Path to config.
  * @param {string} planPath - Path to plan.
@@ -161,8 +168,8 @@ function changedFiles(root: string): string[] {
 }
 
 /**
- * Daemon endpoint and handshake token for repository — same addressing CLI's
- * daemon and violations verbs use.
+ * Daemon endpoint and handshake token for repository — same addressing the
+ * CLI daemon and violations verbs use.
  *
  * @param {string} root - Repository root.
  * @returns {{ endpoint: string; token: string }} Socket path and token path.
@@ -212,122 +219,213 @@ async function readConfigSnapshot(doc: ConfigDocumentPort): Promise<ConfigSnapsh
 }
 
 /**
- * Run one effect and produce message that carry its result. Gates run project's
- * gates on working-tree changes; daemon actions go over socket; config actions
- * edit bindings on disk. Each resolve to message its view folds.
+ * The teach line an action ends with: the CLI command doing the same thing.
  *
- * @param {Effect} effect - Effect to run.
- * @param {string} root - Repository root.
- * @returns {Promise<Msg>} Result message.
+ * @param {MenuEntry} entry - The action's menu entry.
+ * @param {boolean} colored - Paint with the shared palette.
+ * @returns {string | null} The line, or null for actions with no CLI twin.
  */
-async function runEffect(effect: Effect, root: string): Promise<Msg> {
-  if (effect.kind === 'run-gates') {
-    const report: HealthReport = await createNodeGateRunner(root).runForFiles(changedFiles(root));
-    return { kind: 'gates', report };
+function cliLine(entry: MenuEntry, colored: boolean): string | null {
+  if (entry.cli === null) {
+    return null;
   }
-  if (
-    effect.kind === 'config-refresh' ||
-    effect.kind === 'config-bind' ||
-    effect.kind === 'config-unbind'
-  ) {
-    const doc = createNodeConfigDocument(root);
-    if (effect.kind === 'config-bind') {
-      const edit = setBinding(await doc.read(), effect.role, effect.model);
-      if (edit.ok) {
-        await doc.write(edit.config);
+  const text = `cli: ${entry.cli}`;
+  return colored ? ansiPaint.flag(text) : text;
+}
+
+/**
+ * Run one action to its printed lines. Interactive mode may prompt (member
+ * pick, daemon verb, binding edit); batch keeps the defaults: member 0, daemon
+ * status, config read-only.
+ *
+ * @param {ActionId} id - The action.
+ * @param {TuiData} data - Loaded read-only data.
+ * @param {string} root - Repository root.
+ * @param {boolean} interactive - Whether prompts may open.
+ * @returns {Promise<string[]>} Lines to print.
+ */
+async function runAction(
+  id: ActionId,
+  data: TuiData,
+  root: string,
+  interactive: boolean,
+): Promise<string[]> {
+  if (id === 'doctor') {
+    return doctorLines(data.doctor);
+  }
+  if (id === 'plan') {
+    let member = 0;
+    const count = memberCount(data.plan);
+    if (interactive && count > 1) {
+      const picked = await select({
+        message: 'which member?',
+        options: Array.from({ length: count }, (_v, m) => ({
+          value: m,
+          label: `member ${m}`,
+          hint: planKey(data.plan, m),
+        })),
+      });
+      if (isCancel(picked)) {
+        return [];
+      }
+      member = picked;
+    }
+    return planLines(data.plan, member);
+  }
+  if (id === 'herd') {
+    return herdLines(data.herd);
+  }
+  if (id === 'gates') {
+    let report: HealthReport;
+    if (interactive) {
+      const wait = spinner();
+      wait.start('running gates on working-tree changes');
+      report = await createNodeGateRunner(root).runForFiles(changedFiles(root));
+      wait.stop('gates ran');
+    } else {
+      report = await createNodeGateRunner(root).runForFiles(changedFiles(root));
+    }
+    return gatesLines(report);
+  }
+  if (id === 'daemon') {
+    let verb: 'status' | 'restart' | 'prune' | 'stop' = 'status';
+    if (interactive) {
+      const picked = await select({
+        message: 'daemon action?',
+        options: [
+          { value: 'status', label: 'status', hint: 'cli: paw daemon status' },
+          { value: 'restart', label: 'restart', hint: 'cli: paw daemon restart' },
+          { value: 'prune', label: 'prune violations', hint: 'cli: paw violations --prune' },
+          { value: 'stop', label: 'stop', hint: 'cli: paw daemon stop' },
+        ] as const,
+      });
+      if (isCancel(picked)) {
+        return [];
+      }
+      verb = picked;
+    }
+    const { endpoint, token } = daemonEndpoint(root);
+    if (verb === 'restart') {
+      try {
+        execFileSync('paw', ['daemon', 'restart'], { cwd: root, stdio: 'ignore', shell: true });
+      } catch {
+        // A failed restart just leaves the snapshot showing not-running.
       }
     }
-    if (effect.kind === 'config-unbind') {
-      const edit = clearBinding(await doc.read(), effect.role);
-      if (edit.ok) {
-        await doc.write(edit.config);
+    if (verb === 'stop') {
+      await rpcCall(endpoint, token, 'daemon.stop', {});
+      return daemonLines({ status: null, violations: [] });
+    }
+    if (verb === 'prune') {
+      await rpcCall(endpoint, token, 'violations.prune', {});
+    }
+    return daemonLines(await daemonSnapshot(root));
+  }
+  // config
+  const doc = createNodeConfigDocument(root);
+  if (interactive) {
+    const snapshot = await readConfigSnapshot(doc);
+    const picked = await select({
+      message: 'bindings — edit one?',
+      options: [
+        { value: '(view)', label: 'just show them', hint: 'cli: paw config' },
+        ...snapshot.bindings.map((binding) => ({
+          value: binding.role,
+          label: `${binding.role} → ${binding.bound ?? '(unbound)'}`,
+          hint: 'rebind or unbind',
+        })),
+      ],
+    });
+    if (isCancel(picked)) {
+      return [];
+    }
+    if (picked !== '(view)') {
+      const target = await select({
+        message: `bind ${picked} to`,
+        options: [
+          ...snapshot.models.map((model) => ({ value: model, label: model })),
+          { value: '(unbind)', label: '(unbind)', hint: 'cli: paw config unbind' },
+        ],
+      });
+      if (!isCancel(target)) {
+        const current = await doc.read();
+        const edit =
+          target === '(unbind)'
+            ? clearBinding(current, picked)
+            : setBinding(current, picked, target);
+        if (edit.ok) {
+          await doc.write(edit.config);
+        }
       }
     }
-    return { kind: 'config', snapshot: await readConfigSnapshot(doc) };
   }
-  if (effect.kind === 'daemon-restart') {
-    try {
-      execFileSync('paw', ['daemon', 'restart'], { cwd: root, stdio: 'ignore', shell: true });
-    } catch {
-      // Failed restart just leave snapshot showing not-running.
-    }
-    return { kind: 'daemon', snapshot: await daemonSnapshot(root) };
-  }
-  const { endpoint, token } = daemonEndpoint(root);
-  if (effect.kind === 'daemon-stop') {
-    await rpcCall(endpoint, token, 'daemon.stop', {});
-    return { kind: 'daemon', snapshot: { status: null, violations: [] } };
-  }
-  if (effect.kind === 'daemon-prune') {
-    await rpcCall(endpoint, token, 'violations.prune', {});
-  }
-  return { kind: 'daemon', snapshot: await daemonSnapshot(root) };
+  return configLines(await readConfigSnapshot(doc));
 }
 
 /**
- * Paint screen to stdout, clear terminal first.
+ * The clack loop: pick an action, print its lines and its CLI twin, repeat
+ * until quit or cancel.
  *
- * @param {TuiState} state - State to render.
+ * @param {TuiData} data - Loaded read-only data.
+ * @param {string} root - Repository root.
+ * @param {string} planPath - Discovered or given plan, for the intro line.
  */
-function paint(state: TuiState): void {
-  process.stdout.write(`\x1b[2J\x1b[H${render(state).lines.join('\n')}\n`);
+async function runInteractive(data: TuiData, root: string, planPath: string): Promise<void> {
+  const colored = process.env.NO_COLOR === undefined;
+  intro(
+    `${colored ? ansiPaint.verb('paw') : 'paw'} · ${
+      colored ? ansiPaint.concept(planPath) : planPath
+    }`,
+  );
+  for (;;) {
+    const choice = await select({
+      message: 'what do you want?',
+      options: MENU.map((entry) => ({ value: entry.id, label: entry.label, hint: entry.hint })),
+    });
+    if (isCancel(choice) || choice === 'quit') {
+      break;
+    }
+    const entry = MENU.find((candidate) => candidate.id === choice) as MenuEntry;
+    const lines = await runAction(choice, data, root, true);
+    if (lines.length > 0) {
+      note(lines.join('\n'), entry.label);
+    }
+    const teach = cliLine(entry, colored);
+    if (teach !== null) {
+      log.message(teach);
+    }
+  }
+  outro('paw help lists every command');
 }
 
 /**
- * Drive effect-reducer with raw-mode keypress loop on TTY.
+ * Batch mode: whitespace-separated action ids off stdin, printed plain in
+ * order — the deterministic path E2E drives. An unknown id fails loud.
  *
- * @param {TuiState} start - Initial state.
+ * @param {TuiData} data - Loaded read-only data.
  * @param {string} root - Repository root.
  */
-function runInteractive(start: TuiState, root: string): void {
-  let state = start;
-  const dispatch = async (msg: Msg): Promise<void> => {
-    const step = reduce(state, msg);
-    state = step.state;
-    paint(state);
-    if (state.quit) {
-      process.stdin.setRawMode?.(false);
-      process.exit(0);
-    }
-    for (const effect of step.effects) {
-      await dispatch(await runEffect(effect, root));
-    }
-  };
-  paint(state);
-  process.stdin.setRawMode?.(true);
-  process.stdin.resume();
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', (chunk: string) => {
-    for (const key of chunk) {
-      void dispatch({ kind: 'key', key });
-    }
-  });
-}
-
-/**
- * Fold reducer over all of piped stdin, run effects between keys, then print
- * final screen once — deterministic path E2E drive.
- *
- * @param {TuiState} start - Initial state.
- * @param {string} root - Repository root.
- */
-async function runBatch(start: TuiState, root: string): Promise<void> {
+async function runBatch(data: TuiData, root: string): Promise<void> {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) {
     chunks.push(chunk as Buffer);
   }
-  let state = start;
-  const dispatch = async (msg: Msg): Promise<void> => {
-    const step = reduce(state, msg);
-    state = step.state;
-    for (const effect of step.effects) {
-      await dispatch(await runEffect(effect, root));
+  const tokens = Buffer.concat(chunks).toString('utf8').split(/\s+/).filter((t) => t.length > 0);
+  for (const token of tokens) {
+    if (token === 'quit') {
+      return;
     }
-  };
-  for (const key of Buffer.concat(chunks).toString('utf8')) {
-    await dispatch({ kind: 'key', key });
+    const entry = MENU.find((candidate) => candidate.id === token);
+    if (entry === undefined) {
+      throw new Error(`unknown action "${token}" — actions: ${MENU.map((m) => m.id).join(' ')}`);
+    }
+    const lines = await runAction(entry.id, data, root, false);
+    process.stdout.write(`── ${entry.label} ──\n${lines.join('\n')}\n`);
+    const teach = cliLine(entry, false);
+    if (teach !== null) {
+      process.stdout.write(`${teach}\n`);
+    }
   }
-  process.stdout.write(`${render(state).lines.join('\n')}\n`);
 }
 
 /**
@@ -379,12 +477,11 @@ async function main(): Promise<void> {
         'pass one: usage: paw tui [config.json] [plan.swarm.mjs]',
     );
   }
-  const state = initialState(await loadData(configPath, planPath));
-  const root = cwd;
+  const data = await loadData(configPath, planPath);
   if (process.stdin.isTTY) {
-    runInteractive(state, root);
+    await runInteractive(data, cwd, planPath);
   } else {
-    await runBatch(state, root);
+    await runBatch(data, cwd);
   }
 }
 

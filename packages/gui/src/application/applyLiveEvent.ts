@@ -30,6 +30,7 @@ import type {
   HostInfo,
   HostProcess,
   LiveEnvelope,
+  LogEntry,
   PawSnapshot,
   PlanSlice,
   PlansSlice,
@@ -37,6 +38,12 @@ import type {
 } from '@paw/core';
 import type { ConsoleData } from '../domain/console.types.js';
 import { hydrate } from './hydrateSnapshot.js';
+
+/**
+ * Most log entries the console holds — the daemon ring size, so backlog plus
+ * stream never grow past what the daemon itself keeps.
+ */
+const LOG_CAP = 200;
 
 /**
  * Fold one live frame into console data.
@@ -95,6 +102,11 @@ export function applyLiveEvent(data: ConsoleData, event: LiveEnvelope): ConsoleD
 
     case 'budget':
       return { ...data, budget: event.data as BudgetSummary };
+
+    case 'log': {
+      const fresh = event.data as readonly LogEntry[];
+      return { ...data, logs: [...data.logs, ...fresh].slice(-LOG_CAP) };
+    }
 
     default:
       return data;

@@ -71,7 +71,7 @@ function startUi(...args: string[]): Promise<{ url: string; token: string; banne
   return new Promise((resolve, reject) => {
     child = spawn(
       process.execPath,
-      [TSX, MAIN, 'ui', '--root=test/fixtures', '--config=ready.config.json', ...args],
+      [TSX, MAIN, 'ui', '--headless', '--root=test/fixtures', '--config=ready.config.json', ...args],
       { cwd: PKG, env: { ...process.env, PAW_HOME: home } },
     );
     let out = '';

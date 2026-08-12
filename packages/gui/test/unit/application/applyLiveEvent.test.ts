@@ -116,10 +116,26 @@ describe('applyLiveEvent', () => {
   });
 
   it('changes nothing for a topic the console does not render as data', () => {
-    for (const topic of ['tree', 'log', 'error'] as const) {
+    for (const topic of ['tree', 'error'] as const) {
       // Return input identical so an unknown daemon topic cannot alter data a console does not render; reducer then skips re-render.
       expect(applyLiveEvent(DATA, frame(topic, { anything: true }))).toBe(DATA);
     }
+  });
+
+  it('appends log frames, capped at the daemon ring size', () => {
+    const entry = { at: '2026-08-05T15:41:00.000Z', level: 'info' as const, message: 'fresh' };
+    const appended = applyLiveEvent(DATA, frame('log', [entry]));
+    expect(appended.logs[appended.logs.length - 1]).toEqual(entry);
+    expect(appended.logs.length).toBe(DATA.logs.length + 1);
+
+    const flood = Array.from({ length: 250 }, (_v, i) => ({
+      at: `2026-08-05T15:41:${String(i % 60).padStart(2, '0')}.000Z`,
+      level: 'info' as const,
+      message: `m${i}`,
+    }));
+    const capped = applyLiveEvent(DATA, frame('log', flood));
+    expect(capped.logs.length).toBe(200);
+    expect(capped.logs[capped.logs.length - 1].message).toBe('m249');
   });
 
   it('never mutates the data it was given', () => {

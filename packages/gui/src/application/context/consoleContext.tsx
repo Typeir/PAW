@@ -32,6 +32,7 @@ import { useLiveWire, type LiveMode } from '../hooks/useLiveWire.js';
 import type { SocketFactory } from '../../infrastructure/liveSocket.js';
 import type { TreeSource } from '../../infrastructure/snapshotSource.js';
 import type { ConfigClient } from '../../infrastructure/configClient.js';
+import type { PlansClient } from '../../infrastructure/plansClient.js';
 import type { RecentClient } from '../../infrastructure/recentClient.js';
 import type { Shell, WindowControls } from '../../infrastructure/shell.js';
 
@@ -85,6 +86,16 @@ export interface ConfigAccess {
 }
 
 /**
+ * Plan-file write client, boxed so "no provider" (null) stay distinct from "provider present, static page with no daemon to write" (box holding null).
+ *
+ * @interface PlansAccess
+ * @property {PlansClient | null} client - Plans client, or null when static.
+ */
+export interface PlansAccess {
+  readonly client: PlansClient | null;
+}
+
+/**
  * Operator verbs over live socket, plus recent-routes client: grab switches daemon
  * to a route, release asks daemon run a herd (operator approve in terminal). All
  * boxed so "no provider" (null client) stay distinct from static page.
@@ -118,6 +129,7 @@ const ErrorContext = createContext<LiveError | null>(null);
 const LiveContext = createContext<LiveStatus | null>(null);
 const TreeContext = createContext<TreeAccess | null>(null);
 const ConfigContext = createContext<ConfigAccess | null>(null);
+const PlansContext = createContext<PlansAccess | null>(null);
 const ScopeContext = createContext<ScopeAccess | null>(null);
 const ShellContext = createContext<ShellAccess | null>(null);
 
@@ -146,6 +158,7 @@ function useRequired<T>(context: Context<T | null>, hook: string): T {
  * @property {string | null} [token] - Credential this tab adopt.
  * @property {TreeSource | null} [treeSource] - Repository tree source. Omit for static page.
  * @property {ConfigClient | null} [config] - Binding editor's client. Omit for static page.
+ * @property {PlansClient | null} [plans] - Plan-file write client. Omit for static page.
  * @property {RecentClient | null} [recent] - Scope picker's recent-routes client. Omit for static page.
  * @property {WindowControls | null} [controls] - Desktop window's controls. Omit in browser.
  * @property {number} [intervalMs] - Poll period in milliseconds, for degraded mode.
@@ -158,6 +171,7 @@ export interface ConsoleProviderProps {
   readonly token?: string | null;
   readonly treeSource?: TreeSource | null;
   readonly config?: ConfigClient | null;
+  readonly plans?: PlansClient | null;
   readonly recent?: RecentClient | null;
   readonly controls?: WindowControls | null;
   readonly intervalMs?: number;
@@ -183,6 +197,7 @@ export function ConsoleProvider({
   token = null,
   treeSource = null,
   config = null,
+  plans = null,
   recent = null,
   controls = null,
   intervalMs = DEFAULT_POLL_MS,
@@ -233,6 +248,7 @@ export function ConsoleProvider({
   );
   const tree = useMemo<TreeAccess>(() => ({ source: treeSource }), [treeSource]);
   const configAccess = useMemo<ConfigAccess>(() => ({ client: config }), [config]);
+  const plansAccess = useMemo<PlansAccess>(() => ({ client: plans }), [plans]);
   const scopeAccess = useMemo<ScopeAccess>(
     () => ({ recent, grab: wire.scope, release: wire.release }),
     [recent, wire.scope, wire.release],
@@ -249,9 +265,11 @@ export function ConsoleProvider({
           <LiveContext.Provider value={live}>
             <TreeContext.Provider value={tree}>
               <ConfigContext.Provider value={configAccess}>
-                <ScopeContext.Provider value={scopeAccess}>
-                  <ShellContext.Provider value={shell}>{children}</ShellContext.Provider>
-                </ScopeContext.Provider>
+                <PlansContext.Provider value={plansAccess}>
+                  <ScopeContext.Provider value={scopeAccess}>
+                    <ShellContext.Provider value={shell}>{children}</ShellContext.Provider>
+                  </ScopeContext.Provider>
+                </PlansContext.Provider>
               </ConfigContext.Provider>
             </TreeContext.Provider>
           </LiveContext.Provider>
@@ -313,6 +331,15 @@ export function useTreeSource(): TreeSource | null {
  */
 export function useConfigClient(): ConfigClient | null {
   return useRequired(ConfigContext, 'useConfigClient').client;
+}
+
+/**
+ * Plan-file write client, or null when page have no daemon behind it.
+ *
+ * @returns {PlansClient | null} Plans client.
+ */
+export function usePlansClient(): PlansClient | null {
+  return useRequired(PlansContext, 'usePlansClient').client;
 }
 
 /**

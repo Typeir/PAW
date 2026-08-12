@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clack/prompts": "^1.1.0",
     "@paw/adapters": "file:../adapters",
     "@paw/core": "file:../core",
     "@paw/cosmetics": "file:../cosmetics",

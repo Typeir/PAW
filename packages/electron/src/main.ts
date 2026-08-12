@@ -1,11 +1,16 @@
 /**
  * PAW Electron Main Process
  *
- * @fileoverview Desktop shell for PAW console. Start `pawd` inside
- * this same process — same `runDaemon` CLI call, same node runtime — and open
- * one hardened {@link BrowserWindow} on loopback URL daemon bound. Window re-reads
- * live data every poll: host facts, owned process subtree, plan doctor; content
- * from the daemon snapshot.
+ * @fileoverview Desktop shell for PAW console. Two launch modes. Default:
+ * start `pawd` inside this same process — same `runDaemon` CLI call, same node
+ * runtime — and open one hardened {@link BrowserWindow} on loopback URL daemon
+ * bound. Viewer (`--url= --fingerprint=`): open the window on an external
+ * pawd's console URL instead — `paw ui --open` launches this mode against the
+ * daemon it just started, so release approvals stay on that daemon's terminal.
+ * The fingerprint is that daemon's leaf certificate; the window pins it exactly
+ * as it pins an in-process daemon's. Window re-reads live data every poll:
+ * host facts, owned process subtree, plan doctor; content from the daemon
+ * snapshot.
  *
  * Window **frameless**. Console renders its own titlebar; three buttons
  * minimise, maximise, close over single IPC channel. Channel accepts only those
@@ -34,6 +39,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
   chromiumFingerprint,
+  createNodeLogSink,
   createNodeRecentRoutes,
   identityNotice,
   nodeRuntime,
@@ -88,15 +94,19 @@ function cspFor(origin: string): string {
 /**
  * Read repository this shell launches. No arguments required; resolves the
  * directory launched from, discovers that repo's config and every plan in it,
- * as `paw ui` do. Plan may be named to open on.
+ * as `paw ui` do. Plan may be named to open on. `--url=` with `--fingerprint=`
+ * selects viewer mode: no in-process daemon, window opens on that URL and pins
+ * that certificate.
  *
  * @param {string[]} argv - Process argv.
- * @returns {{ root: string; configPath?: string; planPath?: string }} Launch options.
+ * @returns {{ root: string; configPath?: string; planPath?: string; url?: string; fingerprint?: string }} Launch options.
  */
 export function readLaunchArgs(argv: string[]): {
   root: string;
   configPath?: string;
   planPath?: string;
+  url?: string;
+  fingerprint?: string;
 } {
   const flag = (name: string): string | undefined => {
     const hit = argv.find((a) => a.startsWith(`--${name}=`));
@@ -105,7 +115,13 @@ export function readLaunchArgs(argv: string[]): {
   const [planPath] = argv
     .slice(2)
     .filter((a) => !a.startsWith('-') && !a.endsWith('.cjs'));
-  return { root: resolve(flag('root') ?? '.'), configPath: flag('config'), planPath };
+  return {
+    root: resolve(flag('root') ?? '.'),
+    configPath: flag('config'),
+    planPath,
+    url: flag('url'),
+    fingerprint: flag('fingerprint'),
+  };
 }
 
 /**
@@ -203,6 +219,7 @@ function createWindow(url: string): BrowserWindow {
     frame: false,
     titleBarStyle: 'hidden',
     backgroundColor: '#0b0e13',
+    icon: ICON,
     webPreferences: { ...SECURE_WEB_PREFERENCES },
   });
   lockToDaemon(win);
@@ -242,6 +259,7 @@ async function capture(url: string): Promise<void> {
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
+    icon: ICON,
     webPreferences: { ...SECURE_WEB_PREFERENCES },
   });
   lockToDaemon(win);
@@ -262,36 +280,29 @@ async function capture(url: string): Promise<void> {
 const GUI_PAGE = join(__dirname, '..', '..', 'gui', 'dist', 'live.html');
 
 /**
+ * Window and taskbar icon: the console's paw mark, rendered to `.ico` by
+ * `npm run build:icons`. The packaged exe's own resource icon is a separate
+ * install-time concern (rcedit), not set here.
+ */
+const ICON = join(__dirname, '..', 'assets', 'paw.ico');
+
+/**
  * Daemon this shell run, kept so stop it with app.
  */
 let daemon: DaemonHandle | null = null;
 
 /**
- * Start daemon, then window.
+ * Pin, apply CSP, and open the window (or capture) on a console URL. The tail
+ * both launch modes share once a daemon URL and its certificate are known.
+ *
+ * @param {string} url - Console URL, credential fragment included.
+ * @param {string} fingerprint - That daemon's leaf certificate fingerprint.
+ * @returns {Promise<void>} Resolve once the window (or capture) is up.
  */
-async function start(): Promise<void> {
-  daemon = await runDaemon(
-    {
-      ...readLaunchArgs(process.argv),
-      scopeCeiling: homedir(),
-      recent: createNodeRecentRoutes(pawHome(process.platform, process.env)),
-    },
-    nodeRuntime(GUI_PAGE),
-  );
-  process.stdout.write(
-    `pawd (in-process) on ${daemon.url} · repo ${daemon.root} · ${daemon.plans.length} plan(s)\n` +
-      identityNotice(daemon.identity, new Date())
-        .map((line) => `  ${line}\n`)
-        .join(''),
-  );
-  pinDaemonCertificate(daemon.identity.meta.leafFingerprint, '127.0.0.1');
-  installCsp(`https://127.0.0.1:${daemon.port}`);
+async function openOn(url: string, fingerprint: string): Promise<void> {
+  pinDaemonCertificate(fingerprint, new URL(url).hostname);
+  installCsp(new URL(url).origin);
   installWindowControls();
-
-  // Console reads its credential from the URL fragment, which is replaced out
-  // of history — the same path a browser takes from a printed URL.
-  const url = `${daemon.url}#t=${daemon.token}`;
-
   if (IS_CAPTURE) {
     await capture(url);
     app.quit();
@@ -303,6 +314,40 @@ async function start(): Promise<void> {
       createWindow(url);
     }
   });
+}
+
+/**
+ * Start daemon — or attach to an external one in viewer mode — then window.
+ */
+async function start(): Promise<void> {
+  const launch = readLaunchArgs(process.argv);
+  if (launch.url !== undefined) {
+    if (launch.fingerprint === undefined) {
+      throw new Error('--url needs --fingerprint of that daemon to pin');
+    }
+    process.stdout.write(`viewer on ${new URL(launch.url).origin} · external pawd\n`);
+    await openOn(launch.url, launch.fingerprint);
+    return;
+  }
+  daemon = await runDaemon(
+    {
+      ...launch,
+      scopeCeiling: homedir(),
+      recent: createNodeRecentRoutes(pawHome(process.platform, process.env)),
+      logSink: createNodeLogSink(join(launch.root, '.paw', 'daemon.log')),
+    },
+    nodeRuntime(GUI_PAGE),
+  );
+  process.stdout.write(
+    `pawd (in-process) on ${daemon.url} · repo ${daemon.root} · ${daemon.plans.length} plan(s)\n` +
+      identityNotice(daemon.identity, new Date())
+        .map((line) => `  ${line}\n`)
+        .join(''),
+  );
+
+  // Console reads its credential from the URL fragment, which is replaced out
+  // of history — the same path a browser takes from a printed URL.
+  await openOn(`${daemon.url}#t=${daemon.token}`, daemon.identity.meta.leafFingerprint);
 }
 
 void app.whenReady().then(() =>

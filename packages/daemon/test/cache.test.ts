@@ -175,6 +175,7 @@ describe('composeSnapshot', () => {
     socket: '127.0.0.1:8971',
     gates: 3,
     keys: 2,
+    logs: [{ at: '2026-08-06T15:40:03.000Z', level: 'info' as const, message: 'listening' }],
   };
 
   it('flattens the slices into the shape a console renders', () => {
@@ -182,6 +183,9 @@ describe('composeSnapshot', () => {
 
     expect(snapshot.root).toBe('C:\\served\\repo');
     expect(snapshot.configPath).toBe('.paw/config.json');
+    expect(snapshot.logs).toEqual([
+      { at: '2026-08-06T15:40:03.000Z', level: 'info', message: 'listening' },
+    ]);
     expect(snapshot.plans).toEqual(['a.swarm.mjs']);
     expect(snapshot.selectedPlan).toBe('a.swarm.mjs');
     expect(snapshot.planName).toBe('lore');

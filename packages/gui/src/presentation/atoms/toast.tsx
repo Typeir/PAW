@@ -15,7 +15,8 @@
  * @since 5.0.0
  */
 
-import { CircleCheck, CircleX, Info, TriangleAlert, X, type LucideIcon } from 'lucide-react';
+import { CircleCheck, CircleX, Info, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { CloseLight } from './closeLight.js';
 import {
   createContext,
   useCallback,
@@ -156,9 +157,7 @@ function ToastItem({ toast, onDismiss }: { readonly toast: Toast; readonly onDis
         <p className='toast-msg'>{toast.message}</p>
       </div>
       {toast.dismissible && (
-        <button type='button' className='toast-x' aria-label='Dismiss' onClick={onDismiss}>
-          <X size={13} aria-hidden='true' />
-        </button>
+        <CloseLight small className='toast-x' label='Dismiss' onClick={onDismiss} />
       )}
     </div>
   );

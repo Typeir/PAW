@@ -17,6 +17,7 @@ import type { PawSnapshot, TreeNode } from '@paw/core';
 import type { SnapshotSource } from '../application/hooks/useLiveRefresh.js';
 import { adoptToken, type AuthWindow } from './auth.js';
 import { createConfigClient, type ConfigClient } from './configClient.js';
+import { createPlansClient, type PlansClient } from './plansClient.js';
 import { createRecentClient, type RecentClient } from './recentClient.js';
 import {
   createSocketFactory,
@@ -154,6 +155,7 @@ export function createTreeSource(fetchFn: FetchLike, root = ''): TreeSource {
  * @property {SocketFactory | null} connect - Open live socket, or null when static or not on https.
  * @property {TreeSource | null} treeSource - Tree source, or null when static.
  * @property {ConfigClient | null} config - Binding editor client, or null when static.
+ * @property {PlansClient | null} plans - Plan-file write client, or null when static.
  * @property {RecentClient | null} recent - Scope picker recent-routes client, or null when static.
  * @property {string | null} token - Credential this tab adopted, or null.
  */
@@ -163,6 +165,7 @@ export interface Boot {
   readonly connect: SocketFactory | null;
   readonly treeSource: TreeSource | null;
   readonly config: ConfigClient | null;
+  readonly plans: PlansClient | null;
   readonly recent: RecentClient | null;
   readonly token: string | null;
 }
@@ -189,6 +192,7 @@ export async function boot(
       connect: null,
       treeSource: null,
       config: null,
+      plans: null,
       recent: null,
       token: null,
     };
@@ -205,6 +209,7 @@ export async function boot(
     connect: url === null || ctor === undefined ? null : createSocketFactory(url, ctor),
     treeSource: createTreeSource(authed),
     config: createConfigClient(authed),
+    plans: createPlansClient(authed),
     recent: createRecentClient(authed),
     token,
   };

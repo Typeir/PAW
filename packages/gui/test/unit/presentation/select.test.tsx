@@ -8,7 +8,7 @@
  * @module @paw/gui/test/unit/presentation/select
  */
 
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Select, type SelectOption } from '../../../src/presentation/atoms/select.js';
 
@@ -49,14 +49,15 @@ describe('Select (closed)', () => {
 
   it('opens on ArrowDown/Enter/Space, highlighting the current or first option', () => {
     for (const key of ['ArrowDown', 'Enter', ' ']) {
-      const { root, scope } = setup();
+      const { root } = setup();
       fireEvent.keyDown(root, { key });
-      expect(scope.getByRole('option', { name: 'Beta' })).toHaveClass('hl');
-      scope.getByRole('listbox');
+      expect(screen.getByRole('option', { name: 'Beta' })).toHaveClass('hl');
+      screen.getByRole('listbox');
+      cleanup();
     }
     const none = setup({ value: 'missing' });
     fireEvent.keyDown(none.root, { key: 'ArrowDown' });
-    expect(none.scope.getByRole('option', { name: 'Alpha' })).toHaveClass('hl');
+    expect(screen.getByRole('option', { name: 'Alpha' })).toHaveClass('hl');
   });
 });
 

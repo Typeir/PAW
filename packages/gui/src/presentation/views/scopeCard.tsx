@@ -23,6 +23,7 @@ import { useLiveStatus, useScope } from '../../application/context/consoleContex
 import { useConsoleData } from '../../application/hooks/useConsole.js';
 import { Button } from '../atoms/button.js';
 import { Card } from '../atoms/card.js';
+import { CloseLight } from '../atoms/closeLight.js';
 import { Placeholder } from '../atoms/placeholder.js';
 
 /**
@@ -120,14 +121,12 @@ export function ScopeCard() {
                     <span className={here ? 'scope-dot here' : 'scope-dot'} aria-hidden='true' />
                     {route}
                   </button>
-                  <button
-                    type='button'
+                  <CloseLight
+                    small
                     className='scope-remove'
-                    aria-label={`Remove ${route} from recent routes`}
+                    label={`Remove ${route} from recent routes`}
                     onClick={() => forget(route)}
-                  >
-                    ✕
-                  </button>
+                  />
                 </li>
               );
             })}
