@@ -127,19 +127,15 @@ async function main(): Promise<number> {
   }
   if (command === 'tui') {
     // The TUI is its own shell package with a raw-mode stdin loop; spawn it
-    // with inherited stdio and carry its exit code.
-    const entry = join(
-      dirname(fileURLToPath(import.meta.url)),
-      '..',
-      '..',
-      '..',
-      'tui',
-      'src',
-      'infrastructure',
-      'main.ts',
-    );
+    // with inherited stdio and carry its exit code. tsx runs by absolute path
+    // from this package's dependencies — a bare `--import tsx` resolves
+    // against the caller's working directory and fails outside a repo that
+    // holds tsx.
+    const packages = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+    const tsx = join(packages, 'cli', 'node_modules', 'tsx', 'dist', 'cli.mjs');
+    const entry = join(packages, 'tui', 'src', 'infrastructure', 'main.ts');
     return new Promise<number>((resolveCode) => {
-      spawn(process.execPath, ['--import', 'tsx', entry, ...rest], { stdio: 'inherit' }).on(
+      spawn(process.execPath, [tsx, entry, ...rest], { stdio: 'inherit' }).on(
         'exit',
         (code) => resolveCode(code ?? 0),
       );
