@@ -20,6 +20,7 @@ import type {
 } from '@paw/core';
 import {
   formatBrief,
+  formatConnectors,
   formatDoctor,
   formatGateReport,
   formatHelp,
@@ -43,6 +44,7 @@ describe('formatHelp', () => {
       'sync',
       'violations',
       'config',
+      'connectors',
       'doctor',
       'swarm',
       'ui',
@@ -77,6 +79,22 @@ describe('formatHelp', () => {
     expect(painted).toContain('\x1b[38;5;175mJSON\x1b[0m');
     // The config.json path never splits into a .paw/ prefix + bare json.
     expect(painted).not.toContain('.paw/\x1b[0mconfig');
+  });
+});
+
+describe('formatConnectors', () => {
+  it('counts what is enabled and marks every row', () => {
+    const lines = formatConnectors([
+      { id: 'tsc', kind: 'linter', title: 'TypeScript', description: 'type errors', enabled: true },
+      { id: 'eslint', kind: 'linter', title: 'ESLint', description: 'lint findings', enabled: false },
+    ]);
+    expect(lines[0]).toBe('connectors: 1 of 2 enabled');
+    expect(lines[1]).toBe('  on  tsc · linter · type errors');
+    expect(lines[2]).toBe('  off eslint · linter · lint findings');
+  });
+
+  it('reports an empty catalogue without a row', () => {
+    expect(formatConnectors([])).toEqual(['connectors: 0 of 0 enabled']);
   });
 });
 

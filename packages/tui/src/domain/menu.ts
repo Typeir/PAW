@@ -20,7 +20,7 @@ import {
   type SwarmPlan,
   type Violation,
 } from '@paw/core';
-import type { DoctorReport, HealthReport } from '@paw/core';
+import type { ConnectorRosterRow, DoctorReport, HealthReport } from '@paw/core';
 
 const GATE_FINDING_CAP = 8;
 const VIOLATION_FILE_CAP = 8;
@@ -94,7 +94,15 @@ export interface TuiData {
 /**
  * Action ids the menu offer. Batch mode reads these same ids off stdin.
  */
-export type ActionId = 'doctor' | 'plan' | 'herd' | 'gates' | 'daemon' | 'config' | 'quit';
+export type ActionId =
+  | 'doctor'
+  | 'plan'
+  | 'herd'
+  | 'gates'
+  | 'daemon'
+  | 'config'
+  | 'connectors'
+  | 'quit';
 
 /**
  * One menu entry.
@@ -152,8 +160,30 @@ export const MENU: readonly MenuEntry[] = [
     hint: 'role → model bindings in .paw/config.json',
     cli: 'paw config',
   },
+  {
+    id: 'connectors',
+    label: 'connectors',
+    hint: 'which connectors are on — host bridges and linters',
+    cli: 'paw connectors',
+  },
   { id: 'quit', label: 'quit', hint: 'leave', cli: null },
 ];
+
+/**
+ * Render the connector catalogue with each entry's enabled state.
+ *
+ * @param {readonly ConnectorRosterRow[]} roster - Catalogue with enabled state.
+ * @returns {string[]} Panel lines.
+ */
+export function connectorLines(roster: readonly ConnectorRosterRow[]): string[] {
+  return [
+    `${roster.filter((row) => row.enabled).length} of ${roster.length} enabled`,
+    '',
+    ...roster.map(
+      (row) => `  ${row.enabled ? '✓' : '·'} ${row.id} (${row.kind}) — ${row.description}`,
+    ),
+  ];
+}
 
 /**
  * Doctor lines: readiness, config problems, one row per role.

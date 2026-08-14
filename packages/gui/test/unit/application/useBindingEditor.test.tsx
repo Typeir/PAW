@@ -36,6 +36,8 @@ const client = (over: Partial<ConfigClient> = {}): ConfigClient => ({
   models: async () => ['fast', 'slow'],
   bindings: async () => ({ models: ['fast', 'slow'], roles: {} }),
   providers: async () => [],
+  connectors: async () => [],
+  setConnector: async () => ({ ok: true }),
   bind: async () => ({ ok: true }),
   unbind: async () => ({ ok: true }),
   ...over,

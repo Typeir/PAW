@@ -27,6 +27,7 @@ import {
   BUILTIN_ROLES,
   buildRegistry,
   clearBinding,
+  connectorRoster,
   dispatchSwarm,
   memberCount,
   planKey,
@@ -46,6 +47,7 @@ import { rpcCall, socketPath, tokenPath } from '@paw/daemon';
 import {
   MENU,
   configLines,
+  connectorLines,
   daemonLines,
   doctorLines,
   gatesLines,
@@ -320,6 +322,9 @@ async function runAction(
       await rpcCall(endpoint, token, 'violations.prune', {});
     }
     return daemonLines(await daemonSnapshot(root));
+  }
+  if (id === 'connectors') {
+    return connectorLines(connectorRoster(await createNodeConfigDocument(root).read()));
   }
   // config
   const doc = createNodeConfigDocument(root);

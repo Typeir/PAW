@@ -521,6 +521,24 @@ describe('the write pipeline', () => {
   });
 });
 
+describe('the connector roster', () => {
+  it('serves the catalogue with enabled state when the daemon supplies one', async () => {
+    const roster = [{ id: 'tsc', kind: 'linter', title: 'TypeScript', description: 'x', enabled: true }];
+    const res = await route(req('/api/connectors'), { ...deps, connectors: () => roster });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual(roster);
+  });
+
+  it('answers 404 with no roster supplied, and 401 without the token', async () => {
+    expect((await route(req('/api/connectors'), deps)).status).toBe(404);
+    const res = await route(
+      req('/api/connectors', { headers: { authorization: 'Bearer wrong' } }),
+      { ...deps, connectors: () => [] },
+    );
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('the provider roster', () => {
   it('serves the key-free roster when the daemon supplies one', async () => {
     const roster = [{ name: 'deepseek', type: 'openai', baseUrl: 'https://x', keyChars: 5 }];

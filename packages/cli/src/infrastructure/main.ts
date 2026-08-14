@@ -31,6 +31,7 @@ import { buildRegistry, runDoctor, type ModelPort } from '@paw/core';
 import { formatDoctor, formatHelp } from '../domain/format.js';
 import { runCheck } from './commands/check.js';
 import { runConfig } from './commands/config.js';
+import { runConnectors } from './commands/connectors.js';
 import { runDaemonCommand } from './commands/daemonCommand.js';
 import { runGates } from './commands/gates.js';
 import { runInit } from './commands/init.js';
@@ -104,6 +105,9 @@ async function main(): Promise<number> {
   }
   if (command === 'config') {
     return runConfig(rest, print);
+  }
+  if (command === 'connectors') {
+    return runConnectors(rest, print);
   }
   if (command === 'doctor') {
     if (rest[0] === undefined) {

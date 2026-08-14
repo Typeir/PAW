@@ -18,6 +18,7 @@ import type { DispatchResult, DoctorReport, HealthReport, SwarmPlan, Violation }
 import {
   MENU,
   configLines,
+  connectorLines,
   daemonLines,
   doctorLines,
   gatesLines,
@@ -70,7 +71,16 @@ describe('MENU', () => {
   it('offers every action id once', () => {
     const ids = MENU.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids).toEqual(['doctor', 'plan', 'herd', 'gates', 'daemon', 'config', 'quit']);
+    expect(ids).toEqual([
+      'doctor',
+      'plan',
+      'herd',
+      'gates',
+      'daemon',
+      'config',
+      'connectors',
+      'quit',
+    ]);
   });
 });
 

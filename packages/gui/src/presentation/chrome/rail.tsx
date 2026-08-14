@@ -18,6 +18,7 @@ import {
   Boxes,
   KeyRound,
   LayoutDashboard,
+  Plug,
   ScrollText,
   ShieldCheck,
   TriangleAlert,
@@ -86,6 +87,9 @@ export function Rail() {
         </li>
         <li>
           <NavItem id='keys' icon={KeyRound} label='Keys' count={chrome.keys} />
+        </li>
+        <li>
+          <NavItem id='connectors' icon={Plug} label='Connectors' />
         </li>
       </Group>
       <Group label='Work'>

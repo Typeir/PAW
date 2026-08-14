@@ -15,6 +15,9 @@
 import {
   clearBinding,
   declareModel,
+  disableConnector,
+  enableConnector,
+  enabledConnectorIds,
   parseCapabilities,
   setBinding,
   type ConfigDocumentPort,
@@ -57,7 +60,12 @@ export function configControl(configDoc: ConfigDocumentPort): ControlPort {
     await configDoc.write(edit.config);
     return {
       status: 200,
-      body: { ok: true, roles: edit.config.roles ?? {}, models: edit.config.models ?? {} },
+      body: {
+        ok: true,
+        roles: edit.config.roles ?? {},
+        models: edit.config.models ?? {},
+        connectors: enabledConnectorIds(edit.config),
+      },
     };
   };
   return {
@@ -76,6 +84,20 @@ export function configControl(configDoc: ConfigDocumentPort): ControlPort {
           return refuse('role is required');
         }
         return commit(clearBinding(await configDoc.read(), roleId));
+      },
+      'PUT /api/connectors': async ({ body }) => {
+        const id = asString(body.id);
+        if (id === null) {
+          return refuse('id must be a string');
+        }
+        return commit(enableConnector(await configDoc.read(), id));
+      },
+      'DELETE /api/connectors': async ({ query, body }) => {
+        const id = asString(body.id) ?? query?.get('id') ?? null;
+        if (id === null) {
+          return refuse('id is required');
+        }
+        return commit(disableConnector(await configDoc.read(), id));
       },
       'PUT /api/config/models': async ({ body }) => {
         const id = asString(body.id);

@@ -57,7 +57,12 @@ describe('configControl', () => {
       const doc = fakeDoc(withModel);
       const res = await run(doc.port, { body: { role: 'review.judge', model: 'fast' } });
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ ok: true, roles: { 'review.judge': 'fast' }, models: { fast: caps } });
+      expect(res.body).toEqual({
+        ok: true,
+        roles: { 'review.judge': 'fast' },
+        models: { fast: caps },
+        connectors: [],
+      });
       expect(doc.get().roles).toEqual({ 'review.judge': 'fast' });
     });
 
@@ -113,6 +118,36 @@ describe('configControl', () => {
     it('refuses malformed capabilities', async () => {
       const res = await run(fakeDoc().port, { body: { id: 'slow', capabilities: { tools: 'yes' } } });
       expect(res.status).toBe(422);
+    });
+  });
+
+  describe('connector enable and disable', () => {
+    const enable = (doc: ConfigDocumentPort, over: Partial<ControlRequest>) =>
+      configControl(doc).handlers['PUT /api/connectors'](req(over));
+    const disable = (doc: ConfigDocumentPort, over: Partial<ControlRequest>) =>
+      configControl(doc).handlers['DELETE /api/connectors'](req(over));
+
+    it('enables a connector, writes the document, and returns the enabled ids', async () => {
+      const doc = fakeDoc();
+      const res = await enable(doc.port, { body: { id: 'tsc' } });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ ok: true, connectors: ['tsc'] });
+      expect(doc.get().connectors).toEqual(['tsc']);
+    });
+
+    it('disables by body or by query', async () => {
+      const doc = fakeDoc({ connectors: ['tsc', 'eslint'] });
+      expect(await disable(doc.port, { body: { id: 'tsc' } })).toMatchObject({ status: 200 });
+      expect(doc.get().connectors).toEqual(['eslint']);
+      const byQuery = await disable(doc.port, { query: new URLSearchParams('id=eslint') });
+      expect(byQuery).toMatchObject({ status: 200 });
+      expect(doc.get().connectors).toEqual([]);
+    });
+
+    it('refuses an unknown id and a missing one', async () => {
+      expect(await enable(fakeDoc().port, { body: { id: 'jenkins' } })).toMatchObject({ status: 422 });
+      expect(await enable(fakeDoc().port, { body: {} })).toMatchObject({ status: 422 });
+      expect(await disable(fakeDoc().port, { body: {} })).toMatchObject({ status: 422 });
     });
   });
 });

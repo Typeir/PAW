@@ -12,6 +12,7 @@
  */
 
 import type {
+  ConnectorRosterRow,
   DispatchResult,
   DoctorFinding,
   DoctorReport,
@@ -90,6 +91,7 @@ export function formatHelp(color = false): string[] {
     '  sync                           re-run init, keeping existing config',
     '  violations [--prune [file]]    list recorded violations, or clear them',
     '  config <get|set> …             read or edit model and role bindings in .paw/config.json',
+    '  connectors [enable|disable <id>]  list the connector catalogue, or turn one on or off',
     '  doctor <config.json>           check a config file: every role bound to a capable model',
     '  swarm doctor|show|run <plan>   validate, preview, or run a multi-agent swarm plan (.swarm.mjs)',
     '    run flags: --live --full --ui --context a,b --concurrency N --max-tokens N',
@@ -166,6 +168,22 @@ export function formatGateReport(report: HealthReport): string[] {
     lines.push(`  ${mark(true)} all gates clean`);
   }
   return lines;
+}
+
+/**
+ * Render the connector roster, enabled state first on each row.
+ *
+ * @param {readonly ConnectorRosterRow[]} roster - Catalogue with enabled state.
+ * @returns {string[]} Terminal lines.
+ */
+export function formatConnectors(roster: readonly ConnectorRosterRow[]): string[] {
+  const on = roster.filter((row) => row.enabled).length;
+  return [
+    `connectors: ${on} of ${roster.length} enabled`,
+    ...roster.map(
+      (row) => `  ${row.enabled ? 'on ' : 'off'} ${row.id} · ${row.kind} · ${row.description}`,
+    ),
+  ];
 }
 
 /**

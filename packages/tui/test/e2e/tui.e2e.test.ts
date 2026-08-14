@@ -90,11 +90,20 @@ describe('tui (e2e)', () => {
     expect(stdout).toContain('cli: paw config');
   });
 
+  it('prints the connector catalogue with its enabled state', async () => {
+    const { stdout, code } = await runTui('connectors quit');
+    expect(code).toBe(0);
+    expect(stdout).toContain('── connectors ──');
+    expect(stdout).toContain('enabled');
+    expect(stdout).toContain('tsc (linter)');
+    expect(stdout).toContain('cli: paw connectors');
+  });
+
   it('exits 1 naming the roster on an unknown action id', async () => {
     const { stderr, code } = await runTui('gallop');
     expect(code).toBe(1);
     expect(stderr).toContain('unknown action "gallop"');
-    expect(stderr).toContain('doctor plan herd gates daemon config quit');
+    expect(stderr).toContain('doctor plan herd gates daemon config connectors quit');
   });
 
   it('exits 1 with usage when run bare outside an attached repository', async () => {

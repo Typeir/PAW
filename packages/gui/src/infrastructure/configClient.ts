@@ -22,6 +22,11 @@ export const CONFIG_URL = '/api/config';
 export const PROVIDERS_URL = '/api/providers';
 
 /**
+ * Daemon connector roster read and enable/disable endpoint.
+ */
+export const CONNECTORS_URL = '/api/connectors';
+
+/**
  * Daemon role-binding write endpoint.
  */
 export const CONFIG_ROLES_URL = '/api/config/roles';
@@ -71,21 +76,43 @@ export interface ProviderRow {
 }
 
 /**
- * Binding editor and Keys view verbs.
+ * One connector on the catalogue `/api/connectors` serves.
+ *
+ * @interface ConnectorRow
+ * @property {string} id - Stable connector id.
+ * @property {string} kind - `host` bridge or `linter`.
+ * @property {string} title - Display name.
+ * @property {string} description - What enabling it does.
+ * @property {boolean} enabled - Whether the repo config enables it.
+ */
+export interface ConnectorRow {
+  readonly id: string;
+  readonly kind: string;
+  readonly title: string;
+  readonly description: string;
+  readonly enabled: boolean;
+}
+
+/**
+ * Binding editor, Keys view, and Connectors view verbs.
  *
  * @interface ConfigClient
  * @property {() => Promise<readonly string[]>} models - Declared model ids.
  * @property {() => Promise<ConfigBindings>} bindings - Declared models and every role binding.
  * @property {() => Promise<readonly ProviderRow[]>} providers - Key-free provider roster.
+ * @property {() => Promise<readonly ConnectorRow[]>} connectors - Connector catalogue with enabled state.
  * @property {(role: string, model: string) => Promise<ConfigWrite>} bind - Bind role to model.
  * @property {(role: string) => Promise<ConfigWrite>} unbind - Clear role binding.
+ * @property {(id: string, on: boolean) => Promise<ConfigWrite>} setConnector - Enable or disable a connector.
  */
 export interface ConfigClient {
   models(): Promise<readonly string[]>;
   bindings(): Promise<ConfigBindings>;
   providers(): Promise<readonly ProviderRow[]>;
+  connectors(): Promise<readonly ConnectorRow[]>;
   bind(role: string, model: string): Promise<ConfigWrite>;
   unbind(role: string): Promise<ConfigWrite>;
+  setConnector(id: string, on: boolean): Promise<ConfigWrite>;
 }
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
@@ -137,6 +164,22 @@ export function createConfigClient(fetchFn: FetchLike): ConfigClient {
         throw new Error(`PAW console: ${PROVIDERS_URL} responded ${response.status}`);
       }
       return (await response.json()) as readonly ProviderRow[];
+    },
+    async connectors(): Promise<readonly ConnectorRow[]> {
+      const response = await fetchFn(CONNECTORS_URL);
+      if (!response.ok) {
+        throw new Error(`PAW console: ${CONNECTORS_URL} responded ${response.status}`);
+      }
+      return (await response.json()) as readonly ConnectorRow[];
+    },
+    async setConnector(id: string, on: boolean): Promise<ConfigWrite> {
+      return writeResult(
+        await fetchFn(on ? CONNECTORS_URL : `${CONNECTORS_URL}?id=${encodeURIComponent(id)}`, {
+          method: on ? 'PUT' : 'DELETE',
+          headers: JSON_HEADERS,
+          ...(on ? { body: JSON.stringify({ id }) } : {}),
+        }),
+      );
     },
     async bind(role: string, model: string): Promise<ConfigWrite> {
       return writeResult(

@@ -8,13 +8,14 @@
  * @module @paw/gui/test/unit/presentation/views
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ConsoleProvider } from '../../../src/application/context/consoleContext.js';
 import type { ConfigClient } from '../../../src/infrastructure/configClient.js';
 import { Rail } from '../../../src/presentation/chrome/rail.js';
 import { OverviewView, formatMb } from '../../../src/presentation/views/overviewView.js';
+import { ConnectorsView } from '../../../src/presentation/views/connectorsView.js';
 import { KeysView } from '../../../src/presentation/views/keysView.js';
 import { LogsView } from '../../../src/presentation/views/logsView.js';
 import { PendingView } from '../../../src/presentation/views/pendingView.js';
@@ -31,6 +32,17 @@ const configClient = (over: Partial<ConfigClient> = {}): ConfigClient => ({
     { name: 'deepseek', type: 'openai', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', keyChars: 35 },
     { name: 'broken', error: 'provider "broken": broken.provider.env needs KEY and BASE_URL' },
   ],
+  connectors: async () => [
+    {
+      id: 'copilot-hooks',
+      kind: 'host',
+      title: 'Copilot agent hooks',
+      description: 'Bridges hook events.',
+      enabled: true,
+    },
+    { id: 'tsc', kind: 'linter', title: 'TypeScript', description: 'Type errors.', enabled: false },
+  ],
+  setConnector: async () => ({ ok: true }),
   bind: async () => ({ ok: true }),
   unbind: async () => ({ ok: true }),
   ...over,
@@ -166,6 +178,60 @@ describe('PendingView', () => {
     expect(
       screen.getByText('— Gates — a live pawd control API will back this view —'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('ConnectorsView', () => {
+  const renderConnectors = (client = configClient()) =>
+    render(
+      <ConsoleProvider snapshot={makeSnapshot()} config={client}>
+        <ConnectorsView />
+      </ConsoleProvider>,
+    );
+
+  it('lists the catalogue with each entry’s enabled state', async () => {
+    renderConnectors();
+    expect(await screen.findByText('copilot-hooks')).toBeInTheDocument();
+    expect(screen.getByText('1 of 2 enabled')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'disable' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'enable' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('toggles a connector and re-reads the roster', async () => {
+    const setConnector = vi.fn(async () => ({ ok: true }));
+    const connectors = vi.fn(async () => [
+      { id: 'tsc', kind: 'linter', title: 'TypeScript', description: 'Type errors.', enabled: false },
+    ]);
+    renderConnectors(configClient({ setConnector, connectors }));
+    await userEvent.click(await screen.findByRole('button', { name: 'enable' }));
+    expect(setConnector).toHaveBeenCalledWith('tsc', true);
+    await waitFor(() => expect(connectors).toHaveBeenCalledTimes(2));
+  });
+
+  it('reports a refused toggle and a failed read', async () => {
+    renderConnectors(
+      configClient({ setConnector: async () => ({ ok: false, reason: 'control disabled' }) }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'enable' }));
+    expect(await screen.findByText('control disabled')).toBeInTheDocument();
+
+    renderConnectors(
+      configClient({
+        connectors: async () => {
+          throw new Error('offline');
+        },
+      }),
+    );
+    expect(await screen.findByText('could not read the connectors')).toBeInTheDocument();
+  });
+
+  it('falls back to a plain refusal, and placeholders on a static page', async () => {
+    renderConnectors(configClient({ setConnector: async () => ({ ok: false }) }));
+    await userEvent.click(await screen.findByRole('button', { name: 'enable' }));
+    expect(await screen.findByText('refused')).toBeInTheDocument();
+
+    renderInConsole(<ConnectorsView />);
+    expect(screen.getAllByText('— a live daemon backs this view —').length).toBeGreaterThan(0);
   });
 });
 

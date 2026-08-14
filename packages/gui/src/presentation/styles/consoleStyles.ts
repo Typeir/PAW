@@ -514,6 +514,16 @@ ${punchyHover('.selecttrigger', { scale: 1.02 })}
 .planname:focus-visible { ${focusRing(1)} }
 .modalrow { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 
+.connlist { list-style: none; margin: 0; padding: 0; font-family: var(--mono); font-size: 11.5px; }
+.connrow { display: grid; grid-template-columns: 10px 10ch 6ch 1fr auto; align-items: center;
+  gap: 10px; padding: 7px 10px; border-top: 1px solid var(--line-soft); }
+.connrow .conndot { width: 7px; height: 7px; border-radius: 50%; background: var(--idle); }
+.connrow.on .conndot { background: var(--good);
+  box-shadow: 0 0 6px color-mix(in oklab, var(--good) 80%, transparent); }
+.connrow .connname { color: var(--ink); }
+.connrow .connkind { color: var(--ink-faint); font-size: 10.5px; }
+.connrow .conndesc { color: var(--ink-dim); overflow-wrap: anywhere; }
+
 .keytable { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11.5px; }
 .keytable th { text-align: left; color: var(--ink-faint); font-weight: 500; font-size: 10px;
   text-transform: uppercase; letter-spacing: .12em; padding: 4px 10px 6px; }
