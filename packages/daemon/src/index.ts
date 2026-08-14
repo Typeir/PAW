@@ -67,6 +67,13 @@ export type { EnforcementControlSeams } from './application/enforcementControl.j
 export { configControl } from './application/configControl.js';
 export { plansControl } from './application/plansControl.js';
 export type { PlansControlSeams } from './application/plansControl.js';
+export {
+  consoleEndpointPath,
+  probeConsoleEndpoint,
+  readConsoleEndpoint,
+  recordConsoleEndpoint,
+} from './infrastructure/consoleEndpoint.js';
+export type { ConsoleEndpoint } from './infrastructure/consoleEndpoint.js';
 
 export { IGNORED_DIRS, buildFileTree, findSubtree } from './domain/tree.js';
 export type { FileEntry } from './domain/tree.js';

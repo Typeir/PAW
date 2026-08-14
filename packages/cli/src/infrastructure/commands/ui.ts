@@ -47,6 +47,9 @@ import {
   nodeRuntime,
   openLiveHerd,
   plansControl,
+  probeConsoleEndpoint,
+  readConsoleEndpoint,
+  recordConsoleEndpoint,
   runDaemon,
   type DaemonHandle,
   type Dispatcher,
@@ -325,6 +328,41 @@ export async function runUi(
   const attached = await resolveContextArg(args.values.get('context'));
   const portValue = args.values.get('port');
   const root = resolve(args.values.get('root') ?? '.');
+
+  // Attach instead of boot when a recorded daemon still answers and no flag
+  // asks to shape a daemon of our own. Approvals stay on the terminal that
+  // owns the running pawd.
+  const plainOpen =
+    !shouldRun &&
+    !args.flags.has('control') &&
+    planPath === undefined &&
+    portValue === undefined &&
+    attached.length === 0;
+  const recorded = plainOpen ? readConsoleEndpoint(root) : null;
+  if (recorded !== null && (await probeConsoleEndpoint(recorded))) {
+    const url = `${recorded.url}#t=${recorded.token}`;
+    print([
+      `pawd already serves this repo (pid ${recorded.pid}) on ${url}`,
+      'that URL carries this session’s credential — treat it like a password',
+      'attached · release approvals happen in the terminal that owns pawd',
+      args.flags.has('headless')
+        ? 'headless · open that URL for the console yourself'
+        : 'opening the console · desktop shell first, browser as fallback',
+    ]);
+    if (!args.flags.has('headless')) {
+      const surface = await openConsole(url, recorded.fingerprint, CLI_ROOT, {
+        exists: existsSync,
+        electronBinOf,
+        spawnShell,
+        openWeb: openBrowser,
+      });
+      if (surface === 'web') {
+        process.stdout.write('desktop shell unavailable · opened the console in your browser\n');
+      }
+    }
+    process.exit(0);
+  }
+
   let handle: DaemonHandle | null = null;
   const scope = (): string => handle?.root ?? root;
   const control = args.flags.has('control')
@@ -358,6 +396,12 @@ export async function runUi(
     nodeRuntime(consolePage()),
   );
   handle = daemon;
+  recordConsoleEndpoint(daemon.root, {
+    url: daemon.url,
+    token: daemon.token,
+    fingerprint: daemon.identity.meta.leafFingerprint,
+    pid: process.pid,
+  });
   print([
     `pawd listening on ${daemon.url}#t=${daemon.token}`,
     'that URL carries this session’s credential — treat it like a password',

@@ -44,6 +44,7 @@ import {
   identityNotice,
   nodeRuntime,
   pawHome,
+  recordConsoleEndpoint,
   runDaemon,
   type DaemonHandle,
 } from '@paw/daemon';
@@ -344,6 +345,12 @@ async function start(): Promise<void> {
         .map((line) => `  ${line}\n`)
         .join(''),
   );
+  recordConsoleEndpoint(daemon.root, {
+    url: daemon.url,
+    token: daemon.token,
+    fingerprint: daemon.identity.meta.leafFingerprint,
+    pid: process.pid,
+  });
 
   // Console reads its credential from the URL fragment, which is replaced out
   // of history — the same path a browser takes from a printed URL.

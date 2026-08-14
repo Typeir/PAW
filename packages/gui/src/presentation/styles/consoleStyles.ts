@@ -77,7 +77,7 @@ ${cssVariables()}
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
 body {
   background:
     radial-gradient(1200px 700px at 78% -10%, color-mix(in oklab, var(--accent) 6%, transparent), transparent 60%),
