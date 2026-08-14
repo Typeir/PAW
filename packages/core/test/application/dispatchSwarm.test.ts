@@ -127,6 +127,22 @@ describe('dispatchSwarm', () => {
     ]);
   });
 
+  it('carries the plan-resolved model per member, role binding as fallback', async () => {
+    const models: string[] = [];
+    const recording: ModelPort = {
+      complete: async (req) => {
+        models.push(req.model);
+        return { content: 'x', inputTokens: 1, outputTokens: 1 };
+      },
+    };
+    const res = await dispatchSwarm(
+      plan({ model: (_a, m) => (m === 1 ? 'deepseek-reasoner' : undefined) }),
+      { registry: registry({ port: recording }), files: reader(), concurrency: 1 },
+    );
+    expect(res.released).toBe(true);
+    expect(models).toEqual(['ds-flash', 'deepseek-reasoner', 'ds-flash']);
+  });
+
   it('honours the skip predicate without a model call', async () => {
     const res = await dispatchSwarm(plan(), {
       registry: registry(),

@@ -22,6 +22,7 @@
  * @property {(args: A, member: number) => (boolean | Promise<boolean>)} [skip] - Cheap predicate run before dispatch; true skip member with no model call. May read files; application apply it.
  * @property {(args: A, member: number) => readonly string[]} [contextFiles] - Files whose contents attach to member brief at dispatch. Declare paths only; reading application concern behind port.
  * @property {(args: A, member: number) => string} [key] - Stable per-member identity for idempotent resume; default to member index.
+ * @property {(args: A, member: number) => string | undefined} [model] - Per-member model id. String override the role-bound model for that member; undefined fall back to it. Pure; run at dispatch.
  * @property {readonly string[]} [availableTools] - Canonical tool names grant to every member, override role default. SDK-agnostic; each model port map them to own tool names.
  * @property {(args: A, member: number) => readonly string[]} [resolveTools] - Per-member canonical tool names, override `availableTools` and role default. Run at dispatch.
  * @property {(sections: Readonly<Record<string, string>>, args: A, member: number) => Readonly<Record<string, string | undefined>>} [system] - Compose member system prompt from port slim baseline. Get baseline sections; return override per id. String → replace; `undefined` → drop to model default; id left out → keep baseline. SDK-agnostic; port map resolved section to system-message.
@@ -36,6 +37,7 @@ export interface SwarmPlan<A = unknown> {
   readonly skip?: (args: A, member: number) => boolean | Promise<boolean>;
   readonly contextFiles?: (args: A, member: number) => readonly string[];
   readonly key?: (args: A, member: number) => string;
+  readonly model?: (args: A, member: number) => string | undefined;
   readonly availableTools?: readonly string[];
   readonly resolveTools?: (args: A, member: number) => readonly string[];
   readonly system?: (
@@ -120,6 +122,17 @@ export function targetsOf<A>(plan: SwarmPlan<A>, member: number): string[] {
  */
 export function contextOf<A>(plan: SwarmPlan<A>, member: number): string[] {
   return plan.contextFiles ? [...plan.contextFiles(plan.args, member)] : [];
+}
+
+/**
+ * Model id one member run with, or undefined for the role-bound default.
+ *
+ * @param {SwarmPlan<A>} plan - The plan.
+ * @param {number} member - Zero-based member index.
+ * @returns {string | undefined} Override model id, or undefined.
+ */
+export function modelOf<A>(plan: SwarmPlan<A>, member: number): string | undefined {
+  return plan.model ? plan.model(plan.args, member) : undefined;
 }
 
 /**
@@ -324,6 +337,44 @@ function checkContextPaths<A>(
 }
 
 /**
+ * Check `model`, when declared, resolve every member to a non-empty string or
+ * undefined without throw. Whether a returned id is configured is the
+ * registry's concern; the plan check is shape only.
+ *
+ * @param {SwarmPlan<A>} plan - The plan.
+ * @param {number[]} members - Member indices.
+ * @returns {DoctorFinding} Model-resolution finding.
+ */
+function checkModelResolution<A>(
+  plan: SwarmPlan<A>,
+  members: number[],
+): DoctorFinding {
+  if (!plan.model) {
+    return { check: 'model-resolution', ok: true, detail: 'no model resolutor declared' };
+  }
+  for (const m of members) {
+    let id: string | undefined;
+    try {
+      id = modelOf(plan, m);
+    } catch (err) {
+      return {
+        check: 'model-resolution',
+        ok: false,
+        detail: `member ${m} threw: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    if (id !== undefined && (typeof id !== 'string' || id.length === 0)) {
+      return {
+        check: 'model-resolution',
+        ok: false,
+        detail: `member ${m} resolved to ${JSON.stringify(id)}, expected a model id or undefined`,
+      };
+    }
+  }
+  return { check: 'model-resolution', ok: true };
+}
+
+/**
  * Validate plan before release. Return one finding per check; release refuse
  * when any finding not ok.
  *
@@ -347,5 +398,6 @@ export function doctorPlan<A>(plan: SwarmPlan<A>): DoctorFinding[] {
     checkFileConflict(plan, members),
     checkKeyCollision(plan, members),
     checkContextPaths(plan, members),
+    checkModelResolution(plan, members),
   ];
 }

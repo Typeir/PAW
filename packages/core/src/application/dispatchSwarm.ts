@@ -3,10 +3,12 @@
  *
  * @fileoverview Run swarm plan. Validate it. Refuse release when doctor fail.
  * Resolve role to model through port. Then each member, apply resume and skip
- * before dispatch rendered brief. Compose swarm domain, role registry, and
- * {@link ModelPort} through interfaces. Fail loud per CONSTRAINTS.md Constraint 3:
- * plan that fail doctor not released (`released: false` result). Role that
- * resolve to no model throw.
+ * before dispatch rendered brief. A plan `model` resolutor overrides the
+ * role-bound model id per member; the request still carries the role-bound
+ * output ceiling. Compose swarm domain, role registry, and {@link ModelPort}
+ * through interfaces. Fail loud per CONSTRAINTS.md Constraint 3: plan that
+ * fail doctor not released (`released: false` result). Role that resolve to
+ * no model throw.
  *
  * @module @paw/core/application/dispatchSwarm
  * @version 0.0.0
@@ -18,6 +20,7 @@ import {
   composeSystemSections,
   doctorPlan,
   memberCount,
+  modelOf,
   planKey,
   toolsOf,
   type DoctorFinding,
@@ -174,7 +177,7 @@ export async function dispatchSwarm<A>(
     const tools = toolsOf(plan, member);
     const sections = composeSystemSections(plan, member, deps.systemBaseline ?? {});
     const res = await handle.port.complete({
-      model: handle.modelId,
+      model: modelOf(plan, member) ?? handle.modelId,
       prompt: await composeBrief(plan, member, deps.files),
       maxOutputTokens: deps.maxOutputTokens ?? handle.maxOutputTokens,
       ...(tools === undefined ? {} : { availableTools: tools }),

@@ -107,6 +107,7 @@ export {
   contextOf,
   doctorPlan,
   memberCount,
+  modelOf,
   planKey,
   renderBrief,
   targetsOf,

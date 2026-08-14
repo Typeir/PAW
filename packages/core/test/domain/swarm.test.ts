@@ -16,6 +16,7 @@ import {
   contextOf,
   doctorPlan,
   memberCount,
+  modelOf,
   planKey,
   renderBrief,
   targetsOf,
@@ -104,6 +105,7 @@ describe('doctorPlan', () => {
       'file-conflict',
       'key-collision',
       'context-paths',
+      'model-resolution',
     ]);
   });
 
@@ -237,5 +239,45 @@ describe('doctorPlan key-collision', () => {
     // Every later member sharing a key report `skipped`, reads exactly like
     // legitimate resume — so release must not proceed.
     expect(doctorPlan(keyedBy(['same', 'same'])).every((f) => f.ok)).toBe(false);
+  });
+});
+
+describe('modelOf', () => {
+  it('resolves the per-member override, or undefined without a resolutor', () => {
+    expect(modelOf(plan(), 0)).toBeUndefined();
+    const resolved = plan({ model: (_a, m) => (m === 0 ? 'deepseek-reasoner' : undefined) });
+    expect(modelOf(resolved, 0)).toBe('deepseek-reasoner');
+    expect(modelOf(resolved, 1)).toBeUndefined();
+  });
+});
+
+describe('doctorPlan model-resolution', () => {
+  it('passes without a resolutor and with one returning ids or undefined', () => {
+    expect(doctorPlan(plan()).find((f) => f.check === 'model-resolution')).toEqual({
+      check: 'model-resolution',
+      ok: true,
+      detail: 'no model resolutor declared',
+    });
+    const good = doctorPlan(
+      plan({ model: (_a, m) => (m === 2 ? 'deepseek-reasoner' : undefined) }),
+    ).find((f) => f.check === 'model-resolution');
+    expect(good).toEqual({ check: 'model-resolution', ok: true });
+  });
+
+  it('refuses an empty string, a non-string, and a throwing resolutor', () => {
+    const empty = doctorPlan(plan({ model: () => '' }));
+    expect(empty.find((f) => f.check === 'model-resolution')?.ok).toBe(false);
+    const wrongType = doctorPlan(plan({ model: (() => 42) as never }));
+    expect(wrongType.find((f) => f.check === 'model-resolution')?.detail).toContain('42');
+    const throwing = doctorPlan(
+      plan({
+        model: () => {
+          throw new Error('resolutor exploded');
+        },
+      }),
+    );
+    expect(throwing.find((f) => f.check === 'model-resolution')?.detail).toContain(
+      'resolutor exploded',
+    );
   });
 });
