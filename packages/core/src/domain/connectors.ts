@@ -70,7 +70,10 @@ const KNOWN: ReadonlySet<string> = new Set(VENDOR_CONNECTORS.map((entry) => entr
 
 /**
  * Enabled connector ids a config declares, unknown and non-string entries
- * dropped.
+ * dropped. The legacy singular `connector` field counts as enabling that id:
+ * a repo configured before this catalogue existed still has that host bridge
+ * running, and a roster that called it disabled would be describing something
+ * other than what the daemon does.
  *
  * @param {ConfigDocument} config - The config document.
  * @returns {string[]} Enabled ids, catalogue order.
@@ -78,6 +81,9 @@ const KNOWN: ReadonlySet<string> = new Set(VENDOR_CONNECTORS.map((entry) => entr
 export function enabledConnectorIds(config: ConfigDocument): string[] {
   const declared = Array.isArray(config.connectors) ? config.connectors : [];
   const wanted = new Set(declared.filter((id): id is string => typeof id === 'string'));
+  if (typeof config.connector === 'string') {
+    wanted.add(config.connector);
+  }
   return VENDOR_CONNECTORS.filter((entry) => wanted.has(entry.id)).map((entry) => entry.id);
 }
 

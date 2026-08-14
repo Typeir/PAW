@@ -144,17 +144,24 @@ export function enableConnector(config: ConfigDocument, id: string): ConfigEdit 
 }
 
 /**
- * Disable a connector. Disabling one that is not enabled is a no-op edit.
+ * Disable a connector. Disabling one that is not enabled is a no-op edit. A
+ * host bridge named only by the legacy singular `connector` field is cleared
+ * from that field too, or it would come straight back on the next read.
  *
  * @param {ConfigDocument} config - The config document.
  * @param {string} id - Connector id.
  * @returns {ConfigEdit} New config.
  */
 export function disableConnector(config: ConfigDocument, id: string): ConfigEdit {
-  return {
-    ok: true,
-    config: { ...config, connectors: enabledConnectorIds(config).filter((cid) => cid !== id) },
+  const next: ConfigDocument = {
+    ...config,
+    connectors: enabledConnectorIds(config).filter((cid) => cid !== id),
   };
+  if (config.connector === id) {
+    const { connector: _dropped, ...rest } = next;
+    return { ok: true, config: rest };
+  }
+  return { ok: true, config: next };
 }
 
 /**

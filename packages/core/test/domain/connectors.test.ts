@@ -39,6 +39,15 @@ describe('enabledConnectorIds', () => {
     expect(enabledConnectorIds({})).toEqual([]);
     expect(enabledConnectorIds({ connectors: 'tsc' })).toEqual([]);
   });
+
+  it('counts the legacy singular connector field as enabled', () => {
+    expect(enabledConnectorIds({ connector: 'copilot-hooks' })).toEqual(['copilot-hooks']);
+    expect(enabledConnectorIds({ connector: 'copilot-hooks', connectors: ['tsc'] })).toEqual([
+      'copilot-hooks',
+      'tsc',
+    ]);
+    expect(enabledConnectorIds({ connector: 'jenkins' })).toEqual([]);
+  });
 });
 
 describe('connectorRoster', () => {
@@ -65,5 +74,14 @@ describe('enableConnector / disableConnector', () => {
     const off = disableConnector({ connectors: ['tsc', 'eslint'], roles: { a: 'b' } }, 'tsc');
     expect(off).toMatchObject({ ok: true, config: { connectors: ['eslint'], roles: { a: 'b' } } });
     expect(disableConnector({}, 'tsc')).toMatchObject({ ok: true, config: { connectors: [] } });
+  });
+
+  it('clears the legacy field too, so a disabled host bridge stays disabled', () => {
+    const off = disableConnector({ connector: 'copilot-hooks', root: '.paw' }, 'copilot-hooks');
+    expect(off.ok).toBe(true);
+    const next = off.ok ? off.config : {};
+    expect(next.connector).toBeUndefined();
+    expect(next.root).toBe('.paw');
+    expect(enabledConnectorIds(next)).toEqual([]);
   });
 });
