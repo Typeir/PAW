@@ -1,7 +1,0 @@
-pawd listening on https://127.0.0.1:49675/#t=smTYCiDgxNDRSxesGqqqlBR58Z8Ay_FLogtC12DlZ08
-that URL carries this session’s credential — treat it like a password
-repo C:\Users\dtira\AppData\Local\Temp\paw-conn-proof · 0 plan(s) · pick one in the console
-no files attached · pass --context a,b or pick them in the console
-no run released · pass --run to dispatch
-control enabled · the console may edit bindings, prune violations, and stop enforcement
-headless · open that URL for the console yourself · ctrl-c to stop
