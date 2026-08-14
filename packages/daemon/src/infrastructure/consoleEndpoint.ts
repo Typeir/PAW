@@ -2,12 +2,10 @@
  * PAW Console Endpoint Record
  *
  * @fileoverview Where the repo's console daemon is reachable. A booting daemon
- * records `{url, token, fingerprint, pid}` to `.paw/console.endpoint.json`;
- * a later `paw ui` reads it, probes `/api/state` with the token over TLS
- * pinned to the recorded fingerprint, and attaches instead of booting a
- * second daemon. A stale record fails the probe and is overwritten by the
- * next boot. The token at rest has the same trust level as the rest of
- * `.paw/`: local, gitignored.
+ * records `{url, token, fingerprint, pid}` to `.paw/console.endpoint.json`; a
+ * later `paw ui` probes it over pinned TLS and attaches instead of booting a
+ * second daemon. A stale record fails the probe and is overwritten. The token
+ * at rest is gitignored like the rest of `.paw/`.
  *
  * @module @paw/daemon/infrastructure/consoleEndpoint
  * @version 0.0.0
@@ -88,10 +86,9 @@ export function readConsoleEndpoint(root: string): ConsoleEndpoint | null {
 }
 
 /**
- * Whether the recorded daemon answers. One `GET /api/state` with the bearer
- * token; the served certificate must match the recorded fingerprint — a pin,
- * no trust-store lookup. Anything else — timeout, refused socket, wrong
- * certificate, non-2xx — is a dead or foreign endpoint.
+ * Whether the recorded daemon answers: one `GET /api/state` whose certificate
+ * must match the recorded fingerprint. Timeout, refusal, wrong certificate,
+ * or non-2xx all read as dead.
  *
  * @param {ConsoleEndpoint} endpoint - The record to probe.
  * @param {number} [timeoutMs] - Probe budget.
@@ -116,9 +113,8 @@ export interface RunEventReport {
 }
 
 /**
- * Report one external-herd event to the recorded daemon, so its console shows
- * the run. Fire-and-forget grade: any failure answers false and the herd runs
- * on unobserved.
+ * Report one external-herd event to the recorded daemon. Any failure answers
+ * false and the herd runs on unobserved.
  *
  * @param {ConsoleEndpoint} endpoint - The recorded daemon.
  * @param {RunEventReport} report - The event to fold.
@@ -134,10 +130,9 @@ export function postRunReport(
 }
 
 /**
- * One HTTPS exchange with the recorded daemon: bearer token, certificate
- * pinned to the recorded fingerprint, own timer — node's request `timeout`
- * option does not fire during a stalled TLS handshake. Anything but a 2xx
- * from the pinned certificate answers false.
+ * One HTTPS exchange with the recorded daemon: bearer token, pinned
+ * certificate, own timer — node's request `timeout` does not fire during a
+ * stalled TLS handshake.
  *
  * @param {ConsoleEndpoint} endpoint - The recorded daemon.
  * @param {string} method - HTTP method.

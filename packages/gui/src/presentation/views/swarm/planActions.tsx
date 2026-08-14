@@ -1,15 +1,10 @@
 /**
  * Plan Actions
  *
- * @fileoverview Create and delete plan files from the console. Renders next to
- * the plan picker: `new` scaffolds `plans/<name>.swarm.mjs` from the daemon's
- * starter template, `delete` removes the selected plan after a confirm modal.
- * Both go through the daemon's `--control` write surface; a refusal (control
- * disabled, bad name, duplicate) displays in the modal as the daemon's reason.
- * A created plan appears in the picker on the next snapshot tick, when the
- * daemon re-reads the roster from disk; the console does not select it early,
- * because watching a plan the daemon has not discovered yet answers an error
- * frame. Renders nothing on a static page.
+ * @fileoverview Create and delete plan files beside the plan picker, through
+ * the daemon's `--control` writes; refusals show the daemon's reason. A new
+ * plan appears in the picker on the next roster tick and is not selected
+ * early: watching an undiscovered plan answers an error frame.
  *
  * @module @paw/gui/presentation/views/swarm/planActions
  * @version 0.0.0

@@ -1,11 +1,10 @@
 /**
  * PAW Console Plans Client
  *
- * @fileoverview Plan-file write transport: scaffold a new `*.swarm.mjs`
- * (`POST /api/plans`), delete one (`DELETE /api/plans`). The daemon answers
- * these only when started with `--control`; otherwise the write returns the
- * transport refusal, which the view displays. Uses the same authenticated
- * {@link FetchLike} as the snapshot source; no credential is handled here.
+ * @fileoverview Plan-file write transport: `POST /api/plans` scaffolds one,
+ * `DELETE /api/plans` removes one. The daemon answers only with `--control`;
+ * otherwise the refusal comes back for the view to show. Uses the same
+ * authenticated {@link FetchLike} as the snapshot source.
  *
  * @module @paw/gui/infrastructure/plansClient
  * @version 0.0.0

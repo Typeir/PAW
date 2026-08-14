@@ -1,11 +1,8 @@
 /**
  * PAW Linter Connectors
  *
- * @fileoverview Pure half of the linter connectors: the command each linter
- * runs and the parser that turns its output into findings. Execution and
- * violation recording live behind seams in the enforcement daemon. Every
- * linter finding is deferred severity — recorded as an indirect violation,
- * never critical — so the operator acts on them later in any order.
+ * @fileoverview Commands the linter connectors run and the parsers for their
+ * output. Every finding records as an indirect violation, never critical.
  *
  * @module @paw/core/domain/linters
  * @version 0.0.0
@@ -64,10 +61,9 @@ export function linterCommandFor(id: string, files: readonly string[]): LinterCo
 }
 
 /**
- * Linter finding as an unrecorded violation. Always `indirectFix`: a linter
- * finding nudges on the next tool call and never denies one, so the operator
- * clears them in any order. The store carries no line number, so the line
- * rides in the message.
+ * Linter finding as an unrecorded violation. Always `indirectFix`, so it
+ * nudges and never denies. The store has no line field; the line rides in
+ * the message.
  *
  * @param {LintFinding} finding - The finding.
  * @returns {Violation} Deferred violation to raise.

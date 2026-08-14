@@ -1,12 +1,10 @@
 /**
  * PAW Provider Roster
  *
- * @fileoverview Key-free view of the configured providers, for the console's
- * Keys view. Scans `<root>/.paw/*.provider.env`, parses each through
- * {@link parseProviderEnv}, and strips the credential to its character count —
- * key material never crosses this boundary. A file that does not parse stays
- * on the roster with its reason, so a half-configured provider is visible, not
- * vanished.
+ * @fileoverview Key-free view of `<root>/.paw/*.provider.env` for the Keys
+ * view. The credential is reduced to its character count; key material never
+ * crosses this boundary. A file that does not parse stays listed with its
+ * reason.
  *
  * @module @paw/daemon/model/providerRoster
  * @version 0.0.0

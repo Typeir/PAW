@@ -2,10 +2,8 @@
  * Close Light Atom
  *
  * @fileoverview The console's one destructive-dismiss control: a red stoplight
- * disc with an always-visible ✕ glyph, the same design as the titlebar close.
- * Every remove, delete, dismiss, or close affordance renders this atom, so the
- * verb reads identically everywhere; green pips mark selection, red discs
- * remove.
+ * disc with a visible ✕, matching the titlebar close. Every remove, delete,
+ * dismiss, and close renders this. Green pips mark selection, red discs remove.
  *
  * @module @paw/gui/presentation/atoms/closeLight
  * @version 0.0.0

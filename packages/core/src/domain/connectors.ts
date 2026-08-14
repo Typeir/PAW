@@ -1,14 +1,10 @@
 /**
  * PAW Connector Catalogue
  *
- * @fileoverview The connectors this build knows and the enabled-state edits
- * over `.paw/config.json`. `VENDOR_CONNECTORS` is the vendor JSON baked into
- * the build — there is no vendor endpoint and none is planned. Two kinds:
- * `host` bridges editor-agent hooks into the loop (the legacy `connector`
- * config field selects one); `linter` runs a tool during hook enforcement and
- * records its findings as violations. Linter violations are always deferred —
- * never forced critical — so they can be acted on later in any order.
- * Enabled ids live in the config `connectors` array.
+ * @fileoverview The connector catalogue this build ships, baked in; there is
+ * no vendor endpoint. A `host` connector bridges editor-agent hooks into the
+ * loop; a `linter` runs a tool during enforcement and records deferred
+ * violations. Enabled ids live in the config `connectors` array.
  *
  * @module @paw/core/domain/connectors
  * @version 0.0.0
@@ -69,11 +65,9 @@ export const VENDOR_CONNECTORS: readonly ConnectorEntry[] = [
 const KNOWN: ReadonlySet<string> = new Set(VENDOR_CONNECTORS.map((entry) => entry.id));
 
 /**
- * Enabled connector ids a config declares, unknown and non-string entries
- * dropped. The legacy singular `connector` field counts as enabling that id:
- * a repo configured before this catalogue existed still has that host bridge
- * running, and a roster that called it disabled would be describing something
- * other than what the daemon does.
+ * Enabled connector ids, unknown and non-string entries dropped. The legacy
+ * singular `connector` field counts as enabling that id — a repo predating
+ * this catalogue still runs that host bridge.
  *
  * @param {ConfigDocument} config - The config document.
  * @returns {string[]} Enabled ids, catalogue order.

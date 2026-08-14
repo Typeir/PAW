@@ -1,11 +1,9 @@
 /**
  * Logs View
  *
- * @fileoverview The daemon log, filtered. Entries come from the snapshot's log
- * ring and grow over the live `log` topic; the view holds only its filters —
- * level and substring — and applies them per render. Raw output is noise at
- * ring size, so the filter bar is the point of the view. Newest entries render
- * last; the list scrolls its own box.
+ * @fileoverview The daemon log, filtered by level and substring. Entries come
+ * from the snapshot ring and grow over the live `log` topic; the view holds
+ * only the filters. Newest render last, in a scrolling box.
  *
  * @module @paw/gui/presentation/views/logsView
  * @version 0.0.0

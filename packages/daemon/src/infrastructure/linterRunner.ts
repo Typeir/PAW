@@ -1,22 +1,11 @@
 /**
  * PAW Linter Runner
  *
- * @fileoverview Executing half of the linter connectors. Reads which
- * connectors are enabled per call, so enabling one in a surface takes effect
- * on the next edit without a daemon restart.
- *
- * Two execution shapes. ESLint scopes to the touched files and runs inline
- * within the hook budget. `tsc` type-checks the whole project — it cannot
- * check one file in isolation — which is far slower than the 8s RPC budget,
- * so it runs detached, single-flight, and its findings land later through
- * `onLate`; findings are scoped to the touched files, because the violation
- * store answers "what did this edit break", not "what does the project owe".
- *
- * A linter that exits non-zero is reporting findings, not failing: the exec
- * seam resolves with stdout for any exit code and rejects only when the
- * process could not run at all. Binaries resolve to the repo's own
- * `node_modules/.bin` and run without a shell, so a filename an agent chose
- * cannot become a shell command.
+ * @fileoverview Runs the enabled linter connectors. Enabled ids are read per
+ * call. ESLint runs inline on the touched files; `tsc` is whole-project and
+ * slower than the hook budget, so it runs detached and single-flight, and its
+ * findings reach `onLate` scoped to the touched files. Tools run as their own
+ * JS entry under node: no shell, so a filename cannot become a command.
  *
  * @module @paw/daemon/infrastructure/linterRunner
  * @version 0.0.0
@@ -51,8 +40,8 @@ export const INLINE_TIMEOUT_MS = 5_000;
 export const PROJECT_TIMEOUT_MS = 180_000;
 
 /**
- * Run one command and resolve with its stdout, whatever its exit code.
- * Rejects only when the process could not be started or timed out.
+ * Runs one command, resolving with stdout whatever the exit code. Rejects
+ * only when the process could not start or timed out.
  *
  * @callback LintExec
  * @param {string} cmd - Executable.
@@ -94,10 +83,8 @@ export const nodeLintExec: LintExec = (cmd, args, cwd, timeoutMs) =>
   });
 
 /**
- * Each tool's JS entry inside its own package. The `.bin` shims are not
- * usable here: node refuses to execute a Windows `.cmd` without a shell, and
- * a shell would let a filename an agent chose become a command. Running the
- * entry under this node binary is both shell-free and cross-platform.
+ * Each tool's JS entry inside its own package. The `.bin` shims are unusable:
+ * node refuses to execute a Windows `.cmd` without a shell.
  */
 const TOOL_ENTRIES: Readonly<Record<string, string>> = {
   eslint: join('eslint', 'bin', 'eslint.js'),
@@ -161,10 +148,8 @@ export function createLinterRunner(options: LinterRunnerOptions): LinterRunner {
   let projectRunning = false;
 
   /**
-   * Start the detached whole-project run unless one is already in flight.
-   * Findings are scoped to the files this edit touched and handed to
-   * `onLate`. Every failure is swallowed: a linter that cannot run must not
-   * disturb the enforcement loop.
+   * Start the detached whole-project run unless one is in flight. Findings go
+   * to `onLate`, scoped to `files`. Failures are swallowed.
    *
    * @param {readonly string[]} files - Touched files, repo-relative.
    */

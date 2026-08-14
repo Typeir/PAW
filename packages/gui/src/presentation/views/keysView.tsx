@@ -2,10 +2,8 @@
  * Keys view.
  *
  * @fileoverview Provider and binding roster. Providers come key-free from
- * `/api/providers` — name, wire type, endpoint, default model, and the
- * credential's length only; a broken env file shows its parse reason. Bindings
- * come from `/api/config`. A static page has no client and renders the
- * placeholder.
+ * `/api/providers`: identity and credential length only, or a parse reason.
+ * Bindings come from `/api/config`.
  *
  * @module @paw/gui/presentation/views/keysView
  * @version 0.0.0

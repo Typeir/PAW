@@ -1,11 +1,9 @@
 /**
  * PAW Console Style Mixins
  *
- * @fileoverview TS functions that emit CSS declaration fragments for the
- * console stylesheet — the Ikuisuus SCSS mixin vocabulary (focus ring, glow,
- * transition groups) ported to template-literal CSS. TypeScript is the
- * preprocessor: parameterised, type-checked, no extra compile step. Interpolate
- * into `consoleStyles.ts` rules.
+ * @fileoverview CSS fragments for the console stylesheet: the Ikuisuus SCSS
+ * mixin vocabulary (focus ring, glow, transitions) as TS functions.
+ * Interpolate into `consoleStyles.ts` rules.
  *
  * @module @paw/gui/presentation/styles/mixins
  * @version 0.0.0
@@ -86,10 +84,9 @@ export interface PunchyHoverOptions {
 }
 
 /**
- * Wire a control's whole hover feel in one interpolation: shared transition,
- * scale-up with glow (and border tint) on hover, press-down on active,
- * disabled excluded, `prefers-reduced-motion` guard included. Emits complete
- * rules for the selector, so a component is wired by one call.
+ * A control's whole hover feel in one call: transition, hover scale + glow
+ * (and border tint), active press, disabled excluded, reduced-motion guard.
+ * Emits complete rules for the selector.
  *
  * @param {string} selector - Selector to wire.
  * @param {PunchyHoverOptions} [options] - Feel overrides.

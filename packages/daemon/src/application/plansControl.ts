@@ -1,13 +1,10 @@
 /**
  * PAW Plans Control Port
  *
- * @fileoverview Console plan-file verbs, applied in the daemon: scaffold a new
- * `*.swarm.mjs` from the starter template, delete an existing one. The daemon
- * holds filesystem authority; the browser only asks. Names are validated to
- * kebab-case before they become filenames, delete paths are normalised and
- * refused on traversal or wrong suffix, so the port can only ever create or
- * remove plan files under the served root. Filesystem failures answer 500 with
- * the message; they never take the request pipeline down.
+ * @fileoverview Console plan-file verbs, applied in the daemon: scaffold a
+ * `*.swarm.mjs` from the template, delete one. Names are kebab-case gated and
+ * delete paths refuse traversal or a wrong suffix, so the port only ever
+ * touches plan files under the served root. Filesystem failures answer 500.
  *
  * @module @paw/daemon/plansControl
  * @version 0.0.0

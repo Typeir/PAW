@@ -1,14 +1,10 @@
 /**
  * PAW Console Launcher
  *
- * @fileoverview Decides which surface `paw ui --open` launches. The desktop
- * shell is preferred: the Electron viewer is spawned on the daemon's URL with
- * the daemon's certificate fingerprint, so the window pins the pawd this CLI
- * just started. The browser is the fallback, taken when the shell is not built,
- * its Electron binary is not installed, the spawn errors, or the process exits
- * within the grace window. Every effect — existence checks, binary resolution,
- * spawn, browser open — is an injected seam; this module holds the decision
- * only.
+ * @fileoverview Decides which surface `paw ui` opens. The Electron viewer is
+ * tried first, spawned on the daemon's URL and certificate fingerprint; the
+ * browser is the fallback when the shell is missing, its binary is absent, or
+ * the spawn dies inside the grace window. Effects are injected seams.
  *
  * @module @paw/cli/application/electronLauncher
  * @version 0.0.0

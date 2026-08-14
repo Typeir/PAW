@@ -1,12 +1,9 @@
 /**
  * Connectors view.
  *
- * @fileoverview The connector catalogue this build ships, with each entry's
- * enabled state and a toggle. Host connectors bridge editor-agent hooks into
- * the loop; linter connectors run their tool on the files an edit touched and
- * record findings as deferred violations, which nudge but never deny. Toggling
- * writes `.paw/config.json` through the daemon, so it needs a `--control`
- * daemon; without one the toggle reports the refusal it got back.
+ * @fileoverview Connector catalogue with each entry's enabled state and a
+ * toggle. Toggling writes `.paw/config.json` through the daemon, so it needs
+ * `--control`; a refusal shows the daemon's reason.
  *
  * @module @paw/gui/presentation/views/connectorsView
  * @version 0.0.0

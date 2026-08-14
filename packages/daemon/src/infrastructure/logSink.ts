@@ -1,14 +1,10 @@
 /**
  * PAW Daemon Log Sink
  *
- * @fileoverview Persists the log ring: one JSON `LogEntry` per line in
- * `.paw/daemon.log`, bounded by ENTRY COUNT — hook traffic is verbose, so the
- * cap is large and deliberate, never a dated prune. Boot loads the tail back
- * into the ring so the console backlog survives restarts. A line that does not
- * parse is skipped: a log file is telemetry, and one corrupt line must not
- * take the rest down. The codec and the trim are pure; the node sink writes
- * through `node:fs` and re-trims after every `TRIM_EVERY` appends, bounding
- * the file at cap + TRIM_EVERY entries between trims.
+ * @fileoverview Persists the log ring as JSONL in `.paw/daemon.log`, bounded
+ * by entry count, never by date. Boot loads the tail back into the ring. A
+ * line that does not parse is skipped. The node sink re-trims every
+ * `TRIM_EVERY` appends, so the file peaks at cap + that many entries.
  *
  * @module @paw/daemon/infrastructure/logSink
  * @version 0.0.0
