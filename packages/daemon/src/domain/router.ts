@@ -107,6 +107,7 @@ export interface ConfigView {
  * @property {() => ConfigView} [config] - Declared models and role bindings, for config editor.
  * @property {() => Promise<readonly string[]>} [recent] - Recently-grabbed routes, newest first, for scope picker.
  * @property {(route: string) => Promise<readonly string[]>} [forgetRecent] - Drop route from recent list, return new list. Daemon-own metadata, so it need no {@link ControlPort} — delete a stale entry never touch the consumer repo.
+ * @property {(id: string, at: string, event: Record<string, unknown>) => boolean} [reportRun] - Fold one external-herd dispatch event into the run slice. Daemon-own display state, no {@link ControlPort}; false when the event does not fold.
  */
 export interface RouterDeps {
   readonly page: string;
@@ -115,6 +116,7 @@ export interface RouterDeps {
   readonly config?: () => ConfigView;
   readonly recent?: () => Promise<readonly string[]>;
   readonly forgetRecent?: (route: string) => Promise<readonly string[]>;
+  readonly reportRun?: (id: string, at: string, event: Record<string, unknown>) => boolean;
   readonly token: string;
   readonly port: number;
   readonly scriptHashes: readonly string[];
@@ -294,6 +296,39 @@ export async function route(request: HttpRequest, deps: RouterDeps): Promise<Htt
       return refuse(404, 'not found', cors);
     }
     return json(await deps.forgetRecent(target), cors);
+  }
+
+  if (request.method === 'POST' && request.path === '/api/run/report') {
+    if (!originAllowed(headers.origin, deps.origins)) {
+      return refuse(403, 'origin not allowed', cors);
+    }
+    if (!verifyToken(deps.token, bearerFrom(headers.authorization))) {
+      return refuse(401, 'unauthorized', {
+        ...cors,
+        'www-authenticate': 'Bearer realm="pawd"',
+      });
+    }
+    if (deps.reportRun === undefined) {
+      return refuse(404, 'not found', cors);
+    }
+    const parsed = parseControlBody(request.body ?? '', headers.contentType);
+    if (!parsed.ok) {
+      return refuse(parsed.status, parsed.message, cors);
+    }
+    const { id, at, event } = parsed.body;
+    if (
+      typeof id !== 'string' ||
+      typeof at !== 'string' ||
+      typeof event !== 'object' ||
+      event === null ||
+      Array.isArray(event)
+    ) {
+      return refuse(422, 'id, at, and event are required', cors);
+    }
+    if (!deps.reportRun(id, at, event as Record<string, unknown>)) {
+      return refuse(422, 'event did not fold', cors);
+    }
+    return json({ ok: true }, cors);
   }
 
   if (isWriteMethod(request.method)) {

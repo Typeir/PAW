@@ -19,6 +19,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:https';
 import { dirname, join } from 'node:path';
 import type { TLSSocket } from 'node:tls';
+import type { DispatchEvent } from '@paw/core';
 
 /**
  * A recorded console daemon.
@@ -97,6 +98,61 @@ export function readConsoleEndpoint(root: string): ConsoleEndpoint | null {
  * @returns {Promise<boolean>} True when the daemon is live and its own.
  */
 export function probeConsoleEndpoint(endpoint: ConsoleEndpoint, timeoutMs = 1500): Promise<boolean> {
+  return pinnedRequest(endpoint, 'GET', 'api/state', undefined, timeoutMs);
+}
+
+/**
+ * One dispatch event from an external herd, addressed to a run.
+ *
+ * @interface RunEventReport
+ * @property {string} id - Run id, stable across the herd's events.
+ * @property {string} at - Run start time, ISO.
+ * @property {DispatchEvent} event - The dispatch event.
+ */
+export interface RunEventReport {
+  readonly id: string;
+  readonly at: string;
+  readonly event: DispatchEvent;
+}
+
+/**
+ * Report one external-herd event to the recorded daemon, so its console shows
+ * the run. Fire-and-forget grade: any failure answers false and the herd runs
+ * on unobserved.
+ *
+ * @param {ConsoleEndpoint} endpoint - The recorded daemon.
+ * @param {RunEventReport} report - The event to fold.
+ * @param {number} [timeoutMs] - Request budget.
+ * @returns {Promise<boolean>} True when the daemon accepted it.
+ */
+export function postRunReport(
+  endpoint: ConsoleEndpoint,
+  report: RunEventReport,
+  timeoutMs = 1500,
+): Promise<boolean> {
+  return pinnedRequest(endpoint, 'POST', 'api/run/report', JSON.stringify(report), timeoutMs);
+}
+
+/**
+ * One HTTPS exchange with the recorded daemon: bearer token, certificate
+ * pinned to the recorded fingerprint, own timer — node's request `timeout`
+ * option does not fire during a stalled TLS handshake. Anything but a 2xx
+ * from the pinned certificate answers false.
+ *
+ * @param {ConsoleEndpoint} endpoint - The recorded daemon.
+ * @param {string} method - HTTP method.
+ * @param {string} path - Path under the base URL.
+ * @param {string | undefined} body - JSON body for writes.
+ * @param {number} timeoutMs - Request budget.
+ * @returns {Promise<boolean>} True on a pinned 2xx.
+ */
+function pinnedRequest(
+  endpoint: ConsoleEndpoint,
+  method: string,
+  path: string,
+  body: string | undefined,
+  timeoutMs: number,
+): Promise<boolean> {
   const expected = endpoint.fingerprint.replace(/^SHA256:/, '');
   return new Promise((resolvePromise) => {
     let settled = false;
@@ -112,10 +168,14 @@ export function probeConsoleEndpoint(endpoint: ConsoleEndpoint, timeoutMs = 1500
       req.destroy();
     }, timeoutMs);
     const req = request(
-      `${endpoint.url}api/state`,
+      `${endpoint.url}${path}`,
       {
+        method,
         rejectUnauthorized: false,
-        headers: { authorization: `Bearer ${endpoint.token}` },
+        headers: {
+          authorization: `Bearer ${endpoint.token}`,
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
       },
       (res) => {
         const leaf = (res.socket as TLSSocket).getPeerCertificate();
@@ -129,6 +189,6 @@ export function probeConsoleEndpoint(endpoint: ConsoleEndpoint, timeoutMs = 1500
       },
     );
     req.on('error', () => settle(false));
-    req.end();
+    req.end(body);
   });
 }

@@ -26,7 +26,14 @@ import {
   type SwarmPlan,
 } from '@paw/core';
 import { createNodeFileReader, createNodeFs } from '@paw/adapters';
-import { COPILOT_SLIM_SECTIONS, openLiveHerd, walkFiles } from '@paw/daemon';
+import {
+  COPILOT_SLIM_SECTIONS,
+  openLiveHerd,
+  postRunReport,
+  probeConsoleEndpoint,
+  readConsoleEndpoint,
+  walkFiles,
+} from '@paw/daemon';
 import { createHerdWriter } from '../../application/herdWriter.js';
 import {
   concurrencyFrom,
@@ -146,6 +153,27 @@ export async function runSwarm(
     if (attached.length > 0) {
       print([`attaching ${attached.length} file(s) to every brief: ${attached.join(', ')}`]);
     }
+    // A resident console daemon shows this herd. The recorded endpoint is
+    // probed once — local HTTP, costs nothing — and every dispatch event is
+    // reported to it fire-and-forget; no daemon, no reporting.
+    const recorded = readConsoleEndpoint(process.cwd());
+    const console_ =
+      recorded !== null && (await probeConsoleEndpoint(recorded)) ? recorded : null;
+    const runAt = new Date().toISOString();
+    const runId = runAt.slice(11, 19).replace(/:/g, '-');
+    if (console_ !== null) {
+      print([`reporting this herd to the console pawd (pid ${console_.pid}) serves`]);
+    }
+    const report =
+      console_ === null
+        ? undefined
+        : (event: unknown): void => {
+            void postRunReport(console_, {
+              id: runId,
+              at: runAt,
+              event: event as never,
+            });
+          };
     const { registry, close } = live
       ? await openLiveHerd(plan)
       : { registry: fakeRegistryFor(plan), close: async () => {} };
@@ -156,7 +184,13 @@ export async function runSwarm(
         files: createNodeFileReader(process.cwd()),
         concurrency: concurrencyFrom(args),
         maxOutputTokens: maxTokensFrom(args),
-        onProgress: writer ? (event) => writer.onProgress(event) : undefined,
+        onProgress:
+          writer || report
+            ? (event) => {
+                report?.(event);
+                return writer?.onProgress(event);
+              }
+            : undefined,
         systemBaseline: live && !full ? COPILOT_SLIM_SECTIONS : undefined,
       });
       print(formatHerd(result));

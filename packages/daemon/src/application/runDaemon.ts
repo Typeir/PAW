@@ -504,6 +504,27 @@ export async function runDaemon(
     bus.publish('budget', budget);
   };
 
+  /**
+   * Fold one external-herd event — a `paw swarm run` in another process
+   * reporting over HTTP. One tracker per run id; a new id replaces the shown
+   * run. An event without a member number and key answers false and changes
+   * nothing.
+   */
+  let externalId: string | null = null;
+  let externalTracker: ReturnType<typeof trackRun> | null = null;
+  const reportRun = (id: string, at: string, event: Record<string, unknown>): boolean => {
+    if (typeof event.member !== 'number' || typeof event.key !== 'string') {
+      return false;
+    }
+    if (externalId !== id || externalTracker === null) {
+      externalId = id;
+      externalTracker = trackRun(id, at);
+    }
+    run = externalTracker.apply(event as never);
+    bus.publish('run', run);
+    return true;
+  };
+
   let boundPort = port;
   let origins = allowedOrigins(port, options.allowOrigins);
 
@@ -548,6 +569,7 @@ export async function runDaemon(
           scriptHashes,
           origins,
           control: options.control,
+          reportRun,
           ...(recentRoutes === undefined
             ? {}
             : {

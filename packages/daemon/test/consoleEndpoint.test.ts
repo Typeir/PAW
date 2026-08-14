@@ -23,6 +23,7 @@ import { consolePage } from '../src/domain/consolePage.js';
 import { nodeRuntime } from '../src/infrastructure/nodeRuntime.js';
 import {
   consoleEndpointPath,
+  postRunReport,
   probeConsoleEndpoint,
   readConsoleEndpoint,
   recordConsoleEndpoint,
@@ -107,6 +108,43 @@ describe('console endpoint probe, against a real daemon', () => {
 
   it('answers true for the live daemon it recorded', async () => {
     expect(await probeConsoleEndpoint(live)).toBe(true);
+  });
+
+  it('folds a reported external-herd event into the run slice', async () => {
+    const accepted = await postRunReport(live, {
+      id: '15-40-02',
+      at: '2026-08-14T15:40:02.000Z',
+      event: { phase: 'started', member: 0, key: 'src/a.ts' } as never,
+    });
+    expect(accepted).toBe(true);
+    const settledEvent = await postRunReport(live, {
+      id: '15-40-02',
+      at: '2026-08-14T15:40:02.000Z',
+      event: {
+        phase: 'settled',
+        member: 0,
+        key: 'src/a.ts',
+        outcome: { state: 'done', content: 'edited' },
+      } as never,
+    });
+    expect(settledEvent).toBe(true);
+    const snap = await daemon.snapshot();
+    expect(snap.run.id).toBe('15-40-02');
+    expect(snap.run.done).toBe(1);
+    expect(snap.run.confirmed).toBe(1);
+    expect(snap.run.members[0]).toMatchObject({ member: 0, key: 'src/a.ts', state: 'done' });
+  });
+
+  it('refuses a report without member and key, and one with a stale token', async () => {
+    expect(
+      await postRunReport(live, { id: 'x', at: 'now', event: {} as never }),
+    ).toBe(false);
+    expect(
+      await postRunReport(
+        { ...live, token: 'stale' },
+        { id: 'x', at: 'now', event: { phase: 'started', member: 0, key: 'k' } as never },
+      ),
+    ).toBe(false);
   });
 
   it('answers false for a wrong token and a wrong fingerprint', async () => {

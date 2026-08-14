@@ -69,11 +69,12 @@ export { plansControl } from './application/plansControl.js';
 export type { PlansControlSeams } from './application/plansControl.js';
 export {
   consoleEndpointPath,
+  postRunReport,
   probeConsoleEndpoint,
   readConsoleEndpoint,
   recordConsoleEndpoint,
 } from './infrastructure/consoleEndpoint.js';
-export type { ConsoleEndpoint } from './infrastructure/consoleEndpoint.js';
+export type { ConsoleEndpoint, RunEventReport } from './infrastructure/consoleEndpoint.js';
 
 export { IGNORED_DIRS, buildFileTree, findSubtree } from './domain/tree.js';
 export type { FileEntry } from './domain/tree.js';
