@@ -23,6 +23,8 @@ import { consolePage } from '../src/domain/consolePage.js';
 import { nodeRuntime } from '../src/infrastructure/nodeRuntime.js';
 import {
   consoleEndpointPath,
+  consoleEndpointsIn,
+  findConsoleEndpointByPid,
   postRunReport,
   probeConsoleEndpoint,
   readConsoleEndpoint,
@@ -71,6 +73,31 @@ describe('console endpoint record', () => {
     recordConsoleEndpoint(incomplete, RECORD);
     writeFileSync(consoleEndpointPath(incomplete), JSON.stringify({ url: 'x' }), 'utf8');
     expect(readConsoleEndpoint(incomplete)).toBeNull();
+  });
+
+  it('collects records across roots, skipping empty ones and reading a root once', () => {
+    const a = tempRoot();
+    const b = tempRoot();
+    const bare = tempRoot();
+    recordConsoleEndpoint(a, { ...RECORD, pid: 11 });
+    recordConsoleEndpoint(b, { ...RECORD, pid: 22 });
+
+    const found = consoleEndpointsIn([a, bare, b, a]);
+    expect(found.map((row) => [row.root, row.endpoint.pid])).toEqual([
+      [a, 11],
+      [b, 22],
+    ]);
+  });
+
+  it('finds a record by daemon pid, or null when no root has it', () => {
+    const a = tempRoot();
+    const b = tempRoot();
+    recordConsoleEndpoint(a, { ...RECORD, pid: 11 });
+    recordConsoleEndpoint(b, { ...RECORD, pid: 22 });
+
+    expect(findConsoleEndpointByPid([a, b], 22)?.root).toBe(b);
+    expect(findConsoleEndpointByPid([a, b], 99)).toBeNull();
+    expect(findConsoleEndpointByPid([], 11)).toBeNull();
   });
 
   it('swallows a filesystem failure on record', () => {

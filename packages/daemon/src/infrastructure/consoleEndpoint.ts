@@ -86,6 +86,56 @@ export function readConsoleEndpoint(root: string): ConsoleEndpoint | null {
 }
 
 /**
+ * A recorded endpoint and the repository it serves.
+ *
+ * @interface RootedEndpoint
+ * @property {string} root - Repository root the record was read from.
+ * @property {ConsoleEndpoint} endpoint - The record.
+ */
+export interface RootedEndpoint {
+  readonly root: string;
+  readonly endpoint: ConsoleEndpoint;
+}
+
+/**
+ * Endpoint records across the given roots, in order, skipping roots without
+ * one. Duplicate roots read once.
+ *
+ * @param {readonly string[]} roots - Repository roots to read.
+ * @returns {RootedEndpoint[]} Records found.
+ */
+export function consoleEndpointsIn(roots: readonly string[]): RootedEndpoint[] {
+  const found: RootedEndpoint[] = [];
+  const seen = new Set<string>();
+  for (const root of roots) {
+    if (seen.has(root)) {
+      continue;
+    }
+    seen.add(root);
+    const endpoint = readConsoleEndpoint(root);
+    if (endpoint !== null) {
+      found.push({ root, endpoint });
+    }
+  }
+  return found;
+}
+
+/**
+ * The recorded endpoint for a daemon pid, or null when no known root records
+ * it.
+ *
+ * @param {readonly string[]} roots - Repository roots to search.
+ * @param {number} pid - Daemon process id.
+ * @returns {RootedEndpoint | null} The record, or null.
+ */
+export function findConsoleEndpointByPid(
+  roots: readonly string[],
+  pid: number,
+): RootedEndpoint | null {
+  return consoleEndpointsIn(roots).find((found) => found.endpoint.pid === pid) ?? null;
+}
+
+/**
  * Whether the recorded daemon answers: one `GET /api/state` whose certificate
  * must match the recorded fingerprint. Timeout, refusal, wrong certificate,
  * or non-2xx all read as dead.

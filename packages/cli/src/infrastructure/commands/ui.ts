@@ -36,9 +36,11 @@ import {
 } from '@paw/adapters';
 import {
   configControl,
+  consoleEndpointsIn,
   consolePage,
   COPILOT_SLIM_SECTIONS,
   createNodeLogSink,
+  findConsoleEndpointByPid,
   dispatcherFor,
   enforcementControl,
   identityNotice,
@@ -52,6 +54,7 @@ import {
   readConsoleEndpoint,
   recordConsoleEndpoint,
   runDaemon,
+  type ConsoleEndpoint,
   type DaemonHandle,
   type Dispatcher,
 } from '@paw/daemon';
@@ -318,7 +321,15 @@ export async function runUi(
   rest: string[],
   print: (lines: string[]) => void,
 ): Promise<never> {
-  const args = parseArgs(rest, ['context', 'port', 'root', 'config', 'concurrency', 'max-tokens']);
+  const args = parseArgs(rest, [
+    'context',
+    'port',
+    'root',
+    'config',
+    'concurrency',
+    'max-tokens',
+    'attach',
+  ]);
   const [planPath] = args.positional;
   const live = args.flags.has('live');
   const full = args.flags.has('full');
@@ -330,20 +341,18 @@ export async function runUi(
   const portValue = args.values.get('port');
   const root = resolve(args.values.get('root') ?? '.');
 
-  // Attach instead of boot when a recorded daemon still answers and no flag
-  // asks to shape a daemon of our own. Approvals stay on the terminal that
-  // owns the running pawd.
-  const plainOpen =
-    !shouldRun &&
-    !args.flags.has('control') &&
-    planPath === undefined &&
-    portValue === undefined &&
-    attached.length === 0;
-  const recorded = plainOpen ? readConsoleEndpoint(root) : null;
-  if (recorded !== null && (await probeConsoleEndpoint(recorded))) {
-    const url = `${recorded.url}#t=${recorded.token}`;
+  /**
+   * Open the console against an already-running daemon and end this process.
+   * Approvals stay on the terminal that owns that pawd.
+   *
+   * @param {ConsoleEndpoint} endpoint - The recorded daemon.
+   * @param {string} lead - First printed line.
+   * @returns {Promise<never>} Never returns; exits 0.
+   */
+  const attachTo = async (endpoint: ConsoleEndpoint, lead: string): Promise<never> => {
+    const url = `${endpoint.url}#t=${endpoint.token}`;
     print([
-      `pawd already serves this repo (pid ${recorded.pid}) on ${url}`,
+      lead,
       'that URL carries this session’s credential — treat it like a password',
       'attached · release approvals happen in the terminal that owns pawd',
       args.flags.has('headless')
@@ -351,7 +360,7 @@ export async function runUi(
         : 'opening the console · desktop shell first, browser as fallback',
     ]);
     if (!args.flags.has('headless')) {
-      const surface = await openConsole(url, recorded.fingerprint, CLI_ROOT, {
+      const surface = await openConsole(url, endpoint.fingerprint, CLI_ROOT, {
         exists: existsSync,
         electronBinOf,
         spawnShell,
@@ -362,6 +371,45 @@ export async function runUi(
       }
     }
     process.exit(0);
+  };
+
+  const recent = createNodeRecentRoutes(pawHome(process.platform, process.env));
+  const attachPid = args.values.get('attach');
+  if (attachPid !== undefined) {
+    const pid = Number(attachPid);
+    if (!Number.isInteger(pid)) {
+      throw new Error(`paw ui --attach needs a daemon pid, got "${attachPid}"`);
+    }
+    const roots = [root, ...(await recent.list())];
+    const found = findConsoleEndpointByPid(roots, pid);
+    if (found === null) {
+      const known = consoleEndpointsIn(roots)
+        .map((row) => `  pid ${row.endpoint.pid} · ${row.root}`)
+        .join('\n');
+      throw new Error(
+        `no recorded daemon with pid ${pid}${known === '' ? '' : `\nknown daemons:\n${known}`}`,
+      );
+    }
+    if (!(await probeConsoleEndpoint(found.endpoint))) {
+      throw new Error(`pawd ${pid} recorded for ${found.root} does not answer; it is gone`);
+    }
+    await attachTo(found.endpoint, `attaching to pawd ${pid} · ${found.root}`);
+  }
+
+  // Attach instead of boot when a recorded daemon still answers and no flag
+  // asks to shape a daemon of our own.
+  const plainOpen =
+    !shouldRun &&
+    !args.flags.has('control') &&
+    planPath === undefined &&
+    portValue === undefined &&
+    attached.length === 0;
+  const recorded = plainOpen ? readConsoleEndpoint(root) : null;
+  if (recorded !== null && (await probeConsoleEndpoint(recorded))) {
+    await attachTo(
+      recorded,
+      `pawd already serves this repo (pid ${recorded.pid}) on ${recorded.url}#t=${recorded.token}`,
+    );
   }
 
   let handle: DaemonHandle | null = null;
@@ -380,7 +428,7 @@ export async function runUi(
       planPath,
       port: portValue === undefined ? 0 : Number(portValue),
       scopeCeiling: homedir(),
-      recent: createNodeRecentRoutes(pawHome(process.platform, process.env)),
+      recent,
       logSink: createNodeLogSink(resolve(root, '.paw', 'daemon.log')),
       providers: () => listProviders(scope()),
       onAttach: (path, mode) => {

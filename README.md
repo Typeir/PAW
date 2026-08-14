@@ -112,6 +112,7 @@ npm run demo                           # serve the fixture config + plan
 # Console — serves ONE REPOSITORY: host facts, PAW's process subtree, config,
 # every *.swarm.mjs, the doctor. Opens the desktop shell, browser as fallback.
 paw ui                                 # attaches to a running pawd when one serves this repo
+paw ui --attach 30936                  # attach to a named daemon, wherever it serves
 paw ui --headless                      # print the URL, open nothing
 paw ui --control                       # let the console write config, plans, and connectors
 paw ui --root=../other-repo            # serve a different repository

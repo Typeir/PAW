@@ -69,12 +69,18 @@ export { plansControl } from './application/plansControl.js';
 export type { PlansControlSeams } from './application/plansControl.js';
 export {
   consoleEndpointPath,
+  consoleEndpointsIn,
+  findConsoleEndpointByPid,
   postRunReport,
   probeConsoleEndpoint,
   readConsoleEndpoint,
   recordConsoleEndpoint,
 } from './infrastructure/consoleEndpoint.js';
-export type { ConsoleEndpoint, RunEventReport } from './infrastructure/consoleEndpoint.js';
+export type {
+  ConsoleEndpoint,
+  RootedEndpoint,
+  RunEventReport,
+} from './infrastructure/consoleEndpoint.js';
 export {
   INLINE_TIMEOUT_MS,
   PROJECT_TIMEOUT_MS,
