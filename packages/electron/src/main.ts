@@ -42,6 +42,7 @@ import {
   createNodeLogSink,
   createNodeRecentRoutes,
   identityNotice,
+  listProviders,
   nodeRuntime,
   pawHome,
   recordConsoleEndpoint,
@@ -336,6 +337,7 @@ async function start(): Promise<void> {
       scopeCeiling: homedir(),
       recent: createNodeRecentRoutes(pawHome(process.platform, process.env)),
       logSink: createNodeLogSink(join(launch.root, '.paw', 'daemon.log')),
+      providers: () => listProviders(launch.root),
     },
     nodeRuntime(GUI_PAGE),
   );

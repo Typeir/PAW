@@ -11,20 +11,13 @@
  */
 
 import { useSection } from '../../application/hooks/useConsole.js';
+import { KeysView } from './keysView.js';
 import { LogsView } from './logsView.js';
 import { OverviewView } from './overviewView.js';
 import { PendingView } from './pendingView.js';
 import { RolesView } from './rolesView.js';
 import { SwarmView } from './swarm/swarmView.js';
 import { ViolationsView } from './violationsView.js';
-
-/**
- * Titles for subsystem no daemon report back yet.
- */
-const PENDING: Record<'gates' | 'keys', string> = {
-  gates: 'Gates',
-  keys: 'Keys',
-};
 
 /**
  * View for active subsystem.
@@ -44,7 +37,9 @@ export function SectionOutlet() {
       return <ViolationsView />;
     case 'logs':
       return <LogsView />;
+    case 'keys':
+      return <KeysView />;
     default:
-      return <PendingView title={PENDING[section]} />;
+      return <PendingView title='Gates' />;
   }
 }

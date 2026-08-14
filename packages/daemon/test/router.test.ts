@@ -520,3 +520,21 @@ describe('the write pipeline', () => {
     expect(JSON.stringify(res)).not.toContain(TOKEN);
   });
 });
+
+describe('the provider roster', () => {
+  it('serves the key-free roster when the daemon supplies one', async () => {
+    const roster = [{ name: 'deepseek', type: 'openai', baseUrl: 'https://x', keyChars: 5 }];
+    const res = await route(req('/api/providers'), { ...deps, providers: () => roster });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual(roster);
+  });
+
+  it('answers 404 with no roster supplied, and 401 without the token', async () => {
+    expect((await route(req('/api/providers'), deps)).status).toBe(404);
+    const res = await route(
+      req('/api/providers', { headers: { authorization: 'Bearer wrong' } }),
+      { ...deps, providers: () => [] },
+    );
+    expect(res.status).toBe(401);
+  });
+});

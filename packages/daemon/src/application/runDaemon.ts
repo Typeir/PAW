@@ -570,6 +570,7 @@ export async function runDaemon(
           origins,
           control: options.control,
           reportRun,
+          ...(options.providers === undefined ? {} : { providers: options.providers }),
           ...(recentRoutes === undefined
             ? {}
             : {

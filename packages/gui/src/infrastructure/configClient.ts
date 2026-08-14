@@ -17,6 +17,11 @@ import type { FetchLike, ResponseLike } from './snapshotSource.js';
 export const CONFIG_URL = '/api/config';
 
 /**
+ * Daemon provider-roster read endpoint.
+ */
+export const PROVIDERS_URL = '/api/providers';
+
+/**
  * Daemon role-binding write endpoint.
  */
 export const CONFIG_ROLES_URL = '/api/config/roles';
@@ -34,15 +39,51 @@ export interface ConfigWrite {
 }
 
 /**
- * Binding editor verbs.
+ * Declared models and role bindings, as `/api/config` serves them.
+ *
+ * @interface ConfigBindings
+ * @property {readonly string[]} models - Declared model ids.
+ * @property {Readonly<Record<string, string>>} roles - Role id → model id bindings.
+ */
+export interface ConfigBindings {
+  readonly models: readonly string[];
+  readonly roles: Readonly<Record<string, string>>;
+}
+
+/**
+ * One provider on the key-free roster `/api/providers` serves.
+ *
+ * @interface ProviderRow
+ * @property {string} name - Provider name.
+ * @property {string} [type] - Wire format, when its file parses.
+ * @property {string} [baseUrl] - Endpoint, when its file parses.
+ * @property {string} [model] - Default model id, when declared.
+ * @property {number} [keyChars] - Credential length. Never the credential.
+ * @property {string} [error] - Parse failure reason for a broken file.
+ */
+export interface ProviderRow {
+  readonly name: string;
+  readonly type?: string;
+  readonly baseUrl?: string;
+  readonly model?: string;
+  readonly keyChars?: number;
+  readonly error?: string;
+}
+
+/**
+ * Binding editor and Keys view verbs.
  *
  * @interface ConfigClient
  * @property {() => Promise<readonly string[]>} models - Declared model ids.
+ * @property {() => Promise<ConfigBindings>} bindings - Declared models and every role binding.
+ * @property {() => Promise<readonly ProviderRow[]>} providers - Key-free provider roster.
  * @property {(role: string, model: string) => Promise<ConfigWrite>} bind - Bind role to model.
  * @property {(role: string) => Promise<ConfigWrite>} unbind - Clear role binding.
  */
 export interface ConfigClient {
   models(): Promise<readonly string[]>;
+  bindings(): Promise<ConfigBindings>;
+  providers(): Promise<readonly ProviderRow[]>;
   bind(role: string, model: string): Promise<ConfigWrite>;
   unbind(role: string): Promise<ConfigWrite>;
 }
@@ -81,6 +122,21 @@ export function createConfigClient(fetchFn: FetchLike): ConfigClient {
         throw new Error(`PAW console: ${CONFIG_URL} responded ${response.status}`);
       }
       return ((await response.json()) as { models?: readonly string[] }).models ?? [];
+    },
+    async bindings(): Promise<ConfigBindings> {
+      const response = await fetchFn(CONFIG_URL);
+      if (!response.ok) {
+        throw new Error(`PAW console: ${CONFIG_URL} responded ${response.status}`);
+      }
+      const body = (await response.json()) as Partial<ConfigBindings>;
+      return { models: body.models ?? [], roles: body.roles ?? {} };
+    },
+    async providers(): Promise<readonly ProviderRow[]> {
+      const response = await fetchFn(PROVIDERS_URL);
+      if (!response.ok) {
+        throw new Error(`PAW console: ${PROVIDERS_URL} responded ${response.status}`);
+      }
+      return (await response.json()) as readonly ProviderRow[];
     },
     async bind(role: string, model: string): Promise<ConfigWrite> {
       return writeResult(

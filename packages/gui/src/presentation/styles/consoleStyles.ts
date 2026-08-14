@@ -514,6 +514,18 @@ ${punchyHover('.selecttrigger', { scale: 1.02 })}
 .planname:focus-visible { ${focusRing(1)} }
 .modalrow { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 
+.keytable { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11.5px; }
+.keytable th { text-align: left; color: var(--ink-faint); font-weight: 500; font-size: 10px;
+  text-transform: uppercase; letter-spacing: .12em; padding: 4px 10px 6px; }
+.keytable td { padding: 4px 10px; border-top: 1px solid var(--line-soft); color: var(--ink); }
+.keytable td.dim { color: var(--ink-dim); overflow-wrap: anywhere; }
+.keytable td.crit { color: var(--crit); }
+.keybindings { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0;
+  padding: 4px 10px 8px; font-family: var(--mono); font-size: 11.5px; }
+.keybindings dt { color: var(--ink-dim); }
+.keybindings dd { margin: 0; color: var(--ink); }
+.keybindings .keyrole { display: contents; }
+
 .logfilter { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
 .logfilter .chip { cursor: pointer; }
 .logfilter .chip:hover { color: var(--ink); }

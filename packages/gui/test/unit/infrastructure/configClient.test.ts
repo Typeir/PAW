@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CONFIG_ROLES_URL,
   CONFIG_URL,
+  PROVIDERS_URL,
   createConfigClient,
 } from '../../../src/infrastructure/configClient.js';
 import type { FetchLike, ResponseLike } from '../../../src/infrastructure/snapshotSource.js';
@@ -36,6 +37,47 @@ describe('createConfigClient', () => {
       await expect(
         createConfigClient(respond({ ok: false, status: 500 })).models(),
       ).rejects.toThrow('responded 500');
+    });
+  });
+
+  describe('bindings', () => {
+    it('reads models and roles together, defaulting absent fields', async () => {
+      const fetchFn = respond({
+        ok: true,
+        json: async () => ({ models: ['fast'], roles: { 'edit.apply': 'fast' } }),
+      });
+      await expect(createConfigClient(fetchFn).bindings()).resolves.toEqual({
+        models: ['fast'],
+        roles: { 'edit.apply': 'fast' },
+      });
+      await expect(
+        createConfigClient(respond({ ok: true, json: async () => ({}) })).bindings(),
+      ).resolves.toEqual({ models: [], roles: {} });
+    });
+
+    it('throws when the read fails', async () => {
+      await expect(
+        createConfigClient(respond({ ok: false, status: 502 })).bindings(),
+      ).rejects.toThrow('responded 502');
+    });
+  });
+
+  describe('providers', () => {
+    it('reads the key-free roster', async () => {
+      const fetchFn = respond({
+        ok: true,
+        json: async () => [{ name: 'deepseek', type: 'openai', baseUrl: 'https://x', keyChars: 5 }],
+      });
+      await expect(createConfigClient(fetchFn).providers()).resolves.toEqual([
+        { name: 'deepseek', type: 'openai', baseUrl: 'https://x', keyChars: 5 },
+      ]);
+      expect(fetchFn).toHaveBeenCalledWith(PROVIDERS_URL);
+    });
+
+    it('throws when the read fails', async () => {
+      await expect(
+        createConfigClient(respond({ ok: false, status: 404 })).providers(),
+      ).rejects.toThrow('responded 404');
     });
   });
 

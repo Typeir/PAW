@@ -15,6 +15,7 @@ import { ConsoleProvider } from '../../../src/application/context/consoleContext
 import type { ConfigClient } from '../../../src/infrastructure/configClient.js';
 import { Rail } from '../../../src/presentation/chrome/rail.js';
 import { OverviewView, formatMb } from '../../../src/presentation/views/overviewView.js';
+import { KeysView } from '../../../src/presentation/views/keysView.js';
 import { LogsView } from '../../../src/presentation/views/logsView.js';
 import { PendingView } from '../../../src/presentation/views/pendingView.js';
 import { RolesView } from '../../../src/presentation/views/rolesView.js';
@@ -25,6 +26,11 @@ import { makeSnapshot, renderInConsole } from '../../fixtures.js';
 /** Config client. Declared model and write outcome set per test. */
 const configClient = (over: Partial<ConfigClient> = {}): ConfigClient => ({
   models: async () => ['fast', 'slow'],
+  bindings: async () => ({ models: ['fast', 'slow'], roles: { 'edit.apply': 'fast' } }),
+  providers: async () => [
+    { name: 'deepseek', type: 'openai', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', keyChars: 35 },
+    { name: 'broken', error: 'provider "broken": broken.provider.env needs KEY and BASE_URL' },
+  ],
   bind: async () => ({ ok: true }),
   unbind: async () => ({ ok: true }),
   ...over,
@@ -160,6 +166,90 @@ describe('PendingView', () => {
     expect(
       screen.getByText('— Gates — a live pawd control API will back this view —'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('KeysView', () => {
+  it('shows the key-free provider roster, broken files with their reason', async () => {
+    render(
+      <ConsoleProvider snapshot={makeSnapshot()} config={configClient()}>
+        <KeysView />
+      </ConsoleProvider>,
+    );
+    expect(await screen.findByText('deepseek')).toBeInTheDocument();
+    expect(screen.getByText('https://api.deepseek.com/v1')).toBeInTheDocument();
+    expect(screen.getByText('hidden · 35 chars')).toBeInTheDocument();
+    expect(screen.getByText(/needs KEY and BASE_URL/)).toBeInTheDocument();
+    expect(screen.getByText('2 configured')).toBeInTheDocument();
+    expect(screen.queryByText(/sk-|[A-Za-z0-9]{30,}/)).toBeNull();
+  });
+
+  it('shows models and role bindings from the config', async () => {
+    render(
+      <ConsoleProvider snapshot={makeSnapshot()} config={configClient()}>
+        <KeysView />
+      </ConsoleProvider>,
+    );
+    expect(await screen.findByText('fast · slow')).toBeInTheDocument();
+    expect(screen.getByText('edit.apply')).toBeInTheDocument();
+  });
+
+  it('placeholders on a static page, and reports empty and failing reads', async () => {
+    renderInConsole(<KeysView />);
+    expect(screen.getAllByText('— a live daemon backs this view —')).toHaveLength(2);
+
+    render(
+      <ConsoleProvider
+        snapshot={makeSnapshot()}
+        config={configClient({ providers: async () => [] })}>
+        <KeysView />
+      </ConsoleProvider>,
+    );
+    expect(
+      await screen.findByText('— no .paw/*.provider.env in this repository —'),
+    ).toBeInTheDocument();
+
+    render(
+      <ConsoleProvider
+        snapshot={makeSnapshot()}
+        config={configClient({
+          providers: async () => {
+            throw new Error('offline');
+          },
+        })}>
+        <KeysView />
+      </ConsoleProvider>,
+    );
+    expect(await screen.findByText('could not read the provider roster')).toBeInTheDocument();
+  });
+
+  it('reports a bindings-read failure and an unbound roster without a default model', async () => {
+    render(
+      <ConsoleProvider
+        snapshot={makeSnapshot()}
+        config={configClient({
+          bindings: async () => {
+            throw new Error('offline');
+          },
+          providers: async () => [{ name: 'bare', type: 'openai', baseUrl: 'https://x', keyChars: 4 }],
+        })}>
+        <KeysView />
+      </ConsoleProvider>,
+    );
+    expect(await screen.findByText('could not read the bindings')).toBeInTheDocument();
+    expect(await screen.findByText('—')).toBeInTheDocument();
+  });
+
+  it('shows an empty models line when nothing is declared', async () => {
+    render(
+      <ConsoleProvider
+        snapshot={makeSnapshot()}
+        config={configClient({ bindings: async () => ({ models: [], roles: {} }) })}>
+        <KeysView />
+      </ConsoleProvider>,
+    );
+    expect(await screen.findByText('models')).toBeInTheDocument();
+    expect((await screen.findAllByText('—')).length).toBeGreaterThan(0);
   });
 });
 

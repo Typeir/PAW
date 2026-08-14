@@ -212,6 +212,7 @@ export type Dispatcher = (
  * @property {(settings: RunSettings) => void} [onRelease] - Receive release requests. Daemon never run them itself.
  * @property {(settings: RunSettings) => Dispatcher} [dispatcherFor] - Build dispatcher for approved release settings. Shell own live registry and writers; omit and {@link DaemonHandle.release} throw.
  * @property {LogSinkLike} [logSink] - Log persistence: every report appends one entry, boot seeds the ring from the persisted tail. Omit and logs stay per-boot.
+ * @property {() => readonly unknown[]} [providers] - Key-free provider roster served at `/api/providers` for the Keys view. Omit and the route answers 404.
  */
 export interface DaemonOptions {
   readonly root?: string;
@@ -226,6 +227,7 @@ export interface DaemonOptions {
   readonly control?: ControlPort;
   readonly recent?: RecentRoutesPort;
   readonly logSink?: LogSinkLike;
+  readonly providers?: () => readonly unknown[];
   onAttach?(path: string, mode: InitMode): void;
   onRelease?(settings: RunSettings): void;
   dispatcherFor?(settings: RunSettings): Dispatcher;

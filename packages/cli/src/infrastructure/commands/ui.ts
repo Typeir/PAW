@@ -42,6 +42,7 @@ import {
   dispatcherFor,
   enforcementControl,
   identityNotice,
+  listProviders,
   mergeControl,
   meterPort,
   nodeRuntime,
@@ -381,6 +382,7 @@ export async function runUi(
       scopeCeiling: homedir(),
       recent: createNodeRecentRoutes(pawHome(process.platform, process.env)),
       logSink: createNodeLogSink(resolve(root, '.paw', 'daemon.log')),
+      providers: () => listProviders(scope()),
       onAttach: (path, mode) => {
         void approveAttach(path, mode, () => handle);
       },

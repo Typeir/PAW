@@ -108,6 +108,7 @@ export interface ConfigView {
  * @property {() => Promise<readonly string[]>} [recent] - Recently-grabbed routes, newest first, for scope picker.
  * @property {(route: string) => Promise<readonly string[]>} [forgetRecent] - Drop route from recent list, return new list. Daemon-own metadata, so it need no {@link ControlPort} — delete a stale entry never touch the consumer repo.
  * @property {(id: string, at: string, event: Record<string, unknown>) => boolean} [reportRun] - Fold one external-herd dispatch event into the run slice. Daemon-own display state, no {@link ControlPort}; false when the event does not fold.
+ * @property {() => readonly unknown[]} [providers] - Key-free provider roster for the Keys view.
  */
 export interface RouterDeps {
   readonly page: string;
@@ -117,6 +118,7 @@ export interface RouterDeps {
   readonly recent?: () => Promise<readonly string[]>;
   readonly forgetRecent?: (route: string) => Promise<readonly string[]>;
   readonly reportRun?: (id: string, at: string, event: Record<string, unknown>) => boolean;
+  readonly providers?: () => readonly unknown[];
   readonly token: string;
   readonly port: number;
   readonly scriptHashes: readonly string[];
@@ -369,6 +371,9 @@ export async function route(request: HttpRequest, deps: RouterDeps): Promise<Htt
     }
     if (request.path === '/api/config' && deps.config !== undefined) {
       return json(deps.config(), cors);
+    }
+    if (request.path === '/api/providers' && deps.providers !== undefined) {
+      return json(deps.providers(), cors);
     }
     if (request.path === '/api/recent') {
       return json(deps.recent === undefined ? [] : await deps.recent(), cors);

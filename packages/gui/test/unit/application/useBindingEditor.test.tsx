@@ -34,6 +34,8 @@ function Probe({ client }: { readonly client: ConfigClient | null }) {
 
 const client = (over: Partial<ConfigClient> = {}): ConfigClient => ({
   models: async () => ['fast', 'slow'],
+  bindings: async () => ({ models: ['fast', 'slow'], roles: {} }),
+  providers: async () => [],
   bind: async () => ({ ok: true }),
   unbind: async () => ({ ok: true }),
   ...over,
