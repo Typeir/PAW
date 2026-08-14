@@ -10,6 +10,11 @@
  */
 
 import type { ConfigDocument } from '../domain/config.js';
+import {
+  VENDOR_CONNECTORS,
+  enabledConnectorIds,
+  knownConnector,
+} from '../domain/connectors.js';
 import type { CostClass, ModelCapabilities } from '../domain/role.js';
 import { BUILTIN_ROLES } from './builtinRoles.js';
 
@@ -115,6 +120,41 @@ export function setBinding(config: ConfigDocument, roleId: string, modelId: stri
     return { ok: false, reason: `model "${modelId}" is not declared` };
   }
   return { ok: true, config: { ...config, roles: { ...config.roles, [roleId]: modelId } } };
+}
+
+/**
+ * Enable a catalogued connector. Unknown ids are refused. Idempotent.
+ *
+ * @param {ConfigDocument} config - The config document.
+ * @param {string} id - Connector id.
+ * @returns {ConfigEdit} New config, or refusal.
+ */
+export function enableConnector(config: ConfigDocument, id: string): ConfigEdit {
+  if (!knownConnector(id)) {
+    return {
+      ok: false,
+      reason: `unknown connector "${id}"; known: ${VENDOR_CONNECTORS.map((c) => c.id).join(', ')}`,
+    };
+  }
+  const current = enabledConnectorIds(config);
+  return {
+    ok: true,
+    config: { ...config, connectors: current.includes(id) ? current : [...current, id] },
+  };
+}
+
+/**
+ * Disable a connector. Disabling one that is not enabled is a no-op edit.
+ *
+ * @param {ConfigDocument} config - The config document.
+ * @param {string} id - Connector id.
+ * @returns {ConfigEdit} New config.
+ */
+export function disableConnector(config: ConfigDocument, id: string): ConfigEdit {
+  return {
+    ok: true,
+    config: { ...config, connectors: enabledConnectorIds(config).filter((cid) => cid !== id) },
+  };
 }
 
 /**

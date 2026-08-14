@@ -184,10 +184,27 @@ export type { RegistryConfig } from './application/buildRegistry.js';
 export {
   clearBinding,
   declareModel,
+  disableConnector,
+  enableConnector,
   parseCapabilities,
   setBinding,
 } from './application/configBinding.js';
 export type { ConfigEdit } from './application/configBinding.js';
+
+export {
+  VENDOR_CONNECTORS,
+  connectorRoster,
+  enabledConnectorIds,
+  knownConnector,
+} from './domain/connectors.js';
+export type {
+  ConnectorEntry,
+  ConnectorKind,
+  ConnectorRosterRow,
+} from './domain/connectors.js';
+
+export { linterCommandFor, parseEslintJson, parseTscOutput } from './domain/linters.js';
+export type { LintFinding, LinterCommand } from './domain/linters.js';
 
 export { CONTEXT_HEADING, composeBrief } from './application/composeBrief.js';
 
