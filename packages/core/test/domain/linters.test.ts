@@ -19,12 +19,12 @@ import {
 describe('linterCommandFor', () => {
   it('scopes eslint to the touched files and tsc to the project', () => {
     expect(linterCommandFor('eslint', ['a.ts', 'b.tsx'])).toEqual({
-      cmd: 'npx',
-      args: ['eslint', '--format', 'json', 'a.ts', 'b.tsx'],
+      bin: 'eslint',
+      args: ['--format', 'json', 'a.ts', 'b.tsx'],
     });
     expect(linterCommandFor('tsc', ['a.ts'])).toEqual({
-      cmd: 'npx',
-      args: ['tsc', '--noEmit', '--pretty', 'false'],
+      bin: 'tsc',
+      args: ['--noEmit', '--pretty', 'false'],
     });
     expect(linterCommandFor('copilot-hooks', [])).toBeNull();
   });

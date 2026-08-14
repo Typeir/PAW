@@ -14,6 +14,8 @@ import {
   type GateResult,
   type GateRunner,
   type HealthReport,
+  type LintFinding,
+  type LinterRunner,
   type StorePort,
   type ToolPostEvent,
   type Violation,
@@ -222,5 +224,90 @@ describe('checkEdit — critical run blocks and records', () => {
     );
     expect(gated).toEqual([['src/a.ts']]);
     expect(r.kind).toBe('block');
+  });
+});
+
+describe('checkEdit — linter connectors', () => {
+  /**
+   * Linter runner answering fixed findings, recording what it was asked.
+   *
+   * @param findings - Findings to answer with.
+   * @param seen - Accumulator for the paths it was handed.
+   */
+  const lintersOf = (findings: LintFinding[], seen: string[][] = []): LinterRunner => ({
+    async runForFiles(paths) {
+      seen.push([...paths]);
+      return findings;
+    },
+  });
+
+  it('records lint findings as deferred violations without blocking', async () => {
+    const store = fakeStore();
+    const seen: string[][] = [];
+    const r = await checkEdit(
+      {
+        store: store.port,
+        gates: runnerOf([result({ passed: true })]),
+        isIgnored: () => false,
+        linters: lintersOf(
+          [{ filePath: 'src/a.ts', line: 3, rule: 'eslint/no-unused-vars', message: 'x unused' }],
+          seen,
+        ),
+      },
+      event(['src/a.ts']),
+    );
+
+    expect(r).toEqual({ kind: 'noop' });
+    expect(seen).toEqual([['src/a.ts']]);
+    expect(store.raised[0].violations).toEqual([
+      {
+        id: 0,
+        filePath: 'src/a.ts',
+        rule: 'eslint/no-unused-vars',
+        message: 'x unused (line 3)',
+        indirectFix: true,
+      },
+    ]);
+  });
+
+  it('raises lint findings beside critical gate findings, blocking on the gate alone', async () => {
+    const store = fakeStore();
+    const r = await checkEdit(
+      {
+        store: store.port,
+        gates: runnerOf([
+          result({ findings: [{ file: 'src/a.ts', rule: 'no-bad', message: 'bad' }] }),
+        ]),
+        isIgnored: () => false,
+        linters: lintersOf([
+          { filePath: 'src/a.ts', line: 0, rule: 'tsc/TS2304', message: 'Cannot find name' },
+        ]),
+      },
+      event(['src/a.ts']),
+    );
+
+    expect(r.kind).toBe('block');
+    expect(r.kind === 'block' && r.reason).toContain('no-bad');
+    expect(r.kind === 'block' && r.reason).not.toContain('TS2304');
+    expect(store.raised[0].violations.map((v) => [v.rule, v.indirectFix])).toEqual([
+      ['no-bad', false],
+      ['tsc/TS2304', true],
+    ]);
+  });
+
+  it('records nothing when the linters find nothing', async () => {
+    const store = fakeStore();
+    const r = await checkEdit(
+      {
+        store: store.port,
+        gates: runnerOf([result({ passed: true })]),
+        isIgnored: () => false,
+        linters: lintersOf([]),
+      },
+      event(['src/a.ts']),
+    );
+    expect(r).toEqual({ kind: 'noop' });
+    expect(store.raised).toEqual([]);
+    expect(store.resolved).toEqual([{ path: 'src/a.ts', sessionId: 'sess-1' }]);
   });
 });

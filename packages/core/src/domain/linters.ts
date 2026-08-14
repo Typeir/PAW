@@ -13,6 +13,8 @@
  * @since 5.0.0
  */
 
+import type { Violation } from './violation.js';
+
 /**
  * One linter finding, addressed to a file.
  *
@@ -30,14 +32,15 @@ export interface LintFinding {
 }
 
 /**
- * Command a linter connector runs.
+ * Command a linter connector runs. `bin` is the tool's own name; where that
+ * binary lives is the adapter's business.
  *
  * @interface LinterCommand
- * @property {string} cmd - Executable.
+ * @property {string} bin - Tool name, e.g. `eslint`.
  * @property {readonly string[]} args - Arguments, touched files appended where the tool scopes per file.
  */
 export interface LinterCommand {
-  readonly cmd: string;
+  readonly bin: string;
   readonly args: readonly string[];
 }
 
@@ -52,12 +55,31 @@ export interface LinterCommand {
  */
 export function linterCommandFor(id: string, files: readonly string[]): LinterCommand | null {
   if (id === 'tsc') {
-    return { cmd: 'npx', args: ['tsc', '--noEmit', '--pretty', 'false'] };
+    return { bin: 'tsc', args: ['--noEmit', '--pretty', 'false'] };
   }
   if (id === 'eslint') {
-    return { cmd: 'npx', args: ['eslint', '--format', 'json', ...files] };
+    return { bin: 'eslint', args: ['--format', 'json', ...files] };
   }
   return null;
+}
+
+/**
+ * Linter finding as an unrecorded violation. Always `indirectFix`: a linter
+ * finding nudges on the next tool call and never denies one, so the operator
+ * clears them in any order. The store carries no line number, so the line
+ * rides in the message.
+ *
+ * @param {LintFinding} finding - The finding.
+ * @returns {Violation} Deferred violation to raise.
+ */
+export function lintViolation(finding: LintFinding): Violation {
+  return {
+    id: 0,
+    filePath: finding.filePath,
+    rule: finding.rule,
+    message: finding.line > 0 ? `${finding.message} (line ${finding.line})` : finding.message,
+    indirectFix: true,
+  };
 }
 
 const TSC_LINE = /^(.+?)\((\d+),\d+\):\s+error\s+(TS\d+):\s+(.*)$/;

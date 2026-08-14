@@ -75,6 +75,13 @@ export {
   recordConsoleEndpoint,
 } from './infrastructure/consoleEndpoint.js';
 export type { ConsoleEndpoint, RunEventReport } from './infrastructure/consoleEndpoint.js';
+export {
+  INLINE_TIMEOUT_MS,
+  PROJECT_TIMEOUT_MS,
+  createLinterRunner,
+  nodeLintExec,
+} from './infrastructure/linterRunner.js';
+export type { LintExec, LinterRunnerOptions } from './infrastructure/linterRunner.js';
 export { listProviders } from './infrastructure/model/providerRoster.js';
 export type { ProviderInfo, RosterSeams } from './infrastructure/model/providerRoster.js';
 

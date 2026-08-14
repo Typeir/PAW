@@ -15,7 +15,8 @@
 
 import type { ToolPostEvent, PawResponse } from '../domain/event.js';
 import type { GateFinding } from '../domain/gate.js';
-import type { GateRunner, StorePort } from '../ports/index.js';
+import { lintViolation } from '../domain/linters.js';
+import type { GateRunner, LinterRunner, StorePort } from '../ports/index.js';
 import { truncate, type Violation } from '../domain/violation.js';
 
 const MAX_RULE_LINES = 12;
@@ -28,11 +29,13 @@ const MAX_MESSAGE = 160;
  * @property {StorePort} store - Clear violation there, record there.
  * @property {GateRunner} gates - Run project gates against edited files.
  * @property {(path: string) => boolean} isIgnored - Path pawignored? skip it.
+ * @property {LinterRunner} [linters] - Run enabled linter connectors on the same files; findings recorded deferred. Omit to run no linters.
  */
 export interface CheckEditDeps {
   readonly store: StorePort;
   readonly gates: GateRunner;
   readonly isIgnored: (path: string) => boolean;
+  readonly linters?: LinterRunner;
 }
 
 /**
@@ -116,8 +119,11 @@ function formatFindings(findings: readonly GateFinding[]): string {
  *
  * @description
  * Ignored paths skipped. Clear each gated file stale violations first,
- * then record critical findings and return `block`; clean run record
- * nothing and return `noop`.
+ * then record critical gate findings and any linter findings, and return
+ * `block`; clean run record nothing and return `noop`. Only critical gate
+ * findings decide the block — linter findings are deferred, so a run whose
+ * findings are all lint records them and returns `noop`, and they nudge on
+ * the next `tool.pre`.
  */
 export async function checkEdit(
   deps: CheckEditDeps,
@@ -130,15 +136,19 @@ export async function checkEdit(
 
   const report = await deps.gates.runForFiles(paths);
   const findings = criticalFindings(report);
+  const lint = deps.linters ? await deps.linters.runForFiles(paths) : [];
 
   for (const p of paths) {
     await deps.store.resolveForFile(p, event.sessionId);
   }
 
+  const raised = [...findings.map(toViolation), ...lint.map(lintViolation)];
+  if (raised.length > 0) {
+    await deps.store.raise(raised, event.sessionId);
+  }
+
   if (findings.length === 0) {
     return { kind: 'noop' };
   }
-
-  await deps.store.raise(findings.map(toViolation), event.sessionId);
   return { kind: 'block', reason: formatFindings(findings) };
 }

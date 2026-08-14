@@ -203,7 +203,12 @@ export type {
   ConnectorRosterRow,
 } from './domain/connectors.js';
 
-export { linterCommandFor, parseEslintJson, parseTscOutput } from './domain/linters.js';
+export {
+  linterCommandFor,
+  lintViolation,
+  parseEslintJson,
+  parseTscOutput,
+} from './domain/linters.js';
 export type { LintFinding, LinterCommand } from './domain/linters.js';
 
 export { CONTEXT_HEADING, composeBrief } from './application/composeBrief.js';
@@ -254,6 +259,7 @@ export type {
   FileSystemPort,
   GateRunner,
   HostConnector,
+  LinterRunner,
   ModelPort,
   ModelRequest,
   ModelResponse,

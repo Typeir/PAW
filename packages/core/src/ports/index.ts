@@ -16,6 +16,7 @@
 import type { ConfigDocument } from '../domain/config.js';
 import type { PawEvent, PawEventType, PawResponse } from '../domain/event.js';
 import type { HealthReport } from '../domain/gate.js';
+import type { LintFinding } from '../domain/linters.js';
 import type { Violation } from '../domain/violation.js';
 
 /**
@@ -74,6 +75,20 @@ export interface StorePort {
  */
 export interface GateRunner {
   runForFiles(relativePaths: readonly string[]): Promise<HealthReport>;
+}
+
+/**
+ * Run the enabled linter connectors against files a tool just changed.
+ * Findings become deferred violations, so a linter never denies a tool. Which
+ * connectors are enabled, how each one executes, and what to do with a
+ * whole-project tool too slow for the hook budget are all adapter concerns;
+ * this port answers only with the findings ready now.
+ *
+ * @interface LinterRunner
+ * @property {(relativePaths: readonly string[]) => Promise<readonly LintFinding[]>} runForFiles - Findings available now for these project-relative paths.
+ */
+export interface LinterRunner {
+  runForFiles(relativePaths: readonly string[]): Promise<readonly LintFinding[]>;
 }
 
 /**

@@ -15,7 +15,7 @@
 
 import type { Decision } from '../domain/enforcement.js';
 import type { PawEvent, PawResponse } from '../domain/event.js';
-import type { GateRunner, StorePort } from '../ports/index.js';
+import type { GateRunner, LinterRunner, StorePort } from '../ports/index.js';
 import { checkEdit } from './checkEdit.js';
 import { checkTool, type CheckToolRequest } from './checkTool.js';
 
@@ -27,6 +27,7 @@ import { checkTool, type CheckToolRequest } from './checkTool.js';
  * @property {ReadonlySet<string>} exemptTools - Read-only tools no violate ever block.
  * @property {(path: string) => boolean} isIgnored - Say if path pawignored.
  * @property {GateRunner} [gates] - Run gates on edited files for `tool.post`; omit to skip detection.
+ * @property {LinterRunner} [linters] - Run enabled linter connectors on edited files for `tool.post`; findings deferred. Omit to run no linters.
  * @property {(sessionId: string | null) => Promise<string>} [loadL1] - Make L1 context block for prompt; omit to inject nothing.
  * @property {(path: string) => string} [toRelative] - Normalise host path (maybe absolute) to project-relative; omit to leave paths as given.
  */
@@ -35,6 +36,7 @@ export interface HandleDeps {
   readonly exemptTools: ReadonlySet<string>;
   readonly isIgnored: (path: string) => boolean;
   readonly gates?: GateRunner;
+  readonly linters?: LinterRunner;
   readonly loadL1?: (sessionId: string | null) => Promise<string>;
   readonly toRelative?: (path: string) => string;
 }
@@ -85,7 +87,12 @@ export async function handleEvent(
         return { kind: 'noop' };
       }
       return checkEdit(
-        { store: deps.store, gates: deps.gates, isIgnored: deps.isIgnored },
+        {
+          store: deps.store,
+          gates: deps.gates,
+          isIgnored: deps.isIgnored,
+          ...(deps.linters === undefined ? {} : { linters: deps.linters }),
+        },
         { ...event, editedPaths: event.editedPaths.map(rel) },
       );
     }
