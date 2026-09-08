@@ -2,8 +2,10 @@
  * PAW CLI — check command
  *
  * @fileoverview `paw check`: read decision-input from stdin, print allow/deny
- * decision, exit 0/2. Shell of enforcement decision, wraps stdin + `process.exit`;
- * decision itself come from `@paw/core`'s `decidePreToolUse`.
+ * decision, exit 0/2. Allow print on stdout, deny on stderr — a host reading an
+ * exit-2 block with no decision JSON take its reason from stderr. Shell of
+ * enforcement decision, wraps stdin + `process.exit`; decision itself come from
+ * `@paw/core`'s `decidePreToolUse`.
  *
  * @module @paw/cli/infrastructure/commands/check
  * @version 0.0.0
@@ -38,6 +40,7 @@ export async function runCheck(): Promise<never> {
     violations: wire.violations ?? [],
   };
   const out = decisionToOutput(decidePreToolUse(input));
-  process.stdout.write(`${out.text}\n`);
+  const sink = out.stream === 'stderr' ? process.stderr : process.stdout;
+  sink.write(`${out.text}\n`);
   process.exit(out.exitCode);
 }

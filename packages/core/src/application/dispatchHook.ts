@@ -61,5 +61,5 @@ export async function dispatchHook(
   if (pawEvent === null) {
     return { continue: true };
   }
-  return connector.fromResponse(await handleEvent(pawEvent, deps));
+  return connector.fromResponse(await handleEvent(pawEvent, deps), req.event);
 }

@@ -396,6 +396,28 @@ describe('runDaemon', () => {
     expect(edit.plans).toEqual(['plans/edit.swarm.mjs', 'plans/lore.swarm.mjs']);
   });
 
+  it('serves the module roster resolved against the repository, and 404 without a resolver', async () => {
+    const rig = makeRig();
+    await runDaemon(
+      { moduleResolver: { resolve: async (s) => ({ resolved: true, detail: `/x/${s}` }) } },
+      rig.runtime,
+    );
+    const roster = parse(await rig.handler()?.(asConsole('/api/modules'))) as unknown as Array<{
+      id: string;
+      resolved: boolean;
+      requiredBy: string[];
+    }>;
+    expect(roster[0]).toMatchObject({
+      id: 'paw-agile',
+      resolved: true,
+      requiredBy: ['taiga', 'rally'],
+    });
+
+    const bare = makeRig();
+    await runDaemon({}, bare.runtime);
+    expect((await bare.handler()?.(asConsole('/api/modules')))?.status).toBe(404);
+  });
+
   it('answers 404 for a plan outside the repository rather than importing it', async () => {
     const rig = makeRig();
     await runDaemon({}, rig.runtime);

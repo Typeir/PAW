@@ -40,6 +40,7 @@ import { join, resolve } from 'node:path';
 import {
   chromiumFingerprint,
   createNodeLogSink,
+  createNodeModuleResolver,
   createNodeRecentRoutes,
   identityNotice,
   listProviders,
@@ -338,6 +339,7 @@ async function start(): Promise<void> {
       recent: createNodeRecentRoutes(pawHome(process.platform, process.env)),
       logSink: createNodeLogSink(join(launch.root, '.paw', 'daemon.log')),
       providers: () => listProviders(launch.root),
+      moduleResolver: createNodeModuleResolver(launch.root),
     },
     nodeRuntime(GUI_PAGE),
   );

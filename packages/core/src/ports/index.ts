@@ -30,13 +30,13 @@ import type { Violation } from '../domain/violation.js';
  * @property {string} name - Connector id, matched against `PawConfig.connector`.
  * @property {(type: PawEventType) => (string | null)} eventName - Host native name for canonical event (e.g. `tool.pre` → `PreToolUse`), or null when host have no such event.
  * @property {(raw: unknown) => (PawEvent | null)} toEvent - Translate host payload to canonical event, or null when payload not PAW-relevant.
- * @property {(response: PawResponse) => unknown} fromResponse - Translate canonical response to host native output shape.
+ * @property {(response: PawResponse, type: PawEventType) => unknown} fromResponse - Translate canonical response to host native output shape for the event that fired. Hosts that tag their output with the event name need `type` to tag it right.
  */
 export interface HostConnector {
   readonly name: string;
   eventName(type: PawEventType): string | null;
   toEvent(raw: unknown): PawEvent | null;
-  fromResponse(response: PawResponse): unknown;
+  fromResponse(response: PawResponse, type: PawEventType): unknown;
 }
 
 /**
@@ -312,4 +312,15 @@ export interface PresenterPort {
  */
 export interface ClockPort {
   now(): number;
+}
+
+/**
+ * Locates a federated module's package by specifier. Where a specifier
+ * resolves from is the adapter's choice.
+ *
+ * @interface ModuleResolverPort
+ * @property {(specifier: string) => Promise<{ resolved: boolean; detail: string }>} resolve - Whether the specifier resolves, and where it resolved to or why it did not.
+ */
+export interface ModuleResolverPort {
+  resolve(specifier: string): Promise<{ readonly resolved: boolean; readonly detail: string }>;
 }

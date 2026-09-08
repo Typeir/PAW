@@ -31,6 +31,7 @@ import {
   dispatchSwarm,
   memberCount,
   planKey,
+  resolveModules,
   runDoctor,
   setBinding,
   type ConfigDocumentPort,
@@ -42,7 +43,12 @@ import {
   type Violation,
 } from '@paw/core';
 import { ansiPaint } from '@paw/cosmetics';
-import { createNodeConfigDocument, createNodeFileReader, createNodeGateRunner } from '@paw/adapters';
+import {
+  createNodeConfigDocument,
+  createNodeFileReader,
+  createNodeGateRunner,
+  createNodeModuleResolver,
+} from '@paw/adapters';
 import { rpcCall, socketPath, tokenPath } from '@paw/daemon';
 import {
   MENU,
@@ -52,6 +58,7 @@ import {
   doctorLines,
   gatesLines,
   herdLines,
+  moduleLines,
   planLines,
   type ActionId,
   type ConfigSnapshot,
@@ -61,7 +68,7 @@ import {
   type TuiData,
 } from '../domain/menu.js';
 
-const KNOWN_CONNECTORS = ['copilot-hooks'];
+const KNOWN_CONNECTORS = ['copilot-hooks', 'claude-hooks'];
 
 const NOOP_PORT: ModelPort = {
   complete: async () => ({ content: '', inputTokens: 0, outputTokens: 0 }),
@@ -325,6 +332,10 @@ async function runAction(
   }
   if (id === 'connectors') {
     return connectorLines(connectorRoster(await createNodeConfigDocument(root).read()));
+  }
+  if (id === 'modules') {
+    const config = await createNodeConfigDocument(root).read();
+    return moduleLines(await resolveModules(config, createNodeModuleResolver(root)));
   }
   // config
   const doc = createNodeConfigDocument(root);

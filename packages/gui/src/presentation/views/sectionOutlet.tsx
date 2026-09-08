@@ -14,6 +14,7 @@ import { useSection } from '../../application/hooks/useConsole.js';
 import { ConnectorsView } from './connectorsView.js';
 import { KeysView } from './keysView.js';
 import { LogsView } from './logsView.js';
+import { ModulesView } from './modulesView.js';
 import { OverviewView } from './overviewView.js';
 import { PendingView } from './pendingView.js';
 import { RolesView } from './rolesView.js';
@@ -42,6 +43,8 @@ export function SectionOutlet() {
       return <KeysView />;
     case 'connectors':
       return <ConnectorsView />;
+    case 'modules':
+      return <ModulesView />;
     default:
       return <PendingView title='Gates' />;
   }

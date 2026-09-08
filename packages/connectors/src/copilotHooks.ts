@@ -1,12 +1,14 @@
 /**
  * PAW Copilot-Hooks Connector
  *
- * @fileoverview {@link HostConnector} adapts PAW to GitHub Copilot hooks
- * surface (CLI/VS Code `hooks.json` stdin/stdout protocol) by translation; core
- * stay unaware of Copilot. Map hook payload to canonical {@link PawEvent}, and
- * canonical {@link PawResponse} back to hook output shape Copilot expect.
- * Reference connector: new host (Anthropic runtime, Codex runtime) be sibling
- * file, selected by `PawConfig.connector`, with PAW loop untouched.
+ * @fileoverview {@link HostConnector} adapting PAW to the Copilot hooks surface
+ * by translation; core stay unaware of Copilot. Map hook payload to canonical
+ * {@link PawEvent}, and canonical {@link PawResponse} back to the hook output
+ * shape.
+ *
+ * The event names here are unverified against a live Copilot session — GitHub
+ * documents camelCase (`preToolUse`), this maps PascalCase. Dump a real hook
+ * payload before trusting either. See `.ignore/tasks/CLAUDE-CODE-HOISTING.md` §2.
  *
  * @module @paw/connectors/copilotHooks
  * @version 0.0.0
@@ -15,6 +17,14 @@
  */
 
 import type { HostConnector, PawEvent, PawEventType, PawResponse } from '@paw/core';
+import {
+  envMatch,
+  extractCommands,
+  extractPaths,
+  sessionId,
+  str,
+  toolName,
+} from './hookPayload.js';
 
 /**
  * Host native name for each canonical event. {@link copilotHooksConnector.toEvent}
@@ -27,93 +37,6 @@ const COPILOT_EVENT_NAME: Record<PawEventType, string> = {
   'tool.post': 'PostToolUse',
   'session.end': 'Stop',
 };
-
-/**
- * Coerce value to non-empty string, or null.
- *
- * @param {unknown} v - Value.
- * @returns {string | null} The string, or null.
- */
-function str(v: unknown): string | null {
-  return typeof v === 'string' && v.length > 0 ? v : null;
-}
-
-/**
- * Parse tool-args source, object or JSON string. Malformed input yield null;
- * caller treat null as "no arguments here".
- *
- * @param {unknown} src - Source value.
- * @returns {Record<string, unknown> | null} Parsed record, or null.
- */
-function asArgs(src: unknown): Record<string, unknown> | null {
-  if (typeof src === 'string') {
-    try {
-      return JSON.parse(src) as Record<string, unknown>;
-    } catch {
-      return null;
-    }
-  }
-  if (typeof src === 'object' && src !== null) {
-    return src as Record<string, unknown>;
-  }
-  return null;
-}
-
-/**
- * Extract file paths hook payload reference, normalise to forward slashes.
- * Cover `toolInput` object and `toolArgs` string/object forms.
- *
- * @param {Record<string, unknown>} raw - The hook payload.
- * @returns {string[]} The referenced paths.
- */
-function extractPaths(raw: Record<string, unknown>): string[] {
-  const paths: string[] = [];
-  for (const source of [raw.toolInput, raw.tool_input, raw.toolArgs]) {
-    const args = asArgs(source);
-    if (!args) {
-      continue;
-    }
-    for (const key of ['path', 'filePath', 'file_path']) {
-      const value = args[key];
-      if (typeof value === 'string') {
-        paths.push(value.replace(/\\/g, '/'));
-      }
-    }
-  }
-  return paths;
-}
-
-/**
- * First path that be environment file, or null. Callers use the returned path
- * to make an enforcement decision.
- *
- * @param {string[]} paths - Candidate paths.
- * @returns {string | null} The matching path, or null.
- */
-function envMatch(paths: string[]): string | null {
-  const isEnv = /(?:^|\/)\.env(?:\.[A-Za-z0-9_.-]+)?$/;
-  return paths.find((p) => isEnv.test(p)) ?? null;
-}
-
-/**
- * Session id from either casing.
- *
- * @param {Record<string, unknown>} raw - The hook payload.
- * @returns {string | null} The session id, or null.
- */
-function sessionId(raw: Record<string, unknown>): string | null {
-  return str(raw.session_id) ?? str(raw.sessionId);
-}
-
-/**
- * Tool name from either casing.
- *
- * @param {Record<string, unknown>} raw - The hook payload.
- * @returns {string} The tool name, or empty string.
- */
-function toolName(raw: Record<string, unknown>): string {
-  return str(raw.tool_name) ?? str(raw.toolName) ?? '';
-}
 
 /**
  * Copilot-hooks connector.
@@ -140,7 +63,7 @@ export const copilotHooksConnector: HostConnector = {
           sessionId: session,
           toolName: toolName(r),
           targetPaths: paths,
-          envMatch: envMatch(paths),
+          envMatch: envMatch(paths, extractCommands(r)),
         };
       }
       case 'PostToolUse':
@@ -175,13 +98,14 @@ export const copilotHooksConnector: HostConnector = {
     }
   },
 
-  fromResponse(response: PawResponse): unknown {
+  fromResponse(response: PawResponse, type: PawEventType): unknown {
+    const hookEventName = COPILOT_EVENT_NAME[type];
     switch (response.kind) {
       case 'deny':
         return {
           continue: true,
           hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
+            hookEventName,
             permissionDecision: 'deny',
             permissionDecisionReason: response.reason,
           },
@@ -191,7 +115,7 @@ export const copilotHooksConnector: HostConnector = {
           ? {
               continue: true,
               hookSpecificOutput: {
-                hookEventName: 'PreToolUse',
+                hookEventName,
                 additionalContext: response.additionalContext,
               },
             }

@@ -110,6 +110,7 @@ export interface ConfigView {
  * @property {(id: string, at: string, event: Record<string, unknown>) => boolean} [reportRun] - Fold one external-herd dispatch event into the run slice. Daemon-own display state, no {@link ControlPort}; false when the event does not fold.
  * @property {() => readonly unknown[]} [providers] - Key-free provider roster for the Keys view.
  * @property {() => readonly unknown[]} [connectors] - Connector catalogue with enabled state, for the Connectors view.
+ * @property {() => Promise<readonly unknown[]>} [modules] - Module catalogue with enabled and resolved state, for the Modules view.
  */
 export interface RouterDeps {
   readonly page: string;
@@ -121,6 +122,7 @@ export interface RouterDeps {
   readonly reportRun?: (id: string, at: string, event: Record<string, unknown>) => boolean;
   readonly providers?: () => readonly unknown[];
   readonly connectors?: () => readonly unknown[];
+  readonly modules?: () => Promise<readonly unknown[]>;
   readonly token: string;
   readonly port: number;
   readonly scriptHashes: readonly string[];
@@ -379,6 +381,9 @@ export async function route(request: HttpRequest, deps: RouterDeps): Promise<Htt
     }
     if (request.path === '/api/connectors' && deps.connectors !== undefined) {
       return json(deps.connectors(), cors);
+    }
+    if (request.path === '/api/modules' && deps.modules !== undefined) {
+      return json(await deps.modules(), cors);
     }
     if (request.path === '/api/recent') {
       return json(deps.recent === undefined ? [] : await deps.recent(), cors);

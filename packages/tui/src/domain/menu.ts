@@ -20,7 +20,12 @@ import {
   type SwarmPlan,
   type Violation,
 } from '@paw/core';
-import type { ConnectorRosterRow, DoctorReport, HealthReport } from '@paw/core';
+import type {
+  ConnectorRosterRow,
+  DoctorReport,
+  HealthReport,
+  ModuleStatus,
+} from '@paw/core';
 
 const GATE_FINDING_CAP = 8;
 const VIOLATION_FILE_CAP = 8;
@@ -102,6 +107,7 @@ export type ActionId =
   | 'daemon'
   | 'config'
   | 'connectors'
+  | 'modules'
   | 'quit';
 
 /**
@@ -163,8 +169,14 @@ export const MENU: readonly MenuEntry[] = [
   {
     id: 'connectors',
     label: 'connectors',
-    hint: 'which connectors are on — host bridges and linters',
+    hint: 'which connectors are on — host bridges, linters, and backends',
     cli: 'paw connectors',
+  },
+  {
+    id: 'modules',
+    label: 'modules',
+    hint: 'which federated modules are on, and which connectors need them',
+    cli: 'paw modules',
   },
   { id: 'quit', label: 'quit', hint: 'leave', cli: null },
 ];
@@ -180,8 +192,30 @@ export function connectorLines(roster: readonly ConnectorRosterRow[]): string[] 
     `${roster.filter((row) => row.enabled).length} of ${roster.length} enabled`,
     '',
     ...roster.map(
-      (row) => `  ${row.enabled ? '✓' : '·'} ${row.id} (${row.kind}) — ${row.description}`,
+      (row) =>
+        `  ${row.enabled ? '✓' : '·'} ${row.id} (${row.kind}) — ${row.description}${
+          row.requires.length === 0 ? '' : ` [needs ${row.requires.join(', ')}]`
+        }`,
     ),
+  ];
+}
+
+/**
+ * Render the module catalogue with each entry's enabled state, whether its
+ * package resolves, and the connectors it carries.
+ *
+ * @param {readonly ModuleStatus[]} roster - Catalogue with enabled and resolved state.
+ * @returns {string[]} Panel lines.
+ */
+export function moduleLines(roster: readonly ModuleStatus[]): string[] {
+  return [
+    `${roster.filter((row) => row.enabled).length} of ${roster.length} enabled`,
+    '',
+    ...roster.flatMap((row) => [
+      `  ${row.enabled ? '✓' : '·'} ${row.id} — ${row.resolved ? 'installed' : 'not installed'}`,
+      `      ${row.description}`,
+      `      connectors: ${row.requiredBy.length === 0 ? 'none' : row.requiredBy.join(', ')}`,
+    ]),
   ];
 }
 

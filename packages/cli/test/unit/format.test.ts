@@ -21,6 +21,7 @@ import type {
 import {
   formatBrief,
   formatConnectors,
+  formatModules,
   formatDoctor,
   formatGateReport,
   formatHelp,
@@ -85,12 +86,53 @@ describe('formatHelp', () => {
 describe('formatConnectors', () => {
   it('counts what is enabled and marks every row', () => {
     const lines = formatConnectors([
-      { id: 'tsc', kind: 'linter', title: 'TypeScript', description: 'type errors', enabled: true },
-      { id: 'eslint', kind: 'linter', title: 'ESLint', description: 'lint findings', enabled: false },
+      { id: 'tsc', kind: 'linter', title: 'TypeScript', description: 'type errors', enabled: true, requires: [] },
+      { id: 'eslint', kind: 'linter', title: 'ESLint', description: 'lint findings', enabled: false, requires: [] },
     ]);
     expect(lines[0]).toBe('connectors: 1 of 2 enabled');
     expect(lines[1]).toBe('  on  tsc · linter · type errors');
     expect(lines[2]).toBe('  off eslint · linter · lint findings');
+  });
+
+  it('names the module a backend connector needs', () => {
+    const lines = formatConnectors([
+      { id: 'taiga', kind: 'backend', title: 'Taiga', description: 'clones projects', enabled: false, requires: ['paw-agile'] },
+    ]);
+    expect(lines[1]).toBe('  off taiga · backend · clones projects · needs paw-agile');
+  });
+});
+
+describe('formatModules', () => {
+  it('reports enabled state, whether the package resolves, and the connectors carried', () => {
+    const lines = formatModules([
+      {
+        id: 'paw-agile',
+        title: 'PAW Agile',
+        description: 'work model',
+        specifier: '@paw/agile',
+        enabled: true,
+        resolved: true,
+        detail: '/node_modules/@paw/agile',
+        requiredBy: ['taiga', 'rally'],
+      },
+      {
+        id: 'paw-billing',
+        title: 'PAW Billing',
+        description: 'invoices',
+        specifier: '@paw/billing',
+        enabled: false,
+        resolved: false,
+        detail: 'not installed',
+        requiredBy: [],
+      },
+    ]);
+    expect(lines).toEqual([
+      'modules: 1 of 2 enabled',
+      '  on  paw-agile · installed · work model',
+      '      connectors: taiga, rally',
+      '  off paw-billing · not installed · invoices',
+      '      connectors: none',
+    ]);
   });
 
   it('reports an empty catalogue without a row', () => {

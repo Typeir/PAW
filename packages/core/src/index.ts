@@ -185,7 +185,9 @@ export {
   clearBinding,
   declareModel,
   disableConnector,
+  disableModule,
   enableConnector,
+  enableModule,
   parseCapabilities,
   setBinding,
 } from './application/configBinding.js';
@@ -202,6 +204,18 @@ export type {
   ConnectorKind,
   ConnectorRosterRow,
 } from './domain/connectors.js';
+
+export {
+  VENDOR_MODULES,
+  dependentConnectors,
+  enabledModuleIds,
+  knownModule,
+  moduleRoster,
+} from './domain/modules.js';
+export type { ModuleEntry, ModuleRosterRow } from './domain/modules.js';
+
+export { resolveModules } from './application/moduleStatus.js';
+export type { ModuleStatus } from './application/moduleStatus.js';
 
 export {
   linterCommandFor,
@@ -263,6 +277,7 @@ export type {
   ModelPort,
   ModelRequest,
   ModelResponse,
+  ModuleResolverPort,
   PresenterPort,
   ProcessPort,
   ProcessResult,

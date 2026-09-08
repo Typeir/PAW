@@ -27,6 +27,11 @@ export const PROVIDERS_URL = '/api/providers';
 export const CONNECTORS_URL = '/api/connectors';
 
 /**
+ * Daemon module roster read and enable/disable endpoint.
+ */
+export const MODULES_URL = '/api/modules';
+
+/**
  * Daemon role-binding write endpoint.
  */
 export const CONFIG_ROLES_URL = '/api/config/roles';
@@ -84,6 +89,7 @@ export interface ProviderRow {
  * @property {string} title - Display name.
  * @property {string} description - What enabling it does.
  * @property {boolean} enabled - Whether the repo config enables it.
+ * @property {readonly string[]} requires - Module ids that must be enabled first.
  */
 export interface ConnectorRow {
   readonly id: string;
@@ -91,6 +97,31 @@ export interface ConnectorRow {
   readonly title: string;
   readonly description: string;
   readonly enabled: boolean;
+  readonly requires: readonly string[];
+}
+
+/**
+ * One module on the catalogue `/api/modules` serves.
+ *
+ * @interface ModuleRow
+ * @property {string} id - Stable module id.
+ * @property {string} title - Display name.
+ * @property {string} description - What the module owns.
+ * @property {string} specifier - Package specifier the daemon resolved.
+ * @property {boolean} enabled - Whether the repo config enables it.
+ * @property {boolean} resolved - Whether the daemon located the package.
+ * @property {string} detail - Where it resolved to, or why it did not.
+ * @property {readonly string[]} requiredBy - Connectors that need it.
+ */
+export interface ModuleRow {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly specifier: string;
+  readonly enabled: boolean;
+  readonly resolved: boolean;
+  readonly detail: string;
+  readonly requiredBy: readonly string[];
 }
 
 /**
@@ -101,18 +132,22 @@ export interface ConnectorRow {
  * @property {() => Promise<ConfigBindings>} bindings - Declared models and every role binding.
  * @property {() => Promise<readonly ProviderRow[]>} providers - Key-free provider roster.
  * @property {() => Promise<readonly ConnectorRow[]>} connectors - Connector catalogue with enabled state.
+ * @property {() => Promise<readonly ModuleRow[]>} modules - Module catalogue with enabled and resolved state.
  * @property {(role: string, model: string) => Promise<ConfigWrite>} bind - Bind role to model.
  * @property {(role: string) => Promise<ConfigWrite>} unbind - Clear role binding.
  * @property {(id: string, on: boolean) => Promise<ConfigWrite>} setConnector - Enable or disable a connector.
+ * @property {(id: string, on: boolean) => Promise<ConfigWrite>} setModule - Enable or disable a module.
  */
 export interface ConfigClient {
   models(): Promise<readonly string[]>;
   bindings(): Promise<ConfigBindings>;
   providers(): Promise<readonly ProviderRow[]>;
   connectors(): Promise<readonly ConnectorRow[]>;
+  modules(): Promise<readonly ModuleRow[]>;
   bind(role: string, model: string): Promise<ConfigWrite>;
   unbind(role: string): Promise<ConfigWrite>;
   setConnector(id: string, on: boolean): Promise<ConfigWrite>;
+  setModule(id: string, on: boolean): Promise<ConfigWrite>;
 }
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
@@ -175,6 +210,22 @@ export function createConfigClient(fetchFn: FetchLike): ConfigClient {
     async setConnector(id: string, on: boolean): Promise<ConfigWrite> {
       return writeResult(
         await fetchFn(on ? CONNECTORS_URL : `${CONNECTORS_URL}?id=${encodeURIComponent(id)}`, {
+          method: on ? 'PUT' : 'DELETE',
+          headers: JSON_HEADERS,
+          ...(on ? { body: JSON.stringify({ id }) } : {}),
+        }),
+      );
+    },
+    async modules(): Promise<readonly ModuleRow[]> {
+      const response = await fetchFn(MODULES_URL);
+      if (!response.ok) {
+        throw new Error(`PAW console: ${MODULES_URL} responded ${response.status}`);
+      }
+      return (await response.json()) as readonly ModuleRow[];
+    },
+    async setModule(id: string, on: boolean): Promise<ConfigWrite> {
+      return writeResult(
+        await fetchFn(on ? MODULES_URL : `${MODULES_URL}?id=${encodeURIComponent(id)}`, {
           method: on ? 'PUT' : 'DELETE',
           headers: JSON_HEADERS,
           ...(on ? { body: JSON.stringify({ id }) } : {}),

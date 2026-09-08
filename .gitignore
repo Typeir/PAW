@@ -6,3 +6,4 @@ dist/
 .paw*
 coverage/
 .ignore/*
+.ignore

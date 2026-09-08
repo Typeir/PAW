@@ -62,6 +62,7 @@ describe('configControl', () => {
         roles: { 'review.judge': 'fast' },
         models: { fast: caps },
         connectors: [],
+        modules: [],
       });
       expect(doc.get().roles).toEqual({ 'review.judge': 'fast' });
     });
@@ -148,6 +149,47 @@ describe('configControl', () => {
       expect(await enable(fakeDoc().port, { body: { id: 'jenkins' } })).toMatchObject({ status: 422 });
       expect(await enable(fakeDoc().port, { body: {} })).toMatchObject({ status: 422 });
       expect(await disable(fakeDoc().port, { body: {} })).toMatchObject({ status: 422 });
+    });
+
+    it('refuses a backend whose module is not enabled', async () => {
+      const res = await enable(fakeDoc().port, { body: { id: 'taiga' } });
+      expect(res.status).toBe(422);
+      expect(res.body).toMatchObject({ ok: false });
+    });
+  });
+
+  describe('module enable and disable', () => {
+    const enable = (doc: ConfigDocumentPort, over: Partial<ControlRequest>) =>
+      configControl(doc).handlers['PUT /api/modules'](req(over));
+    const disable = (doc: ConfigDocumentPort, over: Partial<ControlRequest>) =>
+      configControl(doc).handlers['DELETE /api/modules'](req(over));
+
+    it('enables a module, writes the document, and returns the enabled ids', async () => {
+      const doc = fakeDoc();
+      const res = await enable(doc.port, { body: { id: 'paw-agile' } });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ ok: true, modules: ['paw-agile'] });
+      expect(doc.get().modules).toEqual(['paw-agile']);
+    });
+
+    it('disables by body or by query', async () => {
+      const doc = fakeDoc({ modules: ['paw-agile'] });
+      expect(await disable(doc.port, { body: { id: 'paw-agile' } })).toMatchObject({ status: 200 });
+      expect(doc.get().modules).toEqual([]);
+      const byQuery = await disable(
+        fakeDoc({ modules: ['paw-agile'] }).port,
+        { query: new URLSearchParams('id=paw-agile') },
+      );
+      expect(byQuery).toMatchObject({ status: 200 });
+    });
+
+    it('refuses an unknown id, a missing one, and one an enabled connector needs', async () => {
+      expect(await enable(fakeDoc().port, { body: { id: 'paw-billing' } })).toMatchObject({ status: 422 });
+      expect(await enable(fakeDoc().port, { body: {} })).toMatchObject({ status: 422 });
+      expect(await disable(fakeDoc().port, { body: {} })).toMatchObject({ status: 422 });
+      const held = fakeDoc({ modules: ['paw-agile'], connectors: ['taiga'] });
+      expect(await disable(held.port, { body: { id: 'paw-agile' } })).toMatchObject({ status: 422 });
+      expect(held.get().modules).toEqual(['paw-agile']);
     });
   });
 });

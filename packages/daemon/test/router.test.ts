@@ -539,6 +539,24 @@ describe('the connector roster', () => {
   });
 });
 
+describe('the module roster', () => {
+  it('serves the catalogue with enabled and resolved state when the daemon supplies one', async () => {
+    const roster = [{ id: 'paw-agile', enabled: true, resolved: true, requiredBy: ['taiga'] }];
+    const res = await route(req('/api/modules'), { ...deps, modules: async () => roster });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual(roster);
+  });
+
+  it('answers 404 with no roster supplied, and 401 without the token', async () => {
+    expect((await route(req('/api/modules'), deps)).status).toBe(404);
+    const res = await route(req('/api/modules', { headers: { authorization: 'Bearer wrong' } }), {
+      ...deps,
+      modules: async () => [],
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('the provider roster', () => {
   it('serves the key-free roster when the daemon supplies one', async () => {
     const roster = [{ name: 'deepseek', type: 'openai', baseUrl: 'https://x', keyChars: 5 }];

@@ -18,6 +18,7 @@ import {
   Boxes,
   KeyRound,
   LayoutDashboard,
+  Package,
   Plug,
   ScrollText,
   ShieldCheck,
@@ -90,6 +91,9 @@ export function Rail() {
         </li>
         <li>
           <NavItem id='connectors' icon={Plug} label='Connectors' />
+        </li>
+        <li>
+          <NavItem id='modules' icon={Package} label='Modules' />
         </li>
       </Group>
       <Group label='Work'>

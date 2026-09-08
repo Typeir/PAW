@@ -56,6 +56,16 @@ describe('copilotHooksConnector.toEvent', () => {
     expect(env).toMatchObject({ envMatch: '.env.local' });
   });
 
+  it('detects an env file a shell command reaches for', () => {
+    expect(
+      c.toEvent({
+        hookEventName: 'PreToolUse',
+        tool_name: 'bash',
+        tool_input: { command: 'cat .env.local' },
+      }),
+    ).toMatchObject({ type: 'tool.pre', targetPaths: [], envMatch: '.env.local' });
+  });
+
   it('tolerates malformed JSON args as no paths', () => {
     const e = c.toEvent({ hookEventName: 'PreToolUse', toolArgs: 'not json', sessionId: 's2' });
     expect(e).toMatchObject({ type: 'tool.pre', sessionId: 's2', targetPaths: [] });
@@ -111,8 +121,8 @@ describe('copilotHooksConnector.toEvent', () => {
 });
 
 describe('copilotHooksConnector.fromResponse', () => {
-  it('renders a deny as a PreToolUse permission denial', () => {
-    expect(c.fromResponse({ kind: 'deny', reason: 'blocked' })).toEqual({
+  it('renders a deny as a permission denial tagged with the firing event', () => {
+    expect(c.fromResponse({ kind: 'deny', reason: 'blocked' }, 'tool.pre')).toEqual({
       continue: true,
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
@@ -123,25 +133,24 @@ describe('copilotHooksConnector.fromResponse', () => {
   });
 
   it('renders a bare allow as continue', () => {
-    expect(c.fromResponse({ kind: 'allow' })).toEqual({ continue: true });
+    expect(c.fromResponse({ kind: 'allow' }, 'tool.pre')).toEqual({ continue: true });
   });
 
-  it('renders an allow with context via additionalContext', () => {
-    expect(c.fromResponse({ kind: 'allow', additionalContext: 'note' })).toEqual({
+  it('tags additionalContext with the firing event, not always PreToolUse', () => {
+    expect(c.fromResponse({ kind: 'allow', additionalContext: 'note' }, 'tool.post')).toEqual({
       continue: true,
-      hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: 'note' },
+      hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: 'note' },
     });
   });
 
   it('renders context as a system message', () => {
-    expect(c.fromResponse({ kind: 'context', additionalContext: 'L1' })).toEqual({
-      continue: true,
-      systemMessage: 'L1',
-    });
+    expect(c.fromResponse({ kind: 'context', additionalContext: 'L1' }, 'prompt.submitted')).toEqual(
+      { continue: true, systemMessage: 'L1' },
+    );
   });
 
   it('renders a block with a decision and reason', () => {
-    expect(c.fromResponse({ kind: 'block', reason: 'gate' })).toEqual({
+    expect(c.fromResponse({ kind: 'block', reason: 'gate' }, 'tool.post')).toEqual({
       continue: true,
       decision: 'block',
       reason: 'gate',
@@ -149,6 +158,6 @@ describe('copilotHooksConnector.fromResponse', () => {
   });
 
   it('renders a noop as continue', () => {
-    expect(c.fromResponse({ kind: 'noop' })).toEqual({ continue: true });
+    expect(c.fromResponse({ kind: 'noop' }, 'session.end')).toEqual({ continue: true });
   });
 });

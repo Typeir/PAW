@@ -22,7 +22,7 @@ import { parseArgs } from '../../domain/context.js';
 import { readStdin } from '../stdin.js';
 import { autostartSeams } from './pawd.js';
 
-const HOST_FLAGS = ['copilot'];
+const HOST_FLAGS = ['copilot', 'claude'];
 
 /**
  * Run `hook` subcommand: client of resident daemon.

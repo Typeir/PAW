@@ -10,6 +10,7 @@
  */
 
 export { createNodeConfigDocument } from './config/nodeConfigDocument.js';
+export { createNodeModuleResolver } from './config/nodeModuleResolver.js';
 export { createNodeRecentRoutes } from './console/nodeRecentRoutes.js';
 export { createNodeFileReader, resolveInRoot } from './file/nodeFileReader.js';
 export { createGateCache } from './gate/gateCache.js';

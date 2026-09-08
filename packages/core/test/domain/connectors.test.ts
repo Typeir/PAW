@@ -4,7 +4,8 @@
  * @fileoverview Cover the baked-in catalogue, enabled-state resolution over a
  * config document (unknown and non-string entries dropped), the roster rows,
  * and the enable/disable config edits: unknown ids refused, enabling
- * idempotent, disabling absent ids a no-op.
+ * idempotent, disabling absent ids a no-op. A backend connector is refused
+ * until the module it requires is enabled.
  *
  * @module @paw/core/test/domain/connectors
  */
@@ -19,14 +20,29 @@ import {
 import { disableConnector, enableConnector } from '../../src/application/configBinding.js';
 
 describe('the vendor catalogue', () => {
-  it('ships copilot-hooks as host, tsc and eslint as linters', () => {
+  it('ships two hosts, two linters, and two backends', () => {
     expect(VENDOR_CONNECTORS.map((c) => [c.id, c.kind])).toEqual([
       ['copilot-hooks', 'host'],
+      ['claude-hooks', 'host'],
       ['tsc', 'linter'],
       ['eslint', 'linter'],
+      ['taiga', 'backend'],
+      ['rally', 'backend'],
     ]);
     expect(knownConnector('tsc')).toBe(true);
     expect(knownConnector('jenkins')).toBe(false);
+  });
+
+  it('routes both backends through the paw-agile module and nothing else through a module', () => {
+    const required = Object.fromEntries(VENDOR_CONNECTORS.map((c) => [c.id, c.requires]));
+    expect(required).toEqual({
+      'copilot-hooks': [],
+      'claude-hooks': [],
+      tsc: [],
+      eslint: [],
+      taiga: ['paw-agile'],
+      rally: ['paw-agile'],
+    });
   });
 });
 
@@ -74,6 +90,17 @@ describe('enableConnector / disableConnector', () => {
     const off = disableConnector({ connectors: ['tsc', 'eslint'], roles: { a: 'b' } }, 'tsc');
     expect(off).toMatchObject({ ok: true, config: { connectors: ['eslint'], roles: { a: 'b' } } });
     expect(disableConnector({}, 'tsc')).toMatchObject({ ok: true, config: { connectors: [] } });
+  });
+
+  it('refuses a backend until its module is enabled, naming the module and the verb', () => {
+    const refused = enableConnector({}, 'taiga');
+    expect(refused.ok).toBe(false);
+    expect(refused.ok === false && refused.reason).toBe(
+      'connector "taiga" requires module paw-agile; enable it with paw modules enable paw-agile',
+    );
+
+    const allowed = enableConnector({ modules: ['paw-agile'] }, 'taiga');
+    expect(allowed).toMatchObject({ ok: true, config: { connectors: ['taiga'] } });
   });
 
   it('clears the legacy field too, so a disabled host bridge stays disabled', () => {

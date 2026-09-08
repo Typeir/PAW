@@ -47,8 +47,8 @@ describe('cli decide (e2e)', () => {
     expect(stdout).toContain('ALLOW');
   });
 
-  it('denies an unrelated tool when a direct violation stands, exit 2', async () => {
-    const { stdout, code } = await runCli(
+  it('denies an unrelated tool when a direct violation stands, exit 2 on stderr', async () => {
+    const { stdout, stderr, code } = await runCli(
       JSON.stringify({
         toolName: 'edit',
         targetPaths: ['src/b.ts'],
@@ -58,8 +58,9 @@ describe('cli decide (e2e)', () => {
       }),
     );
     expect(code).toBe(2);
-    expect(stdout).toContain('DENY');
-    expect(stdout).toContain('src/a.ts');
+    expect(stderr).toContain('DENY');
+    expect(stderr).toContain('src/a.ts');
+    expect(stdout).toBe('');
   });
 
   it('exits 1 on malformed input rather than pretending to decide', async () => {

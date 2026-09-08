@@ -32,6 +32,7 @@ import {
   createNodeConfigDocument,
   createNodeFileReader,
   createNodeFs,
+  createNodeModuleResolver,
   createNodeRecentRoutes,
 } from '@paw/adapters';
 import {
@@ -431,6 +432,7 @@ export async function runUi(
       recent,
       logSink: createNodeLogSink(resolve(root, '.paw', 'daemon.log')),
       providers: () => listProviders(scope()),
+      moduleResolver: createNodeModuleResolver(root),
       onAttach: (path, mode) => {
         void approveAttach(path, mode, () => handle);
       },

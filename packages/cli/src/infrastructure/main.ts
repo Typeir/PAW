@@ -32,6 +32,7 @@ import { formatDoctor, formatHelp } from '../domain/format.js';
 import { runCheck } from './commands/check.js';
 import { runConfig } from './commands/config.js';
 import { runConnectors } from './commands/connectors.js';
+import { runModules } from './commands/modules.js';
 import { runDaemonCommand } from './commands/daemonCommand.js';
 import { runGates } from './commands/gates.js';
 import { runInit } from './commands/init.js';
@@ -42,7 +43,7 @@ import { runSwarm } from './commands/swarm.js';
 import { runTrust } from './commands/trust.js';
 import { runUi } from './commands/ui.js';
 
-const KNOWN_CONNECTORS = ['copilot-hooks'];
+const KNOWN_CONNECTORS = ['copilot-hooks', 'claude-hooks'];
 
 const NOOP_PORT: ModelPort = {
   complete: async () => ({ content: '', inputTokens: 0, outputTokens: 0 }),
@@ -108,6 +109,9 @@ async function main(): Promise<number> {
   }
   if (command === 'connectors') {
     return runConnectors(rest, print);
+  }
+  if (command === 'modules') {
+    return runModules(rest, print);
   }
   if (command === 'doctor') {
     if (rest[0] === undefined) {

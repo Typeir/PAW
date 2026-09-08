@@ -16,6 +16,7 @@ import type { ConfigClient } from '../../../src/infrastructure/configClient.js';
 import { Rail } from '../../../src/presentation/chrome/rail.js';
 import { OverviewView, formatMb } from '../../../src/presentation/views/overviewView.js';
 import { ConnectorsView } from '../../../src/presentation/views/connectorsView.js';
+import { ModulesView } from '../../../src/presentation/views/modulesView.js';
 import { KeysView } from '../../../src/presentation/views/keysView.js';
 import { LogsView } from '../../../src/presentation/views/logsView.js';
 import { PendingView } from '../../../src/presentation/views/pendingView.js';
@@ -39,10 +40,31 @@ const configClient = (over: Partial<ConfigClient> = {}): ConfigClient => ({
       title: 'Copilot agent hooks',
       description: 'Bridges hook events.',
       enabled: true,
+      requires: [],
     },
-    { id: 'tsc', kind: 'linter', title: 'TypeScript', description: 'Type errors.', enabled: false },
+    {
+      id: 'tsc',
+      kind: 'linter',
+      title: 'TypeScript',
+      description: 'Type errors.',
+      enabled: false,
+      requires: [],
+    },
   ],
   setConnector: async () => ({ ok: true }),
+  modules: async () => [
+    {
+      id: 'paw-agile',
+      title: 'PAW Agile',
+      description: 'Multi-parent task graph.',
+      specifier: '@paw/agile',
+      enabled: true,
+      resolved: true,
+      detail: '/node_modules/@paw/agile',
+      requiredBy: ['taiga', 'rally'],
+    },
+  ],
+  setModule: async () => ({ ok: true }),
   bind: async () => ({ ok: true }),
   unbind: async () => ({ ok: true }),
   ...over,
@@ -200,7 +222,14 @@ describe('ConnectorsView', () => {
   it('toggles a connector and re-reads the roster', async () => {
     const setConnector = vi.fn(async () => ({ ok: true }));
     const connectors = vi.fn(async () => [
-      { id: 'tsc', kind: 'linter', title: 'TypeScript', description: 'Type errors.', enabled: false },
+      {
+        id: 'tsc',
+        kind: 'linter',
+        title: 'TypeScript',
+        description: 'Type errors.',
+        enabled: false,
+        requires: [],
+      },
     ]);
     renderConnectors(configClient({ setConnector, connectors }));
     await userEvent.click(await screen.findByRole('button', { name: 'enable' }));
@@ -231,6 +260,75 @@ describe('ConnectorsView', () => {
     expect(await screen.findByText('refused')).toBeInTheDocument();
 
     renderInConsole(<ConnectorsView />);
+    expect(screen.getAllByText('— a live daemon backs this view —').length).toBeGreaterThan(0);
+  });
+});
+
+describe('ModulesView', () => {
+  const renderModules = (client = configClient()) =>
+    render(
+      <ConsoleProvider snapshot={makeSnapshot()} config={client}>
+        <ModulesView />
+      </ConsoleProvider>,
+    );
+
+  it('lists the catalogue with installed state and the connectors carried', async () => {
+    renderModules();
+    expect(await screen.findByText('paw-agile')).toBeInTheDocument();
+    expect(screen.getByText('1 of 1 enabled')).toBeInTheDocument();
+    expect(screen.getByText('installed')).toBeInTheDocument();
+    expect(
+      screen.getByRole('list', { name: 'connectors paw-agile carries' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('taiga')).toBeInTheDocument();
+    expect(screen.getByText('rally')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'disable' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('toggles a module and re-reads the roster', async () => {
+    const setModule = vi.fn(async () => ({ ok: true }));
+    const modules = vi.fn(async () => [
+      {
+        id: 'paw-agile',
+        title: 'PAW Agile',
+        description: 'Multi-parent task graph.',
+        specifier: '@paw/agile',
+        enabled: false,
+        resolved: false,
+        detail: 'not installed',
+        requiredBy: [],
+      },
+    ]);
+    renderModules(configClient({ setModule, modules }));
+    await userEvent.click(await screen.findByRole('button', { name: 'enable' }));
+    expect(setModule).toHaveBeenCalledWith('paw-agile', true);
+    await waitFor(() => expect(modules).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('not installed')).toBeInTheDocument();
+  });
+
+  it('reports a refused toggle and a failed read', async () => {
+    renderModules(
+      configClient({ setModule: async () => ({ ok: false, reason: 'taiga still needs it' }) }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'disable' }));
+    expect(await screen.findByText('taiga still needs it')).toBeInTheDocument();
+
+    renderModules(
+      configClient({
+        modules: async () => {
+          throw new Error('offline');
+        },
+      }),
+    );
+    expect(await screen.findByText('could not read the modules')).toBeInTheDocument();
+  });
+
+  it('falls back to a plain refusal, and placeholders on a static page', async () => {
+    renderModules(configClient({ setModule: async () => ({ ok: false }) }));
+    await userEvent.click(await screen.findByRole('button', { name: 'disable' }));
+    expect(await screen.findByText('refused')).toBeInTheDocument();
+
+    renderInConsole(<ModulesView />);
     expect(screen.getAllByText('— a live daemon backs this view —').length).toBeGreaterThan(0);
   });
 });

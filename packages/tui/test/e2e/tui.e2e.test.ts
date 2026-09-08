@@ -99,11 +99,20 @@ describe('tui (e2e)', () => {
     expect(stdout).toContain('cli: paw connectors');
   });
 
+  it('prints the module catalogue with its enabled and installed state', async () => {
+    const { stdout, code } = await runTui('modules quit');
+    expect(code).toBe(0);
+    expect(stdout).toContain('── modules ──');
+    expect(stdout).toContain('paw-agile');
+    expect(stdout).toContain('connectors: taiga, rally');
+    expect(stdout).toContain('cli: paw modules');
+  });
+
   it('exits 1 naming the roster on an unknown action id', async () => {
     const { stderr, code } = await runTui('gallop');
     expect(code).toBe(1);
     expect(stderr).toContain('unknown action "gallop"');
-    expect(stderr).toContain('doctor plan herd gates daemon config connectors quit');
+    expect(stderr).toContain('doctor plan herd gates daemon config connectors modules quit');
   });
 
   it('exits 1 with usage when run bare outside an attached repository', async () => {

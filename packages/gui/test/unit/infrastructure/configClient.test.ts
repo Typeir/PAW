@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CONFIG_ROLES_URL,
   CONFIG_URL,
+  MODULES_URL,
   PROVIDERS_URL,
   createConfigClient,
 } from '../../../src/infrastructure/configClient.js';
@@ -118,6 +119,51 @@ describe('createConfigClient', () => {
         }),
       ).bind('edit.apply', 'fast');
       expect(res).toEqual({ ok: false, reason: 'HTTP 405' });
+    });
+  });
+
+  describe('modules', () => {
+    it('reads the module roster', async () => {
+      const roster = [{ id: 'paw-agile', enabled: true, resolved: true, requiredBy: ['taiga'] }];
+      const fetchFn = respond({ ok: true, json: async () => roster });
+      await expect(createConfigClient(fetchFn).modules()).resolves.toEqual(roster);
+      expect(fetchFn).toHaveBeenCalledWith(MODULES_URL);
+    });
+
+    it('throws when the read fails', async () => {
+      await expect(
+        createConfigClient(respond({ ok: false, status: 404 })).modules(),
+      ).rejects.toThrow('responded 404');
+    });
+
+    it('PUTs the id to enable and DELETEs it in the query to disable', async () => {
+      const on = respond({ ok: true });
+      await createConfigClient(on).setModule('paw-agile', true);
+      expect(on).toHaveBeenCalledWith(MODULES_URL, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: 'paw-agile' }),
+      });
+
+      const off = respond({ ok: true });
+      await createConfigClient(off).setModule('paw-agile', false);
+      expect(off).toHaveBeenCalledWith(`${MODULES_URL}?id=paw-agile`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    it('surfaces the daemon reason when a toggle is refused', async () => {
+      const res = await createConfigClient(
+        respond({
+          ok: false,
+          json: async () => ({ ok: false, reason: 'module "paw-agile" is required by enabled connectors: taiga' }),
+        }),
+      ).setModule('paw-agile', false);
+      expect(res).toEqual({
+        ok: false,
+        reason: 'module "paw-agile" is required by enabled connectors: taiga',
+      });
     });
   });
 

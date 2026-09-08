@@ -23,6 +23,7 @@ import {
   doctorLines,
   gatesLines,
   herdLines,
+  moduleLines,
   planLines,
 } from '../../src/domain/menu.js';
 
@@ -79,8 +80,53 @@ describe('MENU', () => {
       'daemon',
       'config',
       'connectors',
+      'modules',
       'quit',
     ]);
+  });
+});
+
+describe('connectorLines', () => {
+  it('marks each entry and names the module a backend needs', () => {
+    const lines = connectorLines([
+      { id: 'tsc', kind: 'linter', title: 'TypeScript', description: 'type errors', enabled: true, requires: [] },
+      { id: 'taiga', kind: 'backend', title: 'Taiga', description: 'clones projects', enabled: false, requires: ['paw-agile'] },
+    ]);
+    expect(lines[0]).toBe('1 of 2 enabled');
+    expect(lines[2]).toBe('  ✓ tsc (linter) — type errors');
+    expect(lines[3]).toBe('  · taiga (backend) — clones projects [needs paw-agile]');
+  });
+});
+
+describe('moduleLines', () => {
+  it('reports enabled state, installed state, and the connectors carried', () => {
+    const lines = moduleLines([
+      {
+        id: 'paw-agile',
+        title: 'PAW Agile',
+        description: 'work model',
+        specifier: '@paw/agile',
+        enabled: true,
+        resolved: true,
+        detail: '/node_modules/@paw/agile',
+        requiredBy: ['taiga', 'rally'],
+      },
+      {
+        id: 'paw-billing',
+        title: 'PAW Billing',
+        description: 'invoices',
+        specifier: '@paw/billing',
+        enabled: false,
+        resolved: false,
+        detail: 'not installed',
+        requiredBy: [],
+      },
+    ]);
+    expect(lines[0]).toBe('1 of 2 enabled');
+    expect(lines[2]).toBe('  ✓ paw-agile — installed');
+    expect(lines[4]).toBe('      connectors: taiga, rally');
+    expect(lines[5]).toBe('  · paw-billing — not installed');
+    expect(lines[7]).toBe('      connectors: none');
   });
 });
 

@@ -13,8 +13,13 @@ import type { ConfigDocument } from '../domain/config.js';
 import {
   VENDOR_CONNECTORS,
   enabledConnectorIds,
-  knownConnector,
 } from '../domain/connectors.js';
+import {
+  VENDOR_MODULES,
+  dependentConnectors,
+  enabledModuleIds,
+  knownModule,
+} from '../domain/modules.js';
 import type { CostClass, ModelCapabilities } from '../domain/role.js';
 import { BUILTIN_ROLES } from './builtinRoles.js';
 
@@ -123,23 +128,77 @@ export function setBinding(config: ConfigDocument, roleId: string, modelId: stri
 }
 
 /**
- * Enable a catalogued connector. Unknown ids are refused. Idempotent.
+ * Enable a catalogued connector. An unknown id is refused, and so is a
+ * connector whose required modules are not enabled. Idempotent.
  *
  * @param {ConfigDocument} config - The config document.
  * @param {string} id - Connector id.
  * @returns {ConfigEdit} New config, or refusal.
  */
 export function enableConnector(config: ConfigDocument, id: string): ConfigEdit {
-  if (!knownConnector(id)) {
+  const entry = VENDOR_CONNECTORS.find((connector) => connector.id === id);
+  if (entry === undefined) {
     return {
       ok: false,
       reason: `unknown connector "${id}"; known: ${VENDOR_CONNECTORS.map((c) => c.id).join(', ')}`,
+    };
+  }
+  const enabledModules = enabledModuleIds(config);
+  const missing = entry.requires.filter((moduleId) => !enabledModules.includes(moduleId));
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      reason: `connector "${id}" requires module ${missing.join(', ')}; enable it with paw modules enable ${missing.join(' ')}`,
     };
   }
   const current = enabledConnectorIds(config);
   return {
     ok: true,
     config: { ...config, connectors: current.includes(id) ? current : [...current, id] },
+  };
+}
+
+/**
+ * Enable a catalogued module. Unknown ids are refused. Idempotent.
+ *
+ * @param {ConfigDocument} config - The config document.
+ * @param {string} id - Module id.
+ * @returns {ConfigEdit} New config, or refusal.
+ */
+export function enableModule(config: ConfigDocument, id: string): ConfigEdit {
+  if (!knownModule(id)) {
+    return {
+      ok: false,
+      reason: `unknown module "${id}"; known: ${VENDOR_MODULES.map((m) => m.id).join(', ')}`,
+    };
+  }
+  const current = enabledModuleIds(config);
+  return {
+    ok: true,
+    config: { ...config, modules: current.includes(id) ? current : [...current, id] },
+  };
+}
+
+/**
+ * Disable a module. A module an enabled connector requires is refused, naming
+ * the connectors. Disabling one that is not enabled is a no-op edit.
+ *
+ * @param {ConfigDocument} config - The config document.
+ * @param {string} id - Module id.
+ * @returns {ConfigEdit} New config, or refusal.
+ */
+export function disableModule(config: ConfigDocument, id: string): ConfigEdit {
+  const enabledConnectors = enabledConnectorIds(config);
+  const blocking = dependentConnectors(id).filter((cid) => enabledConnectors.includes(cid));
+  if (blocking.length > 0) {
+    return {
+      ok: false,
+      reason: `module "${id}" is required by enabled connectors: ${blocking.join(', ')}; disable them first`,
+    };
+  }
+  return {
+    ok: true,
+    config: { ...config, modules: enabledModuleIds(config).filter((mid) => mid !== id) },
   };
 }
 

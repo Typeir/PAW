@@ -12,4 +12,5 @@
  * @since 5.0.0
  */
 
+export { claudeHooksConnector } from './claudeHooks.js';
 export { copilotHooksConnector } from './copilotHooks.js';

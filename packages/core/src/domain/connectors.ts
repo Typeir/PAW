@@ -4,7 +4,8 @@
  * @fileoverview The connector catalogue this build ships, baked in; there is
  * no vendor endpoint. A `host` connector bridges editor-agent hooks into the
  * loop; a `linter` runs a tool during enforcement and records deferred
- * violations. Enabled ids live in the config `connectors` array.
+ * violations; a `backend` clones an external work tracker through the module
+ * it requires. Enabled ids live in the config `connectors` array.
  *
  * @module @paw/core/domain/connectors
  * @version 0.0.0
@@ -17,22 +18,24 @@ import type { ConfigDocument } from './config.js';
 /**
  * What a connector is to the loop.
  */
-export type ConnectorKind = 'host' | 'linter';
+export type ConnectorKind = 'host' | 'linter' | 'backend';
 
 /**
  * One catalogue entry.
  *
  * @interface ConnectorEntry
  * @property {string} id - Stable id, the value stored in config.
- * @property {ConnectorKind} kind - Host bridge or linter.
+ * @property {ConnectorKind} kind - Host bridge, linter, or work-tracker backend.
  * @property {string} title - Display name.
  * @property {string} description - One line of what enabling does.
+ * @property {readonly string[]} requires - Module ids that must be enabled first.
  */
 export interface ConnectorEntry {
   readonly id: string;
   readonly kind: ConnectorKind;
   readonly title: string;
   readonly description: string;
+  readonly requires: readonly string[];
 }
 
 /**
@@ -47,18 +50,42 @@ export const VENDOR_CONNECTORS: readonly ConnectorEntry[] = [
     kind: 'host',
     title: 'Copilot agent hooks',
     description: 'Bridges Copilot editor-agent hook events into the enforcement loop.',
+    requires: [],
+  },
+  {
+    id: 'claude-hooks',
+    kind: 'host',
+    title: 'Claude Code hooks',
+    description: 'Bridges Claude Code hook events into the enforcement loop.',
+    requires: [],
   },
   {
     id: 'tsc',
     kind: 'linter',
     title: 'TypeScript compiler',
     description: 'Type errors on touched files become deferred violations.',
+    requires: [],
   },
   {
     id: 'eslint',
     kind: 'linter',
     title: 'ESLint',
     description: 'Lint findings on touched files become deferred violations.',
+    requires: [],
+  },
+  {
+    id: 'taiga',
+    kind: 'backend',
+    title: 'Taiga',
+    description: 'Clones Taiga projects into the work model and projects intents back.',
+    requires: ['paw-agile'],
+  },
+  {
+    id: 'rally',
+    kind: 'backend',
+    title: 'Broadcom Rally',
+    description: 'Clones Rally artifacts into the work model over WSAPI and the Lookback API.',
+    requires: ['paw-agile'],
   },
 ];
 

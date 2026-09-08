@@ -524,6 +524,32 @@ ${punchyHover('.selecttrigger', { scale: 1.02 })}
 .connrow .connkind { color: var(--ink-faint); font-size: 10.5px; }
 .connrow .conndesc { color: var(--ink-dim); overflow-wrap: anywhere; }
 
+.bento { list-style: none; margin: 0; padding: 10px; display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.bentotile { display: flex; flex-direction: column; gap: 9px; min-height: 132px;
+  padding: 12px 13px; background: var(--panel-2); border: 1px solid var(--line-soft);
+  border-radius: var(--r-lg); font-family: var(--mono); font-size: 11.5px; }
+.bentotile.on { border-color: color-mix(in oklab, var(--good) 38%, var(--line)); }
+.bentohead { display: flex; align-items: center; gap: 8px; }
+.bentodot { width: 7px; height: 7px; border-radius: 50%; background: var(--idle); flex: none; }
+.bentotile.on .bentodot { background: var(--good);
+  box-shadow: 0 0 6px color-mix(in oklab, var(--good) 80%, transparent); }
+.bentoname { margin: 0; font-family: var(--mono); font-size: 12.5px; font-weight: 600;
+  color: var(--ink); letter-spacing: .01em; }
+.bentostate { margin-left: auto; flex: none; padding: 2px 8px; border-radius: 999px;
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .12em;
+  background: var(--idle-soft); color: var(--ink-faint); border: 1px solid var(--line-soft); }
+.bentotile.ready .bentostate { background: var(--good-soft); color: var(--good);
+  border-color: color-mix(in oklab, var(--good) 30%, transparent); }
+.bentodesc { margin: 0; flex: 1; color: var(--ink-dim); line-height: 1.55; }
+.bentofoot { display: flex; align-items: center; gap: 8px; margin-top: auto;
+  padding-top: 9px; border-top: 1px solid var(--line-soft); }
+.bentocarries { display: flex; flex-wrap: wrap; gap: 5px; list-style: none; margin: 0; padding: 0; }
+.bentocarries li { padding: 2px 7px; border-radius: 999px; background: var(--panel);
+  border: 1px solid var(--line-soft); color: var(--ink-faint); font-size: 10px; }
+.bentonone { color: var(--ink-faint); font-size: 10.5px; font-style: italic; }
+.bentofoot .btn { margin-left: auto; flex: none; }
+
 .keytable { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11.5px; }
 .keytable th { text-align: left; color: var(--ink-faint); font-weight: 500; font-size: 10px;
   text-transform: uppercase; letter-spacing: .12em; padding: 4px 10px 6px; }

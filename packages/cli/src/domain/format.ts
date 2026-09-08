@@ -17,6 +17,7 @@ import type {
   DoctorFinding,
   DoctorReport,
   HealthReport,
+  ModuleStatus,
   SwarmPlan,
   Violation,
 } from '@paw/core';
@@ -92,6 +93,7 @@ export function formatHelp(color = false): string[] {
     '  violations [--prune [file]]    list recorded violations, or clear them',
     '  config <get|set> …             read or edit model and role bindings in .paw/config.json',
     '  connectors [enable|disable <id>]  list the connector catalogue, or turn one on or off',
+    '  modules [enable|disable <id>]     list the module catalogue, or turn one on or off',
     '  doctor <config.json>           check a config file: every role bound to a capable model',
     '  swarm doctor|show|run <plan>   validate, preview, or run a multi-agent swarm plan (.swarm.mjs)',
     '    run flags: --live --full --ui --context a,b --concurrency N --max-tokens N',
@@ -181,8 +183,29 @@ export function formatConnectors(roster: readonly ConnectorRosterRow[]): string[
   return [
     `connectors: ${on} of ${roster.length} enabled`,
     ...roster.map(
-      (row) => `  ${row.enabled ? 'on ' : 'off'} ${row.id} · ${row.kind} · ${row.description}`,
+      (row) =>
+        `  ${row.enabled ? 'on ' : 'off'} ${row.id} · ${row.kind} · ${row.description}${
+          row.requires.length === 0 ? '' : ` · needs ${row.requires.join(', ')}`
+        }`,
     ),
+  ];
+}
+
+/**
+ * Render the module catalogue: enabled state, whether the package resolves,
+ * and the connectors each module carries.
+ *
+ * @param {readonly ModuleStatus[]} roster - Catalogue with enabled and resolved state.
+ * @returns {string[]} Terminal lines.
+ */
+export function formatModules(roster: readonly ModuleStatus[]): string[] {
+  const on = roster.filter((row) => row.enabled).length;
+  return [
+    `modules: ${on} of ${roster.length} enabled`,
+    ...roster.flatMap((row) => [
+      `  ${row.enabled ? 'on ' : 'off'} ${row.id} · ${row.resolved ? 'installed' : 'not installed'} · ${row.description}`,
+      `      connectors: ${row.requiredBy.length === 0 ? 'none' : row.requiredBy.join(', ')}`,
+    ]),
   ];
 }
 

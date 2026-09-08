@@ -16,8 +16,11 @@ import {
   clearBinding,
   declareModel,
   disableConnector,
+  disableModule,
   enableConnector,
+  enableModule,
   enabledConnectorIds,
+  enabledModuleIds,
   parseCapabilities,
   setBinding,
   type ConfigDocumentPort,
@@ -65,6 +68,7 @@ export function configControl(configDoc: ConfigDocumentPort): ControlPort {
         roles: edit.config.roles ?? {},
         models: edit.config.models ?? {},
         connectors: enabledConnectorIds(edit.config),
+        modules: enabledModuleIds(edit.config),
       },
     };
   };
@@ -98,6 +102,20 @@ export function configControl(configDoc: ConfigDocumentPort): ControlPort {
           return refuse('id is required');
         }
         return commit(disableConnector(await configDoc.read(), id));
+      },
+      'PUT /api/modules': async ({ body }) => {
+        const id = asString(body.id);
+        if (id === null) {
+          return refuse('id must be a string');
+        }
+        return commit(enableModule(await configDoc.read(), id));
+      },
+      'DELETE /api/modules': async ({ query, body }) => {
+        const id = asString(body.id) ?? query?.get('id') ?? null;
+        if (id === null) {
+          return refuse('id is required');
+        }
+        return commit(disableModule(await configDoc.read(), id));
       },
       'PUT /api/config/models': async ({ body }) => {
         const id = asString(body.id);

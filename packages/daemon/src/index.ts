@@ -144,7 +144,7 @@ export type { IdentityIo, IdentityIssuer, ServerIdentity } from './infrastructur
 export { identityPaths, pawHome } from './domain/pawHome.js';
 export type { HomeEnv, IdentityPaths } from './domain/pawHome.js';
 
-export { createNodeRecentRoutes } from '@paw/adapters';
+export { createNodeModuleResolver, createNodeRecentRoutes } from '@paw/adapters';
 
 export { nodeIdentityIo, nodeServerIdentity } from './infrastructure/nodeIdentity.js';
 

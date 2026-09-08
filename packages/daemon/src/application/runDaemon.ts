@@ -25,6 +25,7 @@ import {
   LIVE_TOPICS,
   buildRegistry,
   connectorRoster,
+  resolveModules,
   runDoctor,
   type AttachState,
   type BudgetSummary,
@@ -87,7 +88,7 @@ import { buildFileTree, type FileEntry } from '../domain/tree.js';
 /**
  * Connector repo can resolve, for config doctor.
  */
-const KNOWN_CONNECTORS = ['copilot-hooks'];
+const KNOWN_CONNECTORS = ['copilot-hooks', 'claude-hooks'];
 
 /**
  * Plan loaded from disk, with load source.
@@ -115,6 +116,7 @@ export async function runDaemon(
   runtime: DaemonRuntime,
 ): Promise<DaemonHandle> {
   let root = options.root ?? '.';
+  const moduleResolver = options.moduleResolver;
   const log = createLogRing(() => runtime.now());
   log.seed(options.logSink?.load(LOG_CAPACITY) ?? []);
 
@@ -566,6 +568,9 @@ export async function runDaemon(
             roles: (config.roles as Record<string, string> | undefined) ?? {},
           }),
           connectors: () => connectorRoster(config),
+          ...(moduleResolver === undefined
+            ? {}
+            : { modules: () => resolveModules(config, moduleResolver) }),
           token,
           port: boundPort,
           scriptHashes,
