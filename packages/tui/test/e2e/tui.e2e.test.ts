@@ -108,11 +108,19 @@ describe('tui (e2e)', () => {
     expect(stdout).toContain('cli: paw modules');
   });
 
+  it('names the module to enable when the fixture repo has tasks switched off', async () => {
+    const { stdout, code } = await runTui('tasks quit');
+    expect(code).toBe(0);
+    expect(stdout).toContain('── tasks ──');
+    expect(stdout).toContain('the paw-agile module is not enabled');
+    expect(stdout).toContain('cli: paw tasks');
+  });
+
   it('exits 1 naming the roster on an unknown action id', async () => {
     const { stderr, code } = await runTui('gallop');
     expect(code).toBe(1);
     expect(stderr).toContain('unknown action "gallop"');
-    expect(stderr).toContain('doctor plan herd gates daemon config connectors modules quit');
+    expect(stderr).toContain('doctor plan herd gates daemon config connectors modules tasks quit');
   });
 
   it('exits 1 with usage when run bare outside an attached repository', async () => {

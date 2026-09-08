@@ -15,6 +15,7 @@ import { ConnectorsView } from './connectorsView.js';
 import { KeysView } from './keysView.js';
 import { LogsView } from './logsView.js';
 import { ModulesView } from './modulesView.js';
+import { TasksView } from './tasksView.js';
 import { OverviewView } from './overviewView.js';
 import { PendingView } from './pendingView.js';
 import { RolesView } from './rolesView.js';
@@ -45,6 +46,8 @@ export function SectionOutlet() {
       return <ConnectorsView />;
     case 'modules':
       return <ModulesView />;
+    case 'tasks':
+      return <TasksView />;
     default:
       return <PendingView title='Gates' />;
   }

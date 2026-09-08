@@ -550,6 +550,22 @@ ${punchyHover('.selecttrigger', { scale: 1.02 })}
 .bentonone { color: var(--ink-faint); font-size: 10.5px; font-style: italic; }
 .bentofoot .btn { margin-left: auto; flex: none; }
 
+.tasklist { list-style: none; margin: 0; padding: 6px 0; font-family: var(--mono); font-size: 11.5px; }
+.taskrow { display: grid; grid-template-columns: 10px 12ch 1fr 16ch 16ch 5ch; align-items: center;
+  gap: 10px; padding-top: 5px; padding-bottom: 5px; padding-right: 12px;
+  border-top: 1px solid var(--line-soft); }
+.taskrow .taskdot { width: 6px; height: 6px; border-radius: 50%; background: var(--idle); }
+.taskrow.converged .taskdot { background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in oklab, var(--accent) 70%, transparent); }
+.taskrow .taskid { color: var(--ink); overflow-wrap: anywhere; }
+.taskrow .tasktitle { color: var(--ink-dim); overflow-wrap: anywhere; }
+.taskrow .taskedge { color: var(--ink-faint); font-size: 10.5px; overflow-wrap: anywhere; }
+.taskrow .taskroll { color: var(--ink-dim); text-align: right; }
+.refusallist.loops { color: var(--accent); }
+.taskrow .taskorphan { color: var(--warn); font-size: 10.5px; }
+.refusallist { list-style: none; margin: 0; padding: 8px 12px; display: grid; gap: 5px;
+  font-family: var(--mono); font-size: 11px; color: var(--crit); }
+
 .keytable { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11.5px; }
 .keytable th { text-align: left; color: var(--ink-faint); font-weight: 500; font-size: 10px;
   text-transform: uppercase; letter-spacing: .12em; padding: 4px 10px 6px; }

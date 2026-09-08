@@ -14,6 +14,7 @@ import {
   CONFIG_URL,
   MODULES_URL,
   PROVIDERS_URL,
+  TASKS_URL,
   createConfigClient,
 } from '../../../src/infrastructure/configClient.js';
 import type { FetchLike, ResponseLike } from '../../../src/infrastructure/snapshotSource.js';
@@ -164,6 +165,21 @@ describe('createConfigClient', () => {
         ok: false,
         reason: 'module "paw-agile" is required by enabled connectors: taiga',
       });
+    });
+  });
+
+  describe('tasks', () => {
+    it('reads the graph rows and refusals', async () => {
+      const view = { rows: [{ id: 'a', depth: 0 }], refusals: ['cannot link'] };
+      const fetchFn = respond({ ok: true, json: async () => view });
+      await expect(createConfigClient(fetchFn).tasks()).resolves.toEqual(view);
+      expect(fetchFn).toHaveBeenCalledWith(TASKS_URL);
+    });
+
+    it('throws when the read fails', async () => {
+      await expect(
+        createConfigClient(respond({ ok: false, status: 404 })).tasks(),
+      ).rejects.toThrow('responded 404');
     });
   });
 

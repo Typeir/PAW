@@ -32,6 +32,11 @@ export const CONNECTORS_URL = '/api/connectors';
 export const MODULES_URL = '/api/modules';
 
 /**
+ * Daemon task-graph read endpoint.
+ */
+export const TASKS_URL = '/api/tasks';
+
+/**
  * Daemon role-binding write endpoint.
  */
 export const CONFIG_ROLES_URL = '/api/config/roles';
@@ -125,6 +130,46 @@ export interface ModuleRow {
 }
 
 /**
+ * One task the graph endpoint serves.
+ *
+ * @interface TaskGraphRow
+ * @property {string} id - Task id.
+ * @property {string} title - Display text.
+ * @property {readonly string[]} parents - Parent ids.
+ * @property {readonly string[]} children - Child ids.
+ * @property {number} depth - Longest distance from a root.
+ * @property {number} rollup - Points including everything below it.
+ * @property {boolean} orphan - Whether a parent the document names for it is absent.
+ */
+export interface TaskGraphRow {
+  readonly id: string;
+  readonly title: string;
+  readonly parents: readonly string[];
+  readonly children: readonly string[];
+  readonly depth: number;
+  readonly rollup: number;
+  readonly orphan: boolean;
+}
+
+/**
+ * The graph, and everything the task document asked for and did not get.
+ *
+ * @interface TaskGraphView
+ * @property {boolean} enabled - Whether the repo config enables the paw-agile module.
+ * @property {readonly TaskGraphRow[]} rows - Rows, parents before children.
+ * @property {readonly string[]} refusals - Reasons the kernel or the parser gave.
+ * @property {readonly {parent: string, child: string}[]} loops - Ring-closing edges, declared and not walked.
+ * @property {readonly {parent: string, child: string}[]} dangling - Edges naming an absent task.
+ */
+export interface TaskGraphView {
+  readonly enabled: boolean;
+  readonly rows: readonly TaskGraphRow[];
+  readonly refusals: readonly string[];
+  readonly loops: readonly { readonly parent: string; readonly child: string }[];
+  readonly dangling: readonly { readonly parent: string; readonly child: string }[];
+}
+
+/**
  * Binding editor, Keys view, and Connectors view verbs.
  *
  * @interface ConfigClient
@@ -133,6 +178,7 @@ export interface ModuleRow {
  * @property {() => Promise<readonly ProviderRow[]>} providers - Key-free provider roster.
  * @property {() => Promise<readonly ConnectorRow[]>} connectors - Connector catalogue with enabled state.
  * @property {() => Promise<readonly ModuleRow[]>} modules - Module catalogue with enabled and resolved state.
+ * @property {() => Promise<TaskGraphView>} tasks - Task graph rows and refusals.
  * @property {(role: string, model: string) => Promise<ConfigWrite>} bind - Bind role to model.
  * @property {(role: string) => Promise<ConfigWrite>} unbind - Clear role binding.
  * @property {(id: string, on: boolean) => Promise<ConfigWrite>} setConnector - Enable or disable a connector.
@@ -144,6 +190,7 @@ export interface ConfigClient {
   providers(): Promise<readonly ProviderRow[]>;
   connectors(): Promise<readonly ConnectorRow[]>;
   modules(): Promise<readonly ModuleRow[]>;
+  tasks(): Promise<TaskGraphView>;
   bind(role: string, model: string): Promise<ConfigWrite>;
   unbind(role: string): Promise<ConfigWrite>;
   setConnector(id: string, on: boolean): Promise<ConfigWrite>;
@@ -215,6 +262,13 @@ export function createConfigClient(fetchFn: FetchLike): ConfigClient {
           ...(on ? { body: JSON.stringify({ id }) } : {}),
         }),
       );
+    },
+    async tasks(): Promise<TaskGraphView> {
+      const response = await fetchFn(TASKS_URL);
+      if (!response.ok) {
+        throw new Error(`PAW console: ${TASKS_URL} responded ${response.status}`);
+      }
+      return (await response.json()) as TaskGraphView;
     },
     async modules(): Promise<readonly ModuleRow[]> {
       const response = await fetchFn(MODULES_URL);

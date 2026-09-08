@@ -15,13 +15,18 @@ describe('@paw/agile', () => {
     expect(Object.keys(api).sort()).toEqual([
       'addTask',
       'ancestorsOf',
+      'buildGraph',
       'childrenOf',
       'descendantsOf',
       'emptyGraph',
+      'graphRows',
+      'ingestLink',
       'link',
       'parentsOf',
       'rollup',
       'rootsOf',
+      'taskDetail',
+      'taskViewFrom',
       'topologicalOrder',
       'unlink',
     ]);

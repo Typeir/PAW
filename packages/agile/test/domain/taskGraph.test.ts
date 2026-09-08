@@ -16,6 +16,7 @@ import {
   childrenOf,
   descendantsOf,
   emptyGraph,
+  ingestLink,
   link,
   parentsOf,
   rollup,
@@ -152,6 +153,47 @@ describe('link', () => {
     const graph = withLink(withTask(convergent(), 'g', 1), 'g', 'a');
     expect(parentsOf(graph, 'a')).toEqual(['g']);
     expect(rollup(graph, 'g', 'points')).toBe(7);
+  });
+});
+
+describe('ingestLink', () => {
+  const take = ingestLink;
+
+  it('declares a ring-closing edge instead of refusing it, and never walks it', () => {
+    const graph = take(convergent(), 'f', 'a');
+    expect(graph.loops).toEqual([{ parent: 'f', child: 'a' }]);
+    expect(childrenOf(graph, 'f')).toEqual([]);
+    expect(parentsOf(graph, 'a')).toEqual([]);
+    expect(descendantsOf(graph, 'a')).toEqual(['b', 'c', 'd', 'e', 'f']);
+    expect(rollup(graph, 'a', 'points')).toBe(6);
+  });
+
+  it('declares a self-link as a ring of one', () => {
+    const graph = take(convergent(), 'a', 'a');
+    expect(graph.loops).toEqual([{ parent: 'a', child: 'a' }]);
+    expect(childrenOf(graph, 'a')).toEqual(['b', 'c']);
+  });
+
+  it('takes an ordinary edge as a walkable one', () => {
+    const graph = take(withTask(convergent(), 'g', 1), 'g', 'a');
+    expect(graph.loops).toEqual([]);
+    expect(parentsOf(graph, 'a')).toEqual(['g']);
+  });
+
+  it('is idempotent', () => {
+    const graph = convergent();
+    expect(ingestLink(graph, 'a', 'b')).toBe(graph);
+  });
+
+  it('records an edge naming an absent task rather than dropping it, either end', () => {
+    const missingParent = take(convergent(), 'ghost', 'a');
+    expect(missingParent.dangling).toEqual([{ parent: 'ghost', child: 'a' }]);
+    expect(parentsOf(missingParent, 'a')).toEqual([]);
+
+    const missingChild = take(convergent(), 'a', 'ghost');
+    expect(missingChild.dangling).toEqual([{ parent: 'a', child: 'ghost' }]);
+    expect(childrenOf(missingChild, 'a')).toEqual(['b', 'c']);
+    expect(descendantsOf(missingChild, 'a')).toEqual(['b', 'c', 'd', 'e', 'f']);
   });
 });
 

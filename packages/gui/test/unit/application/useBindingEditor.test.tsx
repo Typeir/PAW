@@ -40,6 +40,7 @@ const client = (over: Partial<ConfigClient> = {}): ConfigClient => ({
   setConnector: async () => ({ ok: true }),
   modules: async () => [],
   setModule: async () => ({ ok: true }),
+  tasks: async () => ({ enabled: true, rows: [], refusals: [], loops: [], dangling: [] }),
   bind: async () => ({ ok: true }),
   unbind: async () => ({ ok: true }),
   ...over,

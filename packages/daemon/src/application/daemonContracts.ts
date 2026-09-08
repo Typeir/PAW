@@ -215,6 +215,7 @@ export type Dispatcher = (
  * @property {LogSinkLike} [logSink] - Log persistence: every report appends one entry, boot seeds the ring from the persisted tail. Omit and logs stay per-boot.
  * @property {() => readonly unknown[]} [providers] - Key-free provider roster served at `/api/providers` for the Keys view. Omit and the route answers 404.
  * @property {ModuleResolverPort} [moduleResolver] - Locates each module's package for `/api/modules`. Omit and the route answers 404.
+ * @property {() => Promise<unknown>} [tasks] - Task graph rows and refusals for `/api/tasks`. Wired by a shell that has the work-model module. Omit and the route answers 404.
  */
 export interface DaemonOptions {
   readonly root?: string;
@@ -231,6 +232,7 @@ export interface DaemonOptions {
   readonly logSink?: LogSinkLike;
   readonly providers?: () => readonly unknown[];
   readonly moduleResolver?: ModuleResolverPort;
+  readonly tasks?: () => Promise<unknown>;
   onAttach?(path: string, mode: InitMode): void;
   onRelease?(settings: RunSettings): void;
   dispatcherFor?(settings: RunSettings): Dispatcher;

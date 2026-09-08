@@ -37,6 +37,7 @@ export type Section =
   | 'keys'
   | 'connectors'
   | 'modules'
+  | 'tasks'
   | 'swarm'
   | 'logs';
 

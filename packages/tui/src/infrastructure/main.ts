@@ -43,11 +43,14 @@ import {
   type Violation,
 } from '@paw/core';
 import { ansiPaint } from '@paw/cosmetics';
+import { graphRows } from '@paw/agile';
 import {
+  ROLLUP_FIELD,
   createNodeConfigDocument,
   createNodeFileReader,
   createNodeGateRunner,
   createNodeModuleResolver,
+  readRepoTasks,
 } from '@paw/adapters';
 import { rpcCall, socketPath, tokenPath } from '@paw/daemon';
 import {
@@ -60,6 +63,7 @@ import {
   herdLines,
   moduleLines,
   planLines,
+  taskLines,
   type ActionId,
   type ConfigSnapshot,
   type DaemonSnapshot,
@@ -336,6 +340,10 @@ async function runAction(
   if (id === 'modules') {
     const config = await createNodeConfigDocument(root).read();
     return moduleLines(await resolveModules(config, createNodeModuleResolver(root)));
+  }
+  if (id === 'tasks') {
+    const { enabled, graph, refusals } = await readRepoTasks(root);
+    return taskLines({ enabled, rows: graphRows(graph, ROLLUP_FIELD), refusals, loops: graph.loops, dangling: graph.dangling });
   }
   // config
   const doc = createNodeConfigDocument(root);

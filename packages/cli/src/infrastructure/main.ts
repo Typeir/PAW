@@ -33,6 +33,7 @@ import { runCheck } from './commands/check.js';
 import { runConfig } from './commands/config.js';
 import { runConnectors } from './commands/connectors.js';
 import { runModules } from './commands/modules.js';
+import { runTasks } from './commands/tasks.js';
 import { runDaemonCommand } from './commands/daemonCommand.js';
 import { runGates } from './commands/gates.js';
 import { runInit } from './commands/init.js';
@@ -112,6 +113,9 @@ async function main(): Promise<number> {
   }
   if (command === 'modules') {
     return runModules(rest, print);
+  }
+  if (command === 'tasks') {
+    return runTasks(rest, print);
   }
   if (command === 'doctor') {
     if (rest[0] === undefined) {

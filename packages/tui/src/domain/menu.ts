@@ -27,8 +27,27 @@ import type {
   ModuleStatus,
 } from '@paw/core';
 
+import type { Edge, TaskRow } from '@paw/agile';
+
 const GATE_FINDING_CAP = 8;
 const VIOLATION_FILE_CAP = 8;
+
+/**
+ * The work graph as the TUI prints it.
+ *
+ * @interface TaskPanel
+ * @property {boolean} enabled - Whether `.paw/config.json` enables the module.
+ * @property {readonly TaskRow[]} rows - Rows, parents before children.
+ * @property {readonly string[]} refusals - Edges the kernel refused.
+ * @property {readonly Edge[]} loops - Ring-closing edges, declared and not walked.
+ */
+export interface TaskPanel {
+  readonly enabled: boolean;
+  readonly rows: readonly TaskRow[];
+  readonly refusals: readonly string[];
+  readonly loops: readonly Edge[];
+  readonly dangling: readonly Edge[];
+}
 
 /**
  * Resident daemon self-report, same shape as `daemon.status` return.
@@ -108,6 +127,7 @@ export type ActionId =
   | 'config'
   | 'connectors'
   | 'modules'
+  | 'tasks'
   | 'quit';
 
 /**
@@ -178,6 +198,12 @@ export const MENU: readonly MenuEntry[] = [
     hint: 'which federated modules are on, and which connectors need them',
     cli: 'paw modules',
   },
+  {
+    id: 'tasks',
+    label: 'tasks',
+    hint: 'the work graph this repository describes',
+    cli: 'paw tasks',
+  },
   { id: 'quit', label: 'quit', hint: 'leave', cli: null },
 ];
 
@@ -217,6 +243,47 @@ export function moduleLines(roster: readonly ModuleStatus[]): string[] {
       `      connectors: ${row.requiredBy.length === 0 ? 'none' : row.requiredBy.join(', ')}`,
     ]),
   ];
+}
+
+/**
+ * Render the work graph, one line per task, indented by depth. A module that
+ * is not enabled prints the verb that enables it and no rows.
+ *
+ * @param {TaskPanel} panel - Module state, rows, and refusals.
+ * @returns {string[]} Panel lines.
+ */
+export function taskLines(panel: TaskPanel): string[] {
+  if (!panel.enabled) {
+    return ['the paw-agile module is not enabled', '', 'cli: paw modules enable paw-agile'];
+  }
+  const edges = (ids: readonly string[]): string => (ids.length === 0 ? '—' : ids.join(', '));
+  const lines = [
+    `${panel.rows.length} tasks`,
+    '',
+    ...panel.rows.map(
+      (row) =>
+        `${'  '.repeat(row.depth + 1)}${row.id}${row.orphan ? ' (orphan)' : ''} — ${row.title}` +
+        `  ↑ ${edges(row.parents)}  ↓ ${edges(row.children)}  ${row.rollup}`,
+    ),
+  ];
+  if (panel.loops.length > 0) {
+    lines.push(
+      '',
+      `loops: ${panel.loops.length} declared, not walked`,
+      ...panel.loops.map((edge) => `  ${edge.parent} → ${edge.child}`),
+    );
+  }
+  if (panel.dangling.length > 0) {
+    lines.push(
+      '',
+      `dangling: ${panel.dangling.length} naming an absent task`,
+      ...panel.dangling.map((edge) => `  ${edge.parent} → ${edge.child}`),
+    );
+  }
+  if (panel.refusals.length === 0) {
+    return lines;
+  }
+  return [...lines, '', `refused: ${panel.refusals.length}`, ...panel.refusals.map((w) => `  ${w}`)];
 }
 
 /**

@@ -557,6 +557,24 @@ describe('the module roster', () => {
   });
 });
 
+describe('the task graph', () => {
+  it('serves rows and refusals when the daemon supplies them', async () => {
+    const view = { rows: [{ id: 'a', depth: 0 }], refusals: ['cannot link'] };
+    const res = await route(req('/api/tasks'), { ...deps, tasks: async () => view });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual(view);
+  });
+
+  it('answers 404 with no source supplied, and 401 without the token', async () => {
+    expect((await route(req('/api/tasks'), deps)).status).toBe(404);
+    const res = await route(req('/api/tasks', { headers: { authorization: 'Bearer wrong' } }), {
+      ...deps,
+      tasks: async () => ({}),
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('the provider roster', () => {
   it('serves the key-free roster when the daemon supplies one', async () => {
     const roster = [{ name: 'deepseek', type: 'openai', baseUrl: 'https://x', keyChars: 5 }];

@@ -37,6 +37,8 @@ import { app, BrowserWindow, ipcMain, session } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { graphRows } from '@paw/agile';
+import { ROLLUP_FIELD, readRepoTasks } from '@paw/adapters';
 import {
   chromiumFingerprint,
   createNodeLogSink,
@@ -55,6 +57,19 @@ import {
  * This launch is a headless regression capture.
  */
 const IS_CAPTURE = process.argv.includes('--capture') || process.env.PAW_CAPTURE === '1';
+
+/**
+ * Build a task-graph thunk over a repository, for the Tasks view.
+ *
+ * @param {string} root - Repository to read from.
+ * @returns {() => Promise<unknown>} Reader the daemon calls per request.
+ */
+function taskSourceFor(root: string): () => Promise<unknown> {
+  return async () => {
+    const { enabled, graph, refusals } = await readRepoTasks(root);
+    return { enabled, rows: graphRows(graph, ROLLUP_FIELD), refusals, loops: graph.loops, dangling: graph.dangling };
+  };
+}
 
 /**
  * Hardened `webPreferences` shared by interactive and capture windows.
@@ -340,6 +355,7 @@ async function start(): Promise<void> {
       logSink: createNodeLogSink(join(launch.root, '.paw', 'daemon.log')),
       providers: () => listProviders(launch.root),
       moduleResolver: createNodeModuleResolver(launch.root),
+      tasks: taskSourceFor(launch.root),
     },
     nodeRuntime(GUI_PAGE),
   );

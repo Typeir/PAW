@@ -28,6 +28,8 @@ import {
   formatHerd,
   formatPlanDoctor,
   formatPruned,
+  formatTaskDetail,
+  formatTasks,
   formatViolations,
 } from '../../src/domain/format.js';
 
@@ -99,6 +101,102 @@ describe('formatConnectors', () => {
       { id: 'taiga', kind: 'backend', title: 'Taiga', description: 'clones projects', enabled: false, requires: ['paw-agile'] },
     ]);
     expect(lines[1]).toBe('  off taiga · backend · clones projects · needs paw-agile');
+  });
+});
+
+describe('formatTasks', () => {
+  const rows = [
+    { id: 'a', title: 'Checkout', parents: [], children: ['b'], depth: 0, rollup: 3, orphan: false },
+    { id: 'b', title: 'Card form', parents: ['a'], children: [], depth: 1, rollup: 1, orphan: false },
+  ];
+
+  it('indents by depth and names each task’s own parents and children', () => {
+    expect(formatTasks(rows, [])).toEqual([
+      'tasks: 2 in the graph',
+      '  a  Checkout  ↑ —  ↓ b  3',
+      '    b  Card form  ↑ a  ↓ —  1',
+    ]);
+  });
+
+  it('appends the refused edges when there are any', () => {
+    const lines = formatTasks(rows, ['unknown task "ghost"']);
+    expect(lines[3]).toBe('refused: 1');
+    expect(lines[4]).toBe('  unknown task "ghost"');
+  });
+
+  it('lists ring-closing edges apart from refusals', () => {
+    const lines = formatTasks(rows, [], [{ parent: 'b', child: 'a' }]);
+    expect(lines[3]).toBe('loops: 1 declared, not walked');
+    expect(lines[4]).toBe('  b → a');
+    expect(lines).not.toContain('refused: 0');
+  });
+
+  it('lists edges naming an absent task and marks the orphaned row', () => {
+    const orphaned = [{ ...rows[0], orphan: true }];
+    const lines = formatTasks(orphaned, [], [], [{ parent: 'ghost', child: 'a' }]);
+    expect(lines[1]).toBe('  a (orphan)  Checkout  ↑ —  ↓ b  3');
+    expect(lines[2]).toBe('dangling: 1 naming an absent task');
+    expect(lines[3]).toBe('  ghost → a');
+  });
+});
+
+describe('formatTaskDetail', () => {
+  const detail = {
+    row: { id: 'd', title: 'Validator', parents: ['b', 'c'], children: ['f'], depth: 2, rollup: 2, orphan: false },
+    ancestors: [
+      { id: 'b', title: 'Card form', parents: ['a'], children: ['d'], depth: 1, rollup: 3, orphan: false },
+    ],
+    descendants: [
+      { id: 'f', title: 'E2E test', parents: ['d'], children: [], depth: 3, rollup: 1, orphan: true },
+    ],
+    loops: [{ parent: 'f', child: 'd' }],
+    dangling: [{ parent: 'ghost', child: 'f' }],
+  };
+
+  it('renders one task without its related tasks by default, unwalked edges included', () => {
+    expect(formatTaskDetail(detail, false)).toEqual([
+      'task "d" — Validator',
+      '  depth 2 · rollup 2',
+      '  parents   b, c',
+      '  children  f',
+      '  loops     f → d',
+      '  dangling  ghost → f',
+    ]);
+  });
+
+  it('adds the ancestor and descendant blocks under --related', () => {
+    const lines = formatTaskDetail(detail, true);
+    expect(lines).toContain('ancestors: 1');
+    expect(lines).toContain('  b  Card form');
+    expect(lines).toContain('descendants: 1');
+    expect(lines).toContain('  f  E2E test');
+  });
+
+  it('renders an em dash for a task with no edges either way', () => {
+    const lone = {
+      row: { id: 'x', title: 'Lone', parents: [], children: [], depth: 0, rollup: 0, orphan: false },
+      ancestors: [],
+      descendants: [],
+      loops: [],
+      dangling: [],
+    };
+    const lines = formatTaskDetail(lone, true);
+    expect(lines[2]).toBe('  parents   —');
+    expect(lines[3]).toBe('  children  —');
+    expect(lines[4]).toBe('  loops     —');
+    expect(lines[5]).toBe('  dangling  —');
+    expect(lines).toContain('ancestors: 0');
+  });
+
+  it('marks an orphaned task in its heading', () => {
+    const orphaned = {
+      row: { id: 'x', title: 'Lone', parents: [], children: [], depth: 0, rollup: 0, orphan: true },
+      ancestors: [],
+      descendants: [],
+      loops: [],
+      dangling: [{ parent: 'ghost', child: 'x' }],
+    };
+    expect(formatTaskDetail(orphaned, false)[0]).toBe('task "x" — Lone (orphan)');
   });
 });
 

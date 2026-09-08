@@ -2,9 +2,11 @@
  * PAW Agile Task Graph
  *
  * @fileoverview A multi-parent directed acyclic graph of tasks. Every edit is
- * pure and returns a new graph or a refusal; `link` refuses an edge that closes
- * a loop and names the path. A task carries an opaque field bag; this module
- * names no rung, status, or workflow.
+ * pure and returns a new graph or a refusal. A direct write through `link`
+ * refuses an edge that closes a loop and names the path; `ingestLink` declares
+ * that edge into `loops` instead, because a backend's data is never dropped. A
+ * task carries an opaque field bag; this module names no rung, status, or
+ * workflow.
  *
  * @module @paw/agile/domain/taskGraph
  * @version 0.0.0
@@ -27,17 +29,35 @@ export interface Task {
 }
 
 /**
- * Tasks and their edges. Both edge maps hold the same edges, keyed each way.
+ * One edge, as recorded rather than walked.
+ *
+ * @interface Edge
+ * @property {string} parent - Task the edge points from.
+ * @property {string} child - Task the edge points to.
+ */
+export interface Edge {
+  readonly parent: string;
+  readonly child: string;
+}
+
+/**
+ * Tasks and their edges. Both edge maps hold the same walkable edges, keyed
+ * each way. `loops` holds edges that close a ring: recorded, never walked, so
+ * every traversal and rollup is total without filtering them out.
  *
  * @interface TaskGraph
  * @property {ReadonlyMap<string, Task>} tasks - Tasks by id, insertion order.
  * @property {ReadonlyMap<string, readonly string[]>} parents - Parent ids by child id.
  * @property {ReadonlyMap<string, readonly string[]>} children - Child ids by parent id.
+ * @property {readonly Edge[]} loops - Edges declared as ring-closing.
+ * @property {readonly Edge[]} dangling - Edges naming a task the graph does not hold.
  */
 export interface TaskGraph {
   readonly tasks: ReadonlyMap<string, Task>;
   readonly parents: ReadonlyMap<string, readonly string[]>;
   readonly children: ReadonlyMap<string, readonly string[]>;
+  readonly loops: readonly Edge[];
+  readonly dangling: readonly Edge[];
 }
 
 /**
@@ -53,7 +73,13 @@ export type GraphEdit =
  * @returns {TaskGraph} The empty graph.
  */
 export function emptyGraph(): TaskGraph {
-  return { tasks: new Map(), parents: new Map(), children: new Map() };
+  return {
+    tasks: new Map(),
+    parents: new Map(),
+    children: new Map(),
+    loops: [],
+    dangling: [],
+  };
 }
 
 /**
@@ -199,10 +225,39 @@ export function link(graph: TaskGraph, parentId: string, childId: string): Graph
   return {
     ok: true,
     graph: {
-      tasks: graph.tasks,
+      ...graph,
       parents: withEdge(graph.parents, childId, parentId),
       children: withEdge(graph.children, parentId, childId),
     },
+  };
+}
+
+/**
+ * Take an edge from a backend. Nothing is refused: an edge that closes a ring —
+ * a self-link included — is declared into `loops`, and an edge naming a task
+ * the graph does not hold is declared into `dangling`. Both are recorded and
+ * neither is walked, so no traversal can recurse or reach a task that is not
+ * there. Re-taking an existing edge is a no-op.
+ *
+ * @param {TaskGraph} graph - The graph.
+ * @param {string} parentId - Task the edge points from.
+ * @param {string} childId - Task the edge points to.
+ * @returns {TaskGraph} Next graph. Ingest never refuses, so there is nothing to report.
+ */
+export function ingestLink(graph: TaskGraph, parentId: string, childId: string): TaskGraph {
+  if (!graph.tasks.has(parentId) || !graph.tasks.has(childId)) {
+    return { ...graph, dangling: [...graph.dangling, { parent: parentId, child: childId }] };
+  }
+  if (childrenOf(graph, parentId).includes(childId)) {
+    return graph;
+  }
+  if (parentId === childId || pathDown(graph, childId, parentId, new Set()) !== null) {
+    return { ...graph, loops: [...graph.loops, { parent: parentId, child: childId }] };
+  }
+  return {
+    ...graph,
+    parents: withEdge(graph.parents, childId, parentId),
+    children: withEdge(graph.children, parentId, childId),
   };
 }
 
@@ -216,7 +271,7 @@ export function link(graph: TaskGraph, parentId: string, childId: string): Graph
  */
 export function unlink(graph: TaskGraph, parentId: string, childId: string): TaskGraph {
   return {
-    tasks: graph.tasks,
+    ...graph,
     parents: withoutEdge(graph.parents, childId, parentId),
     children: withoutEdge(graph.children, parentId, childId),
   };

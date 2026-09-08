@@ -17,6 +17,7 @@ import { Rail } from '../../../src/presentation/chrome/rail.js';
 import { OverviewView, formatMb } from '../../../src/presentation/views/overviewView.js';
 import { ConnectorsView } from '../../../src/presentation/views/connectorsView.js';
 import { ModulesView } from '../../../src/presentation/views/modulesView.js';
+import { TasksView } from '../../../src/presentation/views/tasksView.js';
 import { KeysView } from '../../../src/presentation/views/keysView.js';
 import { LogsView } from '../../../src/presentation/views/logsView.js';
 import { PendingView } from '../../../src/presentation/views/pendingView.js';
@@ -65,6 +66,17 @@ const configClient = (over: Partial<ConfigClient> = {}): ConfigClient => ({
     },
   ],
   setModule: async () => ({ ok: true }),
+  tasks: async () => ({
+    enabled: true,
+    rows: [
+      { id: 'a', title: 'Checkout rework', parents: [], children: ['b', 'c'], depth: 0, rollup: 6, orphan: false },
+      { id: 'b', title: 'Card form', parents: ['a'], children: ['d'], depth: 1, rollup: 2, orphan: false },
+      { id: 'd', title: 'Shared validator', parents: ['b', 'c'], children: [], depth: 2, rollup: 1, orphan: true },
+    ],
+    refusals: [],
+    loops: [{ parent: 'd', child: 'a' }],
+    dangling: [{ parent: 'ghost', child: 'd' }],
+  }),
   bind: async () => ({ ok: true }),
   unbind: async () => ({ ok: true }),
   ...over,
@@ -333,6 +345,95 @@ describe('ModulesView', () => {
   });
 });
 
+describe('TasksView', () => {
+  const renderTasks = (client = configClient()) =>
+    render(
+      <ConsoleProvider snapshot={makeSnapshot()} config={client}>
+        <TasksView />
+      </ConsoleProvider>,
+    );
+
+  it('renders one row per task with its parents, children, and rollup', async () => {
+    renderTasks();
+    expect(await screen.findByText('Checkout rework')).toBeInTheDocument();
+    expect(screen.getByText('3 tasks')).toBeInTheDocument();
+    expect(screen.getByText('↑ b, c')).toBeInTheDocument();
+    expect(screen.getByText('↓ b, c')).toBeInTheDocument();
+    expect(screen.getAllByText('↑ —')).toHaveLength(1);
+  });
+
+  it('indents by depth and marks a task with more than one parent', async () => {
+    renderTasks();
+    const converged = (await screen.findByText('Shared validator')).closest('li');
+    expect(converged).toHaveClass('converged');
+    expect(converged).toHaveStyle({ paddingLeft: '46px' });
+    expect(screen.getByText('Checkout rework').closest('li')).not.toHaveClass('converged');
+  });
+
+  it('lists the ring-closing edges the ingest declared, apart from refusals', async () => {
+    renderTasks();
+    expect(await screen.findByText('Loops')).toBeInTheDocument();
+    expect(screen.getByText('1 declared, not walked')).toBeInTheDocument();
+    expect(screen.getByText('d → a')).toBeInTheDocument();
+    expect(screen.queryByText('Refused')).toBeNull();
+  });
+
+  it('lists edges naming an absent task and marks the orphaned row', async () => {
+    renderTasks();
+    expect(await screen.findByText('Dangling')).toBeInTheDocument();
+    expect(screen.getByText('1 naming an absent task')).toBeInTheDocument();
+    expect(screen.getByText('ghost → d')).toBeInTheDocument();
+    expect(screen.getByText('orphan')).toBeInTheDocument();
+  });
+
+  it('lists the edges the kernel refused', async () => {
+    renderTasks(
+      configClient({
+        tasks: async () => ({
+          enabled: true,
+          rows: [],
+          refusals: ['unknown task "ghost"'],
+          loops: [],
+          dangling: [],
+        }),
+      }),
+    );
+    expect(await screen.findByText('unknown task "ghost"')).toBeInTheDocument();
+    expect(screen.getByText('Refused')).toBeInTheDocument();
+    expect(screen.queryByText('Loops')).toBeNull();
+  });
+
+  it('hides the refused card when every edge took', async () => {
+    renderTasks(configClient({ tasks: async () => ({ enabled: true, rows: [], refusals: [], loops: [], dangling: [] }) }));
+    expect(await screen.findByText('— this repository describes no tasks —')).toBeInTheDocument();
+    expect(screen.queryByText('Refused')).toBeNull();
+  });
+
+  it('names the module to enable when the repository has it switched off', async () => {
+    renderTasks(
+      configClient({ tasks: async () => ({ enabled: false, rows: [], refusals: [], loops: [], dangling: [] }) }),
+    );
+    expect(
+      await screen.findByText(/enable the paw-agile module to read this repository/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Refused')).toBeNull();
+  });
+
+  it('reports a failed read, and placeholders on a static page', async () => {
+    renderTasks(
+      configClient({
+        tasks: async () => {
+          throw new Error('offline');
+        },
+      }),
+    );
+    expect(await screen.findByText('could not read the task graph')).toBeInTheDocument();
+
+    renderInConsole(<TasksView />);
+    expect(screen.getAllByText('— a live daemon backs this view —').length).toBeGreaterThan(0);
+  });
+});
+
 describe('KeysView', () => {
   it('shows the key-free provider roster, broken files with their reason', async () => {
     render(
@@ -467,7 +568,17 @@ describe('SectionOutlet', () => {
     expect(screen.getByRole('heading', { name: 'Swarm', level: 1 })).toBeInTheDocument();
   });
 
-  it.each(['Overview', 'Roles', 'Violations', 'Gates', 'Keys', 'Logs'])(
+  it.each([
+    'Overview',
+    'Roles',
+    'Violations',
+    'Gates',
+    'Keys',
+    'Logs',
+    'Connectors',
+    'Modules',
+    'Tasks',
+  ])(
     'switches to the %s subsystem from the rail',
     async (name) => {
       renderInConsole(

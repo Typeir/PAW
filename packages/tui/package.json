@@ -2,7 +2,7 @@
   "name": "@paw/tui",
   "version": "0.0.0",
   "private": true,
-  "description": "PAW TUI — a driving adapter that consumes @paw/core. A pure renderer and reducer behind a thin process shell.",
+  "description": "PAW TUI â€” a driving adapter that consumes @paw/core. A pure renderer and reducer behind a thin process shell.",
   "type": "module",
   "bin": {
     "paw-tui": "./src/infrastructure/main.ts"
@@ -15,6 +15,7 @@
   "dependencies": {
     "@clack/prompts": "^1.1.0",
     "@paw/adapters": "file:../adapters",
+    "@paw/agile": "file:../agile",
     "@paw/core": "file:../core",
     "@paw/cosmetics": "file:../cosmetics",
     "@paw/daemon": "file:../daemon"

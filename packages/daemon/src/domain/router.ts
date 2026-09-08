@@ -111,6 +111,7 @@ export interface ConfigView {
  * @property {() => readonly unknown[]} [providers] - Key-free provider roster for the Keys view.
  * @property {() => readonly unknown[]} [connectors] - Connector catalogue with enabled state, for the Connectors view.
  * @property {() => Promise<readonly unknown[]>} [modules] - Module catalogue with enabled and resolved state, for the Modules view.
+ * @property {() => Promise<unknown>} [tasks] - Task graph rows and refusals, for the Tasks view.
  */
 export interface RouterDeps {
   readonly page: string;
@@ -123,6 +124,7 @@ export interface RouterDeps {
   readonly providers?: () => readonly unknown[];
   readonly connectors?: () => readonly unknown[];
   readonly modules?: () => Promise<readonly unknown[]>;
+  readonly tasks?: () => Promise<unknown>;
   readonly token: string;
   readonly port: number;
   readonly scriptHashes: readonly string[];
@@ -384,6 +386,9 @@ export async function route(request: HttpRequest, deps: RouterDeps): Promise<Htt
     }
     if (request.path === '/api/modules' && deps.modules !== undefined) {
       return json(await deps.modules(), cors);
+    }
+    if (request.path === '/api/tasks' && deps.tasks !== undefined) {
+      return json(await deps.tasks(), cors);
     }
     if (request.path === '/api/recent') {
       return json(deps.recent === undefined ? [] : await deps.recent(), cors);

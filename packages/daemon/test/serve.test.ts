@@ -418,6 +418,17 @@ describe('runDaemon', () => {
     expect((await bare.handler()?.(asConsole('/api/modules')))?.status).toBe(404);
   });
 
+  it('serves the task view a shell supplies, and 404 without one', async () => {
+    const rig = makeRig();
+    const view = { rows: [{ id: 'a', title: 'A', depth: 0 }], refusals: [] };
+    await runDaemon({ tasks: async () => view }, rig.runtime);
+    expect(parse(await rig.handler()?.(asConsole('/api/tasks')))).toEqual(view);
+
+    const bare = makeRig();
+    await runDaemon({}, bare.runtime);
+    expect((await bare.handler()?.(asConsole('/api/tasks')))?.status).toBe(404);
+  });
+
   it('answers 404 for a plan outside the repository rather than importing it', async () => {
     const rig = makeRig();
     await runDaemon({}, rig.runtime);

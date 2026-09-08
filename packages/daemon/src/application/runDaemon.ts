@@ -571,6 +571,7 @@ export async function runDaemon(
           ...(moduleResolver === undefined
             ? {}
             : { modules: () => resolveModules(config, moduleResolver) }),
+          ...(options.tasks === undefined ? {} : { tasks: options.tasks }),
           token,
           port: boundPort,
           scriptHashes,

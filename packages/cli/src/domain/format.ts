@@ -22,6 +22,7 @@ import type {
   Violation,
 } from '@paw/core';
 import { renderBrief } from '@paw/core';
+import type { Edge, TaskDetail, TaskRow } from '@paw/agile';
 import { ansiPaint } from '@paw/cosmetics';
 
 const GATE_FINDING_CAP = 25;
@@ -94,6 +95,8 @@ export function formatHelp(color = false): string[] {
     '  config <get|set> …             read or edit model and role bindings in .paw/config.json',
     '  connectors [enable|disable <id>]  list the connector catalogue, or turn one on or off',
     '  modules [enable|disable <id>]     list the module catalogue, or turn one on or off',
+    '  tasks [<id>] [--related]       list the work graph, one task, or one task and everything',
+    '                                 connected to it; needs the paw-agile module enabled',
     '  doctor <config.json>           check a config file: every role bound to a capable model',
     '  swarm doctor|show|run <plan>   validate, preview, or run a multi-agent swarm plan (.swarm.mjs)',
     '    run flags: --live --full --ui --context a,b --concurrency N --max-tokens N',
@@ -188,6 +191,82 @@ export function formatConnectors(roster: readonly ConnectorRosterRow[]): string[
           row.requires.length === 0 ? '' : ` · needs ${row.requires.join(', ')}`
         }`,
     ),
+  ];
+}
+
+/**
+ * Render the work graph, one line per task, indented by depth. Each line names
+ * the task's own parents and children, so a task with two parents appears once.
+ *
+ * @param {readonly TaskRow[]} rows - Rows, parents before children.
+ * @param {readonly string[]} refusals - Edges the kernel refused.
+ * @returns {string[]} Terminal lines.
+ */
+export function formatTasks(
+  rows: readonly TaskRow[],
+  refusals: readonly string[],
+  loops: readonly Edge[] = [],
+  dangling: readonly Edge[] = [],
+): string[] {
+  const edges = (ids: readonly string[]): string => (ids.length === 0 ? '—' : ids.join(', '));
+  const lines = [
+    `tasks: ${rows.length} in the graph`,
+    ...rows.map(
+      (row) =>
+        `${'  '.repeat(row.depth + 1)}${row.id}${row.orphan ? ' (orphan)' : ''}  ${row.title}` +
+        `  ↑ ${edges(row.parents)}  ↓ ${edges(row.children)}  ${row.rollup}`,
+    ),
+  ];
+  if (loops.length > 0) {
+    lines.push(
+      `loops: ${loops.length} declared, not walked`,
+      ...loops.map((edge) => `  ${edge.parent} → ${edge.child}`),
+    );
+  }
+  if (dangling.length > 0) {
+    lines.push(
+      `dangling: ${dangling.length} naming an absent task`,
+      ...dangling.map((edge) => `  ${edge.parent} → ${edge.child}`),
+    );
+  }
+  if (refusals.length === 0) {
+    return lines;
+  }
+  return [...lines, `refused: ${refusals.length}`, ...refusals.map((why) => `  ${why}`)];
+}
+
+/**
+ * Render one task, and with `related` every task above and below it.
+ *
+ * @param {TaskDetail} detail - The task with its ancestors and descendants.
+ * @param {boolean} related - Include the ancestor and descendant blocks.
+ * @returns {string[]} Terminal lines.
+ */
+export function formatTaskDetail(detail: TaskDetail, related: boolean): string[] {
+  const { row } = detail;
+  const edges = (ids: readonly string[]): string => (ids.length === 0 ? '—' : ids.join(', '));
+  const block = (label: string, rows: readonly TaskRow[]): string[] => [
+    '',
+    `${label}: ${rows.length}`,
+    ...rows.map((each) => `  ${each.id}  ${each.title}`),
+  ];
+  const asText = (list: readonly Edge[]): string =>
+    edges(list.map((edge) => `${edge.parent} → ${edge.child}`));
+  const lines = [
+    `task "${row.id}" — ${row.title}${row.orphan ? ' (orphan)' : ''}`,
+    `  depth ${row.depth} · rollup ${row.rollup}`,
+    `  parents   ${edges(row.parents)}`,
+    `  children  ${edges(row.children)}`,
+    `  loops     ${asText(detail.loops)}`,
+    `  dangling  ${asText(detail.dangling)}`,
+  ];
+  if (!related) {
+    return lines;
+  }
+  return [
+    ...lines,
+    ...block('ancestors', detail.ancestors),
+    ...block('descendants', detail.descendants),
   ];
 }
 

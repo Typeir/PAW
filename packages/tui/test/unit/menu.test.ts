@@ -25,6 +25,7 @@ import {
   herdLines,
   moduleLines,
   planLines,
+  taskLines,
 } from '../../src/domain/menu.js';
 
 const PLAN: SwarmPlan<{ files: string[] }> = {
@@ -81,6 +82,7 @@ describe('MENU', () => {
       'config',
       'connectors',
       'modules',
+      'tasks',
       'quit',
     ]);
   });
@@ -127,6 +129,52 @@ describe('moduleLines', () => {
     expect(lines[4]).toBe('      connectors: taiga, rally');
     expect(lines[5]).toBe('  · paw-billing — not installed');
     expect(lines[7]).toBe('      connectors: none');
+  });
+});
+
+describe('taskLines', () => {
+  const rows = [
+    { id: 'a', title: 'Checkout', parents: [], children: ['b'], depth: 0, rollup: 3, orphan: false },
+    { id: 'b', title: 'Card form', parents: ['a'], children: [], depth: 1, rollup: 1, orphan: false },
+  ];
+
+  it('names the verb that enables the module when it is off', () => {
+    const lines = taskLines({ enabled: false, rows: [], refusals: [], loops: [], dangling: [] });
+    expect(lines[0]).toBe('the paw-agile module is not enabled');
+    expect(lines).toContain('cli: paw modules enable paw-agile');
+  });
+
+  it('indents by depth and names each task’s own edges', () => {
+    const lines = taskLines({ enabled: true, rows, refusals: [], loops: [], dangling: [] });
+    expect(lines[0]).toBe('2 tasks');
+    expect(lines[2]).toBe('  a — Checkout  ↑ —  ↓ b  3');
+    expect(lines[3]).toBe('    b — Card form  ↑ a  ↓ —  1');
+  });
+
+  it('appends the refused edges when there are any', () => {
+    const lines = taskLines({ enabled: true, rows, refusals: ['unknown task "ghost"'], loops: [], dangling: [] });
+    expect(lines).toContain('refused: 1');
+    expect(lines).toContain('  unknown task "ghost"');
+  });
+
+  it('lists ring-closing edges apart from refusals', () => {
+    const lines = taskLines({ enabled: true, rows, refusals: [], loops: [{ parent: 'b', child: 'a' }], dangling: [] });
+    expect(lines).toContain('loops: 1 declared, not walked');
+    expect(lines).toContain('  b → a');
+  });
+
+  it('lists edges naming an absent task and marks the orphaned row', () => {
+    const orphaned = [{ ...rows[0], orphan: true }];
+    const lines = taskLines({
+      enabled: true,
+      rows: orphaned,
+      refusals: [],
+      loops: [],
+      dangling: [{ parent: 'ghost', child: 'a' }],
+    });
+    expect(lines[2]).toBe('  a (orphan) — Checkout  ↑ —  ↓ b  3');
+    expect(lines).toContain('dangling: 1 naming an absent task');
+    expect(lines).toContain('  ghost → a');
   });
 });
 

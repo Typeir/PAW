@@ -28,12 +28,15 @@ import {
   type RunSettings,
   type SwarmPlan,
 } from '@paw/core';
+import { graphRows } from '@paw/agile';
 import {
+  ROLLUP_FIELD,
   createNodeConfigDocument,
   createNodeFileReader,
   createNodeFs,
   createNodeModuleResolver,
   createNodeRecentRoutes,
+  readRepoTasks,
 } from '@paw/adapters';
 import {
   configControl,
@@ -433,6 +436,10 @@ export async function runUi(
       logSink: createNodeLogSink(resolve(root, '.paw', 'daemon.log')),
       providers: () => listProviders(scope()),
       moduleResolver: createNodeModuleResolver(root),
+      tasks: async () => {
+        const { enabled, graph, refusals } = await readRepoTasks(root);
+        return { enabled, rows: graphRows(graph, ROLLUP_FIELD), refusals, loops: graph.loops, dangling: graph.dangling };
+      },
       onAttach: (path, mode) => {
         void approveAttach(path, mode, () => handle);
       },
