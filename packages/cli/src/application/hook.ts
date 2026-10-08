@@ -5,7 +5,9 @@
  * (doc 10 §7). Read host hook payload from stdin, ask pawd to decide via
  * `hook.dispatch`, write pawd answer back; on daemon trouble write host
  * do-nothing output. Own no store, gate, or connector; daemon hold those.
- * Fails open; daemon failure never stops hook.
+ * Fails open: daemon failure, or any throw around the call, writes do-nothing
+ * output and exits 0 — a host such as Copilot denies the tool call on any other
+ * non-zero exit.
  *
  * @module @paw/cli/application/hook
  * @version 0.0.0
@@ -14,6 +16,11 @@
  */
 
 import { rpcCall } from '@paw/daemon';
+
+/**
+ * Host output that lets the tool call proceed untouched.
+ */
+const DO_NOTHING = { continue: true };
 
 /**
  * Stdin/stdout seam. Injected in tests.
@@ -78,6 +85,37 @@ export async function runHook(opts: HookOptions): Promise<number> {
     event: opts.event,
     payload,
   });
-  opts.io.writeStdout(JSON.stringify(result ?? { continue: true }));
+  opts.io.writeStdout(JSON.stringify(result ?? DO_NOTHING));
   return 0;
+}
+
+/**
+ * Where {@link failOpen} writes host output and the reason it failed.
+ *
+ * @interface FailOpenIo
+ * @property {(text: string) => void} writeStdout - Emit host output.
+ * @property {(text: string) => void} writeStderr - Emit the failure reason.
+ */
+export interface FailOpenIo {
+  writeStdout(text: string): void;
+  writeStderr(text: string): void;
+}
+
+/**
+ * Run one hook invocation so a throw never denies the host's tool call.
+ *
+ * @param {() => Promise<number>} run - The hook invocation.
+ * @param {FailOpenIo} io - Output seam.
+ * @returns {Promise<number>} The invocation's exit code; 0 after a throw, with do-nothing output on stdout and the reason on stderr.
+ */
+export async function failOpen(run: () => Promise<number>, io: FailOpenIo): Promise<number> {
+  try {
+    return await run();
+  } catch (err: unknown) {
+    io.writeStderr(
+      `paw hook: ${err instanceof Error ? err.message : String(err)} · allowed without enforcement\n`,
+    );
+    io.writeStdout(JSON.stringify(DO_NOTHING));
+    return 0;
+  }
 }

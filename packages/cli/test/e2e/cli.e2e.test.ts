@@ -205,6 +205,14 @@ describe('cli routing (e2e)', () => {
     expect(code).toBe(1);
     expect(stderr).toContain('does not export a swarm plan');
   });
+
+  it('fails a broken hook open: do-nothing output, exit 0, the reason on stderr', async () => {
+    const { stdout, stderr, code } = await runCli('hook');
+    expect(code).toBe(0);
+    expect(stdout).toBe(JSON.stringify({ continue: true }));
+    expect(stderr).toContain('paw hook needs a host and event');
+    expect(stderr).toContain('allowed without enforcement');
+  });
 });
 
 describe('cli config show (e2e)', () => {

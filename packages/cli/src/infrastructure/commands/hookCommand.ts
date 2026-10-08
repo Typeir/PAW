@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { lockPath, socketPath, tokenPath } from '@paw/daemon';
 import { ensureDaemon } from '../../application/autostart.js';
-import { runHook } from '../../application/hook.js';
+import { failOpen, runHook } from '../../application/hook.js';
 import { parseArgs } from '../../domain/context.js';
 import { readStdin } from '../stdin.js';
 import { autostartSeams } from './pawd.js';
@@ -25,12 +25,26 @@ import { autostartSeams } from './pawd.js';
 const HOST_FLAGS = ['copilot', 'claude'];
 
 /**
- * Run `hook` subcommand: client of resident daemon.
+ * Run `hook` subcommand: client of resident daemon. Never exits non-zero.
  *
  * @param {string[]} rest - Words after `hook`.
- * @returns {Promise<number>} Exit code (0; decision written to stdout as JSON).
+ * @returns {Promise<number>} Always 0; decision, or do-nothing output after a failure, written to stdout as JSON.
  */
 export async function runHookCommand(rest: string[]): Promise<number> {
+  return failOpen(() => invokeHook(rest), {
+    writeStdout: (text) => process.stdout.write(text),
+    writeStderr: (text) => process.stderr.write(text),
+  });
+}
+
+/**
+ * Parse the host and event, bring the daemon up, and bridge one hook.
+ *
+ * @param {string[]} rest - Words after `hook`.
+ * @returns {Promise<number>} Exit code from {@link runHook}.
+ * @throws {Error} When no host flag names the event.
+ */
+async function invokeHook(rest: string[]): Promise<number> {
   const args = parseArgs(rest, HOST_FLAGS);
   const host = HOST_FLAGS.find((h) => args.values.get(h) !== undefined);
   if (host === undefined) {
