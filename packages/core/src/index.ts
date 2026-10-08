@@ -15,6 +15,8 @@
 export { decidePreToolUse } from './domain/enforcement.js';
 export type { Decision, PreToolInput } from './domain/enforcement.js';
 
+export { isEnvFile } from './domain/envFile.js';
+
 export { chainCommand, mergeHookCommand } from './domain/hookMerge.js';
 export type {
   HookMerge,

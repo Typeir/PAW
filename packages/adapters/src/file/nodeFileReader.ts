@@ -3,8 +3,8 @@
  *
  * @fileoverview {@link FileReaderPort} over `node:fs`. Reads swarm's attached
  * context off disk. Each path resolves against the root directory; a path
- * resolving outside the root is rejected. A path whose basename starts with
- * `.env` is rejected. Unreadable path rejects per CONSTRAINTS.md Constraint 3.
+ * resolving outside the root is rejected, and so is an environment file as
+ * `isEnvFile` defines it. An unreadable path rejects.
  *
  * @module @paw/adapters/file/nodeFileReader
  * @version 0.0.0
@@ -13,18 +13,8 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { basename, isAbsolute, relative, resolve } from 'node:path';
-import type { FileReaderPort } from '@paw/core';
-
-/**
- * Whether a filename is an env file.
- *
- * @param {string} path - The path being read.
- * @returns {boolean} True when basename starts with `.env`.
- */
-function isEnvFile(path: string): boolean {
-  return basename(path).startsWith('.env');
-}
+import { isAbsolute, relative, resolve } from 'node:path';
+import { isEnvFile, type FileReaderPort } from '@paw/core';
 
 /**
  * Resolve the requested path inside the root directory; reject any path that resolves outside it.

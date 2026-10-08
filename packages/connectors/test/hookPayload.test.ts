@@ -78,9 +78,16 @@ describe('envMatch', () => {
     expect(envMatch(['config/.env.production'])).toBe('config/.env.production');
   });
 
+  it('matches a provider key file, by path and by shell word', () => {
+    expect(envMatch(['.paw/deepseek.provider.env'])).toBe('.paw/deepseek.provider.env');
+    expect(envMatch([], ['cat .paw/deepseek.provider.env'])).toBe('.paw/deepseek.provider.env');
+    expect(envMatch([], ['node app.js --env-file=.env'])).toBe('--env-file=.env');
+  });
+
   it('passes a path set that holds no env file', () => {
     expect(envMatch(['src/a.ts'])).toBeNull();
     expect(envMatch(['src/environment.ts'])).toBeNull();
+    expect(envMatch([], ['source .venv/bin/activate', 'printenv PATH'])).toBeNull();
   });
 
   it('finds an env file named in a shell command', () => {

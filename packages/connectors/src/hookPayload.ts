@@ -12,6 +12,8 @@
  * @since 5.0.0
  */
 
+import { isEnvFile } from '@paw/core';
+
 /**
  * Payload keys that carry tool arguments, in every host casing.
  */
@@ -26,11 +28,6 @@ const PATH_KEYS = ['path', 'filePath', 'file_path', 'notebookPath', 'notebook_pa
  * Argument keys that carry shell command text.
  */
 const COMMAND_KEYS = ['command'] as const;
-
-/**
- * Environment file, at path end, bare or with a suffix.
- */
-const ENV_PATH = /(?:^|\/)\.env(?:\.[A-Za-z0-9_.-]+)?$/;
 
 /**
  * Shell word separators and redirection characters.
@@ -159,12 +156,12 @@ export function envMatch(
   paths: readonly string[],
   commands: readonly string[] = [],
 ): string | null {
-  const direct = paths.find((p) => ENV_PATH.test(p));
+  const direct = paths.find(isEnvFile);
   if (direct !== undefined) {
     return direct;
   }
   for (const command of commands) {
-    const word = commandWords(command).find((w) => ENV_PATH.test(w));
+    const word = commandWords(command).find(isEnvFile);
     if (word !== undefined) {
       return word;
     }

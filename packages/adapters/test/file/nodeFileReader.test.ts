@@ -46,6 +46,7 @@ describe('createNodeFileReader', () => {
     const reader = createNodeFileReader(root);
     await expect(reader.read('.env.local')).rejects.toThrow('refusing to attach an environment file');
     await expect(reader.read('src/../.env.local')).rejects.toThrow('environment file');
+    await expect(reader.read('.paw/deepseek.provider.env')).rejects.toThrow('environment file');
   });
 
   it('refuses to climb out of the root', async () => {
