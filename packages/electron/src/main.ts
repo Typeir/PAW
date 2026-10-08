@@ -38,16 +38,20 @@ import { writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { emptyWorkGraph } from '@paw/core';
-import { ROLLUP_FIELD, openRepoWorkModel } from '@paw/adapters';
+import { ROLLUP_FIELD, createNodeConfigDocument, openRepoWorkModel } from '@paw/adapters';
 import {
   chromiumFingerprint,
+  configControl,
   createNodeLogSink,
   createNodeModuleResolver,
   createNodeRecentRoutes,
+  enforcementControl,
   identityNotice,
   listProviders,
+  mergeControl,
   nodeRuntime,
   pawHome,
+  plansControl,
   recordConsoleEndpoint,
   runDaemon,
   type DaemonHandle,
@@ -115,10 +119,10 @@ function cspFor(origin: string): string {
  * directory launched from, discovers that repo's config and every plan in it,
  * as `paw ui` do. Plan may be named to open on. `--url=` with `--fingerprint=`
  * selects viewer mode: no in-process daemon, window opens on that URL and pins
- * that certificate.
+ * that certificate. `--read-only` boots the in-process daemon with no control port.
  *
  * @param {string[]} argv - Process argv.
- * @returns {{ root: string; configPath?: string; planPath?: string; url?: string; fingerprint?: string }} Launch options.
+ * @returns {{ root: string; configPath?: string; planPath?: string; url?: string; fingerprint?: string; readOnly: boolean }} Launch options.
  */
 export function readLaunchArgs(argv: string[]): {
   root: string;
@@ -126,6 +130,7 @@ export function readLaunchArgs(argv: string[]): {
   planPath?: string;
   url?: string;
   fingerprint?: string;
+  readOnly: boolean;
 } {
   const flag = (name: string): string | undefined => {
     const hit = argv.find((a) => a.startsWith(`--${name}=`));
@@ -140,6 +145,7 @@ export function readLaunchArgs(argv: string[]): {
     planPath,
     url: flag('url'),
     fingerprint: flag('fingerprint'),
+    readOnly: argv.includes('--read-only'),
   };
 }
 
@@ -348,9 +354,18 @@ async function start(): Promise<void> {
     await openOn(launch.url, launch.fingerprint);
     return;
   }
+  const scope = (): string => daemon?.root ?? launch.root;
+  const control = launch.readOnly
+    ? undefined
+    : mergeControl(
+        enforcementControl(scope),
+        configControl(createNodeConfigDocument(scope)),
+        plansControl(scope),
+      );
   daemon = await runDaemon(
     {
       ...launch,
+      ...(control ? { control } : {}),
       scopeCeiling: homedir(),
       recent: createNodeRecentRoutes(pawHome(process.platform, process.env)),
       logSink: createNodeLogSink(join(launch.root, '.paw', 'daemon.log')),
@@ -371,6 +386,7 @@ async function start(): Promise<void> {
     token: daemon.token,
     fingerprint: daemon.identity.meta.leafFingerprint,
     pid: process.pid,
+    control: control !== undefined,
   });
 
   // Console reads its credential from the URL fragment, which is replaced out

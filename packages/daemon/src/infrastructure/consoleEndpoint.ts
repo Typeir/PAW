@@ -27,12 +27,14 @@ import type { DispatchEvent } from '@paw/core';
  * @property {string} token - Per-boot bearer credential.
  * @property {string} fingerprint - Leaf certificate fingerprint, PAW `SHA256:AA:..` form.
  * @property {number} pid - Daemon process id, for display.
+ * @property {boolean} control - Whether this boot exposes writes; false serves reads only.
  */
 export interface ConsoleEndpoint {
   readonly url: string;
   readonly token: string;
   readonly fingerprint: string;
   readonly pid: number;
+  readonly control: boolean;
 }
 
 /**
@@ -75,9 +77,16 @@ export function readConsoleEndpoint(root: string): ConsoleEndpoint | null {
       typeof parsed.url === 'string' &&
       typeof parsed.token === 'string' &&
       typeof parsed.fingerprint === 'string' &&
-      typeof parsed.pid === 'number'
+      typeof parsed.pid === 'number' &&
+      typeof parsed.control === 'boolean'
     ) {
-      return { url: parsed.url, token: parsed.token, fingerprint: parsed.fingerprint, pid: parsed.pid };
+      return {
+        url: parsed.url,
+        token: parsed.token,
+        fingerprint: parsed.fingerprint,
+        pid: parsed.pid,
+        control: parsed.control,
+      };
     }
     return null;
   } catch {

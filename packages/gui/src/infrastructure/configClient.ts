@@ -1,7 +1,7 @@
 /**
  * PAW Console Config Client
  *
- * @fileoverview Binding editor transport. Read declared models, bind role, unbind role. Read goes to `GET /api/config`; write goes to daemon control verbs, which respond only when the daemon starts with `--control`. Write returns whether it succeeded and, when it did not, the reason the daemon returned, so the view can display why. Transport uses the same authenticated {@link FetchLike} the snapshot source uses, so credentials are never handled here.
+ * @fileoverview Binding editor transport. Read declared models, bind role, unbind role. Read goes to `GET /api/config`; write goes to daemon control verbs, which refuse when the daemon starts with `--read-only`. Write returns whether it succeeded and, when it did not, the reason the daemon returned, so the view can display why. Transport uses the same authenticated {@link FetchLike} the snapshot source uses, so credentials are never handled here.
  *
  * @module @paw/gui/infrastructure/configClient
  * @version 0.0.0

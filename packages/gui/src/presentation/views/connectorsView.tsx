@@ -2,8 +2,8 @@
  * Connectors view.
  *
  * @fileoverview Connector catalogue with each entry's enabled state and a
- * toggle. Toggling writes `.paw/config.json` through the daemon, so it needs
- * `--control`; a refusal shows the daemon's reason.
+ * toggle. Toggling writes `.paw/config.json` through the daemon, so a daemon
+ * started `--read-only` refuses it; a refusal shows the daemon's reason.
  *
  * @module @paw/gui/presentation/views/connectorsView
  * @version 0.0.0

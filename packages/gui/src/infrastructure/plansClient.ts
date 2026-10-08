@@ -2,8 +2,8 @@
  * PAW Console Plans Client
  *
  * @fileoverview Plan-file write transport: `POST /api/plans` scaffolds one,
- * `DELETE /api/plans` removes one. The daemon answers only with `--control`;
- * otherwise the refusal comes back for the view to show. Uses the same
+ * `DELETE /api/plans` removes one. A daemon started `--read-only` refuses both;
+ * the refusal comes back for the view to show. Uses the same
  * authenticated {@link FetchLike} as the snapshot source.
  *
  * @module @paw/gui/infrastructure/plansClient

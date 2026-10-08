@@ -14,7 +14,7 @@
  * When pawd no answer — maybe not running for this repository — round trip fail
  * open to null and verb answer 503 with plain reason.
  *
- * Exposed only when console start with `--control`; default console compose no
+ * Exposed unless console start with `--read-only`; read-only console compose no
  * control port and stay observational.
  *
  * @module @paw/daemon/enforcementControl
@@ -66,7 +66,7 @@ const UNREACHABLE: ControlResult = {
 };
 
 /**
- * Control port a `--control` console expose: enforcement writes, each single
+ * Control port a console expose unless `--read-only`: enforcement writes, each single
  * round trip to resident pawd for this repository.
  *
  * @param {string | (() => string)} root - Repository console serve, or getter for scope it currently hold.

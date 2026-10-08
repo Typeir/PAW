@@ -59,7 +59,7 @@ function attempt(effect: () => ControlResult): ControlResult {
 }
 
 /**
- * Control port a `--control` console exposes over plan files: create from
+ * Control port a console exposes over plan files unless `--read-only`: create from
  * template, delete.
  *
  * @param {string | (() => string)} root - Repository the console serves, or getter for the scope it currently holds.

@@ -248,6 +248,64 @@ describe('paw ui (e2e)', () => {
     expect(code).toBe(1);
     expect(stderr).toContain('paw ui --run needs the plan to release');
   });
+
+  it('lets the console write by default and names the flag that forbids it', async () => {
+    const { banner } = await startUi();
+    expect(banner).toContain('control enabled');
+    expect(banner).toContain('pass --read-only to forbid it');
+  }, 30000);
+
+  it('boots read-only under --read-only and names the flag to drop', async () => {
+    const { banner } = await startUi('--read-only');
+    expect(banner).toContain('read-only · the console cannot write · drop --read-only to let it');
+    expect(banner).not.toContain('control enabled');
+  }, 30000);
+
+  it('attaches instead of booting a second daemon, and warns the resident one is read-only', async () => {
+    const { banner } = await startUi('--read-only');
+    expect(banner).toContain('pawd listening on');
+
+    const { stdout, code } = await runCli(
+      'ui',
+      '--headless',
+      '--root=test/fixtures',
+      '--config=ready.config.json',
+    );
+    expect(code).toBe(0);
+    expect(stdout).toContain('pawd already serves this repo');
+    expect(stdout).not.toContain('pawd listening on');
+    expect(stdout).toContain('is read-only · writes will refuse');
+  }, 30000);
+
+  it('attaches under --read-only and warns the resident daemon still accepts writes', async () => {
+    await startUi();
+
+    const { stdout, code } = await runCli(
+      'ui',
+      '--read-only',
+      '--headless',
+      '--root=test/fixtures',
+      '--config=ready.config.json',
+    );
+    expect(code).toBe(0);
+    expect(stdout).toContain('pawd already serves this repo');
+    expect(stdout).toContain('accepts writes · --read-only applies only to a daemon paw ui boots');
+  }, 30000);
+
+  it('attaches silently when the resident daemon matches the request', async () => {
+    await startUi();
+
+    const { stdout, code } = await runCli(
+      'ui',
+      '--headless',
+      '--root=test/fixtures',
+      '--config=ready.config.json',
+    );
+    expect(code).toBe(0);
+    expect(stdout).toContain('pawd already serves this repo');
+    expect(stdout).not.toContain('writes will refuse');
+    expect(stdout).not.toContain('accepts writes');
+  }, 30000);
 });
 
 describe('paw trust (e2e)', () => {

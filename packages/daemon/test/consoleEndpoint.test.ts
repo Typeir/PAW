@@ -44,6 +44,7 @@ const RECORD: ConsoleEndpoint = {
   token: 'a-token',
   fingerprint: 'SHA256:AA:BB',
   pid: 4242,
+  control: false,
 };
 
 describe('console endpoint record', () => {
@@ -73,6 +74,14 @@ describe('console endpoint record', () => {
     recordConsoleEndpoint(incomplete, RECORD);
     writeFileSync(consoleEndpointPath(incomplete), JSON.stringify({ url: 'x' }), 'utf8');
     expect(readConsoleEndpoint(incomplete)).toBeNull();
+    const noControl = tempRoot();
+    recordConsoleEndpoint(noControl, RECORD);
+    writeFileSync(
+      consoleEndpointPath(noControl),
+      JSON.stringify({ url: 'x', token: 'y', fingerprint: 'z', pid: 1 }),
+      'utf8',
+    );
+    expect(readConsoleEndpoint(noControl)).toBeNull();
   });
 
   it('collects records across roots, skipping empty ones and reading a root once', () => {
@@ -121,6 +130,7 @@ describe('console endpoint probe, against a real daemon', () => {
       token: daemon.token,
       fingerprint: daemon.identity.meta.leafFingerprint,
       pid: process.pid,
+      control: false,
     };
   }, 30000);
 

@@ -314,6 +314,26 @@ async function approveAttach(
 }
 
 /**
+ * Warning for an attach whose requested write permission the resident daemon does not have.
+ *
+ * @param {ConsoleEndpoint} endpoint - The recorded daemon.
+ * @param {boolean} readOnly - Whether `--read-only` was passed.
+ * @returns {string[]} One warning line, or none when the daemon matches the request.
+ */
+function controlMismatch(endpoint: ConsoleEndpoint, readOnly: boolean): string[] {
+  if (readOnly === endpoint.control) {
+    return endpoint.control
+      ? [
+          `pawd ${endpoint.pid} accepts writes · --read-only applies only to a daemon paw ui boots · stop it and rerun with --read-only`,
+        ]
+      : [
+          `pawd ${endpoint.pid} is read-only · writes will refuse · stop it and rerun paw ui to enable them`,
+        ];
+  }
+  return [];
+}
+
+/**
  * Run `ui` subcommand. Start pawd in this process, serve console for repository
  * till operator interrupt.
  *
@@ -359,6 +379,7 @@ export async function runUi(
       lead,
       'that URL carries this session’s credential — treat it like a password',
       'attached · release approvals happen in the terminal that owns pawd',
+      ...controlMismatch(endpoint, args.flags.has('read-only')),
       args.flags.has('headless')
         ? 'headless · open that URL for the console yourself'
         : 'opening the console · desktop shell first, browser as fallback',
@@ -401,13 +422,11 @@ export async function runUi(
   }
 
   // Attach instead of boot when a recorded daemon still answers and no flag
-  // asks to shape a daemon of our own.
+  // asks to shape a daemon of our own. `--read-only` does not shape a daemon's
+  // identity — it is a permission toggle on the one already running — so it
+  // does not block attach; a mismatch is reported instead, in `attachTo`.
   const plainOpen =
-    !shouldRun &&
-    !args.flags.has('control') &&
-    planPath === undefined &&
-    portValue === undefined &&
-    attached.length === 0;
+    !shouldRun && planPath === undefined && portValue === undefined && attached.length === 0;
   const recorded = plainOpen ? readConsoleEndpoint(root) : null;
   if (recorded !== null && (await probeConsoleEndpoint(recorded))) {
     await attachTo(
@@ -418,13 +437,13 @@ export async function runUi(
 
   let handle: DaemonHandle | null = null;
   const scope = (): string => handle?.root ?? root;
-  const control = args.flags.has('control')
-    ? mergeControl(
+  const control = args.flags.has('read-only')
+    ? undefined
+    : mergeControl(
         enforcementControl(scope),
         configControl(createNodeConfigDocument(scope)),
         plansControl(scope),
-      )
-    : undefined;
+      );
   const daemon = await runDaemon(
     {
       root,
@@ -461,6 +480,7 @@ export async function runUi(
     token: daemon.token,
     fingerprint: daemon.identity.meta.leafFingerprint,
     pid: process.pid,
+    control: control !== undefined,
   });
   print([
     `pawd listening on ${daemon.url}#t=${daemon.token}`,
@@ -476,8 +496,8 @@ export async function runUi(
       ? `releasing the herd (${live ? 'live' : 'fake'} model) · the console fills in as it lands`
       : 'no run released · pass --run to dispatch',
     control
-      ? 'control enabled · the console may edit bindings, prune violations, and stop enforcement'
-      : 'observational · pass --control to let the console write',
+      ? 'control enabled · the console may edit bindings, prune violations, and stop enforcement · pass --read-only to forbid it'
+      : 'read-only · the console cannot write · drop --read-only to let it',
     args.flags.has('headless')
       ? 'headless · open that URL for the console yourself · ctrl-c to stop'
       : 'opening the console · desktop shell first, browser as fallback · pass --headless to skip',

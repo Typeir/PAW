@@ -108,7 +108,7 @@ export function formatHelp(color = false): string[] {
     '    run flags: --live --full --ui --context a,b --concurrency N --max-tokens N',
     '  ui [plan.swarm.mjs]            start the console for this repository: desktop shell,',
     '                                 browser as fallback; --headless only prints the URL',
-    '    flags: --run --live --headless --control --port N --root DIR --attach <pid>',
+    '    flags: --run --live --headless --read-only --port N --root DIR --attach <pid>',
     '  tui [config.json] [plan]       open the keyboard-driven terminal console',
     '  trust [--dry-run]              trust the local TLS certificate, so browsers open the console',
     '                                 without a warning',

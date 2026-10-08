@@ -123,7 +123,7 @@ npx vitest run -u                                 # update snapshots (gui regres
 ```bash
 npm run build:console                  # REQUIRED after any packages/gui change
 npm run demo                           # fixture config + plan
-paw ui --control                       # console that may write config; without it every toggle refuses
+paw ui --read-only                     # console that may not write config; every toggle refuses
 paw ui --headless                      # print the URL, open nothing
 ```
 

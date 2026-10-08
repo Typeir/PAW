@@ -3,8 +3,8 @@
  *
  * @fileoverview Module catalogue as a bento grid, one tile per module: enabled
  * state, whether the package resolves, and the connectors it carries. Toggling
- * writes `.paw/config.json` through the daemon, so it needs `--control`; a
- * refusal shows the daemon's reason.
+ * writes `.paw/config.json` through the daemon, so a daemon started `--read-only`
+ * refuses it; a refusal shows the daemon's reason.
  *
  * @module @paw/gui/presentation/views/modulesView
  * @version 0.0.0

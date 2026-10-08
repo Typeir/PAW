@@ -114,7 +114,7 @@ npm run demo                           # serve the fixture config + plan
 paw ui                                 # attaches to a running pawd when one serves this repo
 paw ui --attach 30936                  # attach to a named daemon, wherever it serves
 paw ui --headless                      # print the URL, open nothing
-paw ui --control                       # let the console write config, plans, and connectors
+paw ui --read-only                     # forbid the console to write config, plans, and connectors
 paw ui --root=../other-repo            # serve a different repository
 paw ui --port=8971
 paw ui plans/lore.swarm.mjs --run      # open on a plan and release its herd

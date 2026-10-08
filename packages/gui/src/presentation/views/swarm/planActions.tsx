@@ -2,7 +2,8 @@
  * Plan Actions
  *
  * @fileoverview Create and delete plan files beside the plan picker, through
- * the daemon's `--control` writes; refusals show the daemon's reason. A new
+ * the daemon's control writes, which a daemon started `--read-only` refuses;
+ * refusals show the daemon's reason. A new
  * plan appears in the picker on the next roster tick and is not selected
  * early: watching an undiscovered plan answers an error frame.
  *
