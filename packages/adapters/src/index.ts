@@ -11,8 +11,8 @@
 
 export { createNodeConfigDocument } from './config/nodeConfigDocument.js';
 export { createNodeModuleResolver } from './config/nodeModuleResolver.js';
-export { AGILE_MODULE, ROLLUP_FIELD, readRepoTasks } from './config/nodeTaskSource.js';
-export type { RepoTasks } from './config/nodeTaskSource.js';
+export { AGILE_MODULE, ROLLUP_FIELD, openRepoWorkModel } from './config/nodeTaskSource.js';
+export type { RepoWorkModel } from './config/nodeTaskSource.js';
 export { createNodeRecentRoutes } from './console/nodeRecentRoutes.js';
 export { createNodeFileReader, resolveInRoot } from './file/nodeFileReader.js';
 export { createGateCache } from './gate/gateCache.js';

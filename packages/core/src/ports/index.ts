@@ -18,6 +18,7 @@ import type { PawEvent, PawEventType, PawResponse } from '../domain/event.js';
 import type { HealthReport } from '../domain/gate.js';
 import type { LintFinding } from '../domain/linters.js';
 import type { Violation } from '../domain/violation.js';
+import type { WorkGraphView, WorkTaskDetail } from '../domain/workModel.js';
 
 /**
  * The driving adapter that connects PAW to a specific host (Copilot SDK,
@@ -322,5 +323,20 @@ export interface ClockPort {
  * @property {(specifier: string) => Promise<{ resolved: boolean; detail: string }>} resolve - Whether the specifier resolves, and where it resolved to or why it did not.
  */
 export interface ModuleResolverPort {
-  resolve(specifier: string): Promise<{ readonly resolved: boolean; readonly detail: string }>;
+  resolve(
+    module: { readonly id: string; readonly specifier: string },
+  ): Promise<{ readonly resolved: boolean; readonly detail: string }>;
+}
+
+/**
+ * What a work-model module supplies. The module owns the graph; a caller hands
+ * over a document and receives rendered rows.
+ *
+ * @interface WorkModelPort
+ * @property {(document: string, field: string) => WorkGraphView} view - Whole graph from a document.
+ * @property {(document: string, id: string, field: string) => WorkTaskDetail | null} detail - One task with everything connected to it, or null when the document has no such task.
+ */
+export interface WorkModelPort {
+  view(document: string, field: string): WorkGraphView;
+  detail(document: string, id: string, field: string): WorkTaskDetail | null;
 }

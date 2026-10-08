@@ -149,6 +149,7 @@ export interface SnapshotParts {
   readonly socket: string;
   readonly gates: number;
   readonly keys: number;
+  readonly tasks: boolean;
   readonly logs: readonly LogEntry[];
 }
 
@@ -189,7 +190,7 @@ export function composeSnapshot(parts: SnapshotParts): PawSnapshot {
       storeWriters: 1,
     },
     logs: parts.logs,
-    chrome: { gates: parts.gates, keys: parts.keys },
+    chrome: { gates: parts.gates, keys: parts.keys, tasks: parts.tasks },
   };
 }
 

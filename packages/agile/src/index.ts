@@ -28,3 +28,5 @@ export type { Edge, GraphEdit, Task, TaskGraph } from './domain/taskGraph.js';
 
 export { buildGraph, graphRows, taskDetail, taskViewFrom } from './application/taskView.js';
 export type { BuiltGraph, TaskDetail, TaskRow, TaskView } from './application/taskView.js';
+
+export { workModel } from './workModel.js';

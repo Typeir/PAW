@@ -205,6 +205,14 @@ export type {
   ConnectorRosterRow,
 } from './domain/connectors.js';
 
+export { emptyWorkGraph } from './domain/workModel.js';
+export type {
+  WorkEdge,
+  WorkGraphView,
+  WorkTaskDetail,
+  WorkTaskRow,
+} from './domain/workModel.js';
+
 export {
   VENDOR_MODULES,
   dependentConnectors,
@@ -216,6 +224,9 @@ export type { ModuleEntry, ModuleRosterRow } from './domain/modules.js';
 
 export { resolveModules } from './application/moduleStatus.js';
 export type { ModuleStatus } from './application/moduleStatus.js';
+
+export { MODULES_DIR, planInstall, planUninstall, runInstall } from './application/moduleInstall.js';
+export type { InstallPlan, InstallResult, UninstallPlan } from './application/moduleInstall.js';
 
 export {
   linterCommandFor,
@@ -285,6 +296,7 @@ export type {
   RecentRoutesPort,
   SecretPort,
   StorePort,
+  WorkModelPort,
 } from './ports/index.js';
 
 export type {

@@ -2,7 +2,7 @@
   "name": "@paw/electron",
   "version": "0.0.0",
   "private": true,
-  "description": "PAW Electron â€” a desktop shell that runs pawd in-process and shows the live @paw/gui console. Owns no domain logic.",
+  "description": "PAW Electron — a desktop shell that runs pawd in-process and shows the live @paw/gui console. Owns no domain logic.",
   "type": "module",
   "main": "dist/main.cjs",
   "scripts": {
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@paw/adapters": "file:../adapters",
-    "@paw/agile": "file:../agile",
+    "@paw/core": "file:../core",
     "@paw/daemon": "file:../daemon",
     "@paw/gui": "file:../gui"
   },

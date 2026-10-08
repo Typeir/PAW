@@ -86,7 +86,7 @@ describe('enableModule / disableModule', () => {
 describe('resolveModules', () => {
   it('reports enabled and resolved as separate facts', async () => {
     const found: ModuleResolverPort = {
-      resolve: async (specifier) => ({ resolved: true, detail: `/node_modules/${specifier}` }),
+      resolve: async (module) => ({ resolved: true, detail: `/node_modules/${module.specifier}` }),
     };
     const [row] = await resolveModules({ modules: ['paw-agile'] }, found);
     expect(row).toMatchObject({

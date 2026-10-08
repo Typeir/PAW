@@ -175,6 +175,7 @@ describe('composeSnapshot', () => {
     socket: '127.0.0.1:8971',
     gates: 3,
     keys: 2,
+    tasks: true,
     logs: [{ at: '2026-08-06T15:40:03.000Z', level: 'info' as const, message: 'listening' }],
   };
 
@@ -192,7 +193,7 @@ describe('composeSnapshot', () => {
     expect(snapshot.memberTotal).toBe(2);
     expect(snapshot.briefs).toHaveLength(2);
     expect(snapshot.doctor).toBe(DOCTOR);
-    expect(snapshot.chrome).toEqual({ gates: 3, keys: 2 });
+    expect(snapshot.chrome).toEqual({ gates: 3, keys: 2, tasks: true });
   });
 
   it('derives the daemon status line from the host it was handed', () => {

@@ -28,6 +28,7 @@ import {
   buildRegistry,
   clearBinding,
   connectorRoster,
+  emptyWorkGraph,
   dispatchSwarm,
   memberCount,
   planKey,
@@ -43,18 +44,17 @@ import {
   type Violation,
 } from '@paw/core';
 import { ansiPaint } from '@paw/cosmetics';
-import { graphRows } from '@paw/agile';
 import {
   ROLLUP_FIELD,
   createNodeConfigDocument,
   createNodeFileReader,
   createNodeGateRunner,
   createNodeModuleResolver,
-  readRepoTasks,
+  openRepoWorkModel,
 } from '@paw/adapters';
 import { rpcCall, socketPath, tokenPath } from '@paw/daemon';
 import {
-  MENU,
+  menuFor,
   configLines,
   connectorLines,
   daemonLines,
@@ -342,8 +342,9 @@ async function runAction(
     return moduleLines(await resolveModules(config, createNodeModuleResolver(root)));
   }
   if (id === 'tasks') {
-    const { enabled, graph, refusals } = await readRepoTasks(root);
-    return taskLines({ enabled, rows: graphRows(graph, ROLLUP_FIELD), refusals, loops: graph.loops, dangling: graph.dangling });
+    const opened = await openRepoWorkModel(root);
+    const view = opened.model?.view(opened.document, ROLLUP_FIELD) ?? emptyWorkGraph();
+    return taskLines({ enabled: opened.enabled && opened.installed, ...view });
   }
   // config
   const doc = createNodeConfigDocument(root);
@@ -394,7 +395,12 @@ async function runAction(
  * @param {string} root - Repository root.
  * @param {string} planPath - Discovered or given plan, for the intro line.
  */
-async function runInteractive(data: TuiData, root: string, planPath: string): Promise<void> {
+async function runInteractive(
+  data: TuiData,
+  root: string,
+  planPath: string,
+  menu: readonly MenuEntry[],
+): Promise<void> {
   const colored = process.env.NO_COLOR === undefined;
   intro(
     `${colored ? ansiPaint.verb('paw') : 'paw'} · ${
@@ -404,12 +410,12 @@ async function runInteractive(data: TuiData, root: string, planPath: string): Pr
   for (;;) {
     const choice = await select({
       message: 'what do you want?',
-      options: MENU.map((entry) => ({ value: entry.id, label: entry.label, hint: entry.hint })),
+      options: menu.map((entry) => ({ value: entry.id, label: entry.label, hint: entry.hint })),
     });
     if (isCancel(choice) || choice === 'quit') {
       break;
     }
-    const entry = MENU.find((candidate) => candidate.id === choice) as MenuEntry;
+    const entry = menu.find((candidate) => candidate.id === choice) as MenuEntry;
     const lines = await runAction(choice, data, root, true);
     if (lines.length > 0) {
       note(lines.join('\n'), entry.label);
@@ -429,7 +435,7 @@ async function runInteractive(data: TuiData, root: string, planPath: string): Pr
  * @param {TuiData} data - Loaded read-only data.
  * @param {string} root - Repository root.
  */
-async function runBatch(data: TuiData, root: string): Promise<void> {
+async function runBatch(data: TuiData, root: string, menu: readonly MenuEntry[]): Promise<void> {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) {
     chunks.push(chunk as Buffer);
@@ -439,9 +445,9 @@ async function runBatch(data: TuiData, root: string): Promise<void> {
     if (token === 'quit') {
       return;
     }
-    const entry = MENU.find((candidate) => candidate.id === token);
+    const entry = menu.find((candidate) => candidate.id === token);
     if (entry === undefined) {
-      throw new Error(`unknown action "${token}" — actions: ${MENU.map((m) => m.id).join(' ')}`);
+      throw new Error(`unknown action "${token}" — actions: ${menu.map((m) => m.id).join(' ')}`);
     }
     const lines = await runAction(entry.id, data, root, false);
     process.stdout.write(`── ${entry.label} ──\n${lines.join('\n')}\n`);
@@ -502,10 +508,12 @@ async function main(): Promise<void> {
     );
   }
   const data = await loadData(configPath, planPath);
+  const opened = await openRepoWorkModel(cwd);
+  const menu = menuFor(opened.enabled && opened.installed);
   if (process.stdin.isTTY) {
-    await runInteractive(data, cwd, planPath);
+    await runInteractive(data, cwd, planPath, menu);
   } else {
-    await runBatch(data, cwd);
+    await runBatch(data, cwd, menu);
   }
 }
 

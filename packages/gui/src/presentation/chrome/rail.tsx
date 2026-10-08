@@ -98,9 +98,11 @@ export function Rail() {
         </li>
       </Group>
       <Group label='Work'>
-        <li>
-          <NavItem id='tasks' icon={Network} label='Tasks' />
-        </li>
+        {chrome.tasks && (
+          <li>
+            <NavItem id='tasks' icon={Network} label='Tasks' />
+          </li>
+        )}
         <li>
           <NavItem id='swarm' icon={Workflow} label='Swarm' dot />
         </li>

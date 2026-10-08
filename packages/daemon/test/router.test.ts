@@ -559,7 +559,7 @@ describe('the module roster', () => {
 
 describe('the task graph', () => {
   it('serves rows and refusals when the daemon supplies them', async () => {
-    const view = { rows: [{ id: 'a', depth: 0 }], refusals: ['cannot link'] };
+    const view = { enabled: true, rows: [{ id: 'a', depth: 0 }], refusals: ['cannot link'] };
     const res = await route(req('/api/tasks'), { ...deps, tasks: async () => view });
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body)).toEqual(view);
@@ -569,7 +569,7 @@ describe('the task graph', () => {
     expect((await route(req('/api/tasks'), deps)).status).toBe(404);
     const res = await route(req('/api/tasks', { headers: { authorization: 'Bearer wrong' } }), {
       ...deps,
-      tasks: async () => ({}),
+      tasks: async () => ({ enabled: false }),
     });
     expect(res.status).toBe(401);
   });

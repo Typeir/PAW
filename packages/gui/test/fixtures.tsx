@@ -115,7 +115,7 @@ const BASE: PawSnapshot = {
     proto: 'v1',
     storeWriters: 1,
   },
-  chrome: { gates: 11, keys: 1 },
+  chrome: { gates: 11, keys: 1, tasks: true },
 };
 
 /**

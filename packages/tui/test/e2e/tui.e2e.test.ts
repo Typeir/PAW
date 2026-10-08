@@ -9,7 +9,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -108,19 +108,66 @@ describe('tui (e2e)', () => {
     expect(stdout).toContain('cli: paw modules');
   });
 
-  it('names the module to enable when the fixture repo has tasks switched off', async () => {
-    const { stdout, code } = await runTui('tasks quit');
-    expect(code).toBe(0);
-    expect(stdout).toContain('── tasks ──');
-    expect(stdout).toContain('the paw-agile module is not enabled');
-    expect(stdout).toContain('cli: paw tasks');
+  it('offers no tasks action where the paw-agile module is not enabled', async () => {
+    const { stderr, code } = await runTui('tasks');
+    expect(code).toBe(1);
+    expect(stderr).toContain('unknown action "tasks"');
+  });
+
+  it('offers no tasks action where the module is enabled but not installed', async () => {
+    const repo = await mkdtemp(join(tmpdir(), 'paw-tui-uninstalled-'));
+    await mkdir(join(repo, '.paw'), { recursive: true });
+    await writeFile(
+      join(repo, '.paw', 'config.json'),
+      JSON.stringify({ root: '.paw', gatesDir: '.paw/gates', modules: ['paw-agile'] }),
+      'utf8',
+    );
+    await copyFile(PLAN, join(repo, 'demo.swarm.mjs'));
+    try {
+      const { stderr, code } = await runTui('tasks', [CONFIG, PLAN], repo);
+      expect(code).toBe(1);
+      expect(stderr).toContain('unknown action "tasks"');
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('prints the work graph where the repository installs the module', async () => {
+    const repo = await mkdtemp(join(tmpdir(), 'paw-tui-tasks-'));
+    await mkdir(join(repo, '.paw'), { recursive: true });
+    await writeFile(
+      join(repo, '.paw', 'config.json'),
+      JSON.stringify({ root: '.paw', gatesDir: '.paw/gates', modules: ['paw-agile'] }),
+      'utf8',
+    );
+    await writeFile(
+      join(repo, '.paw', 'tasks.json'),
+      JSON.stringify({
+        tasks: [{ id: 'a', title: 'Root' }, { id: 'b', title: 'Leaf' }],
+        edges: [['a', 'b'], ['b', 'a']],
+      }),
+      'utf8',
+    );
+    await copyFile(PLAN, join(repo, 'demo.swarm.mjs'));
+    await mkdir(join(repo, '.paw', 'modules'), { recursive: true });
+    await symlink(join(PKG, '..', 'agile'), join(repo, '.paw', 'modules', 'paw-agile'), 'junction');
+    try {
+      const { stdout, code } = await runTui('tasks quit', [CONFIG, PLAN], repo);
+      expect(code).toBe(0);
+      expect(stdout).toContain('── tasks ──');
+      expect(stdout).toContain('2 tasks');
+      expect(stdout).toContain('loops: 1 declared, not walked');
+      expect(stdout).toContain('cli: paw tasks');
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
   });
 
   it('exits 1 naming the roster on an unknown action id', async () => {
     const { stderr, code } = await runTui('gallop');
     expect(code).toBe(1);
     expect(stderr).toContain('unknown action "gallop"');
-    expect(stderr).toContain('doctor plan herd gates daemon config connectors modules tasks quit');
+    expect(stderr).toContain('doctor plan herd gates daemon config connectors modules quit');
   });
 
   it('exits 1 with usage when run bare outside an attached repository', async () => {

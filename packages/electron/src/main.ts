@@ -37,8 +37,8 @@ import { app, BrowserWindow, ipcMain, session } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { graphRows } from '@paw/agile';
-import { ROLLUP_FIELD, readRepoTasks } from '@paw/adapters';
+import { emptyWorkGraph } from '@paw/core';
+import { ROLLUP_FIELD, openRepoWorkModel } from '@paw/adapters';
 import {
   chromiumFingerprint,
   createNodeLogSink,
@@ -62,12 +62,13 @@ const IS_CAPTURE = process.argv.includes('--capture') || process.env.PAW_CAPTURE
  * Build a task-graph thunk over a repository, for the Tasks view.
  *
  * @param {string} root - Repository to read from.
- * @returns {() => Promise<unknown>} Reader the daemon calls per request.
+ * @returns {() => Promise<{ enabled: boolean }>} Reader the daemon calls per request.
  */
-function taskSourceFor(root: string): () => Promise<unknown> {
+function taskSourceFor(root: string): () => Promise<{ enabled: boolean }> {
   return async () => {
-    const { enabled, graph, refusals } = await readRepoTasks(root);
-    return { enabled, rows: graphRows(graph, ROLLUP_FIELD), refusals, loops: graph.loops, dangling: graph.dangling };
+    const opened = await openRepoWorkModel(root);
+    const view = opened.model?.view(opened.document, ROLLUP_FIELD) ?? emptyWorkGraph();
+    return { enabled: opened.enabled && opened.installed, ...view };
   };
 }
 

@@ -3,8 +3,9 @@
  *
  * @fileoverview `paw tasks [<id>] [--related]`: list the repository's work
  * graph, render one task, or render one task with everything connected to it.
- * Needs the `paw-agile` module enabled in `.paw/config.json`; an unknown id and
- * a disabled module are both refused with the verb that fixes them.
+ * Needs the `paw-agile` module enabled in `.paw/config.json` and installed; a
+ * module that is off, one that is not installed, and an unknown id are each
+ * refused with the verb that fixes them.
  *
  * @module @paw/cli/infrastructure/commands/tasks
  * @version 0.0.0
@@ -13,8 +14,7 @@
  */
 
 import { resolve } from 'node:path';
-import { graphRows, taskDetail } from '@paw/agile';
-import { AGILE_MODULE, ROLLUP_FIELD, readRepoTasks } from '@paw/adapters';
+import { AGILE_MODULE, ROLLUP_FIELD, openRepoWorkModel } from '@paw/adapters';
 import { parseArgs } from '../../domain/context.js';
 import { formatTaskDetail, formatTasks } from '../../domain/format.js';
 
@@ -29,7 +29,7 @@ export async function runTasks(rest: string[], print: (lines: string[]) => void)
   const args = parseArgs(rest, ['root']);
   const [id] = args.positional;
   const root = resolve(args.values.get('root') ?? '.');
-  const { enabled, graph, refusals } = await readRepoTasks(root);
+  const { enabled, installed, model, document, detail: reason } = await openRepoWorkModel(root);
 
   if (!enabled) {
     print([
@@ -37,13 +37,20 @@ export async function runTasks(rest: string[], print: (lines: string[]) => void)
     ]);
     return 1;
   }
+  if (model === null || !installed) {
+    print([
+      `tasks: the ${AGILE_MODULE} module is enabled but not installed (${reason}); install it with paw modules install ${AGILE_MODULE}`,
+    ]);
+    return 1;
+  }
 
   if (id === undefined) {
-    print(formatTasks(graphRows(graph, ROLLUP_FIELD), refusals, graph.loops, graph.dangling));
+    const view = model.view(document, ROLLUP_FIELD);
+    print(formatTasks(view.rows, view.refusals, view.loops, view.dangling));
     return 0;
   }
 
-  const detail = taskDetail(graph, id, ROLLUP_FIELD);
+  const detail = model.detail(document, id, ROLLUP_FIELD);
   if (detail === null) {
     print([`tasks: no task "${id}" in this repository; paw tasks lists every one`]);
     return 1;

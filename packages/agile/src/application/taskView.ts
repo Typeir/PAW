@@ -163,10 +163,13 @@ export interface TaskDetail {
  * Build a graph from a task document. Shape:
  * `{ "tasks": [{ "id", "title", "fields" }], "edges": [["parent", "child"]] }`.
  *
- * @param {string} text - The document.
+ * @param {string} text - The document; blank text is no document, an empty graph with no refusals.
  * @returns {BuiltGraph} The graph and its refusals.
  */
 export function buildGraph(text: string): BuiltGraph {
+  if (text.trim() === '') {
+    return { graph: emptyGraph(), refusals: [] };
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);

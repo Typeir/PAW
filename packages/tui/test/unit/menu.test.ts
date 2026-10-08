@@ -23,6 +23,7 @@ import {
   doctorLines,
   gatesLines,
   herdLines,
+  menuFor,
   moduleLines,
   planLines,
   taskLines,
@@ -88,6 +89,14 @@ describe('MENU', () => {
   });
 });
 
+describe('menuFor', () => {
+  it('offers tasks only where the repository has a work model', () => {
+    expect(menuFor(true).map((entry) => entry.id)).toContain('tasks');
+    expect(menuFor(false).map((entry) => entry.id)).not.toContain('tasks');
+    expect(menuFor(false)).toHaveLength(MENU.length - 1);
+  });
+});
+
 describe('connectorLines', () => {
   it('marks each entry and names the module a backend needs', () => {
     const lines = connectorLines([
@@ -108,6 +117,8 @@ describe('moduleLines', () => {
         title: 'PAW Agile',
         description: 'work model',
         specifier: '@paw/agile',
+        repository: 'https://example.invalid/paw-agile.git',
+        ref: 'main',
         enabled: true,
         resolved: true,
         detail: '/node_modules/@paw/agile',
@@ -118,6 +129,8 @@ describe('moduleLines', () => {
         title: 'PAW Billing',
         description: 'invoices',
         specifier: '@paw/billing',
+        repository: 'https://example.invalid/paw-billing.git',
+        ref: 'main',
         enabled: false,
         resolved: false,
         detail: 'not installed',

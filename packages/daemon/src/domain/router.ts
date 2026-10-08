@@ -124,7 +124,7 @@ export interface RouterDeps {
   readonly providers?: () => readonly unknown[];
   readonly connectors?: () => readonly unknown[];
   readonly modules?: () => Promise<readonly unknown[]>;
-  readonly tasks?: () => Promise<unknown>;
+  readonly tasks?: () => Promise<{ readonly enabled: boolean }>;
   readonly token: string;
   readonly port: number;
   readonly scriptHashes: readonly string[];

@@ -232,7 +232,7 @@ export interface DaemonOptions {
   readonly logSink?: LogSinkLike;
   readonly providers?: () => readonly unknown[];
   readonly moduleResolver?: ModuleResolverPort;
-  readonly tasks?: () => Promise<unknown>;
+  readonly tasks?: () => Promise<{ readonly enabled: boolean }>;
   onAttach?(path: string, mode: InitMode): void;
   onRelease?(settings: RunSettings): void;
   dispatcherFor?(settings: RunSettings): Dispatcher;

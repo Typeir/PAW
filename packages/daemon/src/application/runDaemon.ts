@@ -470,6 +470,7 @@ export async function runDaemon(
       socket,
       gates: 0,
       keys: modelCount(config),
+      tasks: options.tasks === undefined ? false : (await options.tasks()).enabled,
       logs: log.entries(),
     });
   };

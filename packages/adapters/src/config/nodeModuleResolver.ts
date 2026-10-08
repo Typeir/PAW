@@ -43,9 +43,15 @@ function ancestors(from: string): string[] {
 export function createNodeModuleResolver(root: string): ModuleResolverPort {
   const from = resolvePath(root);
   return {
-    async resolve(specifier: string) {
-      for (const dir of ancestors(from)) {
-        const manifest = join(dir, 'node_modules', ...specifier.split('/'), 'package.json');
+    async resolve(module: { readonly id: string; readonly specifier: string }) {
+      const installed = join(from, '.paw', 'modules', module.id, 'package.json');
+      const candidates = [
+        installed,
+        ...ancestors(from).map((dir) =>
+          join(dir, 'node_modules', ...module.specifier.split('/'), 'package.json'),
+        ),
+      ];
+      for (const manifest of candidates) {
         try {
           await access(manifest);
           return { resolved: true, detail: manifest };
@@ -53,7 +59,10 @@ export function createNodeModuleResolver(root: string): ModuleResolverPort {
           continue;
         }
       }
-      return { resolved: false, detail: `no node_modules/${specifier} at or above ${from}` };
+      return {
+        resolved: false,
+        detail: `no ${module.id} in .paw/modules and no ${module.specifier} in node_modules at or above ${from}`,
+      };
     },
   };
 }

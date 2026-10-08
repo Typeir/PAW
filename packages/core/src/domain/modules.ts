@@ -23,12 +23,16 @@ import { VENDOR_CONNECTORS } from './connectors.js';
  * @property {string} title - Display name.
  * @property {string} description - One line of what the module owns.
  * @property {string} specifier - Package specifier the resolver looks up.
+ * @property {string} repository - Where `paw modules install` clones it from.
+ * @property {string} ref - Commit, tag, or branch the install checks out.
  */
 export interface ModuleEntry {
   readonly id: string;
   readonly title: string;
   readonly description: string;
   readonly specifier: string;
+  readonly repository: string;
+  readonly ref: string;
 }
 
 /**
@@ -44,6 +48,8 @@ export const VENDOR_MODULES: readonly ModuleEntry[] = [
     description:
       'Unopinionated work model: multi-parent task graph, cycles refused at write, rollup deduplicated by identity.',
     specifier: '@paw/agile',
+    repository: 'https://github.com/Typeir/paw-agile.git',
+    ref: 'main',
   },
 ];
 

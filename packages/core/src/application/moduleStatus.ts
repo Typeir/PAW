@@ -41,7 +41,7 @@ export async function resolveModules(
   return Promise.all(
     moduleRoster(config).map(async (row) => ({
       ...row,
-      ...(await resolver.resolve(row.specifier)),
+      ...(await resolver.resolve({ id: row.id, specifier: row.specifier })),
     })),
   );
 }

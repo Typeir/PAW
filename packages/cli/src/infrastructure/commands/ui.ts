@@ -22,13 +22,13 @@ import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import {
   applyInit,
+  emptyWorkGraph,
   dispatchSwarm,
   pawHome,
   type InitMode,
   type RunSettings,
   type SwarmPlan,
 } from '@paw/core';
-import { graphRows } from '@paw/agile';
 import {
   ROLLUP_FIELD,
   createNodeConfigDocument,
@@ -36,7 +36,7 @@ import {
   createNodeFs,
   createNodeModuleResolver,
   createNodeRecentRoutes,
-  readRepoTasks,
+  openRepoWorkModel,
 } from '@paw/adapters';
 import {
   configControl,
@@ -437,8 +437,9 @@ export async function runUi(
       providers: () => listProviders(scope()),
       moduleResolver: createNodeModuleResolver(root),
       tasks: async () => {
-        const { enabled, graph, refusals } = await readRepoTasks(root);
-        return { enabled, rows: graphRows(graph, ROLLUP_FIELD), refusals, loops: graph.loops, dangling: graph.dangling };
+        const opened = await openRepoWorkModel(root);
+        const view = opened.model?.view(opened.document, ROLLUP_FIELD) ?? emptyWorkGraph();
+        return { enabled: opened.enabled && opened.installed, ...view };
       },
       onAttach: (path, mode) => {
         void approveAttach(path, mode, () => handle);

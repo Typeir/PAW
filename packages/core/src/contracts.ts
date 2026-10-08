@@ -163,10 +163,12 @@ export interface RunProgress {
  * @interface RailChrome
  * @property {number} gates - Gate count.
  * @property {number} keys - Provider key count.
+ * @property {boolean} tasks - Whether the repository has a work model to show.
  */
 export interface RailChrome {
   readonly gates: number;
   readonly keys: number;
+  readonly tasks: boolean;
 }
 
 /**

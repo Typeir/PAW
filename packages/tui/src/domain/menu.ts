@@ -25,9 +25,9 @@ import type {
   DoctorReport,
   HealthReport,
   ModuleStatus,
+  WorkEdge,
+  WorkTaskRow,
 } from '@paw/core';
-
-import type { Edge, TaskRow } from '@paw/agile';
 
 const GATE_FINDING_CAP = 8;
 const VIOLATION_FILE_CAP = 8;
@@ -37,16 +37,16 @@ const VIOLATION_FILE_CAP = 8;
  *
  * @interface TaskPanel
  * @property {boolean} enabled - Whether `.paw/config.json` enables the module.
- * @property {readonly TaskRow[]} rows - Rows, parents before children.
+ * @property {readonly WorkTaskRow[]} rows - Rows, parents before children.
  * @property {readonly string[]} refusals - Edges the kernel refused.
- * @property {readonly Edge[]} loops - Ring-closing edges, declared and not walked.
+ * @property {readonly WorkEdge[]} loops - Ring-closing edges, declared and not walked.
  */
 export interface TaskPanel {
   readonly enabled: boolean;
-  readonly rows: readonly TaskRow[];
+  readonly rows: readonly WorkTaskRow[];
   readonly refusals: readonly string[];
-  readonly loops: readonly Edge[];
-  readonly dangling: readonly Edge[];
+  readonly loops: readonly WorkEdge[];
+  readonly dangling: readonly WorkEdge[];
 }
 
 /**
@@ -206,6 +206,17 @@ export const MENU: readonly MenuEntry[] = [
   },
   { id: 'quit', label: 'quit', hint: 'leave', cli: null },
 ];
+
+/**
+ * The menu for one repository. `tasks` is offered only where the repository
+ * has a work model to show.
+ *
+ * @param {boolean} hasTasks - Whether the paw-agile module is enabled and installed here.
+ * @returns {MenuEntry[]} Entries, menu order.
+ */
+export function menuFor(hasTasks: boolean): MenuEntry[] {
+  return MENU.filter((entry) => hasTasks || entry.id !== 'tasks');
+}
 
 /**
  * Render the connector catalogue with each entry's enabled state.

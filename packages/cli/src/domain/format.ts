@@ -18,11 +18,13 @@ import type {
   DoctorReport,
   HealthReport,
   ModuleStatus,
+  WorkEdge,
+  WorkTaskDetail,
+  WorkTaskRow,
   SwarmPlan,
   Violation,
 } from '@paw/core';
 import { renderBrief } from '@paw/core';
-import type { Edge, TaskDetail, TaskRow } from '@paw/agile';
 import { ansiPaint } from '@paw/cosmetics';
 
 const GATE_FINDING_CAP = 25;
@@ -94,7 +96,9 @@ export function formatHelp(color = false): string[] {
     '  violations [--prune [file]]    list recorded violations, or clear them',
     '  config <get|set> …             read or edit model and role bindings in .paw/config.json',
     '  connectors [enable|disable <id>]  list the connector catalogue, or turn one on or off',
-    '  modules [enable|disable <id>]     list the module catalogue, or turn one on or off',
+    '  modules [enable|disable|install|uninstall <id>]  list the module catalogue, turn one on or',
+    '                                 off, clone one into .paw/modules (--from overrides the',
+    '                                 source), or remove an installed, disabled one',
     '  tasks [<id>] [--related]       list the work graph, one task, or one task and everything',
     '                                 connected to it; needs the paw-agile module enabled',
     '  doctor <config.json>           check a config file: every role bound to a capable model',
@@ -198,15 +202,15 @@ export function formatConnectors(roster: readonly ConnectorRosterRow[]): string[
  * Render the work graph, one line per task, indented by depth. Each line names
  * the task's own parents and children, so a task with two parents appears once.
  *
- * @param {readonly TaskRow[]} rows - Rows, parents before children.
+ * @param {readonly WorkTaskRow[]} rows - Rows, parents before children.
  * @param {readonly string[]} refusals - Edges the kernel refused.
  * @returns {string[]} Terminal lines.
  */
 export function formatTasks(
-  rows: readonly TaskRow[],
+  rows: readonly WorkTaskRow[],
   refusals: readonly string[],
-  loops: readonly Edge[] = [],
-  dangling: readonly Edge[] = [],
+  loops: readonly WorkEdge[] = [],
+  dangling: readonly WorkEdge[] = [],
 ): string[] {
   const edges = (ids: readonly string[]): string => (ids.length === 0 ? '—' : ids.join(', '));
   const lines = [
@@ -238,19 +242,19 @@ export function formatTasks(
 /**
  * Render one task, and with `related` every task above and below it.
  *
- * @param {TaskDetail} detail - The task with its ancestors and descendants.
+ * @param {WorkTaskDetail} detail - The task with its ancestors and descendants.
  * @param {boolean} related - Include the ancestor and descendant blocks.
  * @returns {string[]} Terminal lines.
  */
-export function formatTaskDetail(detail: TaskDetail, related: boolean): string[] {
+export function formatTaskDetail(detail: WorkTaskDetail, related: boolean): string[] {
   const { row } = detail;
   const edges = (ids: readonly string[]): string => (ids.length === 0 ? '—' : ids.join(', '));
-  const block = (label: string, rows: readonly TaskRow[]): string[] => [
+  const block = (label: string, rows: readonly WorkTaskRow[]): string[] => [
     '',
     `${label}: ${rows.length}`,
     ...rows.map((each) => `  ${each.id}  ${each.title}`),
   ];
-  const asText = (list: readonly Edge[]): string =>
+  const asText = (list: readonly WorkEdge[]): string =>
     edges(list.map((edge) => `${edge.parent} → ${edge.child}`));
   const lines = [
     `task "${row.id}" — ${row.title}${row.orphan ? ' (orphan)' : ''}`,

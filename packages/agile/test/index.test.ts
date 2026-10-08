@@ -29,6 +29,7 @@ describe('@paw/agile', () => {
       'taskViewFrom',
       'topologicalOrder',
       'unlink',
+      'workModel',
     ]);
   });
 

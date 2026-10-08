@@ -123,6 +123,15 @@ describe('Rail', () => {
     expect(screen.getByRole('button', { name: /^Keys/ })).toHaveTextContent('1');
   });
 
+  it('offers Tasks only where the repository has a work model', () => {
+    renderInConsole(<Rail />);
+    expect(screen.getByRole('button', { name: /^Tasks/ })).toBeInTheDocument();
+
+    const base = makeSnapshot();
+    renderInConsole(<Rail />, makeSnapshot({ chrome: { ...base.chrome, tasks: false } }));
+    expect(screen.getAllByRole('button', { name: /^Tasks/ })).toHaveLength(1);
+  });
+
   it('shows the daemon socket, memory, and protocol in the foot', () => {
     renderInConsole(<Rail />);
     expect(screen.getByText('127.0.0.1:8971', { exact: false })).toBeInTheDocument();
