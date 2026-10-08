@@ -514,9 +514,12 @@ ${punchyHover('.selecttrigger', { scale: 1.02 })}
 .planname:focus-visible { ${focusRing(1)} }
 .modalrow { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 
-.connlist { list-style: none; margin: 0; padding: 0; font-family: var(--mono); font-size: 11.5px; }
-.connrow { display: grid; grid-template-columns: 10px 10ch 6ch 1fr auto; align-items: center;
-  gap: 10px; padding: 7px 10px; border-top: 1px solid var(--line-soft); }
+.connlist { list-style: none; margin: 0; padding: 0; font-family: var(--mono); font-size: 11.5px;
+  display: grid; grid-template-columns: auto max-content max-content 1fr auto; column-gap: 10px; }
+.connrow { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center;
+  padding: 7px 10px; }
+.connrow + .connrow { border-top: 1px solid var(--line-soft); }
+.connrow .connname, .connrow .connkind { white-space: nowrap; }
 .connrow .conndot { width: 7px; height: 7px; border-radius: 50%; background: var(--idle); }
 .connrow.on .conndot { background: var(--good);
   box-shadow: 0 0 6px color-mix(in oklab, var(--good) 80%, transparent); }
