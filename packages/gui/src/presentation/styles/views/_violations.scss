@@ -1,0 +1,75 @@
+////
+/// Violations list: severity stripe, file and rule header, message, and severity badges.
+////
+
+.vrow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 11px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line-soft);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.vstripe {
+  grid-row: 1 / span 2;
+  width: 3px;
+  border-radius: 3px;
+  align-self: stretch;
+
+  &.crit {
+    background: var(--crit);
+  }
+
+  &.warn {
+    background: var(--warn);
+  }
+}
+
+.vhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+
+  .file {
+    color: var(--ink);
+  }
+
+  .rule {
+    margin-left: auto;
+    color: var(--ink-dim);
+    font-size: 10.5px;
+  }
+}
+
+.vmsg {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink-dim);
+  font-family: var(--sans);
+}
+
+.sev {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--mono);
+
+  &.crit {
+    color: var(--crit);
+    background: var(--crit-soft);
+  }
+
+  &.warn {
+    color: var(--warn);
+    background: var(--warn-soft);
+  }
+}

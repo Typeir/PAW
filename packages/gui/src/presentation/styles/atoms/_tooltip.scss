@@ -1,0 +1,23 @@
+////
+/// Tooltip: fixed (z-index 3000), max 250px wide, ignores pointer events.
+////
+
+.tt-wrap {
+  display: inline-flex;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 3000;
+  max-width: 250px;
+  pointer-events: none;
+  padding: 6px 9px;
+  background: var(--panel-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.45;
+  box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.6);
+}

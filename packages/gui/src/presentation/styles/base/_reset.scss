@@ -1,0 +1,36 @@
+////
+/// Element defaults: border-box sizing, a viewport-locked document, unstyled lists.
+////
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background:
+    radial-gradient(1200px 700px at 78% -10%, color-mix(in oklab, var(--accent) 6%, transparent), transparent 60%),
+    var(--desk);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+dl,
+dd {
+  margin: 0;
+}

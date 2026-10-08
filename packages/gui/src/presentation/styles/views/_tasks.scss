@@ -1,0 +1,75 @@
+////
+/// Tasks view: six-column task rows with a convergence dot, and the refusal list (loops in accent).
+////
+
+.tasklist {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.taskrow {
+  display: grid;
+  grid-template-columns: 10px 12ch 1fr 16ch 16ch 5ch;
+  align-items: center;
+  gap: 10px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  padding-right: 12px;
+  border-top: 1px solid var(--line-soft);
+
+  .taskdot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--idle);
+  }
+
+  &.converged .taskdot {
+    background: var(--accent);
+    box-shadow: 0 0 6px color-mix(in oklab, var(--accent) 70%, transparent);
+  }
+
+  .taskid {
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+
+  .tasktitle {
+    color: var(--ink-dim);
+    overflow-wrap: anywhere;
+  }
+
+  .taskedge {
+    color: var(--ink-faint);
+    font-size: 10.5px;
+    overflow-wrap: anywhere;
+  }
+
+  .taskroll {
+    color: var(--ink-dim);
+    text-align: right;
+  }
+
+  .taskorphan {
+    color: var(--warn);
+    font-size: 10.5px;
+  }
+}
+
+.refusallist {
+  list-style: none;
+  margin: 0;
+  padding: 8px 12px;
+  display: grid;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--crit);
+
+  &.loops {
+    color: var(--accent);
+  }
+}

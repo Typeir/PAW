@@ -1,0 +1,52 @@
+////
+/// Button: neutral by default, accent-tinted with `.pri`. A disabled button keeps its resting colour.
+////
+
+@use '../mixins' as *;
+
+.btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  &.pri {
+    background: color-mix(in oklab, var(--accent) 18%, var(--panel));
+    color: var(--accent);
+    border-color: color-mix(in oklab, var(--accent) 45%, transparent);
+  }
+
+  &:hover {
+    color: var(--ink);
+  }
+
+  &.pri:hover {
+    background: color-mix(in oklab, var(--accent) 28%, var(--panel));
+  }
+
+  @include punchy-hover($scale: 1.04);
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:active:not([disabled]) {
+    transform: translateY(1px);
+  }
+
+  &[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &[disabled]:hover {
+    color: var(--ink-dim);
+  }
+}

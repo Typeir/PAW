@@ -6,7 +6,8 @@
  * from a file and satisfies an artifact host's and Electron's strict CSP. A small
  * resolve plugin rewrites the `.js` specifiers the sources use (TS ESM
  * convention) to the `.ts`/`.tsx` files esbuild reads, the same rewrite tsx does
- * at runtime for the CLI and the daemon.
+ * at runtime for the CLI and the daemon. A second plugin compiles `*.scss?inline`
+ * imports with dart-sass and loads the compressed CSS as a string module.
  *
  * Three targets, and the difference between them is the honest one:
  *
@@ -25,6 +26,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compile } from 'sass';
 import { demoSnapshot } from './demo/spellLore.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -51,6 +53,23 @@ const tsResolve = {
   },
 };
 
+/**
+ * Compile `*.scss?inline` imports with dart-sass to a compressed CSS string.
+ */
+const scssInline = {
+  name: 'scss-inline',
+  setup(builder) {
+    builder.onResolve({ filter: /\.scss\?inline$/ }, (args) => ({
+      path: join(args.resolveDir, args.path.replace(/\?inline$/, '')),
+      namespace: 'scss-inline',
+    }));
+    builder.onLoad({ filter: /.*/, namespace: 'scss-inline' }, (args) => ({
+      contents: compile(args.path, { style: 'compressed' }).css,
+      loader: 'text',
+    }));
+  },
+};
+
 const bundle = await build({
   entryPoints: [join(here, 'src', 'main.tsx')],
   bundle: true,
@@ -61,7 +80,7 @@ const bundle = await build({
   minify: true,
   define: { 'process.env.NODE_ENV': '"production"' },
   write: false,
-  plugins: [tsResolve],
+  plugins: [tsResolve, scssInline],
 });
 const appJs = bundle.outputFiles[0].text;
 

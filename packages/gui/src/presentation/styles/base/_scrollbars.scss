@@ -1,0 +1,42 @@
+////
+/// Thin scrollbars on every scrolling region: transparent track, `--line` thumb, `--ink-faint` on hover.
+////
+
+main,
+[data-shell] > nav,
+.treedropdown,
+.selectdropdown,
+.modal,
+pre,
+.brieftext,
+.herd-groups,
+.logrows {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--line);
+    border-radius: 3px;
+  }
+}
+
+main,
+.treedropdown,
+.selectdropdown {
+  &:hover {
+    scrollbar-color: var(--ink-faint) transparent;
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background-color: var(--ink-faint);
+  }
+}

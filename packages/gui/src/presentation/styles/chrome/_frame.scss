@@ -1,0 +1,25 @@
+////
+/// Console grid: title bar across both columns, rail in column 1, main pane in column 2. Viewport-locked;
+/// the rail and main pane scroll internally. Below 860px the rail is hidden and the grid is one column.
+////
+
+[data-shell] {
+  display: grid;
+  grid-template-columns: 216px 1fr;
+  grid-template-rows: auto 1fr;
+  background: var(--ground);
+  height: 100vh;
+  overflow: hidden;
+
+  > header {
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 860px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+[data-shell="desktop"] {
+  width: 100%;
+}

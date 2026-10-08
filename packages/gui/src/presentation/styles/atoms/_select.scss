@@ -1,0 +1,119 @@
+////
+/// Select: trigger (190–340px wide) with a rotating chevron, and a fixed dropdown (z-index 2500) with a search
+/// field, options, and an empty state.
+////
+
+@use '../mixins' as *;
+
+.selectwrap {
+  position: relative;
+  display: inline-block;
+}
+
+.selecttrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 190px;
+  max-width: 340px;
+  padding: 5px 10px;
+  background: var(--panel-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+
+  @include punchy-hover($scale: 1.02);
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .selectlabel {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--sem-concept);
+  }
+
+  .chevron {
+    color: var(--ink-faint);
+    transition: transform 0.15s;
+    flex: none;
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+  }
+
+  .chevron.open {
+    transform: rotate(180deg);
+  }
+}
+
+.selectdropdown {
+  position: fixed;
+  z-index: 2500;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 4px;
+  }
+}
+
+.selectsearch {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  background: var(--panel-2);
+  color: var(--ink);
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.selectoption {
+  padding: 6px 9px;
+  border-radius: 5px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &.hl {
+    background: var(--panel-2);
+    color: var(--ink);
+  }
+
+  &[aria-selected="true"] {
+    color: var(--accent);
+  }
+}
+
+.selectempty {
+  padding: 10px;
+  text-align: center;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 11px;
+}

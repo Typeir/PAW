@@ -1,0 +1,66 @@
+////
+/// Code block: counter-numbered rows, a highlighted-row tint, and syntax token colours.
+////
+
+@use '../mixins' as *;
+
+pre {
+  margin: 0;
+  padding: 8px 0 10px;
+  overflow-x: auto;
+  counter-reset: ln;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.7;
+
+  &:focus-visible {
+    @include focus-ring(-2px);
+  }
+
+  .row {
+    display: block;
+    white-space: pre;
+    padding-right: 14px;
+
+    &::before {
+      counter-increment: ln;
+      content: counter(ln);
+      display: inline-block;
+      width: 26px;
+      margin-right: 14px;
+      text-align: right;
+      color: var(--ink-faint);
+      opacity: 0.55;
+    }
+
+    &.hl {
+      background: color-mix(in oklab, var(--accent) 9%, transparent);
+    }
+  }
+
+  .k {
+    color: var(--tok-key);
+  }
+
+  .s {
+    color: var(--tok-str);
+  }
+
+  .c {
+    color: var(--ink-faint);
+    font-style: italic;
+  }
+
+  .f {
+    color: var(--tok-fn);
+  }
+
+  .p {
+    color: var(--ink-faint);
+  }
+
+  .i {
+    color: var(--accent);
+  }
+}

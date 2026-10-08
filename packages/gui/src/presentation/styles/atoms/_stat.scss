@@ -1,0 +1,41 @@
+////
+/// Stat tile: uppercase label over a tabular value; `.ok` and `.crit` tint the value.
+////
+
+.stat {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 11px 13px;
+
+  .lbl {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+    color: var(--ink-faint);
+  }
+
+  .val {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 600;
+    margin: 5px 0 0;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+
+    small {
+      font-size: 11px;
+      color: var(--ink-dim);
+      font-weight: 500;
+    }
+
+    &.ok {
+      color: var(--good);
+    }
+
+    &.crit {
+      color: var(--crit);
+    }
+  }
+}

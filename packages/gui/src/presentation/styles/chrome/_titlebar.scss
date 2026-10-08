@@ -1,0 +1,194 @@
+////
+/// Title bar: window lights, wordmark, daemon pill, theme toggle. On the desktop shell the bar is the window
+/// drag region and its buttons are not.
+////
+
+@use '../mixins' as *;
+
+$stoplight-close: #e05c54;
+$stoplight-minimise: #e0b13c;
+$stoplight-zoom: #3fb58c;
+
+[data-shell] > header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px;
+  height: 44px;
+  background: linear-gradient(var(--panel), var(--rail));
+  border-bottom: 1px solid var(--line);
+}
+
+[data-shell="desktop"] > header {
+  -webkit-app-region: drag;
+
+  button {
+    -webkit-app-region: no-drag;
+  }
+}
+
+.lights {
+  display: flex;
+  gap: 7px;
+}
+
+.slight {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: rgba(11, 14, 19, 0.62);
+  flex: none;
+  background: var(--slight-c, #{$stoplight-close});
+  @include smooth(filter, transform);
+
+  svg {
+    display: block;
+  }
+
+  &:hover {
+    transform: scale(1.12);
+    filter: brightness(1.12) glow-layer(6px, var(--slight-c, #{$stoplight-close}));
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &.sm {
+    width: 14px;
+    height: 14px;
+  }
+
+  &.close {
+    --slight-c: #{$stoplight-close};
+  }
+
+  &.minimise {
+    --slight-c: #{$stoplight-minimise};
+  }
+
+  &.zoom {
+    --slight-c: #{$stoplight-zoom};
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover,
+    &:active {
+      transform: none;
+    }
+  }
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--mono);
+
+  .mark {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+    background: color-mix(in oklab, var(--accent) 18%, var(--panel));
+    border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent);
+
+    svg {
+      display: block;
+    }
+  }
+
+  b {
+    font-size: 13px;
+    letter-spacing: 0.06em;
+  }
+
+  span {
+    color: var(--ink-faint);
+    font-size: 12px;
+  }
+
+  .scope {
+    color: var(--ink-dim);
+    max-width: 22ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+[data-shell] > header .daemon {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-dim);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 4px 11px;
+  border-radius: 100px;
+}
+
+.pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 70%, transparent);
+  animation: pulse 2.4s ease-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.theme-toggle {
+  cursor: pointer;
+  background: var(--panel);
+  color: var(--ink-dim);
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  padding: 4px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  &:hover {
+    color: var(--ink);
+  }
+
+  @include punchy-hover;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}

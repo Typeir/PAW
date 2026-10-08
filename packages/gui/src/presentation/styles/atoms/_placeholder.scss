@@ -1,0 +1,16 @@
+////
+/// Empty-state line, centred in faint mono.
+////
+
+.placeholder {
+  margin: 0;
+  padding: 40px 14px;
+  text-align: center;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 12px;
+
+  svg {
+    vertical-align: -2px;
+  }
+}

@@ -1,0 +1,36 @@
+////
+/// Console stylesheet entry. Partial order is cascade order.
+////
+
+@use 'base/tokens';
+@use 'base/reset';
+@use 'chrome/frame';
+@use 'chrome/titlebar';
+@use 'chrome/rail';
+@use 'chrome/main';
+@use 'atoms/plan-picker';
+@use 'atoms/stat';
+@use 'atoms/card';
+@use 'atoms/table';
+@use 'views/violations';
+@use 'atoms/chip';
+@use 'views/swarm';
+@use 'views/roles';
+@use 'views/scope';
+@use 'atoms/button';
+@use 'atoms/code';
+@use 'atoms/check';
+@use 'atoms/placeholder';
+@use 'atoms/banner';
+@use 'atoms/tree-select';
+@use 'atoms/tooltip';
+@use 'atoms/select';
+@use 'views/connectors';
+@use 'views/modules';
+@use 'views/tasks';
+@use 'views/keys';
+@use 'views/logs';
+@use 'atoms/toast';
+@use 'atoms/modal';
+@use 'base/utilities';
+@use 'base/scrollbars';

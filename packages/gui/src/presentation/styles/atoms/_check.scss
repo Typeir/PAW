@@ -1,0 +1,34 @@
+////
+/// Check result: icon tinted ok, bad, or muted, with a bold tabular count.
+////
+
+.chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-dim);
+
+  .ok,
+  .bad,
+  .mut {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .ok {
+    color: var(--good);
+  }
+
+  .bad {
+    color: var(--crit);
+  }
+
+  .mut {
+    color: var(--ink-faint);
+  }
+
+  b {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+}

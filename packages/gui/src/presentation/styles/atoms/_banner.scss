@@ -1,0 +1,25 @@
+////
+/// Critical banner: bold lead and a dimmed detail on a crit-tinted strip.
+////
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px;
+  margin: 0 0 14px;
+  background: var(--crit-soft);
+  border: 1px solid color-mix(in oklab, var(--crit) 45%, transparent);
+  border-radius: var(--r);
+  color: var(--crit);
+  font-family: var(--mono);
+  font-size: 11px;
+
+  .lead {
+    font-weight: 600;
+  }
+
+  .detail {
+    color: var(--ink-dim);
+  }
+}

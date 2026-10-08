@@ -1,0 +1,66 @@
+////
+/// Console mixins: focus ring, glow, transitions, and the shared control hover.
+////
+
+@use 'sass:list';
+
+/// Accent focus indicator for `:focus-visible` rules.
+/// @param {Length} $offset [2px] - Outline offset.
+@mixin focus-ring($offset: 2px) {
+  outline: 2px solid var(--accent);
+  outline-offset: $offset;
+}
+
+/// One glow layer as a `drop-shadow()` value, for a `filter` list.
+/// @param {Length} $radius [4px] - Glow radius.
+/// @param {Color} $color [var(--accent)] - Glow colour.
+/// @return {String} The `drop-shadow(...)` value.
+@function glow-layer($radius: 4px, $color: var(--accent)) {
+  @return drop-shadow(0 0 $radius $color);
+}
+
+/// Transition over the given properties at 0.18s ease each.
+/// @param {String...} $props - CSS properties to transition.
+@mixin smooth($props...) {
+  $transitions: ();
+  @each $prop in $props {
+    $transitions: list.append($transitions, $prop 0.18s ease, $separator: comma);
+  }
+  transition: $transitions;
+}
+
+/// Text-only glow, for rows where a filter halo would bleed over neighbours.
+/// @param {Length} $radius [6px] - Glow radius.
+/// @param {Color} $color [var(--accent)] - Glow colour.
+@mixin text-glow($radius: 6px, $color: var(--accent)) {
+  text-shadow: 0 0 $radius $color;
+}
+
+/// Control hover: transition, hover scale and glow, active press, reduced-motion guard. Disabled controls are excluded.
+/// @param {Number} $scale [1.05] - Hover scale factor.
+/// @param {Length} $glow [3px] - Hover glow radius.
+/// @param {Color} $color [var(--accent)] - Glow and border colour.
+/// @param {Bool} $border [true] - Tint the border on hover.
+@mixin punchy-hover($scale: 1.05, $glow: 3px, $color: var(--accent), $border: true) {
+  & {
+    @include smooth(border-color, color, background, filter, transform);
+  }
+  &:hover:not([disabled]) {
+    transform: scale($scale);
+    @if $border {
+      border-color: $color;
+    }
+    filter: glow-layer($glow, $color);
+  }
+  &:active:not([disabled]) {
+    transform: scale(0.97);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover:not([disabled]),
+    &:active:not([disabled]) {
+      transform: none;
+    }
+  }
+}

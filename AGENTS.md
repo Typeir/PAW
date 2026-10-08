@@ -140,8 +140,8 @@ until `npm run build:console` runs.
   repair with `New-Item -ItemType Junction` (a junction needs no elevation, a symlink does).
 - Electron: clear `ELECTRON_RUN_AS_NODE` or `require('electron')` returns a path string and dies on
   `app.whenReady`. `electron dist/main.cjs --root=<repo> --capture` writes `dist/capture.png`.
-- Comments inside the `consoleStyles.ts` template literal must be real `/* */`. A backslash-star
-  comment emits a malformed selector that silently kills the rule after it.
+- Console styles are SCSS partials under `packages/gui/src/presentation/styles/`. `console.scss`
+  lists them in cascade order, so reordering a `@use` can change which rule wins.
 
 ## Conventions
 

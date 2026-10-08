@@ -1,0 +1,60 @@
+////
+/// Card: panel with a header strip (title, right-aligned meta) and a key-value grid for `dl` bodies.
+////
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+
+  & + .card {
+    margin-top: 14px;
+  }
+
+  > header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    background: color-mix(in oklab, var(--panel-2) 55%, var(--panel));
+
+    h2 {
+      margin: 0;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      letter-spacing: 0.02em;
+      font-weight: 600;
+    }
+
+    .meta {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--ink-dim);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  .pad {
+    padding: 14px;
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: 108px 1fr;
+    gap: 6px 12px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+  }
+
+  dt {
+    color: var(--ink-faint);
+  }
+
+  dd {
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+}

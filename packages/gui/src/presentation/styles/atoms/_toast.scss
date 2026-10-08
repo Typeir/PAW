@@ -1,0 +1,141 @@
+////
+/// Toasts: fixed corner stack (z-index 4000, max 360px), a left border tinted per level, slide-in and fade-out.
+/// Bottom corners stack upward.
+////
+
+.toaster {
+  position: fixed;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  max-width: 360px;
+  pointer-events: none;
+
+  &.top-right {
+    top: 0;
+    right: 0;
+  }
+
+  &.top-left {
+    top: 0;
+    left: 0;
+  }
+
+  &.bottom-right {
+    bottom: 0;
+    right: 0;
+    flex-direction: column-reverse;
+  }
+
+  &.bottom-left {
+    bottom: 0;
+    left: 0;
+    flex-direction: column-reverse;
+  }
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: var(--r);
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+  font-family: var(--mono);
+  font-size: 12px;
+  animation: toast-in 0.25s ease;
+
+  &.info {
+    border-left-color: var(--accent);
+  }
+
+  &.info .toast-ico {
+    color: var(--accent);
+  }
+
+  &.success {
+    border-left-color: var(--good);
+  }
+
+  &.success .toast-ico {
+    color: var(--good);
+  }
+
+  &.warning {
+    border-left-color: var(--warn);
+  }
+
+  &.warning .toast-ico {
+    color: var(--warn);
+  }
+
+  &.error {
+    border-left-color: var(--crit);
+  }
+
+  &.error .toast-ico {
+    color: var(--crit);
+  }
+
+  &.exiting {
+    animation: toast-out 0.2s ease forwards;
+  }
+}
+
+.toast-ico {
+  flex: none;
+  margin-top: 1px;
+}
+
+.toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  margin: 0 0 2px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.toast-msg {
+  margin: 0;
+  color: var(--ink-dim);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.toast-x {
+  margin-top: 1px;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .toast.exiting {
+    animation: none;
+  }
+}

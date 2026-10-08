@@ -1,0 +1,72 @@
+////
+/// State chip: pill with a leading dot, tinted per state (`done`, `run`, `fail`, `idle`). A running dot blinks.
+////
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  font-family: var(--mono);
+
+  .d {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  &.done {
+    color: var(--good);
+    background: var(--good-soft);
+    border-color: color-mix(in oklab, var(--good) 30%, transparent);
+  }
+
+  &.done .d {
+    background: var(--good);
+  }
+
+  &.run {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-color: color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+
+  &.run .d {
+    background: var(--accent);
+    animation: blink 1.3s steps(2) infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+
+  &.fail {
+    color: var(--crit);
+    background: var(--crit-soft);
+    border-color: color-mix(in oklab, var(--crit) 35%, transparent);
+  }
+
+  &.fail .d {
+    background: var(--crit);
+  }
+
+  &.idle {
+    color: var(--idle);
+    background: var(--idle-soft);
+    border-color: color-mix(in oklab, var(--idle) 30%, transparent);
+  }
+
+  &.idle .d {
+    background: var(--idle);
+  }
+}
+
+@keyframes blink {
+  to {
+    opacity: 0.35;
+  }
+}
