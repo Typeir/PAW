@@ -429,6 +429,17 @@ describe('runDaemon', () => {
     expect((await bare.handler()?.(asConsole('/api/tasks')))?.status).toBe(404);
   });
 
+  it('offers the Tasks rail item only when the supplied view is enabled', async () => {
+    const on = await runDaemon({ tasks: async () => ({ enabled: true }) }, makeRig().runtime);
+    expect((await on.snapshot()).chrome.tasks).toBe(true);
+
+    const off = await runDaemon({ tasks: async () => ({ enabled: false }) }, makeRig().runtime);
+    expect((await off.snapshot()).chrome.tasks).toBe(false);
+
+    const bare = await runDaemon({}, makeRig().runtime);
+    expect((await bare.snapshot()).chrome.tasks).toBe(false);
+  });
+
   it('answers 404 for a plan outside the repository rather than importing it', async () => {
     const rig = makeRig();
     await runDaemon({}, rig.runtime);
