@@ -12,7 +12,13 @@
  * @since 5.0.0
  */
 
-import { targetsOf, type DispatchEvent, type FileSystemPort, type SwarmPlan } from '@paw/core';
+import {
+  parentDir,
+  targetsOf,
+  type DispatchEvent,
+  type FileSystemPort,
+  type SwarmPlan,
+} from '@paw/core';
 
 /**
  * Save herd output, report what write.
@@ -62,7 +68,10 @@ export function createHerdWriter<A>(
         return;
       }
       for (const target of targets) {
-        await fs.ensureDir(target.slice(0, Math.max(0, target.lastIndexOf('/'))));
+        const dir = parentDir(target);
+        if (dir !== '') {
+          await fs.ensureDir(dir);
+        }
         await fs.writeText(target, outcome.content);
         paths.push(target);
       }

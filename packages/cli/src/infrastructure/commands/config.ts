@@ -1,7 +1,7 @@
 /**
  * PAW CLI — config command
  *
- * @fileoverview `paw config` edit repo model bindings on disk: show roles and bindings, bind role to declared model, unbind, or declare model. CLI hold filesystem authority; write `.paw/config.json` through core edit engine, same engine console reach over control API.
+ * @fileoverview `paw config` edit repo model bindings on disk: show roles and bindings judged against what each role requires, bind role to declared model, unbind, or declare model. CLI hold filesystem authority; write `.paw/config.json` through core edit engine, same engine console reach over control API.
  *
  * @module @paw/cli/infrastructure/commands/config
  * @version 0.0.0
@@ -10,9 +10,9 @@
  */
 
 import {
-  BUILTIN_ROLES,
   clearBinding,
   declareModel,
+  doctorConfigRoles,
   parseCapabilities,
   setBinding,
   type ConfigDocument,
@@ -21,24 +21,32 @@ import {
 import { createNodeConfigDocument } from '@paw/adapters';
 import type { ConfigDocumentPort } from '@paw/core';
 import { parseArgs } from '../../domain/context.js';
+import { formatRoleRows } from '../../domain/format.js';
 
 /**
- * Print declared models and each role binding.
+ * Print declared models and each role binding, judged. A mark means the bound
+ * model is declared and satisfies the role, not merely that config names one.
  *
  * @param {ConfigDocument} config - Current document.
  * @param {(lines: string[]) => void} print - Line printer.
+ * @returns {number} 0 when no required role is blocked, 1 when one is.
  */
-function showConfig(config: ConfigDocument, print: (lines: string[]) => void): void {
+function showConfig(config: ConfigDocument, print: (lines: string[]) => void): number {
   const models = Object.keys(config.models ?? {});
+  const rows = doctorConfigRoles(config);
+  const blocked = rows.filter((row) => row.blocking);
   print([
     `models: ${models.length === 0 ? '(none declared)' : models.join(', ')}`,
     '',
-    ...BUILTIN_ROLES.map((role) => {
-      const bound = config.roles?.[role.id];
-      const optional = role.optional ? ' [optional]' : '';
-      return `${bound ? '✓' : '·'} ${role.id} → ${bound ?? '(unbound)'}${optional}`;
-    }),
+    ...formatRoleRows(rows),
+    ...(blocked.length === 0
+      ? []
+      : [
+          '',
+          `${blocked.length} required role(s) cannot run: ${blocked.map((row) => row.role).join(', ')}`,
+        ]),
   ]);
+  return blocked.length === 0 ? 0 : 1;
 }
 
 /**
@@ -70,7 +78,7 @@ async function commit(
  *
  * @param {string[]} rest - Words after `config`.
  * @param {(lines: string[]) => void} print - Line printer.
- * @returns {Promise<number>} Exit code.
+ * @returns {Promise<number>} Exit code: 0 when ok, 1 when an edit is refused or a required role cannot run.
  */
 export async function runConfig(
   rest: string[],
@@ -81,8 +89,7 @@ export async function runConfig(
   const config = await doc.read();
 
   if (sub === undefined || sub === 'show') {
-    showConfig(config, print);
-    return 0;
+    return showConfig(config, print);
   }
   if (sub === 'bind') {
     const [, role, model] = rest;

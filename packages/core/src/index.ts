@@ -116,6 +116,22 @@ export {
 export type { DoctorFinding, SwarmPlan } from './domain/swarm.js';
 
 export {
+  parentDir,
+  proveMember,
+  proveTarget,
+  unprovedMembers,
+} from './domain/targetProof.js';
+export type {
+  MemberProof,
+  MemberProofState,
+  TargetProof,
+  TargetState,
+} from './domain/targetProof.js';
+
+export { openTargetLedger } from './application/targetLedger.js';
+export type { TargetLedger } from './application/targetLedger.js';
+
+export {
   AUTH_TIMEOUT_MS,
   BACKPRESSURE_CLOSE_BYTES,
   BACKPRESSURE_RESUME_BYTES,
@@ -167,6 +183,7 @@ export type {
 
 export {
   doctorRoles,
+  judgeRole,
   resolveModel,
 } from './application/roleRegistry.js';
 export type {
@@ -178,8 +195,11 @@ export type {
 
 export { BUILTIN_ROLES } from './application/builtinRoles.js';
 
-export { buildRegistry } from './application/buildRegistry.js';
+export { buildRegistry, doctorConfigRoles } from './application/buildRegistry.js';
 export type { RegistryConfig } from './application/buildRegistry.js';
+
+export { checkRoleBinding, doctorPlanWithBinding } from './application/planDoctor.js';
+export type { PlanBinding } from './application/planDoctor.js';
 
 export {
   clearBinding,

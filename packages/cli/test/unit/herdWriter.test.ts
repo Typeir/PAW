@@ -87,6 +87,14 @@ describe('createHerdWriter', () => {
     expect(dirs).toContain('out');
   });
 
+  it('asks for no directory when the target sits at the repository root', async () => {
+    const { fs, dirs, files } = fakeFs();
+    const plan = { ...planOf(), expectFiles: (): string => 'report.md' };
+    await createHerdWriter(plan, fs).onProgress(settledEvent(0, 'x'));
+    expect(dirs).toEqual([]);
+    expect(files.get('report.md')).toBe('x');
+  });
+
   it('writes as each member settles, not at the end', async () => {
     const { fs, files } = fakeFs();
     const writer = createHerdWriter(planOf(), fs);

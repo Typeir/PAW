@@ -3,7 +3,9 @@
  *
  * @fileoverview `paw swarm doctor|show|run`: validate plan, print member brief,
  * or dispatch plan against deterministic fake model (or live provider under
- * `--live`). Provide helpers shared with the `ui` command: plan loading,
+ * `--live`). `run` creates every declared target before a live dispatch — the
+ * SDK `edit` tool modifies existing files only — and proves each one landed
+ * afterwards. Provide helpers shared with the `ui` command: plan loading,
  * `--context` expansion, fake registry.
  *
  * @module @paw/cli/infrastructure/commands/swarm
@@ -19,15 +21,18 @@ import {
   buildRegistry,
   composeBrief,
   dispatchSwarm,
-  doctorPlan,
+  doctorPlanWithBinding,
+  openTargetLedger,
   type ModelCapabilities,
   type ModelPort,
+  type PlanBinding,
   type RoleRegistry,
   type SwarmPlan,
 } from '@paw/core';
 import { createNodeFileReader, createNodeFs } from '@paw/adapters';
 import {
   COPILOT_SLIM_SECTIONS,
+  liveHerdBinding,
   openLiveHerd,
   postRunReport,
   probeConsoleEndpoint,
@@ -43,7 +48,12 @@ import {
   splitPatterns,
   withContext,
 } from '../../domain/context.js';
-import { formatBrief, formatHerd, formatPlanDoctor } from '../../domain/format.js';
+import {
+  formatBrief,
+  formatHerd,
+  formatPlanDoctor,
+  formatProof,
+} from '../../domain/format.js';
 
 /**
  * Capabilities fake or noop model advertise: everything on, cost trivial.
@@ -117,11 +127,23 @@ export function fakeRegistryFor(plan: SwarmPlan<unknown>): RoleRegistry {
 }
 
 /**
+ * Model a live run would bind to, resolved without opening the runtime, so the
+ * plan doctor can judge the role before a 159 MB runtime spawn. Null outside
+ * `--live`: the fake model satisfies every role, so checking it proves nothing.
+ *
+ * @param {boolean} live - Whether the run targets the live provider.
+ * @returns {Promise<PlanBinding | null>} The binding, or null when not live.
+ */
+export async function planBinding(live: boolean): Promise<PlanBinding | null> {
+  return live ? await liveHerdBinding(process.cwd()) : null;
+}
+
+/**
  * Run `swarm` subcommand.
  *
  * @param {string[]} rest - Words after `swarm`.
  * @param {(lines: string[]) => void} print - Line printer.
- * @returns {Promise<number>} Exit code: 0 when ok, 1 when plan refused.
+ * @returns {Promise<number>} Exit code: 0 when ok, 1 when the plan is refused or a member did not produce the file it declared.
  */
 export async function runSwarm(
   rest: string[],
@@ -133,7 +155,7 @@ export async function runSwarm(
   const [sub, planPath, memberArg] = args.positional;
   const plan = await loadPlan(planPath);
   if (sub === 'doctor') {
-    const findings = doctorPlan(plan);
+    const findings = doctorPlanWithBinding(plan, await planBinding(live));
     print(formatPlanDoctor(plan.name, findings));
     return findings.every((f) => f.ok) ? 0 : 1;
   }
@@ -149,6 +171,12 @@ export async function runSwarm(
     return 0;
   }
   if (sub === 'run') {
+    const binding = await planBinding(live);
+    const findings = doctorPlanWithBinding(plan, binding);
+    if (!findings.every((f) => f.ok)) {
+      print(formatPlanDoctor(plan.name, findings));
+      return 1;
+    }
     const attached = await resolveContextArg(args.values.get('context'));
     if (attached.length > 0) {
       print([`attaching ${attached.length} file(s) to every brief: ${attached.join(', ')}`]);
@@ -174,6 +202,16 @@ export async function runSwarm(
               event: event as never,
             });
           };
+    const ledger = openTargetLedger(plan, createNodeFs());
+    await ledger.snapshot();
+    if (live) {
+      const made = await ledger.createPlaceholders();
+      if (made.length > 0) {
+        print([
+          `pre-created ${made.length} placeholder target(s) — the edit tool cannot create files`,
+        ]);
+      }
+    }
     const { registry, close } = live
       ? await openLiveHerd(plan)
       : { registry: fakeRegistryFor(plan), close: async () => {} };
@@ -204,7 +242,10 @@ export async function runSwarm(
       } else {
         print(['live herd: members edited their files in place through the agent tools']);
       }
-      return result.released ? 0 : 1;
+      const proofs = await ledger.prove(result.outcomes, writer ? writer.written() : []);
+      print(formatProof(proofs));
+      const produced = proofs.every((proof) => proof.state !== 'unproved');
+      return result.released && produced ? 0 : 1;
     } finally {
       await close();
     }

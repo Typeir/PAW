@@ -17,7 +17,9 @@ import type {
   DoctorFinding,
   DoctorReport,
   HealthReport,
+  MemberProof,
   ModuleStatus,
+  RoleDoctorRow,
   WorkEdge,
   WorkTaskDetail,
   WorkTaskRow,
@@ -127,25 +129,36 @@ function mark(ok: boolean): string {
 }
 
 /**
+ * Render one line per role doctor row: mark, binding, and the reasons a
+ * binding falls short. Shared by `paw doctor` and `paw config show`.
+ *
+ * @param {readonly RoleDoctorRow[]} rows - Rows from `doctorRoles` or `doctorConfigRoles`.
+ * @returns {string[]} Terminal lines, each indented two spaces.
+ */
+export function formatRoleRows(rows: readonly RoleDoctorRow[]): string[] {
+  return rows.map((row) => {
+    const bound = row.boundTo ?? '(unbound)';
+    const detail =
+      row.satisfaction && !row.satisfaction.ok
+        ? ` — ${row.satisfaction.reasons.join('; ')}`
+        : '';
+    const optional = row.optional ? ' [optional]' : '';
+    return `  ${mark(!row.blocking)} role ${row.role} → ${bound}${optional}${detail}`;
+  });
+}
+
+/**
  * Render unified doctor report.
  *
  * @param {DoctorReport} report - Report from `runDoctor`.
  * @returns {string[]} Terminal lines.
  */
 export function formatDoctor(report: DoctorReport): string[] {
-  const lines = [`doctor: ${report.ok ? 'ready' : 'NOT READY'}`];
-  for (const problem of report.config) {
-    lines.push(`  ✗ config.${problem.field}: ${problem.message}`);
-  }
-  for (const row of report.roles) {
-    const bound = row.boundTo ?? '(unbound)';
-    const ok = !row.blocking;
-    const detail = row.satisfaction && !row.satisfaction.ok
-      ? ` — ${row.satisfaction.reasons.join('; ')}`
-      : '';
-    lines.push(`  ${mark(ok)} role ${row.role} → ${bound}${detail}`);
-  }
-  return lines;
+  return [
+    `doctor: ${report.ok ? 'ready' : 'NOT READY'}`,
+    ...report.config.map((problem) => `  ✗ config.${problem.field}: ${problem.message}`),
+    ...formatRoleRows(report.roles),
+  ];
 }
 
 /**
@@ -400,6 +413,45 @@ export function formatHerd(result: DispatchResult): string[] {
   const lines = [`herd: ${done} done · ${skipped} skipped`];
   for (const o of result.outcomes) {
     lines.push(`  ${o.state === 'done' ? '✓' : '·'} member ${o.member} (${o.key})`);
+  }
+  return lines;
+}
+
+/**
+ * Why a declared file did not count as produced.
+ */
+const UNPROVED_REASON: Readonly<Record<'empty' | 'unchanged', string>> = {
+  empty: 'declared file is empty',
+  unchanged: 'declared file is unchanged',
+};
+
+/**
+ * Render the verdict on what a herd actually wrote. Members that ran and
+ * declared no `expectFiles` are reported as unenforced rather than counted
+ * as passes; every unproved member is named with the file that failed it.
+ *
+ * @param {readonly MemberProof[]} proofs - Verdicts from `TargetLedger.prove`.
+ * @returns {string[]} Terminal lines.
+ */
+export function formatProof(proofs: readonly MemberProof[]): string[] {
+  const proved = proofs.filter((p) => p.state === 'proved').length;
+  const unproved = proofs.filter((p) => p.state === 'unproved').length;
+  if (proved + unproved === 0) {
+    return ['targets: not enforced — no member that ran declares expectFiles'];
+  }
+  const lines = [`targets: ${proved} proved · ${unproved} unproved`];
+  for (const proof of proofs) {
+    if (proof.state !== 'unproved') {
+      continue;
+    }
+    for (const target of proof.targets) {
+      if (target.state === 'written') {
+        continue;
+      }
+      lines.push(
+        `  ✗ member ${proof.member} (${proof.key}) — ${UNPROVED_REASON[target.state]}: ${target.path}`,
+      );
+    }
   }
   return lines;
 }

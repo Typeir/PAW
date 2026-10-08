@@ -18,7 +18,12 @@
 import type { ModelCapabilities } from '../domain/role.js';
 import type { ModelPort } from '../ports/index.js';
 import { BUILTIN_ROLES } from './builtinRoles.js';
-import type { ModelBinding, RoleRegistry } from './roleRegistry.js';
+import {
+  judgeRole,
+  type ModelBinding,
+  type RoleDoctorRow,
+  type RoleRegistry,
+} from './roleRegistry.js';
 
 /**
  * Registry-relevant slice of repo config.
@@ -56,4 +61,23 @@ export function buildRegistry(
     bindings.set(roleId, { modelId, capabilities, port: portFor(modelId) });
   }
   return { declarations, bindings };
+}
+
+/**
+ * Validate every declared role against the config alone, with no port opened.
+ * Same rows as {@link doctorRoles}, reachable from a display path: a role bound
+ * to a model the config does not declare is reported as an unsatisfied row
+ * rather than thrown, so `paw config show` can print it.
+ *
+ * @param {RegistryConfig} config - The models and bindings.
+ * @returns {RoleDoctorRow[]} One row per declared role.
+ */
+export function doctorConfigRoles(config: RegistryConfig): RoleDoctorRow[] {
+  return BUILTIN_ROLES.map((decl) => {
+    const modelId = config.roles?.[decl.id];
+    if (modelId === undefined) {
+      return judgeRole(decl, null, null);
+    }
+    return judgeRole(decl, modelId, config.models?.[modelId] ?? null);
+  });
 }

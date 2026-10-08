@@ -10,6 +10,8 @@
  */
 
 import { execFile } from 'node:child_process';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -21,6 +23,25 @@ const MAIN = join(PKG, 'src', 'infrastructure', 'main.ts');
 const FIX = join(HERE, '..', 'fixtures');
 
 /**
+ * Run CLI as child process in `cwd` with given argv, resolve with stdout,
+ * stderr, exit code.
+ *
+ * @param cwd - Directory to run in.
+ * @param args - The argv after the script path.
+ */
+function runCliIn(
+  cwd: string,
+  ...args: string[]
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  return new Promise((resolve) => {
+    execFile(process.execPath, [TSX, MAIN, ...args], { cwd }, (err, stdout, stderr) => {
+      const code = err && typeof err.code === 'number' ? err.code : 0;
+      resolve({ stdout, stderr, code });
+    });
+  });
+}
+
+/**
  * Run CLI as child process with given argv, resolve with stdout, stderr, exit
  * code.
  *
@@ -29,17 +50,19 @@ const FIX = join(HERE, '..', 'fixtures');
 function runCli(
   ...args: string[]
 ): Promise<{ stdout: string; stderr: string; code: number }> {
-  return new Promise((resolve) => {
-    execFile(
-      process.execPath,
-      [TSX, MAIN, ...args],
-      { cwd: PKG },
-      (err, stdout, stderr) => {
-        const code = err && typeof err.code === 'number' ? err.code : 0;
-        resolve({ stdout, stderr, code });
-      },
-    );
-  });
+  return runCliIn(PKG, ...args);
+}
+
+/**
+ * Temporary repository holding `.paw/config.json` with the given bindings.
+ *
+ * @param config - Config document to write.
+ */
+function repoWithConfig(config: unknown): string {
+  const root = mkdtempSync(join(tmpdir(), 'paw-e2e-'));
+  mkdirSync(join(root, '.paw'), { recursive: true });
+  writeFileSync(join(root, '.paw', 'config.json'), JSON.stringify(config), 'utf8');
+  return root;
 }
 
 describe('cli help (e2e)', () => {
@@ -84,6 +107,12 @@ describe('cli swarm (e2e)', () => {
     expect(code).toBe(0);
     expect(stdout).toContain('plan demo: ok');
     expect(stdout).toContain('✓ file-conflict');
+  });
+
+  it('says the role binding went unchecked without --live, rather than passing it silently', async () => {
+    const { stdout, code } = await runCli('swarm', 'doctor', plan());
+    expect(code).toBe(0);
+    expect(stdout).toContain('role-binding — edit.apply — not checked; pass --live');
   });
 
   it('renders one member brief', async () => {
@@ -139,6 +168,23 @@ describe('cli swarm (e2e)', () => {
     expect(stdout).toContain('✓ member 0 (docs/one.mdx)');
   });
 
+  it('proves every declared target actually landed, not just that members settled', async () => {
+    const { stdout, code } = await runCli('swarm', 'run', plan());
+    expect(code).toBe(0);
+    expect(stdout).toContain('targets: 2 proved · 0 unproved');
+  });
+
+  it('calls targets unenforced when the plan declares none, rather than reporting a clean run', async () => {
+    const { stdout, code } = await runCli(
+      'swarm',
+      'run',
+      join(FIX, 'undeclared.plan.mjs'),
+    );
+    expect(code).toBe(0);
+    expect(stdout).toContain('herd: 2 done · 0 skipped');
+    expect(stdout).toContain('targets: not enforced — no member that ran declares expectFiles');
+  });
+
   it('rejects an unknown swarm subcommand, exit 1', async () => {
     const { stderr, code } = await runCli('swarm', 'stampede', plan());
     expect(code).toBe(1);
@@ -158,5 +204,66 @@ describe('cli routing (e2e)', () => {
     const { stderr, code } = await runCli('swarm', 'doctor', join(FIX, 'not-a-plan.mjs'));
     expect(code).toBe(1);
     expect(stderr).toContain('does not export a swarm plan');
+  });
+});
+
+describe('cli config show (e2e)', () => {
+  const CHEAP = {
+    contextTokens: 128_000,
+    maxOutputTokens: 8_192,
+    tools: true,
+    structuredOutput: true,
+    reasoning: true,
+    vision: false,
+    costClass: 'cheap',
+  };
+  const ROOMY = { ...CHEAP, maxOutputTokens: 16_384, costClass: 'standard' };
+
+  /**
+   * Config binding both cheap roles to `deepseek-chat` and `review.judge` to
+   * whichever model the case is about.
+   *
+   * @param judge - Model id to bind `review.judge` to.
+   * @param models - Declared models.
+   */
+  const configFor = (judge: string, models: Record<string, unknown>): unknown => ({
+    models,
+    roles: {
+      'edit.apply': 'deepseek-chat',
+      'review.graze': 'deepseek-chat',
+      'review.judge': judge,
+    },
+  });
+
+  it('marks every satisfied binding and exits 0', async () => {
+    const root = repoWithConfig(
+      configFor('deepseek-roomy', { 'deepseek-chat': CHEAP, 'deepseek-roomy': ROOMY }),
+    );
+    const { stdout, code } = await runCliIn(root, 'config', 'show');
+    expect(code).toBe(0);
+    expect(stdout).toContain('✓ role edit.apply → deepseek-chat');
+    expect(stdout).toContain('✓ role review.judge → deepseek-roomy');
+    expect(stdout).not.toContain('cannot run');
+  });
+
+  it('refuses a binding whose model the config does not declare', async () => {
+    const root = repoWithConfig(
+      configFor('deepseek-reasoner', { 'deepseek-chat': CHEAP }),
+    );
+    const { stdout, code } = await runCliIn(root, 'config', 'show');
+    expect(code).toBe(1);
+    expect(stdout).toContain(
+      '✗ role review.judge → deepseek-reasoner — model "deepseek-reasoner" is not declared',
+    );
+    expect(stdout).toContain('1 required role(s) cannot run: review.judge');
+  });
+
+  it('refuses a declared model whose output ceiling falls short of the role', async () => {
+    const root = repoWithConfig(configFor('deepseek-chat', { 'deepseek-chat': CHEAP }));
+    const { stdout, code } = await runCliIn(root, 'config', 'show');
+    expect(code).toBe(1);
+    expect(stdout).toContain(
+      '✗ role review.judge → deepseek-chat — max output 8192 < required 16384',
+    );
   });
 });

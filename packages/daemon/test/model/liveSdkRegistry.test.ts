@@ -6,7 +6,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelPort, SwarmPlan } from '@paw/core';
-import { liveSdkRegistryFor, type OpenModel } from '../../src/infrastructure/model/liveSdkRegistry.js';
+import {
+  LIVE_CAPS,
+  liveModelId,
+  liveSdkRegistryFor,
+  type OpenModel,
+} from '../../src/infrastructure/model/liveSdkRegistry.js';
 import type { OpenSdkModelOptions } from '../../src/infrastructure/model/sdkModel.js';
 
 const PLAN = { name: 'monsters', role: 'lore.author', members: () => 1, brief: () => 'x' } as unknown as SwarmPlan<unknown>;
@@ -90,5 +95,31 @@ describe('liveSdkRegistryFor', () => {
     });
     expect(registry.bindings.get('lore.author')?.modelId).toBe('gemini-2.5-flash');
     expect(captured!.authToken()).toBe('AIza-secret');
+  });
+});
+
+describe('liveModelId', () => {
+  it('prefers an explicit override over every other source', () => {
+    process.env.DEEPSEEK_MODEL = 'from-env';
+    expect(
+      liveModelId({
+        model: 'explicit',
+        provider: { name: 'p', type: 'openai', baseUrl: 'u', key: 'k', model: 'from-profile' },
+      }),
+    ).toBe('explicit');
+  });
+
+  it('falls back to the provider profile, then the environment, then the default', () => {
+    expect(
+      liveModelId({ provider: { name: 'p', type: 'openai', baseUrl: 'u', key: 'k', model: 'from-profile' } }),
+    ).toBe('from-profile');
+    process.env.DEEPSEEK_MODEL = 'from-env';
+    expect(liveModelId({})).toBe('from-env');
+    delete process.env.DEEPSEEK_MODEL;
+    expect(liveModelId({})).toBe('deepseek-chat');
+  });
+
+  it('declares the output ceiling the provider actually serves', () => {
+    expect(LIVE_CAPS.maxOutputTokens).toBe(8_192);
   });
 });

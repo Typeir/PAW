@@ -23,7 +23,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
-import type { SwarmPlan } from '@paw/core';
+import type { PlanBinding, SwarmPlan } from '@paw/core';
 import { parseDeepseekEnv } from './envLocal.js';
 import {
   chooseProvider,
@@ -31,7 +31,12 @@ import {
   providerNameOf,
   type ProviderProfile,
 } from './providerEnv.js';
-import { liveSdkRegistryFor, type LiveSdkRegistry } from './liveSdkRegistry.js';
+import {
+  LIVE_CAPS,
+  liveModelId,
+  liveSdkRegistryFor,
+  type LiveSdkRegistry,
+} from './liveSdkRegistry.js';
 import { openSdkModel } from './sdkModel.js';
 
 /**
@@ -94,15 +99,45 @@ async function loadProviders(root: string): Promise<Map<string, ProviderProfile>
   return providers;
 }
 
+/**
+ * Provider a live run in `cwd` would use: `.env.local`, then
+ * `.paw/*.provider.env`, then `PAW_PROVIDER`. Shared by the run path and the
+ * doctor path, which differ only in whether they open the runtime.
+ *
+ * @param {string} cwd - Repository root.
+ * @returns {Promise<ProviderProfile | undefined>} Chosen provider, or undefined when none is configured.
+ */
+async function resolveProvider(cwd: string): Promise<ProviderProfile | undefined> {
+  await loadEnvLocal(cwd);
+  const providers = await loadProviders(cwd);
+  return providers.size === 0
+    ? undefined
+    : chooseProvider(providers, process.env.PAW_PROVIDER);
+}
+
+/**
+ * Model a live run would bind to and the capabilities it declares, resolved
+ * without opening the 159 MB runtime. Lets `paw swarm doctor --live` judge the
+ * plan's role against the model that would serve it, instead of that shortfall
+ * surfacing at dispatch.
+ *
+ * @param {string} [cwd] - Repository root; default to process cwd.
+ * @returns {Promise<PlanBinding>} Model id and its declared capabilities.
+ */
+export async function liveHerdBinding(cwd: string = process.cwd()): Promise<PlanBinding> {
+  const provider = await resolveProvider(cwd);
+  return {
+    modelId: liveModelId(provider === undefined ? {} : { provider }),
+    capabilities: LIVE_CAPS,
+  };
+}
+
 export async function openLiveHerd(
   plan: SwarmPlan<unknown>,
   cwd: string = process.cwd(),
   opts: { safemode?: boolean } = {},
 ): Promise<LiveSdkRegistry> {
-  await loadEnvLocal(cwd);
-  const providers = await loadProviders(cwd);
-  const provider =
-    providers.size === 0 ? undefined : chooseProvider(providers, process.env.PAW_PROVIDER);
+  const provider = await resolveProvider(cwd);
   const baseDirectory = await mkdtemp(join(tmpdir(), 'paw-herd-'));
   const { registry, close } = await liveSdkRegistryFor(plan, openSdkModel, {
     baseDirectory,

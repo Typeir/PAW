@@ -79,6 +79,43 @@ export interface RoleDoctorRow {
 }
 
 /**
+ * Judge one declared role against the model it names. Shared by the registry
+ * doctor and the config doctor, which differ only in where capabilities come
+ * from.
+ *
+ * @param {RoleDeclaration} decl - The role.
+ * @param {string | null} boundTo - Model id it is bound to, null when unbound.
+ * @param {ModelCapabilities | null} capabilities - Capabilities of that model, null when the model is not declared.
+ * @returns {RoleDoctorRow} One doctor row.
+ */
+export function judgeRole(
+  decl: RoleDeclaration,
+  boundTo: string | null,
+  capabilities: ModelCapabilities | null,
+): RoleDoctorRow {
+  if (boundTo === null) {
+    return {
+      role: decl.id,
+      optional: decl.optional,
+      boundTo: null,
+      satisfaction: null,
+      blocking: !decl.optional,
+    };
+  }
+  const satisfaction: Satisfaction =
+    capabilities === null
+      ? { ok: false, reasons: [`model "${boundTo}" is not declared`] }
+      : satisfies(decl.requires, capabilities);
+  return {
+    role: decl.id,
+    optional: decl.optional,
+    boundTo,
+    satisfaction,
+    blocking: !decl.optional && !satisfaction.ok,
+  };
+}
+
+/**
  * Validate every declared role against binding.
  *
  * @param {RoleRegistry} registry - Declarations and bindings.
@@ -88,24 +125,11 @@ export function doctorRoles(registry: RoleRegistry): RoleDoctorRow[] {
   const rows: RoleDoctorRow[] = [];
   for (const decl of registry.declarations.values()) {
     const binding = registry.bindings.get(decl.id);
-    if (!binding) {
-      rows.push({
-        role: decl.id,
-        optional: decl.optional,
-        boundTo: null,
-        satisfaction: null,
-        blocking: !decl.optional,
-      });
-      continue;
-    }
-    const satisfaction = satisfies(decl.requires, binding.capabilities);
-    rows.push({
-      role: decl.id,
-      optional: decl.optional,
-      boundTo: binding.modelId,
-      satisfaction,
-      blocking: !decl.optional && !satisfaction.ok,
-    });
+    rows.push(
+      binding
+        ? judgeRole(decl, binding.modelId, binding.capabilities)
+        : judgeRole(decl, null, null),
+    );
   }
   return rows;
 }

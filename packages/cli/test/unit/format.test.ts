@@ -2,8 +2,9 @@
  * PAW CLI formatter tests.
  *
  * @fileoverview Cover every formatter branch: ready and not-ready doctor with
- * config and role problems, ok and refused plan doctor, member brief, released
- * and refused herd. `format.ts` reach 100%.
+ * config and role problems, role rows, ok and refused plan doctor, member
+ * brief, released and refused herd, and the target proof that separates a herd
+ * that ran from one that produced. `format.ts` reach 100%.
  *
  * @module @paw/cli/test/unit/format
  * @version 0.0.0
@@ -16,6 +17,7 @@ import type {
   DispatchResult,
   DoctorReport,
   HealthReport,
+  MemberProof,
   SwarmPlan,
 } from '@paw/core';
 import {
@@ -27,7 +29,9 @@ import {
   formatHelp,
   formatHerd,
   formatPlanDoctor,
+  formatProof,
   formatPruned,
+  formatRoleRows,
   formatTaskDetail,
   formatTasks,
   formatViolations,
@@ -425,7 +429,7 @@ describe('formatDoctor', () => {
     expect(out[0]).toBe('doctor: NOT READY');
     expect(out).toContain('  ✗ config.connector: unknown connector "x"');
     expect(out).toContain('  ✗ role review.judge → weak — requires tool calls');
-    expect(out).toContain('  ✓ role memory.draft → (unbound)');
+    expect(out).toContain('  ✓ role memory.draft → (unbound) [optional]');
   });
 });
 
@@ -489,5 +493,88 @@ describe('formatHerd', () => {
       outcomes: [],
     };
     expect(formatHerd(result)[0]).toBe('plan (release refused): REFUSED');
+  });
+});
+
+describe('formatRoleRows', () => {
+  it('marks an optional role so an unbound one reads as deliberate', () => {
+    expect(
+      formatRoleRows([
+        {
+          role: 'memory.draft',
+          optional: true,
+          boundTo: null,
+          satisfaction: null,
+          blocking: false,
+        },
+      ]),
+    ).toEqual(['  ✓ role memory.draft → (unbound) [optional]']);
+  });
+
+  it('names every reason a required binding falls short', () => {
+    expect(
+      formatRoleRows([
+        {
+          role: 'review.judge',
+          optional: false,
+          boundTo: 'deepseek-chat',
+          satisfaction: { ok: false, reasons: ['max output 8192 < required 16384'] },
+          blocking: true,
+        },
+      ]),
+    ).toEqual(['  ✗ role review.judge → deepseek-chat — max output 8192 < required 16384']);
+  });
+});
+
+describe('formatProof', () => {
+  const proof = (over: Partial<MemberProof>): MemberProof => ({
+    member: 0,
+    key: 'k0',
+    state: 'proved',
+    targets: [],
+    ...over,
+  });
+
+  it('says targets are not enforced when no member that ran declared one', () => {
+    expect(formatProof([proof({ state: 'undeclared' }), proof({ state: 'skipped' })])).toEqual([
+      'targets: not enforced — no member that ran declares expectFiles',
+    ]);
+  });
+
+  it('counts proved and unproved members', () => {
+    const out = formatProof([
+      proof({ state: 'proved', targets: [{ path: 'a.md', state: 'written' }] }),
+      proof({ member: 1, key: 'k1', state: 'skipped' }),
+    ]);
+    expect(out[0]).toBe('targets: 1 proved · 0 unproved');
+    expect(out).toHaveLength(1);
+  });
+
+  it('names the empty placeholder a member never filled', () => {
+    const out = formatProof([
+      proof({
+        member: 3,
+        key: 'heirlooms-and-attunement',
+        state: 'unproved',
+        targets: [
+          { path: 'findings/heirlooms.md', state: 'empty' },
+          { path: 'findings/notes.md', state: 'written' },
+        ],
+      }),
+    ]);
+    expect(out).toEqual([
+      'targets: 0 proved · 1 unproved',
+      '  ✗ member 3 (heirlooms-and-attunement) — declared file is empty: findings/heirlooms.md',
+    ]);
+  });
+
+  it('names a declared file the member left byte-identical', () => {
+    const out = formatProof([
+      proof({
+        state: 'unproved',
+        targets: [{ path: 'src/a.ts', state: 'unchanged' }],
+      }),
+    ]);
+    expect(out[1]).toBe('  ✗ member 0 (k0) — declared file is unchanged: src/a.ts');
   });
 });

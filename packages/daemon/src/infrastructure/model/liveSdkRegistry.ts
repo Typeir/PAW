@@ -33,8 +33,10 @@ const DEFAULT_MODEL = 'deepseek-chat';
 /**
  * Capabilities live model declared to have, so role that require
  * tools, structured output, or large window satisfied by binding.
+ * `maxOutputTokens` is the ceiling the provider actually serves; a role
+ * requiring more than this is refused by the plan doctor before dispatch.
  */
-const LIVE_CAPS: ModelCapabilities = {
+export const LIVE_CAPS: ModelCapabilities = {
   contextTokens: 128_000,
   maxOutputTokens: 8_192,
   tools: true,
@@ -54,6 +56,23 @@ const LIVE_CAPS: ModelCapabilities = {
 export type OpenModel = (
   options: OpenSdkModelOptions,
 ) => Promise<{ port: ModelPort; close: () => Promise<void> }>;
+
+/**
+ * Model id a live run bind to: explicit override, else the provider profile,
+ * else `DEEPSEEK_MODEL`, else `deepseek-chat`. Same precedence
+ * {@link liveSdkRegistryFor} apply, reachable without opening the runtime.
+ *
+ * @param {object} opts - Overrides.
+ * @param {ProviderProfile} [opts.provider] - Provider from a `.paw/<name>.provider.env`.
+ * @param {string} [opts.model] - Model id override.
+ * @returns {string} Resolved model id.
+ */
+export function liveModelId(opts: {
+  provider?: ProviderProfile;
+  model?: string;
+}): string {
+  return opts.model ?? opts.provider?.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_MODEL;
+}
 
 /**
  * Live registry paired with hook that stop its client.
@@ -96,7 +115,7 @@ export async function liveSdkRegistryFor(
   const profile = opts.provider;
   const baseUrl =
     opts.baseUrl ?? profile?.baseUrl ?? process.env.DEEPSEEK_BASE_URL ?? DEFAULT_BASE;
-  const modelId = opts.model ?? profile?.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_MODEL;
+  const modelId = liveModelId(opts);
   const { port, close } = await openModel({
     provider: { type: profile?.type ?? 'openai', baseUrl },
     authToken: () => {
