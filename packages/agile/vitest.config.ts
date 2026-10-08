@@ -1,8 +1,8 @@
 import { defineConfig } from 'vitest/config';
 
 /**
- * PAW Agile test + coverage config. Thresholds 100 on all four axes, per
- * CONSTRAINTS.md Constraint 1. No exclusions: the package is pure domain.
+ * PAW Agile test + coverage config. Thresholds 100 on all four axes. No
+ * exclusions: the package is pure domain.
  */
 export default defineConfig({
   test: {

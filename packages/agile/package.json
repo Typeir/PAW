@@ -2,7 +2,12 @@
   "name": "@paw/agile",
   "version": "0.0.0",
   "private": true,
-  "description": "PAW Agile — the work model PAW owns, federated as a module: a multi-parent task graph that refuses an edge closing a loop, with deduplicated rollup. Backend connectors map onto it.",
+  "description": "PAW Agile — the work model PAW owns, federated as a module: a multi-parent task graph that records loop-closing and dangling edges instead of walking them, with deduplicated rollup. Backend connectors map onto it.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Typeir/paw-agile.git"
+  },
   "type": "module",
   "exports": {
     ".": {
