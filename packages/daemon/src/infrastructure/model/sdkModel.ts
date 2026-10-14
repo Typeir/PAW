@@ -58,6 +58,7 @@ class PawEgress extends CopilotRequestHandler {
  * @property {string} baseDirectory - Where runtime write session state.
  * @property {string} workingDirectory - Absolute root member built-in file and shell tool operate within; served repository.
  * @property {boolean} safemode - When true, member deny shell — option-A surface.
+ * @property {unknown} hooks - SDK session hooks every member session carries.
  */
 export interface OpenSdkModelOptions {
   readonly provider: ProviderBlock;
@@ -65,6 +66,7 @@ export interface OpenSdkModelOptions {
   readonly baseDirectory: string;
   readonly workingDirectory: string;
   readonly safemode: boolean;
+  readonly hooks: unknown;
 }
 
 /**
@@ -103,6 +105,7 @@ export async function openSdkModel(
       workingDirectory: options.workingDirectory,
       safemode: options.safemode,
       onPermissionRequest: approveAll,
+      hooks: options.hooks,
     },
   );
   return {

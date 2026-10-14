@@ -23,7 +23,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createGateCache, createNodeConfigDocument, openSqlJsStore } from '@paw/adapters';
-import { claudeHooksConnector, copilotHooksConnector } from '@paw/connectors';
+import { claudeHooksConnector, copilotHooksConnector, sdkHooksConnector } from '@paw/connectors';
 import {
   enabledConnectorIds,
   lintViolation,
@@ -107,7 +107,11 @@ export async function startEnforcement(
         }),
         isIgnored: (path) => IGNORED.test(path),
         toRelative: (path) => toProjectRelative(root, path),
-        connectors: { copilot: copilotHooksConnector, claude: claudeHooksConnector },
+        connectors: {
+          copilot: copilotHooksConnector,
+          claude: claudeHooksConnector,
+          sdk: sdkHooksConnector,
+        },
       };
       return { token, deps };
     },

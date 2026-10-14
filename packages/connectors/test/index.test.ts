@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { claudeHooksConnector, copilotHooksConnector } from '../src/index.js';
+import { claudeHooksConnector, copilotHooksConnector, sdkHooksConnector } from '../src/index.js';
 
 describe('@paw/connectors barrel', () => {
   it('exposes the copilot-hooks connector by its config name', () => {
@@ -24,5 +24,11 @@ describe('@paw/connectors barrel', () => {
     expect(claudeHooksConnector.name).toBe('claude-hooks');
     expect(typeof claudeHooksConnector.toEvent).toBe('function');
     expect(typeof claudeHooksConnector.fromResponse).toBe('function');
+  });
+
+  it('exposes the sdk-hooks connector by its config name', () => {
+    expect(sdkHooksConnector.name).toBe('sdk-hooks');
+    expect(typeof sdkHooksConnector.toEvent).toBe('function');
+    expect(typeof sdkHooksConnector.fromResponse).toBe('function');
   });
 });

@@ -52,7 +52,6 @@ import {
   mergeControl,
   meterPort,
   nodeRuntime,
-  openLiveHerd,
   plansControl,
   probeConsoleEndpoint,
   readConsoleEndpoint,
@@ -70,7 +69,7 @@ import {
 import { openConsole } from '../../application/electronLauncher.js';
 import { createHerdWriter } from '../../application/herdWriter.js';
 import { concurrencyFrom, maxTokensFrom, parseArgs, withContext } from '../../domain/context.js';
-import { fakeRegistryFor, resolveContextArg } from './swarm.js';
+import { fakeRegistryFor, openPolicedHerd, resolveContextArg } from './swarm.js';
 
 /**
  * Build dispatcher for `paw ui --run`. Release the swarm once against the real
@@ -93,7 +92,7 @@ function uiDispatcher(
 ): Dispatcher {
   return async (plan, onProgress) => {
     const { registry: base, close } = live
-      ? await openLiveHerd(plan)
+      ? await openPolicedHerd(plan)
       : { registry: fakeRegistryFor(plan), close: async () => {} };
     try {
       const binding = base.bindings.get(plan.role);
@@ -189,7 +188,7 @@ function spawnShell(bin: string, shellArgs: readonly string[]) {
  */
 function releaseDispatcher(settings: RunSettings): Dispatcher {
   return dispatcherFor(settings, {
-    openLive: (plan: SwarmPlan<unknown>) => openLiveHerd(plan),
+    openLive: (plan: SwarmPlan<unknown>) => openPolicedHerd(plan),
     fakeRegistry: fakeRegistryFor,
     withContext,
     resolveContext: (globs) => resolveContextArg(globs.join(',')),

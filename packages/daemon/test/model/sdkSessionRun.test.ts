@@ -20,7 +20,13 @@ import type { TokenUsage } from '../../src/infrastructure/model/providerUsage.js
 
 const PROVIDER = { type: 'openai', baseUrl: 'https://api.deepseek.com' } as const;
 const approveAll = (): string => 'approved';
-const AGENT: AgentToolConfig = { workingDirectory: '/repo', safemode: false, onPermissionRequest: approveAll };
+const herdHooks = { onPreToolUse: async () => undefined };
+const AGENT: AgentToolConfig = {
+  workingDirectory: '/repo',
+  safemode: false,
+  onPermissionRequest: approveAll,
+  hooks: herdHooks,
+};
 
 function fakeClient(session: Partial<SdkSessionLike> & { sessionId: string }): {
   client: SdkClientLike;
@@ -62,6 +68,7 @@ describe('createSdkSessionRun', () => {
         availableTools: ['builtin:*'],
         excludedTools: [],
         onPermissionRequest: approveAll,
+        hooks: herdHooks,
       }),
     );
     expect(capDuringSend).toBe(8192);
@@ -74,7 +81,7 @@ describe('createSdkSessionRun', () => {
     const usage = new Map<string, TokenUsage>([['s4', { inputTokens: 2, outputTokens: 1 }]]);
     const maxTokens = new Map<string, number>();
     const { client, createSession } = fakeClient({ sessionId: 's4' });
-    const safe: AgentToolConfig = { workingDirectory: '/repo', safemode: true, onPermissionRequest: approveAll };
+    const safe: AgentToolConfig = { ...AGENT, safemode: true };
 
     const run = createSdkSessionRun(client, PROVIDER, usage, maxTokens, safe);
     await run({ model: 'm', prompt: 'p', availableTools: ['read', 'edit'] });

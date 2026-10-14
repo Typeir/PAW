@@ -24,6 +24,9 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import type { PlanBinding, SwarmPlan } from '@paw/core';
+import { createHerdHooks, type HerdHooks } from '../../application/herdHooks.js';
+import { socketPath, tokenPath } from '../endpoint.js';
+import { rpcCall } from '../rpcClient.js';
 import { parseDeepseekEnv } from './envLocal.js';
 import {
   chooseProvider,
@@ -67,16 +70,6 @@ async function loadEnvLocal(startDir: string): Promise<void> {
   }
 }
 
-/**
- * Open live SDK-backed registry for plan, ready to dispatch. Members run SDK
- * built-in tools in place, rooted at `cwd` — served repository.
- *
- * @param {SwarmPlan<unknown>} plan - Plan being run.
- * @param {string} [cwd] - Where look for `.env.local` and root members' tools operate within; default to process cwd.
- * @param {object} [opts] - Agentic surface.
- * @param {boolean} [opts.safemode] - When true, deny members the shell — option-A surface. Default false, full built-in set.
- * @returns {Promise<LiveSdkRegistry>} Registry and close hook that stop client and clean runtime home.
- */
 /**
  * Providers configured in `<root>/.paw/*.provider.env`, parsed, by name. An
  * empty map when the directory holds none.
@@ -132,6 +125,38 @@ export async function liveHerdBinding(cwd: string = process.cwd()): Promise<Plan
   };
 }
 
+/**
+ * Hooks that put every member session under the pawd serving `root`. The
+ * caller starts that pawd; while it is down each hook allows and writes why to
+ * stderr.
+ *
+ * @param {string} root - Repository root pawd serves.
+ * @returns {HerdHooks} SDK session hooks relaying to pawd as host `sdk`.
+ */
+function pawdHooks(root: string): HerdHooks {
+  const endpoint = socketPath(root, {
+    platform: process.platform,
+    xdgRuntimeDir: process.env.XDG_RUNTIME_DIR,
+    tmpdir: tmpdir(),
+  });
+  const token = tokenPath(join(root, '.paw'));
+  return createHerdHooks(
+    (event, payload) => rpcCall(endpoint, token, 'hook.dispatch', { host: 'sdk', event, payload }),
+    (reason) => process.stderr.write(`paw herd: ${reason}\n`),
+  );
+}
+
+/**
+ * Open live SDK-backed registry for plan, ready to dispatch. Members run SDK
+ * built-in tools in place, rooted at `cwd`, and every member session carries
+ * pawd's hooks, so gates and the secrets rule apply to members.
+ *
+ * @param {SwarmPlan<unknown>} plan - Plan being run.
+ * @param {string} [cwd] - Where look for `.env.local`, the root members' tools operate within, and the repo whose pawd polices them; default to process cwd.
+ * @param {object} [opts] - Agentic surface.
+ * @param {boolean} [opts.safemode] - When true, deny members the shell — option-A surface. Default false, full built-in set.
+ * @returns {Promise<LiveSdkRegistry>} Registry and close hook that stop client and clean runtime home.
+ */
 export async function openLiveHerd(
   plan: SwarmPlan<unknown>,
   cwd: string = process.cwd(),
@@ -143,6 +168,7 @@ export async function openLiveHerd(
     baseDirectory,
     workingDirectory: cwd,
     safemode: opts.safemode ?? false,
+    hooks: pawdHooks(cwd),
     ...(provider === undefined ? {} : { provider }),
   });
   return {

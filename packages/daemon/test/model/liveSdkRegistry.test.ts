@@ -17,6 +17,7 @@ import type { OpenSdkModelOptions } from '../../src/infrastructure/model/sdkMode
 const PLAN = { name: 'monsters', role: 'lore.author', members: () => 1, brief: () => 'x' } as unknown as SwarmPlan<unknown>;
 const fakePort: ModelPort = { complete: async () => ({ content: '', inputTokens: 0, outputTokens: 0 }) };
 
+const HOOKS = { onPreToolUse: async () => undefined };
 let captured: OpenSdkModelOptions | null = null;
 let closeSpy: ReturnType<typeof vi.fn>;
 const openModel: OpenModel = async (options) => {
@@ -41,12 +42,14 @@ describe('liveSdkRegistryFor', () => {
       baseDirectory: '/tmp/home',
       workingDirectory: '/repo',
       safemode: true,
+      hooks: HOOKS,
     });
 
     expect(captured?.provider).toEqual({ type: 'openai', baseUrl: 'https://api.deepseek.com' });
     expect(captured?.baseDirectory).toBe('/tmp/home');
     expect(captured?.workingDirectory).toBe('/repo');
     expect(captured?.safemode).toBe(true);
+    expect(captured?.hooks).toBe(HOOKS);
     const binding = registry.bindings.get('lore.author');
     expect(binding?.modelId).toBe('deepseek-chat');
     expect(binding?.port).toBe(fakePort);
@@ -56,7 +59,12 @@ describe('liveSdkRegistryFor', () => {
   });
 
   it('reads the key from the environment at egress, and throws when it is unset', async () => {
-    await liveSdkRegistryFor(PLAN, openModel, { baseDirectory: '/tmp/home', workingDirectory: '/repo', safemode: false });
+    await liveSdkRegistryFor(PLAN, openModel, {
+      baseDirectory: '/tmp/home',
+      workingDirectory: '/repo',
+      safemode: false,
+      hooks: HOOKS,
+    });
     const authToken = captured!.authToken;
 
     expect(() => authToken()).toThrow(/DEEPSEEK_KEY/);
@@ -69,6 +77,7 @@ describe('liveSdkRegistryFor', () => {
       baseDirectory: '/tmp/home',
       workingDirectory: '/repo',
       safemode: false,
+      hooks: HOOKS,
       baseUrl: 'http://localhost:11434/v1',
       model: 'qwen',
     });
@@ -81,6 +90,7 @@ describe('liveSdkRegistryFor', () => {
       baseDirectory: '/tmp/home',
       workingDirectory: '/repo',
       safemode: false,
+      hooks: HOOKS,
       provider: {
         name: 'gemini',
         type: 'openai',

@@ -16,8 +16,27 @@
 import { spawn } from 'node:child_process';
 import { closeSync, openSync, statSync, unlinkSync } from 'node:fs';
 import { connect } from 'node:net';
-import { type AutostartSeams } from '../../application/autostart.js';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
+import { lockPath, socketPath } from '@paw/daemon';
+import { ensureDaemon, type AutostartSeams } from '../../application/autostart.js';
 import { startEnforcement } from '../../application/pawdStart.js';
+
+/**
+ * Start the pawd serving `root` unless one already answers.
+ *
+ * @param {string} root - Repository root.
+ * @returns {Promise<string>} The pawd endpoint; resolve once it answers or the autostart deadline passes.
+ */
+export async function ensurePawd(root: string): Promise<string> {
+  const endpoint = socketPath(root, {
+    platform: process.platform,
+    xdgRuntimeDir: process.env.XDG_RUNTIME_DIR,
+    tmpdir: tmpdir(),
+  });
+  await ensureDaemon(endpoint, lockPath(resolve(root, '.paw')), autostartSeams(root));
+  return endpoint;
+}
 
 /**
  * Spawn resident daemon outside host editor's job.

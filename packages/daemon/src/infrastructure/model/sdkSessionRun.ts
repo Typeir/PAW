@@ -72,11 +72,13 @@ export interface ProviderBlock {
  * @property {string} workingDirectory - Absolute root built-in file/shell tools work in; served repo.
  * @property {boolean} safemode - True → deny shell (option-A surface).
  * @property {unknown} onPermissionRequest - SDK permission handler, forwarded opaque; shell gives `approveAll`.
+ * @property {unknown} hooks - SDK session hooks, forwarded opaque; the herd passes pawd's (`createHerdHooks`).
  */
 export interface AgentToolConfig {
   readonly workingDirectory: string;
   readonly safemode: boolean;
   readonly onPermissionRequest: unknown;
+  readonly hooks: unknown;
 }
 
 const DEFAULT_DEADLINE_MS = 600_000;
@@ -133,6 +135,7 @@ export function createSdkSessionRun(
       availableTools: tools.availableTools,
       excludedTools: tools.excludedTools,
       onPermissionRequest: agent.onPermissionRequest,
+      hooks: agent.hooks,
       ...systemMessageOption(request.systemSections),
       skipCustomInstructions: true,
       enableConfigDiscovery: false,

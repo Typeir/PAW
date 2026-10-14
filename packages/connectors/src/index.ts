@@ -14,3 +14,4 @@
 
 export { claudeHooksConnector } from './claudeHooks.js';
 export { copilotHooksConnector } from './copilotHooks.js';
+export { sdkHooksConnector } from './sdkHooks.js';

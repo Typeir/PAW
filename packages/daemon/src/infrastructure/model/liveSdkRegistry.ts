@@ -95,6 +95,7 @@ export interface LiveSdkRegistry {
  * @param {string} opts.baseDirectory - Where runtime write session state.
  * @param {string} opts.workingDirectory - Absolute root members built-in tools operate within; served repository.
  * @param {boolean} opts.safemode - When true, members denied shell — option-A surface.
+ * @param {unknown} opts.hooks - SDK session hooks every member session carries; the herd passes pawd's.
  * @param {ProviderProfile} [opts.provider] - Provider from a `.paw/<name>.provider.env`; sets wire type, endpoint, default model, and key. Absent, the legacy `DEEPSEEK_*` environment drives all four.
  * @param {string} [opts.baseUrl] - Base URL override; else the provider's, else `DEEPSEEK_BASE_URL`, else the public DeepSeek endpoint.
  * @param {string} [opts.model] - Model id override; else the provider's, else `DEEPSEEK_MODEL`, else `deepseek-chat`.
@@ -107,6 +108,7 @@ export async function liveSdkRegistryFor(
     baseDirectory: string;
     workingDirectory: string;
     safemode: boolean;
+    hooks: unknown;
     provider?: ProviderProfile;
     baseUrl?: string;
     model?: string;
@@ -130,6 +132,7 @@ export async function liveSdkRegistryFor(
     baseDirectory: opts.baseDirectory,
     workingDirectory: opts.workingDirectory,
     safemode: opts.safemode,
+    hooks: opts.hooks,
   });
   const registry = buildRegistry(
     { models: { [modelId]: LIVE_CAPS }, roles: { [plan.role]: modelId } },

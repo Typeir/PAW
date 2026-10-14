@@ -38,8 +38,10 @@ import {
   probeConsoleEndpoint,
   readConsoleEndpoint,
   walkFiles,
+  type LiveSdkRegistry,
 } from '@paw/daemon';
 import { createHerdWriter } from '../../application/herdWriter.js';
+import { ensurePawd } from './pawd.js';
 import {
   concurrencyFrom,
   maxTokensFrom,
@@ -104,6 +106,18 @@ export async function resolveContextArg(value: string | undefined): Promise<stri
     patterns,
     listing.filter((entry) => entry.isFile).map((entry) => entry.path),
   );
+}
+
+/**
+ * Open a live herd for the working directory with its pawd up, so every member
+ * session runs under that pawd's hooks.
+ *
+ * @param {SwarmPlan<unknown>} plan - Plan being run.
+ * @returns {Promise<LiveSdkRegistry>} Registry and close hook.
+ */
+export async function openPolicedHerd(plan: SwarmPlan<unknown>): Promise<LiveSdkRegistry> {
+  await ensurePawd(process.cwd());
+  return openLiveHerd(plan);
 }
 
 /**
@@ -213,7 +227,7 @@ export async function runSwarm(
       }
     }
     const { registry, close } = live
-      ? await openLiveHerd(plan)
+      ? await openPolicedHerd(plan)
       : { registry: fakeRegistryFor(plan), close: async () => {} };
     try {
       const writer = live ? null : createHerdWriter(plan, createNodeFs(), existsSync);

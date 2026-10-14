@@ -13,14 +13,12 @@
  * @since 5.0.0
  */
 
-import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { lockPath, socketPath, tokenPath } from '@paw/daemon';
-import { ensureDaemon } from '../../application/autostart.js';
+import { tokenPath } from '@paw/daemon';
 import { failOpen, runHook } from '../../application/hook.js';
 import { parseArgs } from '../../domain/context.js';
 import { readStdin } from '../stdin.js';
-import { autostartSeams } from './pawd.js';
+import { ensurePawd } from './pawd.js';
 
 const HOST_FLAGS = ['copilot', 'claude'];
 
@@ -52,18 +50,12 @@ async function invokeHook(rest: string[]): Promise<number> {
   }
   const event = args.values.get(host) as string;
   const root = process.cwd();
-  const pawDir = resolve(root, '.paw');
-  const endpoint = socketPath(root, {
-    platform: process.platform,
-    xdgRuntimeDir: process.env.XDG_RUNTIME_DIR,
-    tmpdir: tmpdir(),
-  });
-  await ensureDaemon(endpoint, lockPath(pawDir), autostartSeams(root));
+  const endpoint = await ensurePawd(root);
   return runHook({
     host,
     event,
     socketPath: endpoint,
-    tokenPath: tokenPath(pawDir),
+    tokenPath: tokenPath(resolve(root, '.paw')),
     io: { readStdin, writeStdout: (text) => process.stdout.write(text) },
   });
 }
