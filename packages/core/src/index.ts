@@ -251,6 +251,16 @@ export { MODULES_DIR, planInstall, planUninstall, runInstall } from './applicati
 export type { InstallPlan, InstallResult, UninstallPlan } from './application/moduleInstall.js';
 
 export {
+  SKILLS_DIR,
+  SKILL_MARKER,
+  excludeWith,
+  excludeWithout,
+  planSkillPlacement,
+  skillsOwnedBy,
+} from './application/moduleSkills.js';
+export type { SkillPlacement, SkillPlan } from './application/moduleSkills.js';
+
+export {
   linterCommandFor,
   lintViolation,
   parseEslintJson,

@@ -9,8 +9,8 @@
  * @module @paw/cli/test/e2e/cli
  */
 
-import { execFile } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { execFile, execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -274,4 +274,72 @@ describe('cli config show (e2e)', () => {
       '✗ role review.judge → deepseek-chat — max output 8192 < required 16384',
     );
   });
+});
+
+describe('cli modules install (e2e)', () => {
+  /**
+   * Run git with a throwaway identity.
+   *
+   * @param cwd - Directory to run in.
+   * @param args - Git arguments.
+   */
+  const git = (cwd: string, ...args: string[]): string =>
+    execFileSync('git', ['-c', 'user.name=paw', '-c', 'user.email=paw@example.invalid', ...args], {
+      cwd,
+      encoding: 'utf8',
+    });
+
+  /** Local git repo standing in for the paw-agile remote, shipping one skill on `main`. */
+  const moduleSource = (): string => {
+    const dir = mkdtempSync(join(tmpdir(), 'paw-module-src-'));
+    git(dir, 'init', '-q', '-b', 'main');
+    writeFileSync(join(dir, 'package.json'), '{"name":"@paw/agile"}', 'utf8');
+    mkdirSync(join(dir, 'skills', 'paw-tasks'), { recursive: true });
+    writeFileSync(join(dir, 'skills', 'paw-tasks', 'SKILL.md'), '---\nname: paw-tasks\n---\nread tasks\n', 'utf8');
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-q', '-m', 'module');
+    return dir;
+  };
+
+  /** Consumer repository: a git repo holding a PAW config. */
+  const consumer = (): string => {
+    const root = repoWithConfig({});
+    git(root, 'init', '-q');
+    return root;
+  };
+
+  it('places the module skill in .claude/skills, keeps it out of git, and removes it on uninstall', async () => {
+    const src = moduleSource();
+    const root = consumer();
+    const skill = join(root, '.claude', 'skills', 'paw-tasks');
+
+    const installed = await runCli('modules', 'install', 'paw-agile', `--from=${src}`, `--root=${root}`);
+    expect(installed.code).toBe(0);
+    expect(installed.stdout).toContain('modules: skill paw-tasks → .claude/skills/paw-tasks');
+    expect(readFileSync(join(skill, 'SKILL.md'), 'utf8')).toContain('read tasks');
+    expect(readFileSync(join(skill, '.paw-module'), 'utf8').trim()).toBe('paw-agile');
+    expect(readFileSync(join(root, '.git', 'info', 'exclude'), 'utf8')).toContain('/.claude/skills/paw-tasks/');
+    expect(git(root, 'status', '--porcelain')).not.toContain('.claude');
+
+    const removed = await runCli('modules', 'uninstall', 'paw-agile', `--root=${root}`);
+    expect(removed.code).toBe(0);
+    expect(removed.stdout).toContain('modules: removed skill .claude/skills/paw-tasks');
+    expect(existsSync(skill)).toBe(false);
+    expect(readFileSync(join(root, '.git', 'info', 'exclude'), 'utf8')).not.toContain('/.claude/skills/paw-tasks/');
+  }, 60000);
+
+  it('leaves a skill folder PAW did not place untouched, and says why', async () => {
+    const src = moduleSource();
+    const root = consumer();
+    const skill = join(root, '.claude', 'skills', 'paw-tasks');
+    mkdirSync(skill, { recursive: true });
+    writeFileSync(join(skill, 'SKILL.md'), 'mine', 'utf8');
+
+    const installed = await runCli('modules', 'install', 'paw-agile', `--from=${src}`, `--root=${root}`);
+    expect(installed.code).toBe(0);
+    expect(installed.stdout).toContain(
+      'modules: skill paw-tasks not placed — .claude/skills/paw-tasks already exists and PAW did not place it',
+    );
+    expect(readFileSync(join(skill, 'SKILL.md'), 'utf8')).toBe('mine');
+  }, 60000);
 });
