@@ -30,6 +30,19 @@ hook events, not a check inside one.
 **It fails open.** `paw hook` is a thin stdin/stdout client of the daemon; if `pawd` is down or
 errors, it writes the host's do-nothing output. A broken harness must never wedge the agent.
 
+## Hosts
+
+PAW targets three hosts, in this order:
+
+1. **VS Code Copilot agent mode** — `.github/hooks/*.json` in VS Code's format (PascalCase events,
+   per-OS command keys), through the `copilot-hooks` connector.
+2. **Claude Code** — through the `claude-hooks` connector.
+3. **PAW's own herd** — Copilot SDK sessions carry pawd's hooks programmatically (`sdk-hooks`).
+
+Copilot CLI is low priority: its config-file hooks drop `userPromptSubmitted` output and give
+`preToolUse` no `additionalContext`, so do not treat its limits as blocking. The Copilot cloud agent
+is out of scope. When a capability can go through more than one Copilot surface, use the SDK.
+
 ## The enforcement contract
 
 `decidePreToolUse` ([packages/core/src/domain/enforcement.ts](packages/core/src/domain/enforcement.ts))
@@ -194,12 +207,25 @@ docs(readme): nmctpv style guide, STE pass, honest status
 chore: drop a stray proof-run artifact
 ```
 
-Commit or push only when asked. Never run destructive local git operations.
+After each finished, verified task, commit it and push the branch — one checkpoint per task, not one
+push at the end. Stage only the task's own files: another session may have uncommitted work in the
+same tree. Never force-push; a rejected push stops the work and gets reported. Never run destructive
+local git operations.
 
 ## In flight — not canon
 
-`packages/agile` and the **modules** layer (a federated submodule dependency that backend connectors
-require) are new and under test. They work and are covered, but the design is not settled. Do not
-build on them, do not treat `ModuleResolverPort` or the `paw-agile` task graph as stable API, and do
-not read `docs/15-connectors-and-the-local-clone.md` as shipped behaviour — it is an operator draft
-that predates the module layer.
+`packages/agile` and the **modules** layer (a federated dependency that backend connectors require)
+are new and under operator-directed development. They work and are covered, but their contracts still
+move: do not treat `ModuleResolverPort`, `WorkModelPort`, or the `paw-agile` task graph as stable API,
+and do not read `docs/15-connectors-and-the-local-clone.md` as shipped behaviour — it is an operator
+draft that predates the module layer.
+
+- `packages/agile` is the source of `github.com/Typeir/paw-agile`. Publish a change with
+  `git subtree push --prefix=packages/agile https://github.com/Typeir/paw-agile.git main`; never
+  edit that repository directly.
+- A module's `skills/<name>/` folders are agent skills. `paw modules install` copies them into the
+  consuming repository's `.claude/skills/` and keeps them out of its git history.
+- Backend adapters (Rally, Taiga) are written from public documentation only. Never commit a
+  vendor's private specification, a tenant's schema or custom field names, or payloads captured from
+  a real workspace. Tenant mapping and credentials live in the consuming repository's `.paw/`
+  configuration; test fixtures are hand-written.
