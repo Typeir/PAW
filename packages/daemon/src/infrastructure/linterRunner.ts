@@ -5,7 +5,8 @@
  * call. ESLint runs inline on the touched files; `tsc` is whole-project and
  * slower than the hook budget, so it runs detached and single-flight, and its
  * findings reach `onLate` scoped to the touched files. Tools run as their own
- * JS entry under node: no shell, so a filename cannot become a command.
+ * JS entry under node: no shell, so a filename cannot become a command. A tool
+ * that fails yields no findings and its reason goes to `report`; it never blocks.
  *
  * @module @paw/daemon/infrastructure/linterRunner
  * @version 0.0.0
@@ -21,6 +22,7 @@ import {
   parseTscOutput,
   toProjectRelative,
   type LintFinding,
+  type LinterCommand,
   type LinterRunner,
 } from '@paw/core';
 
@@ -112,6 +114,7 @@ export function toolEntry(root: string, bin: string): string | null {
  * @property {() => readonly string[] | Promise<readonly string[]>} enabled - Enabled connector ids, read per run.
  * @property {LintExec} [exec] - Command execution seam.
  * @property {(findings: readonly LintFinding[]) => void} [onLate] - Receive findings from the detached whole-project run.
+ * @property {(reason: string) => void} report - Receive why a linter did not run; a linter that fails never blocks.
  * @property {number} [inlineTimeoutMs] - Override {@link INLINE_TIMEOUT_MS}.
  * @property {number} [projectTimeoutMs] - Override {@link PROJECT_TIMEOUT_MS}.
  */
@@ -120,8 +123,26 @@ export interface LinterRunnerOptions {
   enabled(): readonly string[] | Promise<readonly string[]>;
   readonly exec?: LintExec;
   onLate?(findings: readonly LintFinding[]): void;
+  report(reason: string): void;
   readonly inlineTimeoutMs?: number;
   readonly projectTimeoutMs?: number;
+}
+
+/**
+ * Entry and arguments for a linter this runner knows; both of them always have both.
+ *
+ * @param {string} root - Repository root.
+ * @param {'eslint' | 'tsc'} id - Linter id.
+ * @param {readonly string[]} files - Touched files, repo-relative.
+ * @returns {{ entry: string; args: readonly string[] }} The tool's JS entry and its arguments.
+ */
+function invocation(
+  root: string,
+  id: 'eslint' | 'tsc',
+  files: readonly string[],
+): { entry: string; args: readonly string[] } {
+  const command = linterCommandFor(id, files) as LinterCommand;
+  return { entry: toolEntry(root, command.bin) as string, args: command.args };
 }
 
 /**
@@ -149,7 +170,7 @@ export function createLinterRunner(options: LinterRunnerOptions): LinterRunner {
 
   /**
    * Start the detached whole-project run unless one is in flight. Findings go
-   * to `onLate`, scoped to `files`. Failures are swallowed.
+   * to `onLate`, scoped to `files`; a failed run goes to `report`.
    *
    * @param {readonly string[]} files - Touched files, repo-relative.
    */
@@ -158,14 +179,10 @@ export function createLinterRunner(options: LinterRunnerOptions): LinterRunner {
     if (projectRunning || onLate === undefined) {
       return;
     }
-    const command = linterCommandFor('tsc', files);
-    const entry = command === null ? null : toolEntry(options.root, command.bin);
-    if (command === null || entry === null) {
-      return;
-    }
+    const tsc = invocation(options.root, 'tsc', files);
     projectRunning = true;
     const touched = new Set(files);
-    void exec(process.execPath, [entry, ...command.args], options.root, projectMs)
+    void exec(process.execPath, [tsc.entry, ...tsc.args], options.root, projectMs)
       .then((stdout) => {
         const scoped = parseTscOutput(stdout)
           .map((finding) => ({ ...finding, filePath: relativise(options.root, finding.filePath) }))
@@ -174,7 +191,9 @@ export function createLinterRunner(options: LinterRunnerOptions): LinterRunner {
           onLate(scoped);
         }
       })
-      .catch(() => undefined)
+      .catch((err: unknown) => {
+        options.report(`tsc did not run: ${String(err)}`);
+      })
       .finally(() => {
         projectRunning = false;
       });
@@ -190,20 +209,19 @@ export function createLinterRunner(options: LinterRunnerOptions): LinterRunner {
       const findings: LintFinding[] = [];
 
       if (ids.has('eslint')) {
-        const command = linterCommandFor('eslint', files);
-        const entry = command === null ? null : toolEntry(options.root, command.bin);
-        if (command !== null && entry !== null) {
-          try {
-            const stdout = await exec(
-              process.execPath,
-              [entry, ...command.args],
-              options.root,
-              inlineMs,
-            );
-            for (const finding of parseEslintJson(stdout)) {
-              findings.push({ ...finding, filePath: relativise(options.root, finding.filePath) });
-            }
-          } catch {}
+        const eslint = invocation(options.root, 'eslint', files);
+        try {
+          const stdout = await exec(
+            process.execPath,
+            [eslint.entry, ...eslint.args],
+            options.root,
+            inlineMs,
+          );
+          for (const finding of parseEslintJson(stdout)) {
+            findings.push({ ...finding, filePath: relativise(options.root, finding.filePath) });
+          }
+        } catch (err: unknown) {
+          options.report(`eslint did not run: ${String(err)}`);
         }
       }
 

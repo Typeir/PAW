@@ -17,9 +17,9 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createMemoryStore } from '@paw/adapters';
-import type { StorePort } from '@paw/core';
+import type { LogEntry, StorePort } from '@paw/core';
 import { socketPath, tokenPath } from '@paw/daemon';
 import type { SocketServerHandle } from '@paw/daemon';
 import { startEnforcement } from '../../src/application/pawdStart.js';
@@ -155,6 +155,74 @@ describe('startEnforcement', () => {
           indirectFix: true,
         }),
       ]);
+    } finally {
+      await handle.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('logs that linters are off when the config does not read', async () => {
+    const root = project('paw-start-badcfg-');
+    const entries: LogEntry[] = [];
+    const handle = await startEnforcement(root, {
+      makeStore: createMemoryStore,
+      readConfig: async () => {
+        throw new Error('config is not JSON');
+      },
+      log: { append: (entry) => entries.push(entry) },
+    });
+    try {
+      await hook(root, 'tool.post', 'src/other.ts');
+      expect(entries).toEqual([
+        expect.objectContaining({
+          level: 'warn',
+          message: 'linters off: .paw/config.json did not read: Error: config is not JSON',
+        }),
+      ]);
+    } finally {
+      await handle.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('logs a linter that did not run, and late findings the store refused', async () => {
+    const root = project('paw-start-late-');
+    const tscDir = path.join(root, 'node_modules', 'typescript', 'bin');
+    mkdirSync(tscDir, { recursive: true });
+    writeFileSync(
+      path.join(tscDir, 'tsc'),
+      `console.log(${JSON.stringify('src/other.ts(1,1): error TS2304: Cannot find name x.')});\n`,
+    );
+    writeFileSync(
+      path.join(root, '.paw', 'config.json'),
+      JSON.stringify({ connectors: ['tsc', 'eslint'] }),
+    );
+    const entries: LogEntry[] = [];
+    const handle = await startEnforcement(root, {
+      makeStore: async () => {
+        const store = await createMemoryStore();
+        return {
+          ...store,
+          raise: async (violations, sessionId) => {
+            if (sessionId === null) {
+              throw new Error('store is read-only');
+            }
+            return store.raise(violations, sessionId);
+          },
+        };
+      },
+      log: { append: (entry) => entries.push(entry) },
+    });
+    try {
+      await hook(root, 'tool.post', 'src/other.ts');
+      await vi.waitFor(() =>
+        expect(entries.map((entry) => entry.message)).toEqual(
+          expect.arrayContaining([
+            expect.stringMatching(/^eslint did not run: /),
+            'late linter findings not recorded: Error: store is read-only',
+          ]),
+        ),
+      );
     } finally {
       await handle.close();
       rmSync(root, { recursive: true, force: true });

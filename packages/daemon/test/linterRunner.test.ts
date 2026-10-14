@@ -12,6 +12,8 @@
  * @module @paw/daemon/test/linterRunner
  */
 
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { LintFinding } from '@paw/core';
@@ -56,7 +58,7 @@ const eslintOut = (filePath: string): string =>
 describe('createLinterRunner', () => {
   it('answers nothing when no touched file is lintable, running no linter', async () => {
     const { exec, calls } = scriptedExec({});
-    const runner = createLinterRunner({ root: ROOT, enabled: () => ['eslint', 'tsc'], exec });
+    const runner = createLinterRunner({ root: ROOT, report: () => undefined, enabled: () => ['eslint', 'tsc'], exec });
     expect(await runner.runForFiles(['README.md', 'assets/logo.png'])).toEqual([]);
     expect(calls).toEqual([]);
   });
@@ -64,7 +66,7 @@ describe('createLinterRunner', () => {
   it('runs no linter when none is enabled, and reads enabled state per run', async () => {
     const { exec, calls } = scriptedExec({ eslint: eslintOut('/repo/src/a.ts') });
     let ids: string[] = [];
-    const runner = createLinterRunner({ root: ROOT, enabled: () => ids, exec });
+    const runner = createLinterRunner({ root: ROOT, report: () => undefined, enabled: () => ids, exec });
 
     expect(await runner.runForFiles(['src/a.ts'])).toEqual([]);
     expect(calls).toEqual([]);
@@ -94,6 +96,7 @@ describe('createLinterRunner', () => {
     const { exec } = scriptedExec({ eslint: eslintOut('C:/repo/src/a.ts') });
     const runner = createLinterRunner({
       root: 'C:/repo',
+      report: () => undefined,
       enabled: async () => ['eslint'],
       exec,
     });
@@ -102,12 +105,19 @@ describe('createLinterRunner', () => {
     ]);
   });
 
-  it('reports nothing when the linter cannot run', async () => {
+  it('finds nothing when the linter cannot run, and reports why', async () => {
     const exec: LintExec = async () => {
       throw new Error('eslint is not installed');
     };
-    const runner = createLinterRunner({ root: ROOT, enabled: () => ['eslint'], exec });
+    const reasons: string[] = [];
+    const runner = createLinterRunner({
+      root: ROOT,
+      report: (reason) => reasons.push(reason),
+      enabled: () => ['eslint'],
+      exec,
+    });
     expect(await runner.runForFiles(['src/a.ts'])).toEqual([]);
+    expect(reasons).toEqual(['eslint did not run: Error: eslint is not installed']);
   });
 
   it('hands whole-project findings to onLate, scoped to the touched files', async () => {
@@ -119,6 +129,7 @@ describe('createLinterRunner', () => {
     const late: LintFinding[][] = [];
     const runner = createLinterRunner({
       root: ROOT,
+      report: () => undefined,
       enabled: () => ['tsc'],
       exec,
       onLate: (findings) => late.push([...findings]),
@@ -136,6 +147,7 @@ describe('createLinterRunner', () => {
     const late: LintFinding[][] = [];
     const runner = createLinterRunner({
       root: ROOT,
+      report: () => undefined,
       enabled: () => ['tsc'],
       exec,
       onLate: (findings) => late.push([...findings]),
@@ -145,7 +157,7 @@ describe('createLinterRunner', () => {
     expect(late).toEqual([]);
   });
 
-  it('keeps the project run single-flight and survives its failure', async () => {
+  it('keeps the project run single-flight, survives its failure, and reports it', async () => {
     let release: (() => void) | null = null;
     const gate = new Promise<void>((resolvePromise) => {
       release = resolvePromise;
@@ -156,8 +168,10 @@ describe('createLinterRunner', () => {
         throw new Error('tsc exploded');
       },
     });
+    const reasons: string[] = [];
     const runner = createLinterRunner({
       root: ROOT,
+      report: (reason) => reasons.push(reason),
       enabled: () => ['tsc'],
       exec,
       onLate: () => undefined,
@@ -172,11 +186,23 @@ describe('createLinterRunner', () => {
       await runner.runForFiles(['src/c.ts']);
       expect(calls).toHaveLength(2);
     });
+    expect(reasons).toContain('tsc did not run: Error: tsc exploded');
+  });
+
+  it('runs the real tool entry by default, and reports a tool that is not installed', async () => {
+    const reasons: string[] = [];
+    const runner = createLinterRunner({
+      root: mkdtempSync(join(tmpdir(), 'paw-lint-none-')),
+      report: (reason) => reasons.push(reason),
+      enabled: () => ['eslint'],
+    });
+    expect(await runner.runForFiles(['src/a.ts'])).toEqual([]);
+    expect(reasons).toEqual([expect.stringMatching(/^eslint did not run: /)]);
   });
 
   it('starts no project run without a late sink', async () => {
     const { exec, calls } = scriptedExec({ tsc: '' });
-    const runner = createLinterRunner({ root: ROOT, enabled: () => ['tsc'], exec });
+    const runner = createLinterRunner({ root: ROOT, report: () => undefined, enabled: () => ['tsc'], exec });
     await runner.runForFiles(['src/a.ts']);
     expect(calls).toEqual([]);
   });

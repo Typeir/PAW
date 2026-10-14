@@ -10,7 +10,9 @@
  * Enabled linter connectors are read from `.paw/config.json` per run, so
  * enabling one in any surface takes effect on the next edit. Findings from the
  * detached whole-project run land straight in the store as deferred
- * violations, since they arrive long after their hook call answered.
+ * violations, since they arrive long after their hook call answered. A linter
+ * that does not run, an unreadable config, or late findings the store refuses
+ * are written to `.paw/daemon.log`, the log the console shows.
  *
  * @module @paw/cli/application/pawdStart
  * @version 0.0.0
@@ -34,9 +36,11 @@ import {
 } from '@paw/core';
 import {
   createLinterRunner,
+  createNodeLogSink,
   serveEnforcement,
   socketPath,
   tokenPath,
+  type LogSink,
   type SocketServerHandle,
 } from '@paw/daemon';
 
@@ -51,6 +55,7 @@ const IGNORED = /(^|\/)(\.paw|\.git|node_modules|dist|coverage|\.next)(\/|$)/;
  * @property {{ ms: number; onIdle: () => void }} [idle] - Close and signal after quiet period; omit to stay resident.
  * @property {{ pid: number; now: () => number; onStop: () => void }} [control] - Enable `daemon.status`/`daemon.stop`; pass through to service.
  * @property {() => Promise<ConfigDocument>} [readConfig] - Read the repo config, for enabled connectors; default the repo's `.paw/config.json`.
+ * @property {Pick<LogSink, 'append'>} [log] - Where pawd writes what went wrong; default `.paw/daemon.log`.
  */
 export interface StartSeams {
   randomToken?: () => string;
@@ -58,6 +63,7 @@ export interface StartSeams {
   idle?: { ms: number; onIdle: () => void };
   control?: { pid: number; now: () => number; onStop: () => void };
   readConfig?: () => Promise<ConfigDocument>;
+  log?: Pick<LogSink, 'append'>;
 }
 
 /**
@@ -89,6 +95,10 @@ export async function startEnforcement(
       const store = await (seams.makeStore ?? (() => openSqlJsStore(join(pawDir, 'paw.sqlite'))))();
       const readConfig =
         seams.readConfig ?? (() => createNodeConfigDocument(root).read());
+      const log = seams.log ?? createNodeLogSink(join(pawDir, 'daemon.log'));
+      const note = (level: 'warn' | 'error', message: string): void => {
+        log.append({ at: new Date().toISOString(), level, message });
+      };
       const deps: DispatchHookDeps = {
         store,
         gates: createGateCache(root),
@@ -97,13 +107,17 @@ export async function startEnforcement(
           enabled: async () => {
             try {
               return enabledConnectorIds(await readConfig());
-            } catch {
+            } catch (err: unknown) {
+              note('warn', `linters off: .paw/config.json did not read: ${String(err)}`);
               return [];
             }
           },
           onLate: (findings) => {
-            void store.raise(findings.map(lintViolation), null).catch(() => undefined);
+            void store.raise(findings.map(lintViolation), null).catch((err: unknown) => {
+              note('error', `late linter findings not recorded: ${String(err)}`);
+            });
           },
+          report: (reason) => note('warn', reason),
         }),
         isIgnored: (path) => IGNORED.test(path),
         toRelative: (path) => toProjectRelative(root, path),
