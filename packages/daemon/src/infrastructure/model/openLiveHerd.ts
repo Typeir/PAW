@@ -131,9 +131,10 @@ export async function liveHerdBinding(cwd: string = process.cwd()): Promise<Plan
  * stderr.
  *
  * @param {string} root - Repository root pawd serves.
+ * @param {boolean} gates - False skips gates; the secrets rule still applies.
  * @returns {HerdHooks} SDK session hooks relaying to pawd as host `sdk`.
  */
-function pawdHooks(root: string): HerdHooks {
+function pawdHooks(root: string, gates: boolean): HerdHooks {
   const endpoint = socketPath(root, {
     platform: process.platform,
     xdgRuntimeDir: process.env.XDG_RUNTIME_DIR,
@@ -143,6 +144,7 @@ function pawdHooks(root: string): HerdHooks {
   return createHerdHooks(
     (event, payload) => rpcCall(endpoint, token, 'hook.dispatch', { host: 'sdk', event, payload }),
     (reason) => process.stderr.write(`paw herd: ${reason}\n`),
+    gates,
   );
 }
 
@@ -155,12 +157,13 @@ function pawdHooks(root: string): HerdHooks {
  * @param {string} [cwd] - Where look for `.env.local`, the root members' tools operate within, and the repo whose pawd polices them; default to process cwd.
  * @param {object} [opts] - Agentic surface.
  * @param {boolean} [opts.safemode] - When true, deny members the shell — option-A surface. Default false, full built-in set.
+ * @param {boolean} [opts.gates] - When false, members are not held to the repo's gates; the secrets rule still applies. Default true.
  * @returns {Promise<LiveSdkRegistry>} Registry and close hook that stop client and clean runtime home.
  */
 export async function openLiveHerd(
   plan: SwarmPlan<unknown>,
   cwd: string = process.cwd(),
-  opts: { safemode?: boolean } = {},
+  opts: { safemode?: boolean; gates?: boolean } = {},
 ): Promise<LiveSdkRegistry> {
   const provider = await resolveProvider(cwd);
   const baseDirectory = await mkdtemp(join(tmpdir(), 'paw-herd-'));
@@ -168,7 +171,7 @@ export async function openLiveHerd(
     baseDirectory,
     workingDirectory: cwd,
     safemode: opts.safemode ?? false,
-    hooks: pawdHooks(cwd),
+    hooks: pawdHooks(cwd, opts.gates ?? true),
     ...(provider === undefined ? {} : { provider }),
   });
   return {

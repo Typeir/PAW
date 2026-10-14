@@ -237,6 +237,7 @@ describe('parseClientMessage', () => {
       maxOutputTokens: 4096,
       concurrency: 8,
       context: ['a.ts', 'src/**'],
+      gates: false,
     };
     expect(parseClientMessage(encodeRelease(settings))).toEqual({ v: 1, type: 'release', settings });
   });
@@ -264,6 +265,7 @@ describe('parseClientMessage', () => {
       '{"v":1,"m":"x","s":{"plan":"p","live":true,"concurrency":2.5}}',
       '{"v":1,"m":"x","s":{"plan":"p","live":true,"context":"a.ts"}}',
       '{"v":1,"m":"x","s":{"plan":"p","live":true,"context":[1]}}',
+      '{"v":1,"m":"x","s":{"plan":"p","live":true,"gates":"off"}}',
     ]) {
       expect(parseClientMessage(frame)).toBeNull();
     }

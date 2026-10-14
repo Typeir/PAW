@@ -89,7 +89,7 @@ describe.skipIf(!LIVE)('SDK model egress (integration)', () => {
       return event === 'tool.pre' && path.endsWith('.env')
         ? { permissionDecision: 'deny', permissionDecisionReason: reason }
         : {};
-    }, () => undefined);
+    }, () => undefined, true);
 
     let toolNames: string[] = [];
     let finalBody = '';

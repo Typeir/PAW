@@ -84,6 +84,17 @@ function deps(over: Partial<HerdDeps> = {}): {
 }
 
 describe('dispatcherFor', () => {
+  it('opens a live herd with gates on unless the settings turn them off', async () => {
+    const openLive = vi.fn(async (_plan: SwarmPlan<unknown>, _gates: boolean) => ({
+      registry: registryWith(capturingPort([])),
+      close: async () => undefined,
+    }));
+    const { deps: d } = deps({ openLive });
+    await dispatcherFor({ plan: 'lore.swarm.mjs', live: true }, d)(PLAN, () => undefined);
+    await dispatcherFor({ plan: 'lore.swarm.mjs', live: true, gates: false }, d)(PLAN, () => undefined);
+    expect(openLive.mock.calls.map((call) => call[1])).toEqual([true, false]);
+  });
+
   it('opens the live registry, meters it, forwards settings, and closes', async () => {
     const close = vi.fn(async () => undefined);
     const { deps: d, seen, calls } = deps({

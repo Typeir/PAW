@@ -149,12 +149,16 @@ function parseRunSettings(value: unknown): RunSettings | null {
   if (context !== undefined && !(Array.isArray(context) && context.every((entry) => typeof entry === 'string'))) {
     return null;
   }
+  if (raw.gates !== undefined && typeof raw.gates !== 'boolean') {
+    return null;
+  }
   return {
     plan: raw.plan,
     live: raw.live,
     ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
     ...(concurrency !== undefined ? { concurrency } : {}),
     ...(context !== undefined ? { context: context as string[] } : {}),
+    ...(raw.gates !== undefined ? { gates: raw.gates } : {}),
   };
 }
 

@@ -2,8 +2,9 @@
  * Command Bar
  *
  * @fileoverview Foot of Plan tab. Shows member-scrub keybinding hint and the
- * release control: select fake or live model, then send a release frame carrying
- * the selected context items. The daemon releases only after the operator
+ * release control: select fake or live model and, for a live run, whether
+ * members are held to the repo's gates, then send a release frame carrying the
+ * selected context items. The daemon releases only after the operator
  * confirms at the terminal running pawd. The button is disabled until the
  * console is live and a plan is selected; the tooltip states the reason.
  *
@@ -47,6 +48,7 @@ export function CommandBar() {
   const { release } = useScope();
   const selection = useContextSelection();
   const [liveModel, setLiveModel] = useState(false);
+  const [gates, setGates] = useState(true);
   const [asked, setAsked] = useState(false);
 
   const blocker = releaseBlocker(mode === 'live', selectedPlan);
@@ -67,6 +69,15 @@ export function CommandBar() {
         />
         live model
       </label>
+      <label className='cmdbar-live'>
+        <input
+          type='checkbox'
+          checked={gates}
+          disabled={!liveModel}
+          onChange={(event) => setGates(event.target.checked)}
+        />
+        gates
+      </label>
       {releasable !== null ? (
         <Button
           primary
@@ -75,6 +86,7 @@ export function CommandBar() {
               plan: releasable,
               live: liveModel,
               ...(selection.length > 0 ? { context: selection } : {}),
+              ...(liveModel && !gates ? { gates: false } : {}),
             });
             setAsked(true);
           }}>

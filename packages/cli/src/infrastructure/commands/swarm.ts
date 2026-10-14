@@ -113,12 +113,22 @@ export async function resolveContextArg(value: string | undefined): Promise<stri
  * session runs under that pawd's hooks.
  *
  * @param {SwarmPlan<unknown>} plan - Plan being run.
+ * @param {boolean} gates - False runs members with no gates; the secrets rule still applies.
  * @returns {Promise<LiveSdkRegistry>} Registry and close hook.
  */
-export async function openPolicedHerd(plan: SwarmPlan<unknown>): Promise<LiveSdkRegistry> {
+export async function openPolicedHerd(
+  plan: SwarmPlan<unknown>,
+  gates: boolean,
+): Promise<LiveSdkRegistry> {
   await ensurePawd(process.cwd());
-  return openLiveHerd(plan);
+  return openLiveHerd(plan, process.cwd(), { gates });
 }
+
+/**
+ * Notice printed when a live herd runs with gates off.
+ */
+export const GATES_OFF_NOTICE =
+  "gates off · members are not held to the repo's gates · the secrets rule still applies";
 
 /**
  * Build registry binding plan role to deterministic fake model.
@@ -166,6 +176,7 @@ export async function runSwarm(
   const args = parseArgs(rest, ['context', 'concurrency', 'max-tokens']);
   const live = args.flags.has('live');
   const full = args.flags.has('full');
+  const gates = !args.flags.has('no-gates');
   const [sub, planPath, memberArg] = args.positional;
   const plan = await loadPlan(planPath);
   if (sub === 'doctor') {
@@ -226,8 +237,11 @@ export async function runSwarm(
         ]);
       }
     }
+    if (live && !gates) {
+      print([GATES_OFF_NOTICE]);
+    }
     const { registry, close } = live
-      ? await openPolicedHerd(plan)
+      ? await openPolicedHerd(plan, gates)
       : { registry: fakeRegistryFor(plan), close: async () => {} };
     try {
       const writer = live ? null : createHerdWriter(plan, createNodeFs(), existsSync);

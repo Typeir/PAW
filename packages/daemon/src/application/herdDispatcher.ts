@@ -41,7 +41,7 @@ export interface HerdWriterLike {
  * Collaborators {@link dispatcherFor} want.
  *
  * @interface HerdDeps
- * @property {(plan: SwarmPlan<unknown>) => Promise<{ registry: RoleRegistry; close: () => Promise<void> }>} openLive - Open live registry plus hook that stop its client.
+ * @property {(plan: SwarmPlan<unknown>, gates: boolean) => Promise<{ registry: RoleRegistry; close: () => Promise<void> }>} openLive - Open live registry plus hook that stop its client; `gates` false runs members with no gates.
  * @property {(plan: SwarmPlan<unknown>) => RoleRegistry} fakeRegistry - Deterministic registry for non-live run.
  * @property {(plan: SwarmPlan<unknown>, paths: readonly string[]) => SwarmPlan<unknown>} withContext - Attach resolved context files to every brief.
  * @property {(globs: readonly string[]) => Promise<readonly string[]>} resolveContext - Turn run context globs to file contents.
@@ -50,7 +50,10 @@ export interface HerdWriterLike {
  * @property {(plan: SwarmPlan<unknown>, deps: DispatchDeps<unknown>) => Promise<DispatchResult>} dispatch - Dispatch use-case.
  */
 export interface HerdDeps {
-  openLive: (plan: SwarmPlan<unknown>) => Promise<{ registry: RoleRegistry; close: () => Promise<void> }>;
+  openLive: (
+    plan: SwarmPlan<unknown>,
+    gates: boolean,
+  ) => Promise<{ registry: RoleRegistry; close: () => Promise<void> }>;
   fakeRegistry: (plan: SwarmPlan<unknown>) => RoleRegistry;
   withContext: (plan: SwarmPlan<unknown>, paths: readonly string[]) => SwarmPlan<unknown>;
   resolveContext: (globs: readonly string[]) => Promise<readonly string[]>;
@@ -78,7 +81,7 @@ export type HerdDispatcher = (
 export function dispatcherFor(settings: RunSettings, deps: HerdDeps): HerdDispatcher {
   return async (plan, onProgress) => {
     const opened = settings.live
-      ? await deps.openLive(plan)
+      ? await deps.openLive(plan, settings.gates ?? true)
       : { registry: deps.fakeRegistry(plan), close: async (): Promise<void> => undefined };
     try {
       const binding = opened.registry.bindings.get(plan.role);

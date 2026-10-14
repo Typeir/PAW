@@ -38,7 +38,7 @@ describe('createHerdHooks', () => {
   it('relays a pre-tool call and hands pawd answer to the SDK', async () => {
     const deny = { permissionDecision: 'deny', permissionDecisionReason: 'fix src/a.ts first' };
     const r = recorder(deny);
-    const hooks = createHerdHooks(r.dispatch, () => undefined);
+    const hooks = createHerdHooks(r.dispatch, () => undefined, true);
     expect(await hooks.onPreToolUse({ toolName: 'edit', toolArgs: { path: 'src/b.ts' } }, session)).toEqual(deny);
     expect(r.calls).toEqual([
       { event: 'tool.pre', payload: { sessionId: 'member-3', toolName: 'edit', toolArgs: { path: 'src/b.ts' } } },
@@ -47,7 +47,7 @@ describe('createHerdHooks', () => {
 
   it('relays a finished tool call as a post-tool edit, and a failed one as failed', async () => {
     const r = recorder({ additionalContext: 'file too long' });
-    const hooks = createHerdHooks(r.dispatch, () => undefined);
+    const hooks = createHerdHooks(r.dispatch, () => undefined, true);
     const input = { toolName: 'edit', toolArgs: { path: 'src/a.ts' } };
     expect(await hooks.onPostToolUse(input, session)).toEqual({ additionalContext: 'file too long' });
     await hooks.onPostToolUseFailure(input, session);
@@ -57,23 +57,36 @@ describe('createHerdHooks', () => {
     ]);
   });
 
+  it('with gates off relays no post-tool event, but still relays pre-tool for the secrets rule', async () => {
+    const r = recorder({ permissionDecision: 'deny', permissionDecisionReason: '.env is blocked' });
+    const hooks = createHerdHooks(r.dispatch, () => undefined, false);
+    const input = { toolName: 'edit', toolArgs: { path: 'src/a.ts' } };
+    expect(await hooks.onPostToolUse(input, session)).toBeUndefined();
+    expect(await hooks.onPostToolUseFailure(input, session)).toBeUndefined();
+    expect(await hooks.onPreToolUse({ toolName: 'view', toolArgs: { path: '.env' } }, session)).toEqual({
+      permissionDecision: 'deny',
+      permissionDecisionReason: '.env is blocked',
+    });
+    expect(r.calls.map((c) => c.event)).toEqual(['tool.pre']);
+  });
+
   it('relays a submitted prompt', async () => {
     const r = recorder({ additionalContext: 'L1' });
-    const hooks = createHerdHooks(r.dispatch, () => undefined);
+    const hooks = createHerdHooks(r.dispatch, () => undefined, true);
     expect(await hooks.onUserPromptSubmitted({ prompt: 'go' }, session)).toEqual({ additionalContext: 'L1' });
     expect(r.calls[0]).toEqual({ event: 'prompt.submitted', payload: { sessionId: 'member-3', prompt: 'go' } });
   });
 
   it('fails open and says so when pawd gives no answer', async () => {
     const reasons: string[] = [];
-    const hooks = createHerdHooks(recorder(null).dispatch, (reason) => reasons.push(reason));
+    const hooks = createHerdHooks(recorder(null).dispatch, (reason) => reasons.push(reason), true);
     expect(await hooks.onPreToolUse({ toolName: 'edit', toolArgs: {} }, session)).toBeUndefined();
     expect(reasons).toEqual(['tool.pre: pawd gave no answer · allowed without enforcement']);
   });
 
   it('fails open and says so when the call throws', async () => {
     const reasons: string[] = [];
-    const hooks = createHerdHooks(recorder(new Error('pipe closed')).dispatch, (reason) => reasons.push(reason));
+    const hooks = createHerdHooks(recorder(new Error('pipe closed')).dispatch, (reason) => reasons.push(reason), true);
     expect(await hooks.onPostToolUse({ toolName: 'edit', toolArgs: {} }, session)).toBeUndefined();
     expect(reasons).toEqual(['tool.post: Error: pipe closed · allowed without enforcement']);
   });

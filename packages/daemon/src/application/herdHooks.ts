@@ -68,11 +68,13 @@ export interface HerdHooks {
  *
  * @param {HerdDispatch} dispatch - Relays one event to pawd.
  * @param {(reason: string) => void} onFailure - Receives why a hook allowed without enforcement.
+ * @param {boolean} gates - False relays no post-tool event, so no gate runs and no violation is raised; pre-tool still relays, so the secrets rule holds.
  * @returns {HerdHooks} The SDK session hooks.
  */
 export function createHerdHooks(
   dispatch: HerdDispatch,
   onFailure: (reason: string) => void,
+  gates: boolean,
 ): HerdHooks {
   const relay = async (
     event: PawEventType,
@@ -96,12 +98,12 @@ export function createHerdHooks(
     toolName: input.toolName,
     toolArgs: input.toolArgs,
   });
+  const post = (input: HerdToolInput, invocation: HerdInvocation, failed: boolean) =>
+    gates ? relay('tool.post', { ...tool(input, invocation), failed }) : Promise.resolve(undefined);
   return {
     onPreToolUse: (input, invocation) => relay('tool.pre', tool(input, invocation)),
-    onPostToolUse: (input, invocation) =>
-      relay('tool.post', { ...tool(input, invocation), failed: false }),
-    onPostToolUseFailure: (input, invocation) =>
-      relay('tool.post', { ...tool(input, invocation), failed: true }),
+    onPostToolUse: (input, invocation) => post(input, invocation, false),
+    onPostToolUseFailure: (input, invocation) => post(input, invocation, true),
     onUserPromptSubmitted: (input, invocation) =>
       relay('prompt.submitted', { sessionId: invocation.sessionId, prompt: input.prompt }),
   };

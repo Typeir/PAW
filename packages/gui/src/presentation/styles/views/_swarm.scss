@@ -329,6 +329,11 @@
   input {
     accent-color: var(--accent);
   }
+
+  &:has(input:disabled) {
+    cursor: default;
+    opacity: 0.5;
+  }
 }
 
 .srcline {

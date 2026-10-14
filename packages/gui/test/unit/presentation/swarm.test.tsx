@@ -197,6 +197,39 @@ describe('CommandBar', () => {
     expect(screen.getByRole('status')).toHaveTextContent('approve it in the pawd terminal');
   });
 
+  it('offers gates only for a live run, and carries gates off in the release settings', async () => {
+    const sent: string[] = [];
+    let handlers: SocketHandlers | null = null;
+    const socket: SocketLike = {
+      send: (text: string) => sent.push(text),
+      close: () => undefined,
+      listen: (registered) => {
+        handlers = registered;
+      },
+    };
+    render(
+      <ConsoleProvider snapshot={makeSnapshot()} connect={() => socket} token='cred'>
+        <CommandBar />
+      </ConsoleProvider>,
+    );
+    act(() => handlers?.open());
+    act(() => handlers?.message(encodeEnvelope('hello', makeSnapshot(), 1)));
+
+    const gates = screen.getByRole('checkbox', { name: /gates/ });
+    expect(gates).toBeChecked();
+    expect(gates).toBeDisabled();
+    await userEvent.click(screen.getByRole('checkbox', { name: /live model/ }));
+    expect(gates).toBeEnabled();
+    await userEvent.click(gates);
+    await userEvent.click(screen.getByRole('button', { name: /Release herd/ }));
+
+    expect(parseClientMessage(sent[sent.length - 1])).toEqual({
+      v: 1,
+      type: 'release',
+      settings: { plan: 'plans/demo.swarm.mjs', live: true, gates: false },
+    });
+  });
+
   it('carries the attached-context selection inside the release settings', async () => {
     const sent: string[] = [];
     let handlers: SocketHandlers | null = null;

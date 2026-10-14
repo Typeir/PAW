@@ -391,6 +391,7 @@ export type ClientMessage =
  * @property {number} [maxOutputTokens] - Per-run output ceiling; omit, take each model default.
  * @property {number} [concurrency] - Members in flight at once; omit, take dispatcher default.
  * @property {readonly string[]} [context] - File globs whose contents attach to every member brief.
+ * @property {boolean} [gates] - Whether live members are held to the repo's gates; omit for true. False skips gates only — the secrets rule still applies.
  */
 export interface RunSettings {
   readonly plan: string;
@@ -398,4 +399,5 @@ export interface RunSettings {
   readonly maxOutputTokens?: number;
   readonly concurrency?: number;
   readonly context?: readonly string[];
+  readonly gates?: boolean;
 }

@@ -69,7 +69,7 @@ import {
 import { openConsole } from '../../application/electronLauncher.js';
 import { createHerdWriter } from '../../application/herdWriter.js';
 import { concurrencyFrom, maxTokensFrom, parseArgs, withContext } from '../../domain/context.js';
-import { fakeRegistryFor, openPolicedHerd, resolveContextArg } from './swarm.js';
+import { fakeRegistryFor, GATES_OFF_NOTICE, openPolicedHerd, resolveContextArg } from './swarm.js';
 
 /**
  * Build dispatcher for `paw ui --run`. Release the swarm once against the real
@@ -81,6 +81,7 @@ import { fakeRegistryFor, openPolicedHerd, resolveContextArg } from './swarm.js'
  * @param {readonly string[]} attached - Files attach to every brief.
  * @param {number | undefined} concurrency - Max members in flight.
  * @param {number | undefined} maxOutputTokens - Per-member output cap.
+ * @param {boolean} gates - Live only: false runs members with no gates; the secrets rule still applies.
  * @returns {Dispatcher} The dispatcher.
  */
 function uiDispatcher(
@@ -89,10 +90,11 @@ function uiDispatcher(
   attached: readonly string[],
   concurrency: number | undefined,
   maxOutputTokens: number | undefined,
+  gates: boolean,
 ): Dispatcher {
   return async (plan, onProgress) => {
     const { registry: base, close } = live
-      ? await openPolicedHerd(plan)
+      ? await openPolicedHerd(plan, gates)
       : { registry: fakeRegistryFor(plan), close: async () => {} };
     try {
       const binding = base.bindings.get(plan.role);
@@ -188,7 +190,7 @@ function spawnShell(bin: string, shellArgs: readonly string[]) {
  */
 function releaseDispatcher(settings: RunSettings): Dispatcher {
   return dispatcherFor(settings, {
-    openLive: (plan: SwarmPlan<unknown>) => openPolicedHerd(plan),
+    openLive: (plan: SwarmPlan<unknown>, gates: boolean) => openPolicedHerd(plan, gates),
     fakeRegistry: fakeRegistryFor,
     withContext,
     resolveContext: (globs) => resolveContextArg(globs.join(',')),
@@ -229,7 +231,9 @@ async function approveRelease(
   process.stdout.write(
     `\nconsole asks to release ${settings.plan} · ${
       settings.live ? 'LIVE model — this spends' : 'fake model'
-    }${globs > 0 ? ` · ${globs} context glob(s)` : ''}\ntype y to release · anything else refuses\n`,
+    }${settings.live && settings.gates === false ? ` · ${GATES_OFF_NOTICE}` : ''}${
+      globs > 0 ? ` · ${globs} context glob(s)` : ''
+    }\ntype y to release · anything else refuses\n`,
   );
   const answer = await new Promise<string>((resolveAnswer) => {
     const rl = createInterface({ input: process.stdin });
@@ -356,6 +360,7 @@ export async function runUi(
   const [planPath] = args.positional;
   const live = args.flags.has('live');
   const full = args.flags.has('full');
+  const gates = !args.flags.has('no-gates');
   const shouldRun = args.flags.has('run');
   if (shouldRun && planPath === undefined) {
     throw new Error('paw ui --run needs the plan to release: paw ui <plan.swarm.mjs> --run');
@@ -468,7 +473,16 @@ export async function runUi(
       dispatcherFor: releaseDispatcher,
       ...(control ? { control } : {}),
       ...(shouldRun
-        ? { dispatch: uiDispatcher(live, full, attached, concurrencyFrom(args), maxTokensFrom(args)) }
+        ? {
+            dispatch: uiDispatcher(
+              live,
+              full,
+              attached,
+              concurrencyFrom(args),
+              maxTokensFrom(args),
+              gates,
+            ),
+          }
         : {}),
     },
     nodeRuntime(consolePage()),
@@ -492,7 +506,7 @@ export async function runUi(
       ? `attaching ${attached.length} file(s) to every brief: ${attached.join(', ')}`
       : 'no files attached · pass --context a,b or pick them in the console',
     shouldRun
-      ? `releasing the herd (${live ? 'live' : 'fake'} model) · the console fills in as it lands`
+      ? `releasing the herd (${live ? 'live' : 'fake'} model)${live && !gates ? ` · ${GATES_OFF_NOTICE}` : ''} · the console fills in as it lands`
       : 'no run released · pass --run to dispatch',
     control
       ? 'control enabled · the console may edit bindings, prune violations, and stop enforcement · pass --read-only to forbid it'
