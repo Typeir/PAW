@@ -14,6 +14,12 @@ The repository's agent guidance is host-agnostic and lives in one file. Read it:
   them in the background rather than assuming a hang.
 - When you touch `packages/gui`, run `npm run build:console` before claiming a console change works.
   The daemon serves a built bundle, not the source tree.
+- `claude` is not on PATH. For a headless session (AGENTS.md, *Proving a change*), call the binary
+  the VS Code extension ships:
+  `~/.vscode/extensions/anthropic.claude-code-<version>-win32-x64/resources/native-binary/claude.exe`.
+  Run it from PowerShell with the scratch repository as the working directory. A headless session
+  has a PowerShell tool as well as Bash; allow the command under test in both, or its first call is
+  refused.
 - Prove console changes by capture rather than by description:
   `electron dist/main.cjs --root=<repo> --capture` writes `dist/capture.png`, which Read renders.
   It opens on the console's default section, so seeing another view means temporarily changing the

@@ -143,6 +143,32 @@ until `npm run build:console` runs.
 - Console styles are SCSS partials under `packages/gui/src/presentation/styles/`. `console.scss`
   lists them in cascade order, so reordering a `@use` can change which rule wins.
 
+## Proving a change
+
+Green tests are the floor. A change is done when the real path it touches has run in a throwaway
+repository. Do not report "unverified" for anything a scratch repository can show.
+
+- **Scratch repository.** Create it under the OS temp directory, or your host's scratchpad:
+  `git init`, a `.paw/config.json`, and the fixtures the change needs — a gate in `.paw/gates/`, a
+  `.paw/tasks.json`, a module from `paw modules install <id> --from <local git repo>`. Delete it
+  when done.
+- **Hooks.** Pipe a complete host payload into `paw hook --<host> <event>` **from bash**. Include
+  the event-name field (`hook_event_name` for Claude Code, `hookEventName` for Copilot); without
+  it the connector places nothing and the call allows. Windows PowerShell 5.1 corrupts JSON piped
+  into a native process — PAW reads `{}` and allows everything, which looks like a broken rule.
+- **pawd.** `paw hook` starts pawd for the repository it runs in; `paw daemon stop` from that
+  repository stops it. Autostart re-runs `process.argv[1]` with `__pawd`, so a script that calls
+  `ensurePawd` spawns itself, not pawd — start pawd with one `paw hook` call first.
+- **Agent behaviour.** To prove an agent sees and uses something — a skill a module places, the
+  context a hook injects — run a headless agent session in the scratch repository, restrict its
+  tools to the command under test, and read its tool calls. Claude Code:
+  `claude -p "<task>" --allowedTools "Bash(paw tasks:*)" --output-format stream-json --verbose`.
+  It spends tokens: keep the prompt small and `--max-turns` low.
+- **Live model path, no tokens.** `PAW_SDK_LIVE=1 npx vitest run test/model/sdkModel.integration.test.ts`
+  in `packages/daemon` runs the real Copilot runtime against a stub model, herd hooks included.
+- **Console.** `--capture` renders a fixed 1280×800 window; an element below the fold does not
+  show. Prove those by the jsdom tests and the regression snapshot, and say so.
+
 ## Conventions
 
 - Refusal messages name the offending thing and the verb that fixes it:
@@ -150,7 +176,7 @@ until `npm run build:console` runs.
 - Config edits are pure transforms over `ConfigDocument` returning `ConfigEdit`; the caller writes.
 - The TUI prints each action's CLI twin (`cli: paw gates`) — the menu teaches the verbs.
 - Architecture calls are the operator's. Recommend with evidence, and prove a claim by running the
-  artifact rather than asserting it.
+  artifact rather than asserting it — see [Proving a change](#proving-a-change).
 
 ### Git
 
