@@ -429,6 +429,15 @@ describe('runDaemon', () => {
     expect((await bare.handler()?.(asConsole('/api/tasks')))?.status).toBe(404);
   });
 
+  it('serves the provider roster a shell supplies, and the connector roster from config', async () => {
+    const rig = makeRig();
+    const providers = [{ name: 'deepseek', type: 'openai', baseUrl: 'https://api.deepseek.com', keyChars: 35 }];
+    await runDaemon({ providers: () => providers }, rig.runtime);
+    expect(parse(await rig.handler()?.(asConsole('/api/providers')))).toEqual(providers);
+    const connectors = parse(await rig.handler()?.(asConsole('/api/connectors'))) as unknown as Array<{ id: string }>;
+    expect(connectors.map((row) => row.id)).toEqual(expect.arrayContaining(['copilot-hooks', 'claude-hooks']));
+  });
+
   it('offers the Tasks rail item only when the supplied view is enabled', async () => {
     const on = await runDaemon({ tasks: async () => ({ enabled: true }) }, makeRig().runtime);
     expect((await on.snapshot()).chrome.tasks).toBe(true);

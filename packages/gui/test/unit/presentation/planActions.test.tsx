@@ -112,6 +112,17 @@ describe('PlanActions', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('falls back to a plain refusal when a refused create carries no reason', async () => {
+    const client = fakeClient({
+      create: vi.fn(async (): Promise<PlanWrite> => ({ ok: false })),
+    });
+    mount(client);
+    await userEvent.click(screen.getByRole('button', { name: 'new plan' }));
+    await userEvent.type(screen.getByLabelText('Plan name'), 'nameless');
+    await userEvent.click(screen.getByRole('button', { name: 'create' }));
+    expect(await screen.findByText('refused')).toBeInTheDocument();
+  });
+
   it('cancel closes the create modal', async () => {
     mount(fakeClient());
     await userEvent.click(screen.getByRole('button', { name: 'new plan' }));

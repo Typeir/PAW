@@ -274,6 +274,19 @@ describe('ConnectorsView', () => {
     renderInConsole(<ConnectorsView />);
     expect(screen.getAllByText('— a live daemon backs this view —').length).toBeGreaterThan(0);
   });
+
+  it('writes nothing when the daemon client is gone after the roster loaded', async () => {
+    const setConnector = vi.fn(async () => ({ ok: true }));
+    const { rerender } = renderConnectors(configClient({ setConnector }));
+    const enable = await screen.findByRole('button', { name: 'enable' });
+    rerender(
+      <ConsoleProvider snapshot={makeSnapshot()} config={null}>
+        <ConnectorsView />
+      </ConsoleProvider>,
+    );
+    await userEvent.click(enable);
+    expect(setConnector).not.toHaveBeenCalled();
+  });
 });
 
 describe('ModulesView', () => {
@@ -342,6 +355,19 @@ describe('ModulesView', () => {
 
     renderInConsole(<ModulesView />);
     expect(screen.getAllByText('— a live daemon backs this view —').length).toBeGreaterThan(0);
+  });
+
+  it('writes nothing when the daemon client is gone after the roster loaded', async () => {
+    const setModule = vi.fn(async () => ({ ok: true }));
+    const { rerender } = renderModules(configClient({ setModule }));
+    const disable = await screen.findByRole('button', { name: 'disable' });
+    rerender(
+      <ConsoleProvider snapshot={makeSnapshot()} config={null}>
+        <ModulesView />
+      </ConsoleProvider>,
+    );
+    await userEvent.click(disable);
+    expect(setModule).not.toHaveBeenCalled();
   });
 });
 

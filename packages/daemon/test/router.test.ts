@@ -592,3 +592,63 @@ describe('the provider roster', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('POST /api/run/report', () => {
+  const report = (body: string, over: Partial<HttpRequest> = {}): HttpRequest =>
+    req('/api/run/report', {
+      method: 'POST',
+      body,
+      ...over,
+      headers: { contentType: 'application/json', ...over.headers },
+    });
+  const event = JSON.stringify({ id: 'run-1', at: '2026-10-14T00:00:00Z', event: { type: 'member', key: 'a' } });
+
+  it('folds a well-formed event into the run', async () => {
+    const reportRun = vi.fn(() => true);
+    const res = await route(report(event), { ...deps, reportRun });
+    expect(res.status).toBe(200);
+    expect(reportRun).toHaveBeenCalledWith('run-1', '2026-10-14T00:00:00Z', { type: 'member', key: 'a' });
+  });
+
+  it('refuses a foreign origin before reading the body', async () => {
+    const reportRun = vi.fn(() => true);
+    const res = await route(report(event, { headers: { origin: 'https://evil.example' } }), { ...deps, reportRun });
+    expect(res.status).toBe(403);
+    expect(reportRun).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 when the daemon folds no reported runs', async () => {
+    expect((await route(report(event), deps)).status).toBe(404);
+  });
+
+  it('refuses a body that is not a JSON object, or no body at all', async () => {
+    for (const request of [
+      report('[1]'),
+      req('/api/run/report', { method: 'POST', headers: { contentType: 'application/json' } }),
+    ]) {
+      const res = await route(request, { ...deps, reportRun: () => true });
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(res.status).toBeLessThan(500);
+    }
+  });
+
+  it('refuses an event missing its id, time, or object body', async () => {
+    const reportRun = vi.fn(() => true);
+    for (const body of [
+      { at: 'x', event: {} },
+      { id: 'run-1', event: {} },
+      { id: 'run-1', at: 'x', event: null },
+      { id: 'run-1', at: 'x', event: [] },
+      { id: 'run-1', at: 'x', event: 'member' },
+    ]) {
+      expect((await route(report(JSON.stringify(body)), { ...deps, reportRun })).status).toBe(422);
+    }
+    expect(reportRun).not.toHaveBeenCalled();
+  });
+
+  it('answers 422 when the run does not take the event', async () => {
+    const res = await route(report(event), { ...deps, reportRun: () => false });
+    expect(res.status).toBe(422);
+    expect(res.body).toContain('event did not fold');
+  });
+});

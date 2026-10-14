@@ -80,4 +80,14 @@ describe('listProviders', () => {
     });
     expect(roster).toEqual([{ name: 'x', type: 'openai', baseUrl: 'https://x', keyChars: 1 }]);
   });
+
+  it('names a read failure that is not an Error', () => {
+    const roster = listProviders('/repo', {
+      readDir: () => ['x.provider.env'],
+      readFile: () => {
+        throw 'locked by another process';
+      },
+    });
+    expect(roster).toEqual([{ name: 'x', error: 'locked by another process' }]);
+  });
 });

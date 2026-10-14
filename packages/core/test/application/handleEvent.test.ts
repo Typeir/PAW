@@ -144,6 +144,23 @@ describe('handleEvent', () => {
     expect(r).toEqual({ kind: 'block', reason: expect.stringContaining('BADCODE') });
   });
 
+  it('hands the edited paths to the linter runner when one is present', async () => {
+    const seen: string[][] = [];
+    await handleEvent(
+      toolPost(),
+      deps({
+        gates: failingGates,
+        linters: {
+          runForFiles: async (paths) => {
+            seen.push([...paths]);
+            return [];
+          },
+        },
+      }),
+    );
+    expect(seen).toHaveLength(1);
+  });
+
   it('is a noop for a post-tool event with no gate runner', async () => {
     expect(await handleEvent(toolPost(), deps())).toEqual({ kind: 'noop' });
   });

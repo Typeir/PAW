@@ -280,4 +280,17 @@ describe('doctorPlan model-resolution', () => {
       'resolutor exploded',
     );
   });
+
+  it('names a thrown value that is not an Error', () => {
+    const findings = doctorPlan(
+      plan({
+        model: () => {
+          throw 'no provider';
+        },
+      }),
+    );
+    expect(findings.find((f) => f.check === 'model-resolution')?.detail).toBe(
+      'member 0 threw: no provider',
+    );
+  });
 });

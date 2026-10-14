@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CONFIG_ROLES_URL,
   CONFIG_URL,
+  CONNECTORS_URL,
   MODULES_URL,
   PROVIDERS_URL,
   TASKS_URL,
@@ -164,6 +165,38 @@ describe('createConfigClient', () => {
       expect(res).toEqual({
         ok: false,
         reason: 'module "paw-agile" is required by enabled connectors: taiga',
+      });
+    });
+  });
+
+  describe('connectors', () => {
+    it('reads the connector roster', async () => {
+      const roster = [{ id: 'tsc', kind: 'linter', enabled: true, requires: [] }];
+      const fetchFn = respond({ ok: true, json: async () => roster });
+      await expect(createConfigClient(fetchFn).connectors()).resolves.toEqual(roster);
+      expect(fetchFn).toHaveBeenCalledWith(CONNECTORS_URL);
+    });
+
+    it('throws when the read fails', async () => {
+      await expect(
+        createConfigClient(respond({ ok: false, status: 503 })).connectors(),
+      ).rejects.toThrow('responded 503');
+    });
+
+    it('PUTs the id to enable and DELETEs it in the query to disable', async () => {
+      const on = respond({ ok: true });
+      await createConfigClient(on).setConnector('taiga', true);
+      expect(on).toHaveBeenCalledWith(CONNECTORS_URL, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: 'taiga' }),
+      });
+
+      const off = respond({ ok: true });
+      await createConfigClient(off).setConnector('taiga', false);
+      expect(off).toHaveBeenCalledWith(`${CONNECTORS_URL}?id=taiga`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
       });
     });
   });
