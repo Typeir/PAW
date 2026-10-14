@@ -35,6 +35,7 @@ const NO_BAD = `export const gate = {
 
 const testConnector: HostConnector = {
   name: 'test',
+  readOnlyTools: ['read_file'],
   eventName: (type) => (type === 'tool.pre' ? 'PRE' : type === 'tool.post' ? 'POST' : null),
   toEvent: (raw): PawEvent | null => {
     const r = raw as { hookEventName?: string; paths?: string[] };
@@ -88,7 +89,6 @@ beforeAll(async () => {
   deps = {
     store: createMemoryStore(),
     gates: createGateCache(root),
-    exemptTools: new Set(['read_file']),
     isIgnored: () => false,
     connectors: { test: testConnector },
   };

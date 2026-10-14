@@ -67,12 +67,19 @@ const failingGates: GateRunner = {
  */
 const testConnector: HostConnector = {
   name: 'test',
+  readOnlyTools: ['read_file'],
   eventName: (type) => (type === 'tool.pre' ? 'PRE' : type === 'tool.post' ? 'POST' : null),
   toEvent: (raw): PawEvent | null => {
-    const r = raw as { hookEventName?: string; paths?: string[] };
+    const r = raw as { hookEventName?: string; paths?: string[]; tool?: string };
     const paths = r.paths ?? [];
     if (r.hookEventName === 'PRE') {
-      return { type: 'tool.pre', sessionId: 'S', toolName: 'edit', targetPaths: paths, envMatch: null };
+      return {
+        type: 'tool.pre',
+        sessionId: 'S',
+        toolName: r.tool ?? 'edit',
+        targetPaths: paths,
+        envMatch: null,
+      };
     }
     if (r.hookEventName === 'POST') {
       return { type: 'tool.post', sessionId: 'S', toolName: 'edit', editedPaths: paths, failed: false };
@@ -87,7 +94,6 @@ const testConnector: HostConnector = {
 
 const deps = (over: Partial<DispatchHookDeps> = {}): DispatchHookDeps => ({
   store: fakeStore(),
-  exemptTools: new Set(['read_file']),
   isIgnored: () => false,
   gates: cleanGates,
   connectors: { test: testConnector },
@@ -114,6 +120,30 @@ describe('dispatchHook', () => {
       payload: { paths: ['src/other.ts'] },
     });
     expect(r).toEqual({ kind: 'allow' });
+  });
+
+  it('allows a read-only tool the handling connector declares, despite a violation elsewhere', async () => {
+    const store = fakeStore([
+      { id: 1, filePath: 'src/a.ts', rule: 'no-bad', message: 'BADCODE', indirectFix: false },
+    ]);
+    const r = await dispatchHook(deps({ store }), {
+      host: 'test',
+      event: 'tool.pre',
+      payload: { paths: ['src/other.ts'], tool: 'read_file' },
+    });
+    expect(r).toEqual({ kind: 'allow' });
+  });
+
+  it('blocks a tool another host would call read-only, when this connector does not declare it', async () => {
+    const store = fakeStore([
+      { id: 1, filePath: 'src/a.ts', rule: 'no-bad', message: 'BADCODE', indirectFix: false },
+    ]);
+    const r = (await dispatchHook(deps({ store }), {
+      host: 'test',
+      event: 'tool.pre',
+      payload: { paths: ['src/other.ts'], tool: 'Read' },
+    })) as { kind: string };
+    expect(r.kind).toBe('deny');
   });
 
   it('denies a pre-tool edit while a violation stands elsewhere', async () => {

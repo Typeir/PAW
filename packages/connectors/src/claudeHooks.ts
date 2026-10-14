@@ -56,10 +56,24 @@ function tagged(
 }
 
 /**
+ * Claude Code tools that never write a file.
+ */
+const READ_ONLY_TOOLS: readonly string[] = [
+  'Read',
+  'Grep',
+  'Glob',
+  'WebFetch',
+  'WebSearch',
+  'TodoWrite',
+  'ToolSearch',
+];
+
+/**
  * Claude-Code-hooks connector.
  */
 export const claudeHooksConnector: HostConnector = {
   name: 'claude-hooks',
+  readOnlyTools: READ_ONLY_TOOLS,
 
   eventName(type: PawEventType): string | null {
     return CLAUDE_EVENT_NAME[type];

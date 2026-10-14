@@ -29,12 +29,14 @@ import type { WorkGraphView, WorkTaskDetail } from '../domain/workModel.js';
  *
  * @interface HostConnector
  * @property {string} name - Connector id, matched against `PawConfig.connector`.
+ * @property {readonly string[]} readOnlyTools - Host tool names that never write; enforcement never blocks them over a violation. A secret path still blocks them.
  * @property {(type: PawEventType) => (string | null)} eventName - Host native name for canonical event (e.g. `tool.pre` → `PreToolUse`), or null when host have no such event.
  * @property {(raw: unknown) => (PawEvent | null)} toEvent - Translate host payload to canonical event, or null when payload not PAW-relevant.
  * @property {(response: PawResponse, type: PawEventType) => unknown} fromResponse - Translate canonical response to host native output shape for the event that fired. Hosts that tag their output with the event name need `type` to tag it right.
  */
 export interface HostConnector {
   readonly name: string;
+  readonly readOnlyTools: readonly string[];
   eventName(type: PawEventType): string | null;
   toEvent(raw: unknown): PawEvent | null;
   fromResponse(response: PawResponse, type: PawEventType): unknown;

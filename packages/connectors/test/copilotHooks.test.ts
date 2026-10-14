@@ -15,6 +15,18 @@
 import { describe, expect, it } from 'vitest';
 import { copilotHooksConnector as c } from '../src/copilotHooks.js';
 
+describe('copilotHooksConnector.readOnlyTools', () => {
+  it('declares the host tools that only read', () => {
+    expect(c.readOnlyTools).toEqual(expect.arrayContaining(['read_file', 'grep_search', 'list_dir']));
+  });
+
+  it('declares no tool that writes or runs a shell', () => {
+    for (const tool of ['replace_string_in_file', 'run_in_terminal']) {
+      expect(c.readOnlyTools).not.toContain(tool);
+    }
+  });
+});
+
 describe('copilotHooksConnector.eventName', () => {
   it('maps each canonical event to its Copilot name', () => {
     expect(c.eventName('tool.pre')).toBe('PreToolUse');

@@ -15,6 +15,18 @@
 import { describe, expect, it } from 'vitest';
 import { claudeHooksConnector as c } from '../src/claudeHooks.js';
 
+describe('claudeHooksConnector.readOnlyTools', () => {
+  it('declares the host tools that only read', () => {
+    expect(c.readOnlyTools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob']));
+  });
+
+  it('declares no tool that writes or runs a shell', () => {
+    for (const tool of ['Edit', 'Write', 'Bash']) {
+      expect(c.readOnlyTools).not.toContain(tool);
+    }
+  });
+});
+
 describe('claudeHooksConnector.eventName', () => {
   it('maps each canonical event to its Claude Code name', () => {
     expect(c.eventName('tool.pre')).toBe('PreToolUse');

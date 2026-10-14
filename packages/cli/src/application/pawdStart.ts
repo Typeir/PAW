@@ -40,27 +40,6 @@ import {
   type SocketServerHandle,
 } from '@paw/daemon';
 
-/**
- * Read-only tools never block by violations. Port from legacy `preToolUse`
- * hook.
- */
-const EXEMPT_TOOLS: ReadonlySet<string> = new Set([
-  'read_file',
-  'view_image',
-  'grep_search',
-  'file_search',
-  'semantic_search',
-  'list_dir',
-  'get_errors',
-  'get_terminal_output',
-  'memory',
-  'manage_todo_list',
-  'vscode_askQuestions',
-  'tool_search_tool_regex',
-  'fetch_webpage',
-  'task_complete',
-]);
-
 const IGNORED = /(^|\/)(\.paw|\.git|node_modules|dist|coverage|\.next)(\/|$)/;
 
 /**
@@ -126,7 +105,6 @@ export async function startEnforcement(
             void store.raise(findings.map(lintViolation), null).catch(() => undefined);
           },
         }),
-        exemptTools: EXEMPT_TOOLS,
         isIgnored: (path) => IGNORED.test(path),
         toRelative: (path) => toProjectRelative(root, path),
         connectors: { copilot: copilotHooksConnector, claude: claudeHooksConnector },

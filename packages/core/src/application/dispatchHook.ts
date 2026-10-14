@@ -31,12 +31,13 @@ export interface HookDispatch {
 }
 
 /**
- * Dispatch deps: loop deps daemon own, plus connector registry.
+ * Dispatch deps: loop deps daemon own, plus connector registry. Exempt tools
+ * come from the connector that handles the hook.
  *
  * @interface DispatchHookDeps
  * @property {Record<string, HostConnector>} connectors - Host key → connector.
  */
-export interface DispatchHookDeps extends HandleDeps {
+export interface DispatchHookDeps extends Omit<HandleDeps, 'exemptTools'> {
   readonly connectors: Record<string, HostConnector>;
 }
 
@@ -61,5 +62,9 @@ export async function dispatchHook(
   if (pawEvent === null) {
     return { continue: true };
   }
-  return connector.fromResponse(await handleEvent(pawEvent, deps), req.event);
+  const response = await handleEvent(pawEvent, {
+    ...deps,
+    exemptTools: new Set(connector.readOnlyTools),
+  });
+  return connector.fromResponse(response, req.event);
 }

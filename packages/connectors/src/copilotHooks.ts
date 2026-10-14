@@ -39,10 +39,31 @@ const COPILOT_EVENT_NAME: Record<PawEventType, string> = {
 };
 
 /**
+ * Copilot agent tools that never write a file.
+ */
+const READ_ONLY_TOOLS: readonly string[] = [
+  'read_file',
+  'view_image',
+  'grep_search',
+  'file_search',
+  'semantic_search',
+  'list_dir',
+  'get_errors',
+  'get_terminal_output',
+  'memory',
+  'manage_todo_list',
+  'vscode_askQuestions',
+  'tool_search_tool_regex',
+  'fetch_webpage',
+  'task_complete',
+];
+
+/**
  * Copilot-hooks connector.
  */
 export const copilotHooksConnector: HostConnector = {
   name: 'copilot-hooks',
+  readOnlyTools: READ_ONLY_TOOLS,
 
   eventName(type: PawEventType): string | null {
     return COPILOT_EVENT_NAME[type];

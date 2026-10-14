@@ -66,7 +66,6 @@ beforeAll(async () => {
   const deps: DispatchHookDeps = {
     store: createMemoryStore(),
     gates: createGateCache(root),
-    exemptTools: new Set(['read_file']),
     isIgnored: () => false,
     connectors: { copilot: copilotHooksConnector },
   };
