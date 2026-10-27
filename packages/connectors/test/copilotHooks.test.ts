@@ -20,6 +20,10 @@ describe('copilotHooksConnector.readOnlyTools', () => {
     expect(c.readOnlyTools).toEqual(expect.arrayContaining(['read_file', 'grep_search', 'list_dir']));
   });
 
+  it('declares web fetch under the Local name and both Copilot harness names', () => {
+    expect(c.readOnlyTools).toEqual(expect.arrayContaining(['fetch_webpage', 'WebFetch', 'web_fetch']));
+  });
+
   it('declares no tool that writes or runs a shell', () => {
     for (const tool of ['replace_string_in_file', 'run_in_terminal']) {
       expect(c.readOnlyTools).not.toContain(tool);

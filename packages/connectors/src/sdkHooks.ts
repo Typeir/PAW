@@ -30,7 +30,7 @@ const SDK_EVENT_NAME: Record<PawEventType, string | null> = {
 /**
  * SDK built-in tools that never write a file.
  */
-const READ_ONLY_TOOLS: readonly string[] = ['view', 'grep'];
+const READ_ONLY_TOOLS: readonly string[] = ['view', 'grep', 'web_fetch'];
 
 /**
  * SDK-hooks connector.
