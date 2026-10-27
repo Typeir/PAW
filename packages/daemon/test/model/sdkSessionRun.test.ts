@@ -66,7 +66,7 @@ describe('createSdkSessionRun', () => {
         provider: { type: 'openai', baseUrl: 'https://api.deepseek.com' },
         workingDirectory: '/repo',
         availableTools: ['builtin:*'],
-        excludedTools: [],
+        excludedTools: ['builtin:semantic_code_search'],
         onPermissionRequest: approveAll,
         hooks: herdHooks,
       }),
@@ -90,6 +90,7 @@ describe('createSdkSessionRun', () => {
       expect.objectContaining({
         availableTools: ['builtin:view', 'builtin:edit'],
         excludedTools: [
+          'builtin:semantic_code_search',
           'builtin:powershell',
           'builtin:list_powershell',
           'builtin:read_powershell',

@@ -5,10 +5,11 @@
  * session. Copilot own resolver, name differ across SDK. Plan grant canonical
  * (`read`, `edit`, `search`, `shell`) via `availableTools` / `resolveTools`;
  * turn into allow/deny list for `createSession`. No grant → full built-in set
- * (`builtin:*`, option B). Safemode deny shell family via denylist;
- * `mode:'empty'` obey deny over allow. Built-in name maps `view` to read,
- * `edit` to edit, `grep` to search; shell is `powershell` family on Windows or
- * `bash` POSIX. Both named — map stay platform-agnostic, unregistered name inert.
+ * (`builtin:*`, option B). GitHub-API built-ins denied every session; safemode
+ * deny shell family too; `mode:'empty'` obey deny over allow. Built-in name
+ * maps `view` to read, `edit` to edit, `grep` to search; shell is `powershell`
+ * family on Windows or `bash` POSIX. Both named — map stay platform-agnostic,
+ * unregistered name inert.
  *
  * @module @paw/daemon/model/copilotTools
  * @version 0.0.0
@@ -29,6 +30,12 @@ const SHELL_BUILTINS: readonly string[] = [
 ];
 
 /**
+ * Built-ins that call the GitHub API from the runtime, outside PAW egress.
+ * `semantic_code_search` posts to `api.github.com/repos/<repo>/embeddings/code/search`.
+ */
+const GITHUB_API_BUILTINS: readonly string[] = ['semantic_code_search'];
+
+/**
  * Canonical name → Copilot built-in grant. `read`=view, `edit`=edit,
  * `search`=grep, `shell`=whole shell family. Name outside map grant nothing.
  */
@@ -44,7 +51,7 @@ const CANONICAL_TO_BUILTIN: Readonly<Record<string, readonly string[]>> = {
  *
  * @interface CopilotToolFilter
  * @property {string[]} availableTools - Allowlist for `createSession`: `builtin:` patterns, or `builtin:*` when plan grant no name.
- * @property {string[]} excludedTools - Denylist. Safemode → shell family, else empty. `mode:'empty'` apply it over allowlist.
+ * @property {string[]} excludedTools - Denylist: GitHub-API built-ins always, shell family too under safemode. `mode:'empty'` apply it over allowlist.
  */
 export interface CopilotToolFilter {
   readonly availableTools: string[];
@@ -53,8 +60,8 @@ export interface CopilotToolFilter {
 
 /**
  * Resolve canonical name to allow/deny filter. Undefined → full built-in set.
- * Granted list → expand to built-in, dedupe, qualify; drop unknown name. Safemode
- * deny shell family, whatever allowlist.
+ * Granted list → expand to built-in, dedupe, qualify; drop unknown name. Deny
+ * GitHub-API built-ins always and shell family under safemode, whatever allowlist.
  *
  * @param {readonly string[] | undefined} canonical - Granted canonical name, undefined → full set.
  * @param {boolean} safemode - True → deny shell (option-A surface).
@@ -74,6 +81,8 @@ export function resolveCopilotTools(
               .map((name) => `builtin:${name}`),
           ),
         ];
-  const excludedTools = safemode ? SHELL_BUILTINS.map((name) => `builtin:${name}`) : [];
+  const excludedTools = [...GITHUB_API_BUILTINS, ...(safemode ? SHELL_BUILTINS : [])].map(
+    (name) => `builtin:${name}`,
+  );
   return { availableTools, excludedTools };
 }

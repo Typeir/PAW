@@ -3,7 +3,8 @@
  * built-in wildcard; granted list expand to runtime's real built-in
  * identifiers (`read`→view, `edit`→edit, `search`→grep, `shell`→cross-platform
  * shell family), de-duplicate, dropping unknown names; safemode denies the whole
- * shell family through denylist, whether allowlist be wildcard or explicit grant.
+ * shell family through denylist, whether allowlist be wildcard or explicit grant;
+ * GitHub-API built-ins are denied in every session.
  *
  * @module @paw/daemon/test/model/copilotTools
  */
@@ -19,11 +20,13 @@ const SHELL_DENY = [
   'builtin:bash',
 ];
 
+const GITHUB_API_DENY = ['builtin:semantic_code_search'];
+
 describe('resolveCopilotTools', () => {
-  it('grants the full built-in set when no names are declared', () => {
+  it('grants the full built-in set when no names are declared, less the GitHub-API built-ins', () => {
     expect(resolveCopilotTools(undefined, false)).toEqual({
       availableTools: ['builtin:*'],
-      excludedTools: [],
+      excludedTools: GITHUB_API_DENY,
     });
   });
 
@@ -35,21 +38,21 @@ describe('resolveCopilotTools', () => {
         'builtin:grep',
         ...SHELL_DENY,
       ],
-      excludedTools: [],
+      excludedTools: GITHUB_API_DENY,
     });
   });
 
   it('denies the shell family under safemode over the wildcard', () => {
     expect(resolveCopilotTools(undefined, true)).toEqual({
       availableTools: ['builtin:*'],
-      excludedTools: SHELL_DENY,
+      excludedTools: [...GITHUB_API_DENY, ...SHELL_DENY],
     });
   });
 
   it('denies the shell family under safemode over an explicit grant', () => {
     expect(resolveCopilotTools(['read', 'edit'], true)).toEqual({
       availableTools: ['builtin:view', 'builtin:edit'],
-      excludedTools: SHELL_DENY,
+      excludedTools: [...GITHUB_API_DENY, ...SHELL_DENY],
     });
   });
 });
