@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.1.0",
-    "@github/copilot-sdk": "1.0.8",
+    "@github/copilot-sdk": "1.0.27",
     "kysely": "^0.29.4",
     "sql.js": "^1.14.1"
   },
