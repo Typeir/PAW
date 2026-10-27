@@ -13,7 +13,16 @@ import { sdkHooksConnector as c } from '../src/sdkHooks.js';
 
 describe('sdkHooksConnector.readOnlyTools', () => {
   it('declares the SDK built-ins that write no file', () => {
-    expect(c.readOnlyTools).toEqual(['view', 'grep', 'web_fetch']);
+    expect(c.readOnlyTools).toEqual([
+      'view',
+      'grep',
+      'glob',
+      'web_fetch',
+      'list_powershell',
+      'read_powershell',
+      'list_agents',
+      'read_agent',
+    ]);
   });
 });
 

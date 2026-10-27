@@ -39,9 +39,10 @@ const COPILOT_EVENT_NAME: Record<PawEventType, string> = {
 };
 
 /**
- * Copilot agent tools that never write a file. Local harness names, plus web
- * fetch as the Copilot harness names it: `WebFetch` under PascalCase hook
- * events, `web_fetch` under camelCase.
+ * Copilot agent tools that never write a file, under each name a hook payload
+ * carries: Local harness names; Copilot harness Claude names under PascalCase
+ * hook events (`Read`); Copilot harness runtime names under camelCase (`view`),
+ * which a tool without a Claude name keeps under PascalCase too.
  */
 const READ_ONLY_TOOLS: readonly string[] = [
   'read_file',
@@ -57,9 +58,26 @@ const READ_ONLY_TOOLS: readonly string[] = [
   'vscode_askQuestions',
   'tool_search_tool_regex',
   'fetch_webpage',
-  'WebFetch',
-  'web_fetch',
   'task_complete',
+  'Read',
+  'Grep',
+  'Glob',
+  'WebFetch',
+  'WebSearch',
+  'AskUserQuestion',
+  'TodoWrite',
+  'view',
+  'grep',
+  'rg',
+  'glob',
+  'web_fetch',
+  'web_search',
+  'ask_user',
+  'update_todo',
+  'list_powershell',
+  'read_powershell',
+  'list_agents',
+  'read_agent',
 ];
 
 /**
