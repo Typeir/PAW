@@ -4,17 +4,18 @@
  * @fileoverview Records network egress from this process and its descendants:
  * a refusing HTTP proxy, installed through the `*_PROXY` variables children
  * inherit, logs every proxied request line; a `netstat -ano` poll logs every
- * non-loopback TCP endpoint, kept when its pid ever joined the tree. Windows
- * only. A descendant that lives and dies between tree refreshes escapes the
- * poll, not the proxy.
+ * non-loopback TCP endpoint, kept when its pid ever joined the tree. One
+ * PowerShell session streams the process table, about every 200 ms. Windows
+ * only. A descendant living under one snapshot escapes the poll, not the proxy.
  *
  * @module @paw/daemon/test/support/egressWatch
  */
 
-import { execFile, spawn } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import net from 'node:net';
 import { networkInterfaces } from 'node:os';
+import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -45,9 +46,11 @@ const HANGUP = new Set(['ECONNRESET', 'EPIPE']);
 const POLL_MS = 150;
 
 /**
- * Pause between process-tree refreshes, milliseconds.
+ * PowerShell loop printing one process-table snapshot per line: `pid:ppid:name`
+ * rows joined by `|`, two characters no image name can hold.
  */
-const TREE_PAUSE_MS = 100;
+const SNAPSHOT_SCRIPT =
+  "$ErrorActionPreference = 'Stop'; while ($true) { $rows = Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, Name | ForEach-Object { '{0}:{1}:{2}' -f $_.ProcessId, $_.ParentProcessId, $_.Name }; [Console]::Out.WriteLine($rows -join '|'); [Console]::Out.Flush() }";
 
 /**
  * Longest the TCP control holds its connection waiting to be seen, milliseconds.
@@ -177,23 +180,51 @@ function foreignEndpoints(netstat: string): Array<[string, number]> {
 }
 
 /**
- * Current process table.
+ * Rows of one snapshot line.
  *
- * @returns {Promise<ProcessRow[]>} One row per process.
+ * @param {string} line - `pid:ppid:name` rows joined by `|`.
+ * @returns {ProcessRow[]} One row per process.
  */
-async function processRows(): Promise<ProcessRow[]> {
-  const { stdout } = await run(
-    'powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-Command', "Get-CimInstance Win32_Process | ForEach-Object { '{0},{1},{2}' -f $_.ProcessId, $_.ParentProcessId, $_.Name }"],
-    { maxBuffer: 1 << 24 },
-  );
-  return stdout
-    .trim()
-    .split(/\r?\n/)
-    .map((line) => {
-      const [pid, ppid, ...name] = line.split(',');
-      return { pid: Number(pid), ppid: Number(ppid), name: name.join(',') };
+function snapshotRows(line: string): ProcessRow[] {
+  return line
+    .split('|')
+    .filter((row) => row.length > 0)
+    .map((row) => {
+      const [pid, ppid, name] = row.split(':');
+      return { pid: Number(pid), ppid: Number(ppid), name };
     });
+}
+
+/**
+ * Start the snapshot loop and resolve on its first snapshot.
+ *
+ * @param {(rows: readonly ProcessRow[]) => void} onSnapshot - Receives every snapshot.
+ * @param {string[]} failures - Receives stderr output and an exit while running.
+ * @returns {Promise<ChildProcess>} The running loop.
+ * @throws {Error} When the loop exits or fails to start before its first snapshot.
+ */
+async function streamSnapshots(
+  onSnapshot: (rows: readonly ProcessRow[]) => void,
+  failures: string[],
+): Promise<ChildProcess> {
+  const loop = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', SNAPSHOT_SCRIPT], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+  loop.stderr.on('data', (chunk: Buffer) => failures.push(`process snapshots: ${chunk.toString('utf8').trim()}`));
+  const lines = createInterface({ input: loop.stdout });
+  lines.on('line', (line) => onSnapshot(snapshotRows(line)));
+  await new Promise<void>((resolve, reject) => {
+    lines.once('line', () => resolve());
+    loop.once('error', reject);
+    loop.once('exit', (code) => reject(new Error(`egress watch: process snapshots exited with code ${code} before the first snapshot`)));
+  });
+  loop.on('exit', (code) => {
+    if (!loop.killed) {
+      failures.push(`process snapshots: exited with code ${code}`);
+    }
+  });
+  return loop;
 }
 
 /**
@@ -305,18 +336,8 @@ export async function startEgressWatch(): Promise<EgressWatch> {
       tree.set(row.pid, row.name);
     }
   };
-  grow(await processRows());
+  const snapshots = await streamSnapshots(grow, failures);
   let polling = true;
-  const treeLoop = (async () => {
-    while (polling) {
-      try {
-        grow(await processRows());
-      } catch (err: unknown) {
-        failures.push(`process tree: ${String(err)}`);
-      }
-      await sleep(TREE_PAUSE_MS);
-    }
-  })();
   const pollLoop = (async () => {
     while (polling) {
       try {
@@ -353,7 +374,11 @@ export async function startEgressWatch(): Promise<EgressWatch> {
     },
     async stop(): Promise<void> {
       polling = false;
-      await Promise.all([treeLoop, pollLoop]);
+      await pollLoop;
+      if (snapshots.exitCode === null && snapshots.signalCode === null) {
+        snapshots.kill();
+        await once(snapshots, 'exit');
+      }
       for (const socket of open) {
         socket.destroy();
       }
