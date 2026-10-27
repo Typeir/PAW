@@ -179,6 +179,11 @@ repository. Do not report "unverified" for anything a scratch repository can sho
   It spends tokens: keep the prompt small and `--max-turns` low.
 - **Live model path, no tokens.** `PAW_SDK_LIVE=1 npx vitest run test/model/sdkModel.integration.test.ts`
   in `packages/daemon` runs the real Copilot runtime against a stub model, herd hooks included.
+- **Egress gate.** `PAW_SDK_LIVE=1 npx vitest run test/integration/egress.integration.test.ts` in
+  `packages/daemon` (Windows) proves every model request leaves through PAW egress and no member
+  built-in reaches the network outside it. Run it before changing the `@github/copilot-sdk` pin;
+  a built-in the sweep has not probed fails the run until it gets sweep arguments or a denial in
+  `copilotTools.ts`. Shared stubs live in `test/support/`.
 - **Console.** `--capture` renders a fixed 1280×800 window; an element below the fold does not
   show. Prove those by the jsdom tests and the regression snapshot, and say so.
 
