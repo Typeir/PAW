@@ -2,8 +2,8 @@
  * @fileoverview Live egress suite: PAW's `openSdkModel` on the bundled Copilot
  * runtime, a stub provider, and an egress watch over this process tree. Proves
  * model traffic leaves only through PAW egress, GitHub-API built-ins stay out,
- * and every offered built-in is called once under the watch. Opt-in behind
- * `PAW_SDK_LIVE=1`; Windows only.
+ * required built-ins stay in, and every offered built-in is called once under
+ * the watch. Opt-in behind `PAW_SDK_LIVE=1`; Windows only.
  *
  * @module @paw/daemon/test/integration/egress
  */
@@ -20,6 +20,11 @@ const LIVE = process.env.PAW_SDK_LIVE === '1';
 const KEY = 'sk-stub-egress';
 const SWEEP_MARK = 'EGRESS-SWEEP:';
 const SUBAGENT_MARK = 'EGRESS-SUBAGENT';
+
+/**
+ * Built-ins every member must be offered.
+ */
+const REQUIRED_BUILTINS: readonly string[] = ['web_fetch'];
 
 /**
  * Built-ins whose job is egress, and what they reach. Their egress is not
@@ -192,7 +197,7 @@ describe.skipIf(!LIVE)('egress (live)', () => {
     }
   }, 120_000);
 
-  it('offers members only built-ins the sweep calls', async () => {
+  it('offers members every required built-in, and only built-ins the sweep calls', async () => {
     const provider = await startStubProvider(() => text('done'));
     try {
       await withModel(provider, async (complete) => {
@@ -200,6 +205,10 @@ describe.skipIf(!LIVE)('egress (live)', () => {
       });
       const offered = provider.requests[0]?.offeredTools ?? [];
       expect(offered.length).toBeGreaterThan(0);
+      expect(
+        REQUIRED_BUILTINS.filter((tool) => !offered.includes(tool)),
+        'required built-ins missing from the member grant: lift the denial in copilotTools.ts',
+      ).toEqual([]);
       expect(
         offered.filter((tool) => !(tool in sweepArgs(repo))),
         'built-ins offered to members but never probed: give each sweep arguments, or deny it in copilotTools.ts',
