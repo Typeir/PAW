@@ -1,6 +1,41 @@
 ////
-/// Tasks view: six-column task rows with a convergence dot, and the refusal list (loops in accent).
+/// Tasks view: the backends freshness list with its sync verbs, seven-column task rows with a
+/// convergence dot and a tracker link, and the refusal list (loops in accent).
 ////
+
+.syncverbs {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.synclist {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.syncrow {
+  display: grid;
+  grid-template-columns: 16ch 1fr;
+  gap: 10px;
+  padding: 5px 12px;
+  border-top: 1px solid var(--line-soft);
+
+  .syncname {
+    color: var(--ink);
+  }
+
+  .syncstate {
+    color: var(--ink-dim);
+    overflow-wrap: anywhere;
+  }
+
+  &.off .syncstate {
+    color: var(--warn);
+  }
+}
 
 .tasklist {
   list-style: none;
@@ -12,7 +47,7 @@
 
 .taskrow {
   display: grid;
-  grid-template-columns: 10px 12ch 1fr 16ch 16ch 5ch;
+  grid-template-columns: 10px 12ch 1fr 16ch 16ch 5ch 2ch;
   align-items: center;
   gap: 10px;
   padding-top: 5px;
@@ -56,6 +91,16 @@
   .taskorphan {
     color: var(--warn);
     font-size: 10.5px;
+  }
+
+  .tasklink {
+    color: var(--accent);
+    text-align: center;
+    text-decoration: none;
+
+    &:hover {
+      color: var(--ink);
+    }
   }
 }
 

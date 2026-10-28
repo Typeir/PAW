@@ -22,6 +22,8 @@ const OPENPROJECT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..',
 
 const ENABLED = { modules: ['paw-agile', 'paw-openproject'], connectors: ['openproject'] };
 
+const NOW = (): string => '2026-10-28T16:00:00.000Z';
+
 let root = '';
 
 /**
@@ -93,26 +95,39 @@ afterEach(async () => {
 });
 
 describe('syncRepoBackends', () => {
-  it('syncs nothing when no backend connector is enabled', async () => {
+  it('syncs nothing and logs nothing when no backend connector is enabled', async () => {
     await seed({ modules: ['paw-agile'] });
-    expect(await syncRepoBackends(root, false, serving([]))).toEqual([]);
+    expect(await syncRepoBackends(root, false, serving([]), NOW)).toEqual([]);
+    await expect(read('.paw/backend-sync.json')).rejects.toThrow(/ENOENT/);
   });
 
-  it('passes a plan refusal through', async () => {
+  it('passes a plan refusal through and logs it with the time', async () => {
     await seed({ modules: ['paw-agile'], connectors: ['openproject'] });
-    expect(await syncRepoBackends(root, false, serving([]))).toEqual([
-      {
-        connector: 'openproject',
-        ok: false,
-        reason:
-          'connector "openproject" syncs through module paw-openproject; enable it with paw modules enable paw-openproject',
-      },
-    ]);
+    const refusal = {
+      connector: 'openproject',
+      ok: false,
+      reason:
+        'connector "openproject" syncs through module paw-openproject; enable it with paw modules enable paw-openproject',
+    };
+    expect(await syncRepoBackends(root, false, serving([]), NOW)).toEqual([refusal]);
+    expect(JSON.parse(await read('.paw/backend-sync.json'))).toEqual({
+      openproject: { at: '2026-10-28T16:00:00.000Z', report: refusal },
+    });
+  });
+
+  it('refuses a sync log that does not parse before pulling anything', async () => {
+    await seed(ENABLED);
+    await install();
+    await writeFile(join(root, '.paw', 'backend-sync.json'), '[', 'utf8');
+    await expect(syncRepoBackends(root, false, serving([{ id: 1, subject: 'Epic' }]), NOW)).rejects.toThrow(
+      /^\.paw\/backend-sync\.json is not valid JSON: /,
+    );
+    await expect(read('.paw/tasks.json')).rejects.toThrow(/ENOENT/);
   });
 
   it('refuses a sync module that is enabled but not installed, naming the install verb', async () => {
     await seed(ENABLED);
-    const [report] = await syncRepoBackends(root, false, serving([]));
+    const [report] = await syncRepoBackends(root, false, serving([]), NOW);
     expect(report).toMatchObject({ connector: 'openproject', ok: false });
     expect(report?.ok === false && report.reason).toMatch(
       /^module paw-openproject is enabled but not installed \(.*\); install it with paw modules install paw-openproject$/,
@@ -122,14 +137,14 @@ describe('syncRepoBackends', () => {
   it('refuses a module that exports no backend', async () => {
     await seed(ENABLED);
     await plant('export const backend = { files: null, sync: () => null };\n');
-    const [report] = await syncRepoBackends(root, false, serving([]));
+    const [report] = await syncRepoBackends(root, false, serving([]), NOW);
     expect(report?.ok === false && report.reason).toMatch(/index\.ts exports no backend$/);
   });
 
   it('refuses a module that throws on load, carrying the error', async () => {
     await seed(ENABLED);
     await plant("throw new Error('module exploded');\n");
-    const [report] = await syncRepoBackends(root, false, serving([]));
+    const [report] = await syncRepoBackends(root, false, serving([]), NOW);
     expect(report?.ok === false && report.reason).toMatch(/index\.ts failed to load: Error: module exploded$/);
   });
 
@@ -137,7 +152,7 @@ describe('syncRepoBackends', () => {
     await seed(ENABLED);
     await install();
     await writeFile(join(root, '.paw', 'tasks.json'), '{"tasks":[]}', 'utf8');
-    expect(await syncRepoBackends(root, false, serving([]))).toEqual([
+    expect(await syncRepoBackends(root, false, serving([]), NOW)).toEqual([
       { connector: 'openproject', ok: false, reason: '.paw/openproject.backend.env needs BASE_URL, KEY, PROJECT' },
     ]);
     expect(await read('.paw/tasks.json')).toBe('{"tasks":[]}');
@@ -158,6 +173,7 @@ describe('syncRepoBackends', () => {
         { id: 1, subject: 'Epic' },
         { id: 2, subject: 'Story', parent: 1 },
       ]),
+      NOW,
     );
     expect(reports).toEqual([
       { connector: 'openproject', ok: true, mode: 'full', pulled: 2, removed: 0, refusals: [] },
@@ -171,14 +187,17 @@ describe('syncRepoBackends', () => {
       project: 'demo',
       cursor: '2026-10-28T15:00:00.000Z',
     });
-    const [again] = await syncRepoBackends(root, true, serving([{ id: 1, subject: 'Epic' }]));
+    const [again] = await syncRepoBackends(root, true, serving([{ id: 1, subject: 'Epic' }]), NOW);
     expect(again).toMatchObject({ ok: true, mode: 'full', pulled: 1, removed: 1 });
+    expect(JSON.parse(await read('.paw/backend-sync.json'))).toEqual({
+      openproject: { at: '2026-10-28T16:00:00.000Z', report: again },
+    });
   });
 
   it('throws when a file the module reads exists but cannot be read', async () => {
     await seed(ENABLED);
     await install();
     await mkdir(join(root, '.paw', 'openproject.backend.env'));
-    await expect(syncRepoBackends(root, false, serving([]))).rejects.toThrow(/EISDIR/);
+    await expect(syncRepoBackends(root, false, serving([]), NOW)).rejects.toThrow(/EISDIR/);
   });
 });

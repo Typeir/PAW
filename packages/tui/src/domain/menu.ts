@@ -13,6 +13,7 @@
  */
 
 import {
+  freshnessText,
   memberCount,
   planKey,
   renderBrief,
@@ -21,33 +22,16 @@ import {
   type Violation,
 } from '@paw/core';
 import type {
+  BackendSyncReport,
   ConnectorRosterRow,
   DoctorReport,
   HealthReport,
   ModuleStatus,
-  WorkEdge,
-  WorkTaskRow,
+  RepoTaskView,
 } from '@paw/core';
 
 const GATE_FINDING_CAP = 8;
 const VIOLATION_FILE_CAP = 8;
-
-/**
- * The work graph as the TUI prints it.
- *
- * @interface TaskPanel
- * @property {boolean} enabled - Whether `.paw/config.json` enables the module.
- * @property {readonly WorkTaskRow[]} rows - Rows, parents before children.
- * @property {readonly string[]} refusals - Edges the kernel refused.
- * @property {readonly WorkEdge[]} loops - Ring-closing edges, declared and not walked.
- */
-export interface TaskPanel {
-  readonly enabled: boolean;
-  readonly rows: readonly WorkTaskRow[];
-  readonly refusals: readonly string[];
-  readonly loops: readonly WorkEdge[];
-  readonly dangling: readonly WorkEdge[];
-}
 
 /**
  * Resident daemon self-report, same shape as `daemon.status` return.
@@ -128,6 +112,7 @@ export type ActionId =
   | 'connectors'
   | 'modules'
   | 'tasks'
+  | 'sync'
   | 'quit';
 
 /**
@@ -201,21 +186,27 @@ export const MENU: readonly MenuEntry[] = [
   {
     id: 'tasks',
     label: 'tasks',
-    hint: 'the work graph this repository describes',
+    hint: 'the work graph this repository describes, with each backend’s last sync',
     cli: 'paw tasks',
+  },
+  {
+    id: 'sync',
+    label: 'sync',
+    hint: 'pull every enabled backend connector into .paw/tasks.json',
+    cli: 'paw tasks sync',
   },
   { id: 'quit', label: 'quit', hint: 'leave', cli: null },
 ];
 
 /**
- * The menu for one repository. `tasks` is offered only where the repository
- * has a work model to show.
+ * The menu for one repository. `tasks` and `sync` are offered only where the
+ * repository has a work model to show.
  *
  * @param {boolean} hasTasks - Whether the paw-agile module is enabled and installed here.
  * @returns {MenuEntry[]} Entries, menu order.
  */
 export function menuFor(hasTasks: boolean): MenuEntry[] {
-  return MENU.filter((entry) => hasTasks || entry.id !== 'tasks');
+  return MENU.filter((entry) => hasTasks || (entry.id !== 'tasks' && entry.id !== 'sync'));
 }
 
 /**
@@ -257,24 +248,27 @@ export function moduleLines(roster: readonly ModuleStatus[]): string[] {
 }
 
 /**
- * Render the work graph, one line per task, indented by depth. A module that
- * is not enabled prints the verb that enables it and no rows.
+ * Render the work graph, one line per task, indented by depth and ending in its
+ * tracker link when it has one, under one freshness line per enabled backend. A
+ * module that is not enabled prints the verb that enables it and no rows.
  *
- * @param {TaskPanel} panel - Module state, rows, and refusals.
+ * @param {RepoTaskView} panel - Module state, rows, backends, and refusals.
  * @returns {string[]} Panel lines.
  */
-export function taskLines(panel: TaskPanel): string[] {
+export function taskLines(panel: RepoTaskView): string[] {
   if (!panel.enabled) {
     return ['the paw-agile module is not enabled', '', 'cli: paw modules enable paw-agile'];
   }
   const edges = (ids: readonly string[]): string => (ids.length === 0 ? '—' : ids.join(', '));
   const lines = [
     `${panel.rows.length} tasks`,
+    ...panel.backends.map((backend) => `  ${backend.connector} · ${freshnessText(backend)}`),
     '',
     ...panel.rows.map(
       (row) =>
         `${'  '.repeat(row.depth + 1)}${row.id}${row.orphan ? ' (orphan)' : ''} — ${row.title}` +
-        `  ↑ ${edges(row.parents)}  ↓ ${edges(row.children)}  ${row.rollup}`,
+        `  ↑ ${edges(row.parents)}  ↓ ${edges(row.children)}  ${row.rollup}` +
+        (row.link === null ? '' : `  ↗ ${row.link}`),
     ),
   ];
   if (panel.loops.length > 0) {
@@ -295,6 +289,27 @@ export function taskLines(panel: TaskPanel): string[] {
     return lines;
   }
   return [...lines, '', `refused: ${panel.refusals.length}`, ...panel.refusals.map((w) => `  ${w}`)];
+}
+
+/**
+ * Render one sync round: counts and skipped elements per synced backend, the
+ * reason per refusal, and the verbs that enable a backend when none is.
+ *
+ * @param {readonly BackendSyncReport[]} reports - Reports, catalogue order.
+ * @returns {string[]} Panel lines.
+ */
+export function syncLines(reports: readonly BackendSyncReport[]): string[] {
+  if (reports.length === 0) {
+    return ['no backend connector is enabled', '', 'cli: paw connectors', 'cli: paw connectors enable <id>'];
+  }
+  return reports.flatMap((report) =>
+    report.ok
+      ? [
+          `${report.connector} · ${report.mode}, ${report.pulled} pulled, ${report.removed} removed`,
+          ...report.refusals.map((reason) => `  skipped: ${reason}`),
+        ]
+      : [`${report.connector} · refused: ${report.reason}`],
+  );
 }
 
 /**

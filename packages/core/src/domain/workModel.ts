@@ -34,6 +34,7 @@ export interface WorkEdge {
  * @property {number} depth - Longest distance from a root, for indenting.
  * @property {number} rollup - Summed field over this task and everything below it.
  * @property {boolean} orphan - Whether a parent the document names for it is absent.
+ * @property {Readonly<Record<string, unknown>>} fields - The task's field bag as the document holds it.
  */
 export interface WorkTaskRow {
   readonly id: string;
@@ -43,6 +44,30 @@ export interface WorkTaskRow {
   readonly depth: number;
   readonly rollup: number;
   readonly orphan: boolean;
+  readonly fields: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * One task as a list renders it: the row without its field bag, plus the tracker link.
+ *
+ * @interface TaskListRow
+ * @property {string | null} link - The task's page in its tracker, `http(s)` only; null when it has none.
+ */
+export interface TaskListRow extends Omit<WorkTaskRow, 'fields'> {
+  readonly link: string | null;
+}
+
+/**
+ * A list row from a work-model row. The link is the `url` field when it is an `http:` or `https:`
+ * URL; a row from a module that predates `fields` gets none.
+ *
+ * @param {WorkTaskRow} row - Work-model row.
+ * @returns {TaskListRow} The list row.
+ */
+export function listRow(row: WorkTaskRow): TaskListRow {
+  const { fields, ...rest } = row;
+  const url = (fields as Readonly<Record<string, unknown>> | undefined)?.url;
+  return { ...rest, link: typeof url === 'string' && /^https?:\/\//i.test(url) ? url : null };
 }
 
 /**

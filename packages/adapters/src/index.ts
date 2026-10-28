@@ -11,7 +11,7 @@
 
 export { createNodeConfigDocument } from './config/nodeConfigDocument.js';
 export { createNodeModuleResolver } from './config/nodeModuleResolver.js';
-export { AGILE_MODULE, ROLLUP_FIELD, openRepoWorkModel } from './config/nodeTaskSource.js';
+export { AGILE_MODULE, ROLLUP_FIELD, openRepoWorkModel, readRepoTasks } from './config/nodeTaskSource.js';
 export type { RepoWorkModel } from './config/nodeTaskSource.js';
 export { syncRepoBackends } from './config/nodeBackendSync.js';
 export { createNodeRecentRoutes } from './console/nodeRecentRoutes.js';

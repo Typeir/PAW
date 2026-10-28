@@ -33,12 +33,12 @@
  * @since 5.0.0
  */
 
-import { app, BrowserWindow, ipcMain, session } from 'electron';
+import { app, BrowserWindow, ipcMain, session, shell } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { emptyWorkGraph } from '@paw/core';
-import { ROLLUP_FIELD, createNodeConfigDocument, openRepoWorkModel } from '@paw/adapters';
+import type { RepoTaskView } from '@paw/core';
+import { createNodeConfigDocument, readRepoTasks, syncRepoBackends } from '@paw/adapters';
 import {
   chromiumFingerprint,
   configControl,
@@ -52,6 +52,7 @@ import {
   nodeRuntime,
   pawHome,
   plansControl,
+  tasksControl,
   recordConsoleEndpoint,
   runDaemon,
   type DaemonHandle,
@@ -63,17 +64,43 @@ import {
 const IS_CAPTURE = process.argv.includes('--capture') || process.env.PAW_CAPTURE === '1';
 
 /**
- * Build a task-graph thunk over a repository, for the Tasks view.
- *
- * @param {string} root - Repository to read from.
- * @returns {() => Promise<{ enabled: boolean }>} Reader the daemon calls per request.
+ * Daemon the window shows: its origin and session credential. Set by {@link openOn}.
  */
-function taskSourceFor(root: string): () => Promise<{ enabled: boolean }> {
-  return async () => {
-    const opened = await openRepoWorkModel(root);
-    const view = opened.model?.view(opened.document, ROLLUP_FIELD) ?? emptyWorkGraph();
-    return { enabled: opened.enabled && opened.installed, ...view };
-  };
+let shownDaemon: { readonly origin: string; readonly token: string } | null = null;
+
+/**
+ * Whether the daemon the window shows serves a task row linking to a URL. Asks it over the
+ * pinned session, so only a link PAW rendered from the task document qualifies.
+ *
+ * @param {string} url - URL a window asked to open.
+ * @returns {Promise<boolean>} True when a served row links to it.
+ */
+async function servedTrackerLink(url: string): Promise<boolean> {
+  if (shownDaemon === null) {
+    return false;
+  }
+  const response = await session.defaultSession.fetch(`${shownDaemon.origin}/api/tasks`, {
+    headers: { authorization: `Bearer ${shownDaemon.token}` },
+  });
+  if (!response.ok) {
+    return false;
+  }
+  const view = (await response.json()) as Partial<RepoTaskView>;
+  return (view.rows ?? []).some((row) => row.link === url);
+}
+
+/**
+ * Hand a URL to the system browser when the daemon served it as a tracker link; say why not otherwise.
+ *
+ * @param {string} url - URL a window asked to open.
+ * @returns {Promise<void>} Resolves once opened or refused.
+ */
+async function openTrackerLink(url: string): Promise<void> {
+  if (await servedTrackerLink(url)) {
+    await shell.openExternal(url);
+    return;
+  }
+  process.stderr.write(`refused to open ${url}: not a tracker link this console serves\n`);
 }
 
 /**
@@ -218,12 +245,18 @@ function installWindowControls(): void {
 
 /**
  * Deny every navigation and every new-window request, keeping the shell on the
- * daemon page. Second line of defense behind CSP.
+ * daemon page. Second line of defense behind CSP. A new-window request for a
+ * tracker link the daemon serves opens in the system browser instead.
  *
  * @param {BrowserWindow} win - Window to guard.
  */
 function lockToDaemon(win: BrowserWindow): void {
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    openTrackerLink(url).catch((err: unknown) => {
+      process.stderr.write(`could not open ${url}: ${String(err)}\n`);
+    });
+    return { action: 'deny' };
+  });
   win.webContents.on('will-navigate', (event) => event.preventDefault());
   win.webContents.on('will-redirect', (event) => event.preventDefault());
 }
@@ -325,6 +358,7 @@ let daemon: DaemonHandle | null = null;
  * @returns {Promise<void>} Resolve once the window (or capture) is up.
  */
 async function openOn(url: string, fingerprint: string): Promise<void> {
+  shownDaemon = { origin: new URL(url).origin, token: new URL(url).hash.replace(/^#t=/, '') };
   pinDaemonCertificate(fingerprint, new URL(url).hostname);
   installCsp(new URL(url).origin);
   installWindowControls();
@@ -361,6 +395,7 @@ async function start(): Promise<void> {
         enforcementControl(scope),
         configControl(createNodeConfigDocument(scope)),
         plansControl(scope),
+        tasksControl((full) => syncRepoBackends(scope(), full, fetch, () => new Date().toISOString())),
       );
   daemon = await runDaemon(
     {
@@ -371,7 +406,7 @@ async function start(): Promise<void> {
       logSink: createNodeLogSink(join(launch.root, '.paw', 'daemon.log')),
       providers: () => listProviders(launch.root),
       moduleResolver: createNodeModuleResolver(launch.root),
-      tasks: taskSourceFor(launch.root),
+      tasks: () => readRepoTasks(scope()),
     },
     nodeRuntime(GUI_PAGE),
   );

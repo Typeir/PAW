@@ -12,6 +12,7 @@
  */
 
 import type {
+  BackendFreshness,
   BackendSyncReport,
   ConnectorRosterRow,
   DispatchResult,
@@ -27,7 +28,7 @@ import type {
   SwarmPlan,
   Violation,
 } from '@paw/core';
-import { renderBrief } from '@paw/core';
+import { freshnessText, listRow, renderBrief } from '@paw/core';
 import { ansiPaint } from '@paw/cosmetics';
 
 const GATE_FINDING_CAP = 25;
@@ -215,22 +216,28 @@ export function formatConnectors(roster: readonly ConnectorRosterRow[]): string[
 }
 
 /**
- * Render the work graph, one line per task, indented by depth. Each line names
- * the task's own parents and children, so a task with two parents appears once.
+ * Render the work graph, one line per task, indented by depth, under one line
+ * per enabled backend's last sync. Each line names the task's own parents and
+ * children, so a task with two parents appears once.
  *
- * @param {readonly WorkTaskRow[]} rows - Rows, parents before children.
+ * @param {readonly Omit<WorkTaskRow, 'fields'>[]} rows - Rows, parents before children.
  * @param {readonly string[]} refusals - Edges the kernel refused.
+ * @param {readonly WorkEdge[]} [loops] - Ring-closing edges; default none.
+ * @param {readonly WorkEdge[]} [dangling] - Edges naming an absent task; default none.
+ * @param {readonly BackendFreshness[]} [backends] - Enabled backends; default none.
  * @returns {string[]} Terminal lines.
  */
 export function formatTasks(
-  rows: readonly WorkTaskRow[],
+  rows: readonly Omit<WorkTaskRow, 'fields'>[],
   refusals: readonly string[],
   loops: readonly WorkEdge[] = [],
   dangling: readonly WorkEdge[] = [],
+  backends: readonly BackendFreshness[] = [],
 ): string[] {
   const edges = (ids: readonly string[]): string => (ids.length === 0 ? '—' : ids.join(', '));
   const lines = [
     `tasks: ${rows.length} in the graph`,
+    ...backends.map((backend) => `backend ${backend.connector} · ${freshnessText(backend)}`),
     ...rows.map(
       (row) =>
         `${'  '.repeat(row.depth + 1)}${row.id}${row.orphan ? ' (orphan)' : ''}  ${row.title}` +
@@ -297,6 +304,7 @@ export function formatTaskDetail(detail: WorkTaskDetail, related: boolean): stri
   const lines = [
     `task "${row.id}" — ${row.title}${row.orphan ? ' (orphan)' : ''}`,
     `  depth ${row.depth} · rollup ${row.rollup}`,
+    `  link      ${listRow(row).link ?? '—'}`,
     `  parents   ${edges(row.parents)}`,
     `  children  ${edges(row.children)}`,
     `  loops     ${asText(detail.loops)}`,

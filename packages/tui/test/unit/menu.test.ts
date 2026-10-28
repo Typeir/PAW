@@ -26,6 +26,7 @@ import {
   menuFor,
   moduleLines,
   planLines,
+  syncLines,
   taskLines,
 } from '../../src/domain/menu.js';
 
@@ -84,16 +85,22 @@ describe('MENU', () => {
       'connectors',
       'modules',
       'tasks',
+      'sync',
       'quit',
     ]);
   });
 });
 
 describe('menuFor', () => {
-  it('offers tasks only where the repository has a work model', () => {
-    expect(menuFor(true).map((entry) => entry.id)).toContain('tasks');
+  it('offers tasks and sync only where the repository has a work model', () => {
+    expect(menuFor(true).map((entry) => entry.id)).toEqual(expect.arrayContaining(['tasks', 'sync']));
     expect(menuFor(false).map((entry) => entry.id)).not.toContain('tasks');
-    expect(menuFor(false)).toHaveLength(MENU.length - 1);
+    expect(menuFor(false).map((entry) => entry.id)).not.toContain('sync');
+    expect(menuFor(false)).toHaveLength(MENU.length - 2);
+  });
+
+  it('teaches paw tasks sync for the sync action', () => {
+    expect(MENU.find((entry) => entry.id === 'sync')?.cli).toBe('paw tasks sync');
   });
 });
 
@@ -147,31 +154,43 @@ describe('moduleLines', () => {
 
 describe('taskLines', () => {
   const rows = [
-    { id: 'a', title: 'Checkout', parents: [], children: ['b'], depth: 0, rollup: 3, orphan: false },
-    { id: 'b', title: 'Card form', parents: ['a'], children: [], depth: 1, rollup: 1, orphan: false },
+    { id: 'a', title: 'Checkout', parents: [], children: ['b'], depth: 0, rollup: 3, orphan: false, link: null },
+    { id: 'b', title: 'Card form', parents: ['a'], children: [], depth: 1, rollup: 1, orphan: false, link: 'https://tracker.test/wp/2' },
   ];
 
   it('names the verb that enables the module when it is off', () => {
-    const lines = taskLines({ enabled: false, rows: [], refusals: [], loops: [], dangling: [] });
+    const lines = taskLines({ enabled: false, rows: [], refusals: [], loops: [], dangling: [], backends: [] });
     expect(lines[0]).toBe('the paw-agile module is not enabled');
     expect(lines).toContain('cli: paw modules enable paw-agile');
   });
 
-  it('indents by depth and names each task’s own edges', () => {
-    const lines = taskLines({ enabled: true, rows, refusals: [], loops: [], dangling: [] });
+  it('indents by depth, names each task’s own edges, and ends a linked row with its tracker link', () => {
+    const lines = taskLines({ enabled: true, rows, refusals: [], loops: [], dangling: [], backends: [] });
     expect(lines[0]).toBe('2 tasks');
     expect(lines[2]).toBe('  a — Checkout  ↑ —  ↓ b  3');
-    expect(lines[3]).toBe('    b — Card form  ↑ a  ↓ —  1');
+    expect(lines[3]).toBe('    b — Card form  ↑ a  ↓ —  1  ↗ https://tracker.test/wp/2');
+  });
+
+  it('prints one freshness line per enabled backend under the count', () => {
+    const lines = taskLines({
+      enabled: true,
+      rows,
+      refusals: [],
+      loops: [],
+      dangling: [],
+      backends: [{ connector: 'openproject', ready: true, reason: null, last: null }],
+    });
+    expect(lines.slice(0, 3)).toEqual(['2 tasks', '  openproject · never synced', '']);
   });
 
   it('appends the refused edges when there are any', () => {
-    const lines = taskLines({ enabled: true, rows, refusals: ['unknown task "ghost"'], loops: [], dangling: [] });
+    const lines = taskLines({ enabled: true, rows, refusals: ['unknown task "ghost"'], loops: [], dangling: [], backends: [] });
     expect(lines).toContain('refused: 1');
     expect(lines).toContain('  unknown task "ghost"');
   });
 
   it('lists ring-closing edges apart from refusals', () => {
-    const lines = taskLines({ enabled: true, rows, refusals: [], loops: [{ parent: 'b', child: 'a' }], dangling: [] });
+    const lines = taskLines({ enabled: true, rows, refusals: [], loops: [{ parent: 'b', child: 'a' }], dangling: [], backends: [] });
     expect(lines).toContain('loops: 1 declared, not walked');
     expect(lines).toContain('  b → a');
   });
@@ -184,10 +203,35 @@ describe('taskLines', () => {
       refusals: [],
       loops: [],
       dangling: [{ parent: 'ghost', child: 'a' }],
+      backends: [],
     });
     expect(lines[2]).toBe('  a (orphan) — Checkout  ↑ —  ↓ b  3');
     expect(lines).toContain('dangling: 1 naming an absent task');
     expect(lines).toContain('  ghost → a');
+  });
+});
+
+describe('syncLines', () => {
+  it('names the verbs that enable a backend when none is', () => {
+    expect(syncLines([])).toEqual([
+      'no backend connector is enabled',
+      '',
+      'cli: paw connectors',
+      'cli: paw connectors enable <id>',
+    ]);
+  });
+
+  it('prints counts and skipped elements per sync, and the reason per refusal', () => {
+    expect(
+      syncLines([
+        { connector: 'openproject', ok: true, mode: 'full', pulled: 5, removed: 1, refusals: ['bad element'] },
+        { connector: 'rally', ok: false, reason: 'connector "rally" has no sync module in this build' },
+      ]),
+    ).toEqual([
+      'openproject · full, 5 pulled, 1 removed',
+      '  skipped: bad element',
+      'rally · refused: connector "rally" has no sync module in this build',
+    ]);
   });
 });
 

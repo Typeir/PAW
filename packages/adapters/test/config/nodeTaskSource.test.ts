@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AGILE_MODULE, ROLLUP_FIELD, openRepoWorkModel } from '../../src/config/nodeTaskSource.js';
+import { AGILE_MODULE, ROLLUP_FIELD, openRepoWorkModel, readRepoTasks } from '../../src/config/nodeTaskSource.js';
 
 const AGILE = resolve(dirname(fileURLToPath(import.meta.url)), '../../..', 'agile');
 
@@ -154,3 +154,46 @@ async function plant(source: string): Promise<void> {
   await writeFile(join(dir, 'package.json'), '{"name":"planted"}', 'utf8');
   await writeFile(join(dir, 'src', 'index.ts'), source, 'utf8');
 }
+
+describe('readRepoTasks', () => {
+  it('shows no rows when the module is off, and lists enabled backends anyway', async () => {
+    await seed({ connectors: ['openproject'], modules: ['paw-openproject'] });
+    expect(await readRepoTasks(root)).toEqual({
+      enabled: false,
+      rows: [],
+      refusals: [],
+      loops: [],
+      dangling: [],
+      backends: [{ connector: 'openproject', ready: true, reason: null, last: null }],
+    });
+  });
+
+  it('lists rows with tracker links and each backend with its last sync', async () => {
+    await seed(
+      { modules: [AGILE_MODULE, 'paw-openproject'], connectors: ['openproject'] },
+      JSON.stringify({
+        tasks: [
+          { id: 'op-1', title: 'Epic', fields: { url: 'http://op.test/work_packages/1' } },
+          { id: 'op-2', title: 'Story', fields: { points: 3 } },
+        ],
+        edges: [['op-1', 'op-2']],
+      }),
+    );
+    expect(await install()).toBe(true);
+    const report = { connector: 'openproject', ok: true, mode: 'full', pulled: 2, removed: 0, refusals: [] };
+    await writeFile(
+      join(root, '.paw', 'backend-sync.json'),
+      JSON.stringify({ openproject: { at: '2026-10-28T16:00:00.000Z', report } }),
+      'utf8',
+    );
+    const shown = await readRepoTasks(root);
+    expect(shown.enabled).toBe(true);
+    expect(shown.rows.map((row) => [row.id, row.link, row.rollup])).toEqual([
+      ['op-1', 'http://op.test/work_packages/1', 3],
+      ['op-2', null, 3],
+    ]);
+    expect(shown.backends).toEqual([
+      { connector: 'openproject', ready: true, reason: null, last: { at: '2026-10-28T16:00:00.000Z', report } },
+    ]);
+  });
+});

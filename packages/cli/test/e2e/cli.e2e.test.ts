@@ -404,6 +404,9 @@ describe('cli tasks sync (e2e)', () => {
       const listed = await runCli('tasks', `--root=${root}`);
       expect(listed.code).toBe(0);
       expect(listed.stdout).toContain('tasks: 2 in the graph');
+      expect(listed.stdout).toMatch(/backend openproject · synced \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC · full · 2 pulled, 0 removed/);
+      const detail = await runCli('tasks', 'op-2', `--root=${root}`);
+      expect(detail.stdout).toContain(`  link      ${server.origin}/work_packages/2`);
       expect(listed.stdout).toMatch(/op-1 {2}Checkout epic {2}↑ — {2}↓ op-2 {2}5/);
     } finally {
       server.close();
