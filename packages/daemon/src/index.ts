@@ -67,6 +67,7 @@ export type { EnforcementControlSeams } from './application/enforcementControl.j
 export { configControl } from './application/configControl.js';
 export { plansControl } from './application/plansControl.js';
 export type { PlansControlSeams } from './application/plansControl.js';
+export { tasksControl } from './application/tasksControl.js';
 export {
   consoleEndpointPath,
   consoleEndpointsIn,

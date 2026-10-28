@@ -410,7 +410,7 @@ describe('runDaemon', () => {
     expect(roster[0]).toMatchObject({
       id: 'paw-agile',
       resolved: true,
-      requiredBy: ['taiga', 'rally'],
+      requiredBy: ['taiga', 'rally', 'openproject'],
     });
 
     const bare = makeRig();

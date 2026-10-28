@@ -342,3 +342,57 @@ export interface WorkModelPort {
   view(document: string, field: string): WorkGraphView;
   detail(document: string, id: string, field: string): WorkTaskDetail | null;
 }
+
+/**
+ * A GET-only fetch a backend module reaches its tracker with; the global `fetch` satisfies it.
+ */
+export type BackendFetch = (
+  url: string,
+  init: { readonly headers: Readonly<Record<string, string>> },
+) => Promise<{ readonly status: number; text(): Promise<string> }>;
+
+/**
+ * Inputs to one backend sync: file texts the caller read, blank for a missing file.
+ *
+ * @interface BackendSyncInput
+ * @property {string} env - Backend env file text.
+ * @property {string} state - Sync sidecar text.
+ * @property {string} document - Task document text.
+ * @property {boolean} full - Force a full sweep.
+ * @property {BackendFetch} fetch - Fetch to reach the tracker with.
+ */
+export interface BackendSyncInput {
+  readonly env: string;
+  readonly state: string;
+  readonly document: string;
+  readonly full: boolean;
+  readonly fetch: BackendFetch;
+}
+
+/**
+ * Outcome of one backend sync: texts for the caller to write, or why nothing is written.
+ */
+export type BackendSyncResult =
+  | {
+      readonly ok: true;
+      readonly document: string;
+      readonly state: string;
+      readonly mode: 'full' | 'delta';
+      readonly pulled: number;
+      readonly removed: number;
+      readonly refusals: readonly string[];
+    }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * What a backend module supplies: the repository-relative files it reads and writes, and one sync
+ * over their texts. The module holds no I/O beyond the fetch it is given.
+ *
+ * @interface BackendModulePort
+ * @property {{ env: string; state: string; tasks: string }} files - Env, sidecar, and task document paths.
+ * @property {(input: BackendSyncInput) => Promise<BackendSyncResult>} sync - One sync.
+ */
+export interface BackendModulePort {
+  readonly files: { readonly env: string; readonly state: string; readonly tasks: string };
+  sync(input: BackendSyncInput): Promise<BackendSyncResult>;
+}

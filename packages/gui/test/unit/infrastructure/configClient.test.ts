@@ -15,6 +15,7 @@ import {
   CONNECTORS_URL,
   MODULES_URL,
   PROVIDERS_URL,
+  TASKS_SYNC_URL,
   TASKS_URL,
   createConfigClient,
 } from '../../../src/infrastructure/configClient.js';
@@ -213,6 +214,31 @@ describe('createConfigClient', () => {
       await expect(
         createConfigClient(respond({ ok: false, status: 404 })).tasks(),
       ).rejects.toThrow('responded 404');
+    });
+  });
+
+  describe('syncTasks', () => {
+    it('POSTs the sweep flag and returns the reports', async () => {
+      const reports = [{ connector: 'openproject', ok: true, mode: 'full', pulled: 2, removed: 0, refusals: [] }];
+      const fetchFn = respond({ ok: true, json: async () => ({ ok: true, reports }) });
+      await expect(createConfigClient(fetchFn).syncTasks(true)).resolves.toEqual({ ok: true, reports });
+      expect(fetchFn).toHaveBeenCalledWith(TASKS_SYNC_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ full: true }),
+      });
+    });
+
+    it('returns the daemon refusal, read as a write refusal is', async () => {
+      const busy = respond({
+        ok: false,
+        status: 409,
+        json: async () => ({ ok: false, reason: 'a sync is already running; wait for it to finish' }),
+      });
+      await expect(createConfigClient(busy).syncTasks(false)).resolves.toEqual({
+        ok: false,
+        reason: 'a sync is already running; wait for it to finish',
+      });
     });
   });
 

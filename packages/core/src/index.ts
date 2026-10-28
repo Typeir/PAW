@@ -227,12 +227,13 @@ export type {
   ConnectorRosterRow,
 } from './domain/connectors.js';
 
-export { emptyWorkGraph } from './domain/workModel.js';
+export { emptyWorkGraph, listRow } from './domain/workModel.js';
 export type {
   WorkEdge,
   WorkGraphView,
   WorkTaskDetail,
   WorkTaskRow,
+  TaskListRow,
 } from './domain/workModel.js';
 
 export {
@@ -243,6 +244,27 @@ export {
   moduleRoster,
 } from './domain/modules.js';
 export type { ModuleEntry, ModuleRosterRow } from './domain/modules.js';
+
+export {
+  BACKEND_SYNC,
+  SYNC_LOG_FILE,
+  backendFreshness,
+  freshnessText,
+  backendSyncPlan,
+  parseSyncLog,
+  recordSyncs,
+} from './domain/backendSync.js';
+export type {
+  BackendFreshness,
+  BackendRoute,
+  BackendSyncReport,
+  BackendSyncStep,
+  LastSync,
+  SyncLogParse,
+} from './domain/backendSync.js';
+
+export { repoTaskView } from './application/repoTasks.js';
+export type { RepoTaskInput, RepoTaskView } from './application/repoTasks.js';
 
 export { resolveModules } from './application/moduleStatus.js';
 export type { ModuleStatus } from './application/moduleStatus.js';
@@ -329,6 +351,10 @@ export type {
   SecretPort,
   StorePort,
   WorkModelPort,
+  BackendFetch,
+  BackendModulePort,
+  BackendSyncInput,
+  BackendSyncResult,
 } from './ports/index.js';
 
 export type {

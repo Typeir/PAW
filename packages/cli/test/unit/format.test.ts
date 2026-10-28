@@ -32,6 +32,7 @@ import {
   formatProof,
   formatPruned,
   formatRoleRows,
+  formatSyncReports,
   formatTaskDetail,
   formatTasks,
   formatViolations,
@@ -110,8 +111,8 @@ describe('formatConnectors', () => {
 
 describe('formatTasks', () => {
   const rows = [
-    { id: 'a', title: 'Checkout', parents: [], children: ['b'], depth: 0, rollup: 3, orphan: false },
-    { id: 'b', title: 'Card form', parents: ['a'], children: [], depth: 1, rollup: 1, orphan: false },
+    { id: 'a', title: 'Checkout', parents: [], children: ['b'], depth: 0, rollup: 3, orphan: false, fields: {} },
+    { id: 'b', title: 'Card form', parents: ['a'], children: [], depth: 1, rollup: 1, orphan: false, fields: {} },
   ];
 
   it('indents by depth and names each task’s own parents and children', () => {
@@ -142,16 +143,50 @@ describe('formatTasks', () => {
     expect(lines[2]).toBe('dangling: 1 naming an absent task');
     expect(lines[3]).toBe('  ghost → a');
   });
+
+  it('prints one line per enabled backend under the count', () => {
+    const lines = formatTasks(rows, [], [], [], [
+      { connector: 'openproject', ready: true, reason: null, last: null },
+      { connector: 'rally', ready: false, reason: 'no sync module', last: null },
+    ]);
+    expect(lines.slice(0, 4)).toEqual([
+      'tasks: 2 in the graph',
+      'backend openproject · never synced',
+      'backend rally · cannot sync: no sync module',
+      '  a  Checkout  ↑ —  ↓ b  3',
+    ]);
+  });
+});
+
+describe('formatSyncReports', () => {
+  it('says how to enable a backend when none is', () => {
+    expect(formatSyncReports([])).toEqual([
+      'tasks sync: no backend connector is enabled; paw connectors lists them, paw connectors enable <id> turns one on',
+    ]);
+  });
+
+  it('renders counts and skipped elements for a sync, and the reason for a refusal', () => {
+    expect(
+      formatSyncReports([
+        { connector: 'openproject', ok: true, mode: 'delta', pulled: 2, removed: 0, refusals: ['bad element'] },
+        { connector: 'rally', ok: false, reason: 'connector "rally" has no sync module in this build' },
+      ]),
+    ).toEqual([
+      'tasks sync: openproject delta, 2 pulled, 0 removed',
+      '  skipped: bad element',
+      'tasks sync: rally refused: connector "rally" has no sync module in this build',
+    ]);
+  });
 });
 
 describe('formatTaskDetail', () => {
   const detail = {
-    row: { id: 'd', title: 'Validator', parents: ['b', 'c'], children: ['f'], depth: 2, rollup: 2, orphan: false },
+    row: { id: 'd', title: 'Validator', parents: ['b', 'c'], children: ['f'], depth: 2, rollup: 2, orphan: false, fields: { url: 'https://tracker.test/work_packages/4' } },
     ancestors: [
-      { id: 'b', title: 'Card form', parents: ['a'], children: ['d'], depth: 1, rollup: 3, orphan: false },
+      { id: 'b', title: 'Card form', parents: ['a'], children: ['d'], depth: 1, rollup: 3, orphan: false, fields: {} },
     ],
     descendants: [
-      { id: 'f', title: 'E2E test', parents: ['d'], children: [], depth: 3, rollup: 1, orphan: true },
+      { id: 'f', title: 'E2E test', parents: ['d'], children: [], depth: 3, rollup: 1, orphan: true, fields: {} },
     ],
     loops: [{ parent: 'f', child: 'd' }],
     dangling: [{ parent: 'ghost', child: 'f' }],
@@ -161,6 +196,7 @@ describe('formatTaskDetail', () => {
     expect(formatTaskDetail(detail, false)).toEqual([
       'task "d" — Validator',
       '  depth 2 · rollup 2',
+      '  link      https://tracker.test/work_packages/4',
       '  parents   b, c',
       '  children  f',
       '  loops     f → d',
@@ -178,23 +214,24 @@ describe('formatTaskDetail', () => {
 
   it('renders an em dash for a task with no edges either way', () => {
     const lone = {
-      row: { id: 'x', title: 'Lone', parents: [], children: [], depth: 0, rollup: 0, orphan: false },
+      row: { id: 'x', title: 'Lone', parents: [], children: [], depth: 0, rollup: 0, orphan: false, fields: {} },
       ancestors: [],
       descendants: [],
       loops: [],
       dangling: [],
     };
     const lines = formatTaskDetail(lone, true);
-    expect(lines[2]).toBe('  parents   —');
-    expect(lines[3]).toBe('  children  —');
-    expect(lines[4]).toBe('  loops     —');
-    expect(lines[5]).toBe('  dangling  —');
+    expect(lines[2]).toBe('  link      —');
+    expect(lines[3]).toBe('  parents   —');
+    expect(lines[4]).toBe('  children  —');
+    expect(lines[5]).toBe('  loops     —');
+    expect(lines[6]).toBe('  dangling  —');
     expect(lines).toContain('ancestors: 0');
   });
 
   it('marks an orphaned task in its heading', () => {
     const orphaned = {
-      row: { id: 'x', title: 'Lone', parents: [], children: [], depth: 0, rollup: 0, orphan: true },
+      row: { id: 'x', title: 'Lone', parents: [], children: [], depth: 0, rollup: 0, orphan: true, fields: {} },
       ancestors: [],
       descendants: [],
       loops: [],

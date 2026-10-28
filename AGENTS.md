@@ -179,6 +179,16 @@ repository. Do not report "unverified" for anything a scratch repository can sho
   It spends tokens: keep the prompt small and `--max-turns` low.
 - **Live model path, no tokens.** `PAW_SDK_LIVE=1 npx vitest run test/model/sdkModel.integration.test.ts`
   in `packages/daemon` runs the real Copilot runtime against a stub model, herd hooks included.
+- **Egress gate.** `PAW_SDK_LIVE=1 npx vitest run test/integration/egress.integration.test.ts` in
+  `packages/daemon` (Windows) proves every model request leaves through PAW egress and no member
+  built-in reaches the network outside it. Run it before changing the `@github/copilot-sdk` pin;
+  a built-in the sweep has not probed fails the run until it gets sweep arguments or a denial in
+  `copilotTools.ts`. Shared stubs live in `test/support/`.
+- **Backend against a real tracker.** `npm run test:live` in `packages/openproject` runs the module
+  against OpenProject from `test/live/compose.yaml` (Docker; `127.0.0.1:18081`; first boot about
+  four minutes; the container is left running). Each run seeds and deletes its own projects. No
+  other gate runs it. For the CLI path, `paw tasks sync` in a scratch repository whose
+  `.paw/openproject.backend.env` points at that instance.
 - **Console.** `--capture` renders a fixed 1280×800 window; an element below the fold does not
   show. Prove those by the jsdom tests and the regression snapshot, and say so.
 
@@ -214,15 +224,20 @@ local git operations.
 
 ## In flight — not canon
 
-`packages/agile` and the **modules** layer (a federated dependency that backend connectors require)
-are new and under operator-directed development. They work and are covered, but their contracts still
-move: do not treat `ModuleResolverPort`, `WorkModelPort`, or the `paw-agile` task graph as stable API,
+`packages/agile`, `packages/openproject`, and the **modules** layer (a federated dependency that
+backend connectors require) are new and under operator-directed development. They work and are
+covered, but their contracts still move: do not treat `ModuleResolverPort`, `WorkModelPort`,
+`BackendModulePort`, `BACKEND_SYNC`, or the `paw-agile` task graph as stable API,
 and do not read `docs/15-connectors-and-the-local-clone.md` as shipped behaviour — it is an operator
 draft that predates the module layer.
 
 - `packages/agile` is the source of `github.com/Typeir/paw-agile`. Publish a change with
   `git subtree push --prefix=packages/agile https://github.com/Typeir/paw-agile.git main`; never
   edit that repository directly.
+- `packages/openproject` is the first backend module and is the source of
+  `github.com/Typeir/paw-openproject`, which is not published yet; publishing it needs the operator.
+  It owns `op-<id>` tasks in `.paw/tasks.json`; its sidecar `.paw/openproject.sync.json` holds the
+  delta cursor.
 - A module's `skills/<name>/` folders are agent skills. `paw modules install` copies them into the
   consuming repository's `.claude/skills/` and keeps them out of its git history.
 - Backend adapters (Rally, Taiga) are written from public documentation only. Never commit a

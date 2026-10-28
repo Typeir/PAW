@@ -145,10 +145,16 @@ export function enableConnector(config: ConfigDocument, id: string): ConfigEdit 
   }
   const enabledModules = enabledModuleIds(config);
   const missing = entry.requires.filter((moduleId) => !enabledModules.includes(moduleId));
-  if (missing.length > 0) {
+  if (missing.length === 1) {
     return {
       ok: false,
-      reason: `connector "${id}" requires module ${missing.join(', ')}; enable it with paw modules enable ${missing.join(' ')}`,
+      reason: `connector "${id}" requires module ${missing[0]}; enable it with paw modules enable ${missing[0]}`,
+    };
+  }
+  if (missing.length > 1) {
+    return {
+      ok: false,
+      reason: `connector "${id}" requires modules ${missing.join(', ')}; enable them with ${missing.map((moduleId) => `paw modules enable ${moduleId}`).join(', then ')}`,
     };
   }
   const current = enabledConnectorIds(config);

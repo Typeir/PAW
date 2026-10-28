@@ -22,7 +22,6 @@ import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import {
   applyInit,
-  emptyWorkGraph,
   dispatchSwarm,
   pawHome,
   type InitMode,
@@ -30,13 +29,13 @@ import {
   type SwarmPlan,
 } from '@paw/core';
 import {
-  ROLLUP_FIELD,
   createNodeConfigDocument,
   createNodeFileReader,
   createNodeFs,
   createNodeModuleResolver,
   createNodeRecentRoutes,
-  openRepoWorkModel,
+  readRepoTasks,
+  syncRepoBackends,
 } from '@paw/adapters';
 import {
   configControl,
@@ -53,6 +52,7 @@ import {
   meterPort,
   nodeRuntime,
   plansControl,
+  tasksControl,
   probeConsoleEndpoint,
   readConsoleEndpoint,
   recordConsoleEndpoint,
@@ -447,6 +447,7 @@ export async function runUi(
         enforcementControl(scope),
         configControl(createNodeConfigDocument(scope)),
         plansControl(scope),
+        tasksControl((full) => syncRepoBackends(scope(), full, fetch, () => new Date().toISOString())),
       );
   const daemon = await runDaemon(
     {
@@ -459,11 +460,7 @@ export async function runUi(
       logSink: createNodeLogSink(resolve(root, '.paw', 'daemon.log')),
       providers: () => listProviders(scope()),
       moduleResolver: createNodeModuleResolver(root),
-      tasks: async () => {
-        const opened = await openRepoWorkModel(root);
-        const view = opened.model?.view(opened.document, ROLLUP_FIELD) ?? emptyWorkGraph();
-        return { enabled: opened.enabled && opened.installed, ...view };
-      },
+      tasks: () => readRepoTasks(scope()),
       onAttach: (path, mode) => {
         void approveAttach(path, mode, () => handle);
       },
@@ -509,7 +506,7 @@ export async function runUi(
       ? `releasing the herd (${live ? 'live' : 'fake'} model)${live && !gates ? ` · ${GATES_OFF_NOTICE}` : ''} · the console fills in as it lands`
       : 'no run released · pass --run to dispatch',
     control
-      ? 'control enabled · the console may edit bindings, prune violations, and stop enforcement · pass --read-only to forbid it'
+      ? 'control enabled · the console may edit bindings, prune violations, sync tasks, and stop enforcement · pass --read-only to forbid it'
       : 'read-only · the console cannot write · drop --read-only to let it',
     args.flags.has('headless')
       ? 'headless · open that URL for the console yourself · ctrl-c to stop'

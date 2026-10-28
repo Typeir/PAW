@@ -12,8 +12,17 @@ import { describe, expect, it } from 'vitest';
 import { sdkHooksConnector as c } from '../src/sdkHooks.js';
 
 describe('sdkHooksConnector.readOnlyTools', () => {
-  it('declares the SDK built-ins that only read', () => {
-    expect(c.readOnlyTools).toEqual(['view', 'grep']);
+  it('declares the SDK built-ins that write no file', () => {
+    expect(c.readOnlyTools).toEqual([
+      'view',
+      'grep',
+      'glob',
+      'web_fetch',
+      'list_powershell',
+      'read_powershell',
+      'list_agents',
+      'read_agent',
+    ]);
   });
 });
 

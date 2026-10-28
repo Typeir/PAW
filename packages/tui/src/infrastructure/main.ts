@@ -28,7 +28,6 @@ import {
   buildRegistry,
   clearBinding,
   connectorRoster,
-  emptyWorkGraph,
   dispatchSwarm,
   memberCount,
   planKey,
@@ -45,12 +44,13 @@ import {
 } from '@paw/core';
 import { ansiPaint } from '@paw/cosmetics';
 import {
-  ROLLUP_FIELD,
   createNodeConfigDocument,
   createNodeFileReader,
   createNodeGateRunner,
   createNodeModuleResolver,
   openRepoWorkModel,
+  readRepoTasks,
+  syncRepoBackends,
 } from '@paw/adapters';
 import { rpcCall, socketPath, tokenPath } from '@paw/daemon';
 import {
@@ -63,6 +63,7 @@ import {
   herdLines,
   moduleLines,
   planLines,
+  syncLines,
   taskLines,
   type ActionId,
   type ConfigSnapshot,
@@ -342,9 +343,24 @@ async function runAction(
     return moduleLines(await resolveModules(config, createNodeModuleResolver(root)));
   }
   if (id === 'tasks') {
-    const opened = await openRepoWorkModel(root);
-    const view = opened.model?.view(opened.document, ROLLUP_FIELD) ?? emptyWorkGraph();
-    return taskLines({ enabled: opened.enabled && opened.installed, ...view });
+    return taskLines(await readRepoTasks(root));
+  }
+  if (id === 'sync') {
+    let full = false;
+    if (interactive) {
+      const picked = await select({
+        message: 'sync how?',
+        options: [
+          { value: 'delta', label: 'delta', hint: 'cli: paw tasks sync' },
+          { value: 'full', label: 'full sweep', hint: 'cli: paw tasks sync --full' },
+        ] as const,
+      });
+      if (isCancel(picked)) {
+        return [];
+      }
+      full = picked === 'full';
+    }
+    return syncLines(await syncRepoBackends(root, full, fetch, () => new Date().toISOString()));
   }
   // config
   const doc = createNodeConfigDocument(root);

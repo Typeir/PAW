@@ -1,0 +1,19 @@
+# PAW OpenProject live instance: `npm run test:live` starts it and leaves it running.
+# Loopback only, port 18081. Test data only; SECRET_KEY_BASE is a fixed test value.
+name: paw-openproject-live
+services:
+  openproject:
+    image: openproject/openproject:17
+    ports:
+      - "127.0.0.1:18081:80"
+    environment:
+      SECRET_KEY_BASE: paw-openproject-live-test-instance
+      OPENPROJECT_HOST__NAME: localhost:18081
+      OPENPROJECT_HTTPS: "false"
+      OPENPROJECT_DEFAULT__LANGUAGE: en
+    volumes:
+      - pgdata:/var/openproject/pgdata
+      - assets:/var/openproject/assets
+volumes:
+  pgdata:
+  assets:

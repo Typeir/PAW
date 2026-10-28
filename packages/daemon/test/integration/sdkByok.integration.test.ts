@@ -7,7 +7,9 @@
  *
  * Version guard always-on, deterministic. Read installed package version.
  * Fail if the pin downgrades or a caret allows it to walk. The pin assertion
- * fails the build below `0.2.2`.
+ * fails the build below `0.2.2`. The runtime the SDK spawns ships as a
+ * sibling `@github/copilot-sdk-<platform>` package; it must carry the pinned
+ * version, and the SDK must not depend on the floating `@github/copilot` CLI.
  *
  * Two opt-in live tests behind `PAW_SDK_LIVE=1`. They spawn the ~159 MB
  * Copilot runtime binary. Need no API key, spend no credit. Local stub
@@ -20,16 +22,16 @@
  * @module @paw/daemon/test/integration/sdkByok
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { startStubProvider, text, toolCall } from '../support/stubProvider.js';
 
 const require = createRequire(import.meta.url);
-const PINNED = '1.0.8';
+const PINNED = '1.0.27';
 const LIVE = process.env.PAW_SDK_LIVE === '1';
 
 /**
@@ -52,22 +54,60 @@ interface SdkModule {
 }
 
 /**
- * Resolve installed `@github/copilot-sdk` version. Package does not expose
+ * Installed package manifest fields the version guard reads.
+ *
+ * @interface InstalledManifest
+ * @property {string} root - Package directory.
+ * @property {string} version - Installed version.
+ * @property {Record<string, string>} dependencies - Declared runtime dependencies.
+ */
+interface InstalledManifest {
+  readonly root: string;
+  readonly version: string;
+  readonly dependencies: Record<string, string>;
+}
+
+/**
+ * Resolve installed `@github/copilot-sdk` manifest. Package does not expose
  * its own `./package.json` through the exports map.
  *
- * @returns {string} The installed version string.
+ * @returns {InstalledManifest} The SDK's directory, version, and dependencies.
+ * @throws {Error} When no `@github/copilot-sdk` manifest sits above the resolved entry.
  */
-function installedSdkVersion(): string {
+function installedSdk(): InstalledManifest {
   let dir = dirname(require.resolve('@github/copilot-sdk'));
   for (let depth = 0; depth < 8; depth += 1) {
     const manifest = join(dir, 'package.json');
     if (existsSync(manifest)) {
-      const parsed = JSON.parse(readFileSync(manifest, 'utf8')) as { name?: string; version?: string };
-      if (parsed.name === '@github/copilot-sdk' && parsed.version) return parsed.version;
+      const parsed = JSON.parse(readFileSync(manifest, 'utf8')) as {
+        name?: string;
+        version?: string;
+        dependencies?: Record<string, string>;
+      };
+      if (parsed.name === '@github/copilot-sdk' && parsed.version) {
+        return { root: dir, version: parsed.version, dependencies: parsed.dependencies ?? {} };
+      }
     }
     dir = dirname(dir);
   }
   throw new Error('could not locate @github/copilot-sdk package.json');
+}
+
+/**
+ * Versions of the installed `@github/copilot-sdk-<platform>` runtime packages
+ * beside the SDK.
+ *
+ * @param {string} sdkRoot - The SDK's package directory.
+ * @returns {Record<string, string>} Package name to installed version; empty when none is installed.
+ */
+function installedRuntimes(sdkRoot: string): Record<string, string> {
+  const scope = dirname(sdkRoot);
+  const runtimes: Record<string, string> = {};
+  for (const entry of readdirSync(scope).filter((name) => name.startsWith('copilot-sdk-'))) {
+    const parsed = JSON.parse(readFileSync(join(scope, entry, 'package.json'), 'utf8')) as { version: string };
+    runtimes[`@github/${entry}`] = parsed.version;
+  }
+  return runtimes;
 }
 
 /**
@@ -86,7 +126,19 @@ function headlessEnv(): NodeJS.ProcessEnv {
 
 describe('copilot-sdk dependency', () => {
   it(`is pinned to exactly ${PINNED}`, () => {
-    expect(installedSdkVersion()).toBe(PINNED);
+    expect(installedSdk().version).toBe(PINNED);
+  });
+
+  it(`spawns a runtime package at exactly ${PINNED}`, () => {
+    const runtimes = installedRuntimes(installedSdk().root);
+    expect(Object.keys(runtimes).length).toBeGreaterThan(0);
+    for (const version of Object.values(runtimes)) {
+      expect(version).toBe(PINNED);
+    }
+  });
+
+  it('depends on no floating @github/copilot CLI', () => {
+    expect(installedSdk().dependencies['@github/copilot']).toBeUndefined();
   });
 });
 
@@ -99,25 +151,8 @@ describe.skipIf(!LIVE)('BYOK headless — Test A', () => {
   it('runs a session with no GitHub identity and reaches the BYOK provider', async () => {
     const { CopilotClient, approveAll } = (await import('@github/copilot-sdk')) as unknown as SdkModule;
 
-    let sawAuthHeader = false;
-    const server = createServer((req, res) => {
-      sawAuthHeader ||= Boolean(req.headers.authorization);
-      let body = '';
-      req.on('data', (chunk) => (body += chunk));
-      req.on('end', () => {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({
-          id: 'chatcmpl-stub', object: 'chat.completion', created: 1, model: 'stub-model',
-          choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'STUB_OK: reached the BYOK provider.' } }],
-          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-        }));
-      });
-    });
-    const baseUrl = await new Promise<string>((resolve) => {
-      server.listen(0, '127.0.0.1', () => {
-        resolve(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`);
-      });
-    });
+    const provider = await startStubProvider(() => text('STUB_OK: reached the BYOK provider.'));
+    const baseUrl = provider.baseUrl;
 
     home = await mkdtemp(join(tmpdir(), 'paw-sdk-a-'));
     const client = new CopilotClient({
@@ -141,11 +176,11 @@ describe.skipIf(!LIVE)('BYOK headless — Test A', () => {
       });
       const reply = await session.sendAndWait({ prompt: 'Say hello.' }, 60_000);
       expect(String(reply?.data?.content ?? '')).toContain('STUB_OK');
-      expect(sawAuthHeader).toBe(true);
+      expect(provider.requests.some((r) => r.authorization !== null)).toBe(true);
       await session.disconnect();
     } finally {
       await client.stop().catch(() => undefined);
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await provider.close();
     }
   }, 90_000);
 });
@@ -159,37 +194,12 @@ describe.skipIf(!LIVE)('BYOK tool round-trip — Test B', () => {
   it('dispatches a custom tool call back into our handler with structured arguments', async () => {
     const { CopilotClient, approveAll, defineTool } = (await import('@github/copilot-sdk')) as unknown as SdkModule;
 
-    let turn = 0;
-    const server = createServer((req, res) => {
-      let body = '';
-      req.on('data', (chunk) => (body += chunk));
-      req.on('end', () => {
-        turn += 1;
-        const toolCall = {
-          id: 'chatcmpl-1', object: 'chat.completion', created: 1, model: 'stub-model',
-          choices: [{ index: 0, finish_reason: 'tool_calls', message: {
-            role: 'assistant', content: null,
-            tool_calls: [{ id: 'call_1', type: 'function', function: {
-              name: 'submit_review',
-              arguments: JSON.stringify({ findings: [{ file: 'src/a.ts', line: 12, severity: 'critical', summary: 'null deref' }] }),
-            } }],
-          } }],
-          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-        };
-        const done = {
-          id: 'chatcmpl-2', object: 'chat.completion', created: 1, model: 'stub-model',
-          choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'Review submitted.' } }],
-          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-        };
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify(turn === 1 ? toolCall : done));
-      });
-    });
-    const baseUrl = await new Promise<string>((resolve) => {
-      server.listen(0, '127.0.0.1', () => {
-        resolve(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`);
-      });
-    });
+    const provider = await startStubProvider((request) =>
+      request.toolResults.length === 0
+        ? toolCall('submit_review', { findings: [{ file: 'src/a.ts', line: 12, severity: 'critical', summary: 'null deref' }] })
+        : text('Review submitted.'),
+    );
+    const baseUrl = provider.baseUrl;
 
     let captured: unknown = null;
     const preToolUse: string[] = [];
@@ -241,7 +251,7 @@ describe.skipIf(!LIVE)('BYOK tool round-trip — Test B', () => {
       await session.disconnect();
     } finally {
       await client.stop().catch(() => undefined);
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await provider.close();
     }
   }, 90_000);
 });

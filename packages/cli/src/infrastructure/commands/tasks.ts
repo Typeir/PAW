@@ -14,9 +14,23 @@
  */
 
 import { resolve } from 'node:path';
-import { AGILE_MODULE, ROLLUP_FIELD, openRepoWorkModel } from '@paw/adapters';
+import { AGILE_MODULE, ROLLUP_FIELD, openRepoWorkModel, readRepoTasks, syncRepoBackends } from '@paw/adapters';
 import { parseArgs } from '../../domain/context.js';
-import { formatTaskDetail, formatTasks } from '../../domain/format.js';
+import { formatSyncReports, formatTaskDetail, formatTasks } from '../../domain/format.js';
+
+/**
+ * Run `tasks sync [--full]`: every enabled backend connector, through the global fetch.
+ *
+ * @param {string} root - Repository root.
+ * @param {boolean} full - Force a full sweep.
+ * @param {(lines: string[]) => void} print - Line printer.
+ * @returns {Promise<number>} Exit code: 0 when at least one backend synced and none refused, else 1.
+ */
+async function runSync(root: string, full: boolean, print: (lines: string[]) => void): Promise<number> {
+  const reports = await syncRepoBackends(root, full, fetch, () => new Date().toISOString());
+  print(formatSyncReports(reports));
+  return reports.length > 0 && reports.every((report) => report.ok) ? 0 : 1;
+}
 
 /**
  * Run `tasks` subcommand.
@@ -29,6 +43,9 @@ export async function runTasks(rest: string[], print: (lines: string[]) => void)
   const args = parseArgs(rest, ['root']);
   const [id] = args.positional;
   const root = resolve(args.values.get('root') ?? '.');
+  if (id === 'sync') {
+    return runSync(root, args.flags.has('full'), print);
+  }
   const { enabled, installed, model, document, detail: reason } = await openRepoWorkModel(root);
 
   if (!enabled) {
@@ -45,8 +62,8 @@ export async function runTasks(rest: string[], print: (lines: string[]) => void)
   }
 
   if (id === undefined) {
-    const view = model.view(document, ROLLUP_FIELD);
-    print(formatTasks(view.rows, view.refusals, view.loops, view.dangling));
+    const shown = await readRepoTasks(root);
+    print(formatTasks(shown.rows, shown.refusals, shown.loops, shown.dangling, shown.backends));
     return 0;
   }
 

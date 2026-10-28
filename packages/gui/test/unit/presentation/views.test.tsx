@@ -69,14 +69,25 @@ const configClient = (over: Partial<ConfigClient> = {}): ConfigClient => ({
   tasks: async () => ({
     enabled: true,
     rows: [
-      { id: 'a', title: 'Checkout rework', parents: [], children: ['b', 'c'], depth: 0, rollup: 6, orphan: false },
-      { id: 'b', title: 'Card form', parents: ['a'], children: ['d'], depth: 1, rollup: 2, orphan: false },
-      { id: 'd', title: 'Shared validator', parents: ['b', 'c'], children: [], depth: 2, rollup: 1, orphan: true },
+      {
+        id: 'a',
+        title: 'Checkout rework',
+        parents: [],
+        children: ['b', 'c'],
+        depth: 0,
+        rollup: 6,
+        orphan: false,
+        link: 'https://tracker.test/work_packages/1',
+      },
+      { id: 'b', title: 'Card form', parents: ['a'], children: ['d'], depth: 1, rollup: 2, orphan: false, link: null },
+      { id: 'd', title: 'Shared validator', parents: ['b', 'c'], children: [], depth: 2, rollup: 1, orphan: true, link: null },
     ],
     refusals: [],
     loops: [{ parent: 'd', child: 'a' }],
     dangling: [{ parent: 'ghost', child: 'd' }],
+    backends: [{ connector: 'openproject', ready: true, reason: null, last: null }],
   }),
+  syncTasks: async () => ({ ok: true, reports: [] }),
   bind: async () => ({ ok: true }),
   unbind: async () => ({ ok: true }),
   ...over,
@@ -421,6 +432,7 @@ describe('TasksView', () => {
           refusals: ['unknown task "ghost"'],
           loops: [],
           dangling: [],
+          backends: [],
         }),
       }),
     );
@@ -430,19 +442,121 @@ describe('TasksView', () => {
   });
 
   it('hides the refused card when every edge took', async () => {
-    renderTasks(configClient({ tasks: async () => ({ enabled: true, rows: [], refusals: [], loops: [], dangling: [] }) }));
+    renderTasks(configClient({ tasks: async () => ({ enabled: true, rows: [], refusals: [], loops: [], dangling: [], backends: [] }) }));
     expect(await screen.findByText('— this repository describes no tasks —')).toBeInTheDocument();
     expect(screen.queryByText('Refused')).toBeNull();
   });
 
   it('names the module to enable when the repository has it switched off', async () => {
     renderTasks(
-      configClient({ tasks: async () => ({ enabled: false, rows: [], refusals: [], loops: [], dangling: [] }) }),
+      configClient({ tasks: async () => ({ enabled: false, rows: [], refusals: [], loops: [], dangling: [], backends: [] }) }),
     );
     expect(
       await screen.findByText(/enable the paw-agile module to read this repository/),
     ).toBeInTheDocument();
     expect(screen.queryByText('Refused')).toBeNull();
+  });
+
+  it('links a row to its tracker page in a new tab and leaves a row without one unlinked', async () => {
+    renderTasks();
+    const link = await screen.findByRole('link', { name: 'open a in its tracker' });
+    expect(link).toHaveAttribute('href', 'https://tracker.test/work_packages/1');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.queryByRole('link', { name: 'open b in its tracker' })).toBeNull();
+  });
+
+  it('shows each backend’s last sync, syncs a delta or a full sweep, and lists what a sync skipped', async () => {
+    const asked: boolean[] = [];
+    const base = await configClient().tasks();
+    const report = { connector: 'openproject', ok: true as const, mode: 'delta' as const, pulled: 1, removed: 0, refusals: ['bad element'] };
+    let synced = false;
+    renderTasks(
+      configClient({
+        tasks: async () =>
+          synced
+            ? { ...base, backends: [{ connector: 'openproject', ready: true, reason: null, last: { at: '2026-10-28T16:05:00.000Z', report } }] }
+            : base,
+        syncTasks: async (full) => {
+          asked.push(full);
+          synced = true;
+          return { ok: true, reports: [report] };
+        },
+      }),
+    );
+    expect(await screen.findByText('never synced')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'sync' }));
+    expect(await screen.findByText('openproject skipped: bad element')).toBeInTheDocument();
+    expect(screen.getByText('synced 2026-10-28 16:05 UTC · delta · 1 pulled, 0 removed · 1 skipped')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'full sweep' }));
+    await waitFor(() => expect(asked).toEqual([false, true]));
+  });
+
+  it('disables both verbs while a sync runs', async () => {
+    let finish: () => void = () => undefined;
+    renderTasks(
+      configClient({
+        syncTasks: () =>
+          new Promise((resolve) => {
+            finish = () => resolve({ ok: true, reports: [] });
+          }),
+      }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'sync' }));
+    expect(screen.getByRole('button', { name: 'syncing…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'full sweep' })).toBeDisabled();
+    finish();
+    expect(await screen.findByRole('button', { name: 'sync' })).toBeEnabled();
+  });
+
+  it('says why the daemon refused a sync, and when it could not be reached', async () => {
+    renderTasks(configClient({ syncTasks: async () => ({ ok: false, reason: 'HTTP 405' }) }));
+    await userEvent.click(await screen.findByRole('button', { name: 'sync' }));
+    expect(await screen.findByText('sync refused: HTTP 405')).toBeInTheDocument();
+  });
+
+  it('leaves a backend refusal to its freshness line, adding no notice', async () => {
+    const syncTasks = vi.fn(async () => ({
+      ok: true as const,
+      reports: [{ connector: 'openproject', ok: false as const, reason: 'GET /x page 1 returned 401: no' }],
+    }));
+    renderTasks(configClient({ syncTasks }));
+    await userEvent.click(await screen.findByRole('button', { name: 'sync' }));
+    await waitFor(() => expect(syncTasks).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('button', { name: 'sync' })).toBeEnabled();
+    expect(screen.queryByText(/skipped:|sync refused/)).toBeNull();
+  });
+
+  it('says a sync never reached the daemon', async () => {
+    renderTasks(
+      configClient({
+        syncTasks: async () => {
+          throw new Error('offline');
+        },
+      }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'sync' }));
+    expect(await screen.findByText('sync refused: could not reach the daemon')).toBeInTheDocument();
+  });
+
+  it('offers no sync verbs when no backend can sync, and says how to enable one when none is', async () => {
+    const base = await configClient().tasks();
+    renderTasks(
+      configClient({
+        tasks: async () => ({
+          ...base,
+          backends: [{ connector: 'rally', ready: false, reason: 'no sync module', last: null }],
+        }),
+      }),
+    );
+    expect(await screen.findByText('cannot sync: no sync module')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'sync' })).toBeNull();
+  });
+
+  it('says how to enable a backend when none is', async () => {
+    const base = await configClient().tasks();
+    renderTasks(configClient({ tasks: async () => ({ ...base, backends: [] }) }));
+    expect(await screen.findByText(/no backend connector is enabled · paw connectors enable <id>/)).toBeInTheDocument();
   });
 
   it('reports a failed read, and placeholders on a static page', async () => {

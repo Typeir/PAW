@@ -20,8 +20,49 @@ describe('copilotHooksConnector.readOnlyTools', () => {
     expect(c.readOnlyTools).toEqual(expect.arrayContaining(['read_file', 'grep_search', 'list_dir']));
   });
 
+  it('declares web fetch under the Local name and both Copilot harness names', () => {
+    expect(c.readOnlyTools).toEqual(expect.arrayContaining(['fetch_webpage', 'WebFetch', 'web_fetch']));
+  });
+
+  it('declares the Copilot harness read tools under PascalCase hook events', () => {
+    expect(c.readOnlyTools).toEqual(
+      expect.arrayContaining(['Read', 'Grep', 'Glob', 'WebSearch', 'AskUserQuestion', 'TodoWrite']),
+    );
+  });
+
+  it('declares the Copilot harness read tools under camelCase hook events', () => {
+    expect(c.readOnlyTools).toEqual(
+      expect.arrayContaining([
+        'view',
+        'grep',
+        'rg',
+        'glob',
+        'web_search',
+        'ask_user',
+        'update_todo',
+        'list_powershell',
+        'read_powershell',
+        'list_agents',
+        'read_agent',
+      ]),
+    );
+  });
+
   it('declares no tool that writes or runs a shell', () => {
-    for (const tool of ['replace_string_in_file', 'run_in_terminal']) {
+    for (const tool of [
+      'replace_string_in_file',
+      'run_in_terminal',
+      'Write',
+      'Edit',
+      'Bash',
+      'create',
+      'edit',
+      'powershell',
+      'bash',
+      'stop_powershell',
+      'write_agent',
+      'task',
+    ]) {
       expect(c.readOnlyTools).not.toContain(tool);
     }
   });

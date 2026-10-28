@@ -13,17 +13,21 @@
  * @since 5.0.0
  */
 
-import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import {
+  SYNC_LOG_FILE,
+  emptyWorkGraph,
   enabledModuleIds,
+  repoTaskView,
   VENDOR_MODULES,
   type ModuleEntry,
+  type RepoTaskView,
   type WorkModelPort,
 } from '@paw/core';
+import { importModuleEntry } from './moduleEntry.js';
 import { createNodeModuleResolver } from './nodeModuleResolver.js';
 import { createNodeConfigDocument } from './nodeConfigDocument.js';
+import { readOptionalText } from './optionalText.js';
 
 /**
  * Module that must be enabled for a repository to hold tasks.
@@ -70,34 +74,14 @@ const ABSENT: RepoWorkModel = {
 async function loadModel(
   manifest: string,
 ): Promise<{ model: WorkModelPort | null; detail: string }> {
-  const entry = join(manifest, '..', 'src', 'index.ts');
-  let loaded: { workModel?: WorkModelPort };
-  try {
-    loaded = (await import(pathToFileURL(entry).href)) as { workModel?: WorkModelPort };
-  } catch (err: unknown) {
-    return { model: null, detail: `${entry} failed to load: ${String(err)}` };
+  const loaded = await importModuleEntry(manifest);
+  if (!loaded.ok) {
+    return { model: null, detail: loaded.detail };
   }
-  return loaded.workModel === undefined
-    ? { model: null, detail: `${entry} exports no workModel` }
-    : { model: loaded.workModel, detail: entry };
-}
-
-/**
- * Read the repository's task document.
- *
- * @param {string} root - Repository to read from.
- * @returns {Promise<string>} Document text; empty when `.paw/tasks.json` does not exist.
- * @throws {Error} Any read failure other than a missing file.
- */
-async function readDocument(root: string): Promise<string> {
-  try {
-    return await readFile(join(root, '.paw', 'tasks.json'), 'utf8');
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      return '';
-    }
-    throw err;
-  }
+  const model = loaded.exports.workModel as WorkModelPort | undefined;
+  return model === undefined
+    ? { model: null, detail: `${loaded.entry} exports no workModel` }
+    : { model, detail: loaded.entry };
 }
 
 /**
@@ -124,7 +108,25 @@ export async function openRepoWorkModel(root: string): Promise<RepoWorkModel> {
     enabled: true,
     installed: true,
     model: loaded.model,
-    document: await readDocument(root),
+    document: await readOptionalText(join(root, '.paw', 'tasks.json')),
     detail: loaded.detail,
   };
+}
+
+/**
+ * Read a repository's tasks as every surface shows them: the work graph as list rows and each
+ * enabled backend's freshness from the sync log.
+ *
+ * @param {string} root - Repository to read from.
+ * @returns {Promise<RepoTaskView>} The view; no rows when the module is off or not installed.
+ * @throws {Error} Any read failure other than a missing file.
+ */
+export async function readRepoTasks(root: string): Promise<RepoTaskView> {
+  const opened = await openRepoWorkModel(root);
+  return repoTaskView({
+    enabled: opened.enabled && opened.installed,
+    view: opened.model?.view(opened.document, ROLLUP_FIELD) ?? emptyWorkGraph(),
+    config: await createNodeConfigDocument(root).read(),
+    syncLog: await readOptionalText(join(root, SYNC_LOG_FILE)),
+  });
 }

@@ -44,9 +44,17 @@ describe('taskViewFrom', () => {
     expect(byId.c).toMatchObject({ children: ['d', 'e'], rollup: 4 });
   });
 
+  it('carries each task field bag on its row', () => {
+    const view = taskViewFrom(
+      JSON.stringify({ tasks: [{ id: 'a', title: 'A', fields: { url: 'https://tracker.test/1', points: 2 } }] }),
+      'points',
+    );
+    expect(view.rows[0]?.fields).toEqual({ url: 'https://tracker.test/1', points: 2 });
+  });
+
   it('falls back to the id when an entry names no title, and to no fields', () => {
     const view = taskViewFrom(JSON.stringify({ tasks: [{ id: 'bare' }] }), 'points');
-    expect(view.rows[0]).toMatchObject({ id: 'bare', title: 'bare', rollup: 0, depth: 0 });
+    expect(view.rows[0]).toMatchObject({ id: 'bare', title: 'bare', rollup: 0, depth: 0, fields: {} });
   });
 
   it('reports a document that is not JSON', () => {
