@@ -24,6 +24,7 @@ import {
   rollup,
   topologicalOrder,
   type Edge,
+  type Task,
   type TaskGraph,
 } from '../domain/taskGraph.js';
 
@@ -38,6 +39,7 @@ import {
  * @property {number} depth - Longest distance from a root, for indenting.
  * @property {number} rollup - Summed field over this task and everything below it.
  * @property {boolean} orphan - Whether a parent the document names for it is absent.
+ * @property {Readonly<Record<string, unknown>>} fields - The task's field bag as the document holds it.
  */
 export interface TaskRow {
   readonly id: string;
@@ -47,6 +49,7 @@ export interface TaskRow {
   readonly depth: number;
   readonly rollup: number;
   readonly orphan: boolean;
+  readonly fields: Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -105,10 +108,6 @@ function asString(value: unknown): string | null {
  * @returns {TaskRow[]} Rows in topological order.
  */
 export function graphRows(graph: TaskGraph, field: string): TaskRow[] {
-  const titles: Record<string, string> = {};
-  for (const [id, task] of graph.tasks) {
-    titles[id] = task.title;
-  }
   const depths: Record<string, number> = {};
   const depthOf = (id: string): number => {
     if (depths[id] === undefined) {
@@ -118,15 +117,19 @@ export function graphRows(graph: TaskGraph, field: string): TaskRow[] {
     return depths[id];
   };
   const orphans = new Set(graph.dangling.map((edge) => edge.child));
-  return topologicalOrder(graph).map((id) => ({
-    id,
-    title: titles[id],
-    parents: parentsOf(graph, id),
-    children: childrenOf(graph, id),
-    depth: depthOf(id),
-    rollup: rollup(graph, id, field),
-    orphan: orphans.has(id),
-  }));
+  return topologicalOrder(graph).map((id) => {
+    const task = graph.tasks.get(id) as Task;
+    return {
+      id,
+      title: task.title,
+      parents: parentsOf(graph, id),
+      children: childrenOf(graph, id),
+      depth: depthOf(id),
+      rollup: rollup(graph, id, field),
+      orphan: orphans.has(id),
+      fields: task.fields,
+    };
+  });
 }
 
 /**
