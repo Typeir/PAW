@@ -1,0 +1,31 @@
+{
+  "name": "@paw/openproject",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PAW OpenProject — a backend module: syncs an OpenProject project subtree into the PAW work model over API v3, full or by updatedAt delta.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Typeir/paw-openproject.git"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage",
+    "test:live": "vitest run --config vitest.live.config.ts",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.live.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@vitest/coverage-v8": "^2.1.9",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  }
+}
