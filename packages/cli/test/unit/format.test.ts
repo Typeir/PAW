@@ -32,6 +32,7 @@ import {
   formatProof,
   formatPruned,
   formatRoleRows,
+  formatSyncReports,
   formatTaskDetail,
   formatTasks,
   formatViolations,
@@ -141,6 +142,27 @@ describe('formatTasks', () => {
     expect(lines[1]).toBe('  a (orphan)  Checkout  ↑ —  ↓ b  3');
     expect(lines[2]).toBe('dangling: 1 naming an absent task');
     expect(lines[3]).toBe('  ghost → a');
+  });
+});
+
+describe('formatSyncReports', () => {
+  it('says how to enable a backend when none is', () => {
+    expect(formatSyncReports([])).toEqual([
+      'tasks sync: no backend connector is enabled; paw connectors lists them, paw connectors enable <id> turns one on',
+    ]);
+  });
+
+  it('renders counts and skipped elements for a sync, and the reason for a refusal', () => {
+    expect(
+      formatSyncReports([
+        { connector: 'openproject', ok: true, mode: 'delta', pulled: 2, removed: 0, refusals: ['bad element'] },
+        { connector: 'rally', ok: false, reason: 'connector "rally" has no sync module in this build' },
+      ]),
+    ).toEqual([
+      'tasks sync: openproject delta, 2 pulled, 0 removed',
+      '  skipped: bad element',
+      'tasks sync: rally refused: connector "rally" has no sync module in this build',
+    ]);
   });
 });
 

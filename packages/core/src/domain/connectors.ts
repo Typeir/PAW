@@ -87,6 +87,13 @@ export const VENDOR_CONNECTORS: readonly ConnectorEntry[] = [
     description: 'Clones Rally artifacts into the work model over WSAPI and the Lookback API.',
     requires: ['paw-agile'],
   },
+  {
+    id: 'openproject',
+    kind: 'backend',
+    title: 'OpenProject',
+    description: 'Syncs an OpenProject project subtree into the work model over API v3.',
+    requires: ['paw-agile', 'paw-openproject'],
+  },
 ];
 
 const KNOWN: ReadonlySet<string> = new Set(VENDOR_CONNECTORS.map((entry) => entry.id));

@@ -15,13 +15,13 @@
 
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import {
   enabledModuleIds,
   VENDOR_MODULES,
   type ModuleEntry,
   type WorkModelPort,
 } from '@paw/core';
+import { importModuleEntry } from './moduleEntry.js';
 import { createNodeModuleResolver } from './nodeModuleResolver.js';
 import { createNodeConfigDocument } from './nodeConfigDocument.js';
 
@@ -70,16 +70,14 @@ const ABSENT: RepoWorkModel = {
 async function loadModel(
   manifest: string,
 ): Promise<{ model: WorkModelPort | null; detail: string }> {
-  const entry = join(manifest, '..', 'src', 'index.ts');
-  let loaded: { workModel?: WorkModelPort };
-  try {
-    loaded = (await import(pathToFileURL(entry).href)) as { workModel?: WorkModelPort };
-  } catch (err: unknown) {
-    return { model: null, detail: `${entry} failed to load: ${String(err)}` };
+  const loaded = await importModuleEntry(manifest);
+  if (!loaded.ok) {
+    return { model: null, detail: loaded.detail };
   }
-  return loaded.workModel === undefined
-    ? { model: null, detail: `${entry} exports no workModel` }
-    : { model: loaded.workModel, detail: entry };
+  const model = loaded.exports.workModel as WorkModelPort | undefined;
+  return model === undefined
+    ? { model: null, detail: `${loaded.entry} exports no workModel` }
+    : { model, detail: loaded.entry };
 }
 
 /**

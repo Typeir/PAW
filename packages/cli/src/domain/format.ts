@@ -12,6 +12,7 @@
  */
 
 import type {
+  BackendSyncReport,
   ConnectorRosterRow,
   DispatchResult,
   DoctorFinding,
@@ -103,6 +104,8 @@ export function formatHelp(color = false): string[] {
     '                                 source), or remove an installed, disabled one',
     '  tasks [<id>] [--related]       list the work graph, one task, or one task and everything',
     '                                 connected to it; needs the paw-agile module enabled',
+    '  tasks sync [--full]            pull every enabled backend connector into .paw/tasks.json:',
+    '                                 a delta since the last sync, or a full sweep with --full',
     '  doctor <config.json>           check a config file: every role bound to a capable model',
     '  swarm doctor|show|run <plan>   validate, preview, or run a multi-agent swarm plan (.swarm.mjs)',
     '    run flags: --live --full --no-gates --ui --context a,b --concurrency N --max-tokens N',
@@ -250,6 +253,28 @@ export function formatTasks(
     return lines;
   }
   return [...lines, `refused: ${refusals.length}`, ...refusals.map((why) => `  ${why}`)];
+}
+
+/**
+ * Render backend sync reports: counts and skipped elements per sync, the reason per refusal.
+ *
+ * @param {readonly BackendSyncReport[]} reports - Reports, catalogue order; empty when no backend is enabled.
+ * @returns {string[]} Terminal lines.
+ */
+export function formatSyncReports(reports: readonly BackendSyncReport[]): string[] {
+  if (reports.length === 0) {
+    return [
+      'tasks sync: no backend connector is enabled; paw connectors lists them, paw connectors enable <id> turns one on',
+    ];
+  }
+  return reports.flatMap((report) =>
+    report.ok
+      ? [
+          `tasks sync: ${report.connector} ${report.mode}, ${report.pulled} pulled, ${report.removed} removed`,
+          ...report.refusals.map((reason) => `  skipped: ${reason}`),
+        ]
+      : [`tasks sync: ${report.connector} refused: ${report.reason}`],
+  );
 }
 
 /**

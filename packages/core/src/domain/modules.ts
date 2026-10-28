@@ -51,6 +51,15 @@ export const VENDOR_MODULES: readonly ModuleEntry[] = [
     repository: 'https://github.com/Typeir/paw-agile.git',
     ref: 'main',
   },
+  {
+    id: 'paw-openproject',
+    title: 'PAW OpenProject',
+    description:
+      'Backend: syncs an OpenProject project subtree into the work model over API v3, full or by updatedAt delta.',
+    specifier: '@paw/openproject',
+    repository: 'https://github.com/Typeir/paw-openproject.git',
+    ref: 'main',
+  },
 ];
 
 const KNOWN: ReadonlySet<string> = new Set(VENDOR_MODULES.map((entry) => entry.id));

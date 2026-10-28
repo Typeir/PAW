@@ -21,9 +21,13 @@ import { resolveModules } from '../../src/application/moduleStatus.js';
 import type { ModuleResolverPort } from '../../src/ports/index.js';
 
 describe('the vendor catalogue', () => {
-  it('ships paw-agile under the @paw/agile specifier', () => {
-    expect(VENDOR_MODULES.map((m) => [m.id, m.specifier])).toEqual([['paw-agile', '@paw/agile']]);
+  it('ships paw-agile and paw-openproject under their @paw specifiers', () => {
+    expect(VENDOR_MODULES.map((m) => [m.id, m.specifier])).toEqual([
+      ['paw-agile', '@paw/agile'],
+      ['paw-openproject', '@paw/openproject'],
+    ]);
     expect(knownModule('paw-agile')).toBe(true);
+    expect(knownModule('paw-openproject')).toBe(true);
     expect(knownModule('paw-billing')).toBe(false);
   });
 });
@@ -38,7 +42,8 @@ describe('enabledModuleIds', () => {
 
 describe('dependentConnectors', () => {
   it('names the connectors a module carries', () => {
-    expect(dependentConnectors('paw-agile')).toEqual(['taiga', 'rally']);
+    expect(dependentConnectors('paw-agile')).toEqual(['taiga', 'rally', 'openproject']);
+    expect(dependentConnectors('paw-openproject')).toEqual(['openproject']);
     expect(dependentConnectors('paw-billing')).toEqual([]);
   });
 });
@@ -46,7 +51,7 @@ describe('dependentConnectors', () => {
 describe('moduleRoster', () => {
   it('marks enabled entries and reports their dependents', () => {
     const [row] = moduleRoster({ modules: ['paw-agile'] });
-    expect(row).toMatchObject({ id: 'paw-agile', enabled: true, requiredBy: ['taiga', 'rally'] });
+    expect(row).toMatchObject({ id: 'paw-agile', enabled: true, requiredBy: ['taiga', 'rally', 'openproject'] });
     expect(moduleRoster({})[0]?.enabled).toBe(false);
   });
 });

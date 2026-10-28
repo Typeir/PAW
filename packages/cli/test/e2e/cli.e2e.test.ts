@@ -10,7 +10,9 @@
  */
 
 import { execFile, execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -341,5 +343,70 @@ describe('cli modules install (e2e)', () => {
       'modules: skill paw-tasks not placed — .claude/skills/paw-tasks already exists and PAW did not place it',
     );
     expect(readFileSync(join(skill, 'SKILL.md'), 'utf8')).toBe('mine');
+  }, 60000);
+});
+
+describe('cli tasks sync (e2e)', () => {
+  const PACKAGES = join(PKG, '..');
+
+  /**
+   * Serve one work package collection page on loopback until closed.
+   *
+   * @param body - Collection JSON.
+   */
+  const serve = (body: unknown): Promise<{ origin: string; close: () => void }> =>
+    new Promise((resolve) => {
+      const server = createServer((_req, res) => {
+        res.writeHead(200, { 'content-type': 'application/hal+json' });
+        res.end(JSON.stringify(body));
+      });
+      server.listen(0, '127.0.0.1', () => {
+        const { port } = server.address() as AddressInfo;
+        resolve({ origin: `http://127.0.0.1:${port}`, close: () => server.close() });
+      });
+    });
+
+  it('says how to enable a backend when none is, exit 1', async () => {
+    const root = repoWithConfig({ modules: ['paw-agile'] });
+    const { stdout, code } = await runCli('tasks', 'sync', `--root=${root}`);
+    expect(code).toBe(1);
+    expect(stdout).toContain('tasks sync: no backend connector is enabled');
+  });
+
+  it('pulls through the installed module into .paw/tasks.json, which paw tasks then renders', async () => {
+    const root = repoWithConfig({ modules: ['paw-agile', 'paw-openproject'], connectors: ['openproject'] });
+    mkdirSync(join(root, '.paw', 'modules'), { recursive: true });
+    symlinkSync(join(PACKAGES, 'agile'), join(root, '.paw', 'modules', 'paw-agile'), 'junction');
+    symlinkSync(join(PACKAGES, 'openproject'), join(root, '.paw', 'modules', 'paw-openproject'), 'junction');
+    const element = (id: number, subject: string, parent: number | null, storyPoints: number | null) => ({
+      id,
+      subject,
+      updatedAt: '2026-10-28T15:00:00.000Z',
+      storyPoints,
+      _links: { parent: { href: parent === null ? null : `/api/v3/work_packages/${parent}` } },
+    });
+    const server = await serve({
+      total: 2,
+      _embedded: { elements: [element(1, 'Checkout epic', null, null), element(2, 'Pay with card', 1, 5)] },
+    });
+    try {
+      writeFileSync(
+        join(root, '.paw', 'openproject.backend.env'),
+        `BASE_URL=${server.origin}\nKEY=test-key\nPROJECT=demo\n`,
+        'utf8',
+      );
+      const synced = await runCli('tasks', 'sync', `--root=${root}`);
+      expect(synced.stdout).toContain('tasks sync: openproject full, 2 pulled, 0 removed');
+      expect(synced.code).toBe(0);
+      expect(JSON.parse(readFileSync(join(root, '.paw', 'openproject.sync.json'), 'utf8'))).toMatchObject({
+        cursor: '2026-10-28T15:00:00.000Z',
+      });
+      const listed = await runCli('tasks', `--root=${root}`);
+      expect(listed.code).toBe(0);
+      expect(listed.stdout).toContain('tasks: 2 in the graph');
+      expect(listed.stdout).toMatch(/op-1 {2}Checkout epic {2}↑ — {2}↓ op-2 {2}5/);
+    } finally {
+      server.close();
+    }
   }, 60000);
 });

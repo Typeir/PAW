@@ -20,7 +20,7 @@ import {
 import { disableConnector, enableConnector } from '../../src/application/configBinding.js';
 
 describe('the vendor catalogue', () => {
-  it('ships two hosts, two linters, and two backends', () => {
+  it('ships two hosts, two linters, and three backends', () => {
     expect(VENDOR_CONNECTORS.map((c) => [c.id, c.kind])).toEqual([
       ['copilot-hooks', 'host'],
       ['claude-hooks', 'host'],
@@ -28,12 +28,13 @@ describe('the vendor catalogue', () => {
       ['eslint', 'linter'],
       ['taiga', 'backend'],
       ['rally', 'backend'],
+      ['openproject', 'backend'],
     ]);
     expect(knownConnector('tsc')).toBe(true);
     expect(knownConnector('jenkins')).toBe(false);
   });
 
-  it('routes both backends through the paw-agile module and nothing else through a module', () => {
+  it('routes every backend through paw-agile, openproject also through its own module, nothing else through a module', () => {
     const required = Object.fromEntries(VENDOR_CONNECTORS.map((c) => [c.id, c.requires]));
     expect(required).toEqual({
       'copilot-hooks': [],
@@ -42,6 +43,7 @@ describe('the vendor catalogue', () => {
       eslint: [],
       taiga: ['paw-agile'],
       rally: ['paw-agile'],
+      openproject: ['paw-agile', 'paw-openproject'],
     });
   });
 });
@@ -101,6 +103,19 @@ describe('enableConnector / disableConnector', () => {
 
     const allowed = enableConnector({ modules: ['paw-agile'] }, 'taiga');
     expect(allowed).toMatchObject({ ok: true, config: { connectors: ['taiga'] } });
+  });
+
+  it('names one enable verb per missing module, since paw modules enable takes one id', () => {
+    expect(enableConnector({}, 'openproject')).toEqual({
+      ok: false,
+      reason:
+        'connector "openproject" requires modules paw-agile, paw-openproject; enable them with paw modules enable paw-agile, then paw modules enable paw-openproject',
+    });
+    expect(enableConnector({ modules: ['paw-agile'] }, 'openproject')).toEqual({
+      ok: false,
+      reason:
+        'connector "openproject" requires module paw-openproject; enable it with paw modules enable paw-openproject',
+    });
   });
 
   it('clears the legacy field too, so a disabled host bridge stays disabled', () => {

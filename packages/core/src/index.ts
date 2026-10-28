@@ -244,6 +244,9 @@ export {
 } from './domain/modules.js';
 export type { ModuleEntry, ModuleRosterRow } from './domain/modules.js';
 
+export { BACKEND_SYNC, backendSyncPlan } from './domain/backendSync.js';
+export type { BackendRoute, BackendSyncReport, BackendSyncStep } from './domain/backendSync.js';
+
 export { resolveModules } from './application/moduleStatus.js';
 export type { ModuleStatus } from './application/moduleStatus.js';
 
@@ -329,6 +332,10 @@ export type {
   SecretPort,
   StorePort,
   WorkModelPort,
+  BackendFetch,
+  BackendModulePort,
+  BackendSyncInput,
+  BackendSyncResult,
 } from './ports/index.js';
 
 export type {
