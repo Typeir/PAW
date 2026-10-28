@@ -3,7 +3,7 @@
  *
  * @fileoverview Maps one API v3 work package to a work-model record: id `op-<id>`, the parent
  * from `_links.parent`, and a field bag of link titles. `storyPoints` lands in `points`, the
- * field paw-agile rolls up.
+ * field paw-agile rolls up; `url` is the work package's page on the instance.
  *
  * @module @paw/openproject/domain/workPackage
  * @version 0.0.0
@@ -101,12 +101,18 @@ function parentOf(links: Record<string, unknown>): string | null {
  *
  * @param {Record<string, unknown>} element - The work package.
  * @param {Record<string, unknown>} links - Its `_links` object.
- * @returns {Record<string, unknown>} Source, ids, link titles, and numeric story points.
+ * @param {string} baseUrl - Instance origin, no trailing slash.
+ * @returns {Record<string, unknown>} Source, ids, web URL, link titles, and numeric story points.
  */
-function fieldsOf(element: Record<string, unknown>, links: Record<string, unknown>): Record<string, unknown> {
+function fieldsOf(
+  element: Record<string, unknown>,
+  links: Record<string, unknown>,
+  baseUrl: string,
+): Record<string, unknown> {
   const fields: Record<string, unknown> = {
     source: 'openproject',
     sourceId: element.id,
+    url: `${baseUrl}/work_packages/${String(element.id)}`,
     updatedAt: element.updatedAt,
   };
   if (typeof element.displayId === 'string') {
@@ -128,9 +134,10 @@ function fieldsOf(element: Record<string, unknown>, links: Record<string, unknow
  * The work-model record of one collection element.
  *
  * @param {unknown} value - One element of `_embedded.elements`.
+ * @param {string} baseUrl - Instance origin, no trailing slash; prefixes the `url` field.
  * @returns {RecordParse} The record, or a refusal when the id, subject, or updatedAt is missing.
  */
-export function recordOf(value: unknown): RecordParse {
+export function recordOf(value: unknown, baseUrl: string): RecordParse {
   const element = objectOf(value);
   if (
     element === null ||
@@ -151,7 +158,7 @@ export function recordOf(value: unknown): RecordParse {
       title: element.subject,
       parent: parentOf(links),
       updatedAt: element.updatedAt,
-      fields: fieldsOf(element, links),
+      fields: fieldsOf(element, links, baseUrl),
     },
   };
 }

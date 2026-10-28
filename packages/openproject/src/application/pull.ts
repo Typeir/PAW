@@ -178,7 +178,7 @@ export async function pullWorkPackages(fetch: FetchLike, config: BackendConfig, 
       return { ok: false, reason: read };
     }
     for (const element of read.elements) {
-      const parsed = recordOf(element);
+      const parsed = recordOf(element, config.baseUrl);
       if (parsed.ok) {
         records.push(parsed.record);
         cursor = newest(cursor, parsed.record.updatedAt);

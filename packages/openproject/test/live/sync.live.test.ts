@@ -176,6 +176,9 @@ describe('backend.sync against a live OpenProject', () => {
       title: 'Pay with card',
       fields: { source: 'openproject', sourceId: seeded.story, type: 'User story', project: `PAW live ${run} sub`, points: 5 },
     });
+    const page = await fetch(story?.fields.url as string, { redirect: 'manual' });
+    expect(story?.fields.url).toBe(`${BASE_URL}/work_packages/${seeded.story}`);
+    expect(page.status).toBeLessThan(400);
     const closed = document.tasks.find((t) => t.id === id(seeded.closed));
     expect(closed?.fields.status).not.toBe('New');
     expect(JSON.parse(files.state)).toMatchObject({ baseUrl: BASE_URL, project: `paw-live-${run}` });
