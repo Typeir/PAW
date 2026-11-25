@@ -24,9 +24,8 @@ import { createNodeFs } from '@paw/adapters';
 import {
   applyInit,
   binDir,
-  configPathFor,
   pawHome,
-  planInit,
+  readInitPlan,
   type InitMode,
 } from '@paw/core';
 import { existsSync } from 'node:fs';
@@ -131,10 +130,7 @@ async function runInit(argv: string[], print: (s: string) => void): Promise<void
   }
 
   const fs = createNodeFs();
-  const existing = await fs.readText(configPathFor(root));
-  const plan = dryRun
-    ? planInit(root, existing === '' ? null : existing, mode)
-    : await applyInit(root, fs, mode);
+  const plan = dryRun ? await readInitPlan(root, fs, mode) : await applyInit(root, fs, mode);
 
   const verb = dryRun ? 'would write' : 'wrote';
   for (const write of plan.writes) {

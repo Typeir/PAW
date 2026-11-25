@@ -129,7 +129,7 @@ paw trust                              # install the local CA into your user sto
 paw check                              # stdin: an allow/deny decision (exit 0/2)
 paw doctor <config.json>               # validate config + role/capability bindings
 paw gates [--staged] [files…]          # run the quality gates
-paw violations [--prune [file]]        # list or clear recorded violations
+paw violations [list|prune [file]]     # list or clear recorded violations
 paw connectors [enable|disable <id>]   # the connector catalogue and its state
 paw config <get|set> …                 # model and role bindings
 

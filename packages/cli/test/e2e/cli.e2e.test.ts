@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFil
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -53,6 +53,48 @@ function runCli(
   ...args: string[]
 ): Promise<{ stdout: string; stderr: string; code: number }> {
   return runCliIn(PKG, ...args);
+}
+
+/**
+ * Run git with a throwaway identity.
+ *
+ * @param cwd - Directory to run in.
+ * @param args - Git arguments.
+ */
+function git(cwd: string, ...args: string[]): string {
+  return gitWith(process.env, cwd, ...args);
+}
+
+/**
+ * Run git with a throwaway identity and the given environment.
+ *
+ * @param env - Environment for git and the hooks it runs.
+ * @param cwd - Directory to run in.
+ * @param args - Git arguments.
+ */
+function gitWith(env: NodeJS.ProcessEnv, cwd: string, ...args: string[]): string {
+  return execFileSync('git', ['-c', 'user.name=paw', '-c', 'user.email=paw@example.invalid', ...args], {
+    cwd,
+    env,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+/**
+ * Environment whose PATH starts with a directory holding a `paw` shell shim
+ * that runs this CLI, so a git hook's `exec paw` reaches the source under test.
+ */
+function envWithPawShim(): NodeJS.ProcessEnv {
+  const bin = mkdtempSync(join(tmpdir(), 'paw-shim-'));
+  const slash = (p: string): string => p.replace(/\\/g, '/');
+  writeFileSync(
+    join(bin, 'paw'),
+    `#!/bin/sh\nexec "${slash(process.execPath)}" "${slash(TSX)}" "${slash(MAIN)}" "$@"\n`,
+    { mode: 0o755 },
+  );
+  const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH';
+  return { ...process.env, [key]: `${bin}${delimiter}${process.env[key] ?? ''}` };
 }
 
 /**
@@ -279,18 +321,6 @@ describe('cli config show (e2e)', () => {
 });
 
 describe('cli modules install (e2e)', () => {
-  /**
-   * Run git with a throwaway identity.
-   *
-   * @param cwd - Directory to run in.
-   * @param args - Git arguments.
-   */
-  const git = (cwd: string, ...args: string[]): string =>
-    execFileSync('git', ['-c', 'user.name=paw', '-c', 'user.email=paw@example.invalid', ...args], {
-      cwd,
-      encoding: 'utf8',
-    });
-
   /** Local git repo standing in for the paw-agile remote, shipping one skill on `main`. */
   const moduleSource = (): string => {
     const dir = mkdtempSync(join(tmpdir(), 'paw-module-src-'));
@@ -411,5 +441,64 @@ describe('cli tasks sync (e2e)', () => {
     } finally {
       server.close();
     }
+  }, 60000);
+});
+
+describe('cli init (e2e)', () => {
+  const NO_BAD = `export const gate = {
+  id: 'no-bad', name: 'No BADCODE', port: 'code-quality', severity: 'critical', appliesTo: ['.ts'],
+  async check(ctx) {
+    const findings = [];
+    for (const file of await ctx.targetFiles(['.ts'])) {
+      if ((await ctx.readFile(file)).includes('BADCODE')) findings.push({ file, rule: 'no-bad', message: 'BADCODE forbidden' });
+    }
+    return { gate: 'no-bad', passed: findings.length === 0, severity: 'critical', findings, stats: { filesChecked: 1, findingsCount: findings.length, durationMs: 0 } };
+  },
+};
+`;
+
+  it('attaches a repository whose pre-commit hook runs the gates and whose runtime files git ignores', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'paw-init-'));
+    git(root, 'init', '-q');
+    const init = await runCliIn(root, 'init');
+    expect(init.code).toBe(0);
+    expect(init.stdout).toContain('.paw/.gitignore');
+
+    mkdirSync(join(root, '.paw', 'gates'), { recursive: true });
+    writeFileSync(join(root, '.paw', 'gates', 'no-bad.gate.mjs'), NO_BAD, 'utf8');
+    writeFileSync(join(root, '.paw', 'daemon.token'), 'secret', 'utf8');
+    writeFileSync(join(root, '.paw', 'paw.sqlite'), '', 'utf8');
+    writeFileSync(join(root, '.paw', 'openproject.backend.env'), 'KEY=secret\n', 'utf8');
+    mkdirSync(join(root, 'src'));
+    writeFileSync(join(root, 'src', 'ok.ts'), 'export const ok = 1;\n', 'utf8');
+    git(root, 'add', '-A');
+    const staged = git(root, 'diff', '--cached', '--name-only');
+    expect(staged).toContain('.paw/config.json');
+    expect(staged).toContain('.paw/.gitignore');
+    expect(staged).not.toMatch(/daemon\.token|paw\.sqlite|backend\.env/);
+
+    const env = envWithPawShim();
+    expect(() => gitWith(env, root, 'commit', '-q', '-m', 'clean')).not.toThrow();
+
+    writeFileSync(join(root, 'src', 'bad.ts'), 'export const bad = 1; // BADCODE\n', 'utf8');
+    git(root, 'add', 'src/bad.ts');
+    let refused = '';
+    try {
+      gitWith(env, root, 'commit', '-q', '-m', 'bad');
+    } catch (err) {
+      const e = err as { stdout: string; stderr: string };
+      refused = `${e.stdout}${e.stderr}`;
+    }
+    expect(refused).toContain('BADCODE forbidden');
+    expect(git(root, 'log', '--format=%s')).toBe('clean\n');
+  }, 120000);
+});
+
+describe('cli violations (e2e)', () => {
+  it('lists on a bare `paw violations`, reporting a repository no daemon serves, exit 1', async () => {
+    const root = repoWithConfig({});
+    const listed = await runCliIn(root, 'violations');
+    expect(listed.stdout).toContain('violations: no daemon is running for this repository');
+    expect(listed.code).toBe(1);
   }, 60000);
 });

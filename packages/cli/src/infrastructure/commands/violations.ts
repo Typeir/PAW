@@ -1,7 +1,7 @@
 /**
  * PAW CLI — violations command.
  *
- * @fileoverview `paw violations list` show outstanding violations recorded for
+ * @fileoverview `paw violations [list]` show outstanding violations recorded for
  * this repository; `paw violations prune [<file>]` clear them — one file's, or
  * all when no path given. Thin clients of resident daemon (violations store
  * lives there); both return failure when daemon unreachable. Manual way to clear
@@ -38,7 +38,7 @@ export async function runViolations(
     tmpdir: tmpdir(),
   });
   const token = tokenPath(resolve(root, '.paw'));
-  if (sub === 'list') {
+  if (sub === undefined || sub === 'list') {
     const result = await rpcCall(endpoint, token, 'violations.list', {});
     print(formatViolations(result as { violations?: Violation[] } | null));
     return result === null ? 1 : 0;
@@ -49,5 +49,5 @@ export async function runViolations(
     print(formatPruned(result as { cleared?: number } | null, file ?? null));
     return result === null ? 1 : 0;
   }
-  throw new Error(`unknown violations subcommand "${sub ?? '(none)'}" — try list or prune [<file>]`);
+  throw new Error(`unknown violations subcommand "${sub}" — try list or prune [<file>]`);
 }

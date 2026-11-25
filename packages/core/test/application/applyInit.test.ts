@@ -13,23 +13,24 @@
 
 import { stampConfig } from '../../src/domain/initConfig.js';
 import { describe, expect, it, vi } from 'vitest';
-import { applyInit } from '../../src/application/applyInit.js';
+import { applyInit, readInitPlan } from '../../src/application/applyInit.js';
 import type { FileSystemPort } from '../../src/ports/index.js';
-import { configPathFor, planInit } from '../../src/domain/initScaffold.js';
+import { configPathFor, ignorePathFor, planInit } from '../../src/domain/initScaffold.js';
 
 const ROOT = '/repo';
 const EXISTING = '{"surface":"all","runners":{".gate.ts":"tsx"}}';
 
 /**
- * Filesystem fake. `readText` serve fixed config. Records writes.
+ * Filesystem fake. `readText` serve fixed config and ignore file. Records writes.
  *
- * @param configText - What `readText` return for any path.
+ * @param configText - What `readText` return for `.paw/config.json`.
+ * @param ignoreText - What `readText` return for any other path.
  * @returns The port and write spy.
  */
-function fakeFs(configText: string) {
+function fakeFs(configText: string, ignoreText = '') {
   const writeText = vi.fn(async () => {});
   const fs: FileSystemPort = {
-    readText: async () => configText,
+    readText: async (path) => (path === configPathFor(ROOT) ? configText : ignoreText),
     writeText,
     appendText: async () => {},
     ensureDir: async () => {},
@@ -39,17 +40,19 @@ function fakeFs(configText: string) {
 }
 
 describe('planInit with an existing config', () => {
-  it('plans both files when nothing is there', () => {
+  it('plans all three files when nothing is there', () => {
     const plan = planInit(ROOT, null, 'create');
-    expect(plan.writes).toHaveLength(2);
+    expect(plan.writes).toHaveLength(3);
     expect(plan.refusal).toBeUndefined();
   });
 
-  it('refuses an unstamped config but still plans the hook', () => {
+  it('refuses an unstamped config but still plans the hook and the ignore file', () => {
     const plan = planInit(ROOT, EXISTING, 'create');
     expect(plan.refusal?.conflict.kind).toBe('unstamped');
-    expect(plan.writes).toHaveLength(1);
-    expect(plan.writes[0].path).toContain('pre-commit');
+    expect(plan.writes.map((w) => w.path)).toEqual([
+      '/repo/.git/hooks/pre-commit',
+      ignorePathFor(ROOT),
+    ]);
   });
 
   it('refuses a config it wrote itself', () => {
@@ -96,6 +99,15 @@ describe('applyInit with an existing config', () => {
     expect(written.some((p) => p.includes('config.json'))).toBe(true);
   });
 
+  it('merges into the existing .paw/.gitignore instead of replacing it', async () => {
+    const { fs, writeText } = fakeFs('', 'mine\n');
+    await applyInit(ROOT, fs);
+    const call = writeText.mock.calls.find(
+      (c) => (c as unknown as string[])[0] === ignorePathFor(ROOT),
+    ) as unknown as string[];
+    expect(call[1]).toMatch(/^mine\ndaemon\.token\n/);
+  });
+
   it('writes a merged config when asked', async () => {
     const { fs, writeText } = fakeFs(EXISTING);
     const plan = await applyInit(ROOT, fs, 'merge');
@@ -104,5 +116,20 @@ describe('applyInit with an existing config', () => {
       (c as unknown as string[])[0].includes('config.json'),
     ) as unknown as string[];
     expect(JSON.parse(call[1]).runners).toEqual({ '.gate.ts': 'tsx' });
+  });
+});
+
+describe('readInitPlan', () => {
+  it('plans against the config and ignore file on disk and writes nothing', async () => {
+    const { fs, writeText } = fakeFs(EXISTING, 'mine\n');
+    const plan = await readInitPlan(ROOT, fs, 'merge');
+    expect(writeText).not.toHaveBeenCalled();
+    expect(plan.refusal).toBeUndefined();
+    expect(plan.writes.find((w) => w.path === ignorePathFor(ROOT))?.content).toMatch(/^mine\n/);
+  });
+
+  it('reads an absent config as none', async () => {
+    const { fs } = fakeFs('');
+    expect((await readInitPlan(ROOT, fs, 'create')).refusal).toBeUndefined();
   });
 });

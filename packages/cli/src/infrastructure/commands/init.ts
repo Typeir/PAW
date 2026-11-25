@@ -2,8 +2,9 @@
  * PAW CLI — init / sync commands
  *
  * @fileoverview `paw init` attach PAW to current repo: write
- * `.paw/config.json` (host-agnostic descriptor: gates dir, connector) and a
- * `.git/hooks/pre-commit` that defer to `paw check --staged`. `paw sync` be
+ * `.paw/config.json` (host-agnostic descriptor: gates dir, connector),
+ * `.paw/.gitignore`, and a `.git/hooks/pre-commit` that run
+ * `paw gates --staged`. Host hook config is not written. `paw sync` be
  * same in merge mode: re-apply non-destructively, keep whatever repo already
  * declare. Both be process shell around core's `applyInit`, the
  * attach use-case shared by `paw`, `paw-setup`, and console. `--dry-run`
@@ -17,7 +18,7 @@
 
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { applyInit, configPathFor, planInit, type InitMode } from '@paw/core';
+import { applyInit, readInitPlan, type InitMode } from '@paw/core';
 import { createNodeFs } from '@paw/adapters';
 
 /**
@@ -60,10 +61,7 @@ export async function runInit(
     throw new Error(`paw ${label}: not inside a git repository`);
   }
   const fs = createNodeFs();
-  const existing = await fs.readText(configPathFor(root));
-  const plan = dryRun
-    ? planInit(root, existing === '' ? null : existing, mode)
-    : await applyInit(root, fs, mode);
+  const plan = dryRun ? await readInitPlan(root, fs, mode) : await applyInit(root, fs, mode);
   const verb = dryRun ? 'would write' : 'wrote';
   print([
     `${label}: ${dryRun ? 'dry run · ' : ''}${root}`,

@@ -1,8 +1,8 @@
 /**
  * PAW Init Scaffold Tests
  *
- * @fileoverview Cover `planInit`: host-agnostic config an' delegating git hook,
- * with exec flags. Pin bytes attach writes.
+ * @fileoverview Cover `planInit`: host-agnostic config, delegating git hook,
+ * and `.paw/.gitignore`, with exec flags. Pin bytes attach writes.
  *
  * @module @paw/core/test/domain/initScaffold
  * @version 0.0.0
@@ -11,10 +11,11 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { planInit } from '../../src/domain/initScaffold.js';
+import { ignorePathFor, planInit } from '../../src/domain/initScaffold.js';
 
 describe('planInit', () => {
   const plan = planInit('/work/repo');
+  const ignore = (p: typeof plan) => p.writes.find((w) => w.path === ignorePathFor('/work/repo'));
 
   it('writes a host-agnostic .paw/config.json (not executable)', () => {
     const config = plan.writes.find((w) => w.path.endsWith('config.json'));
@@ -25,14 +26,31 @@ describe('planInit', () => {
     });
   });
 
-  it('writes a pre-commit hook that delegates to the global paw (executable)', () => {
+  it('writes a pre-commit hook that runs the gates on staged files (executable)', () => {
     const hook = plan.writes.find((w) => w.path.includes('pre-commit'));
     expect(hook?.executable).toBe(true);
-    expect(hook?.content).toContain('exec paw check --staged');
+    expect(hook?.content).toContain('exec paw gates --staged\n');
   });
 
-  it('vendors no framework code — only config and the hook', () => {
-    expect(plan.writes).toHaveLength(2);
+  it('writes .paw/.gitignore covering runtime state and credential files (not executable)', () => {
+    expect(ignore(plan)).toEqual({
+      path: '/work/repo/.paw/.gitignore',
+      executable: false,
+      content:
+        '# Written by `paw init`: PAW runtime state and credential files.\n' +
+        'daemon.token\ndaemon.lock\ndaemon.log\npaw.sqlite\nconsole.endpoint.json\n*.env\n.env*\n',
+    });
+  });
+
+  it('appends only missing entries to an existing .paw/.gitignore, keeping its lines', () => {
+    const merged = planInit('/work/repo', null, 'create', 'mine\ndaemon.token\n');
+    expect(ignore(merged)?.content).toBe(
+      'mine\ndaemon.token\ndaemon.lock\ndaemon.log\npaw.sqlite\nconsole.endpoint.json\n*.env\n.env*\n',
+    );
+  });
+
+  it('vendors no framework code — only config, the hook, and the ignore file', () => {
+    expect(plan.writes).toHaveLength(3);
     expect(plan.root).toBe('/work/repo');
   });
 });

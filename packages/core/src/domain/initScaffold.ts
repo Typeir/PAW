@@ -2,8 +2,9 @@
  * PAW Init Scaffold
  *
  * @fileoverview What attaching PAW to repo write into it: a
- * host-agnostic `.paw/config.json` descriptor and a git hook that shell out to
- * globally-installed `paw` on PATH. No framework code copied — repo
+ * host-agnostic `.paw/config.json` descriptor, a `.paw/.gitignore` for runtime
+ * state and credentials, and a pre-commit hook that run `paw gates --staged`
+ * from globally-installed `paw` on PATH. No framework code copied — repo
  * declare where its gates, connectors, plans, and bindings live, and defer to
  * installed binary (decision doc 21).
  *
@@ -19,6 +20,7 @@
  */
 
 import { resolveInit, type InitMode, type InitOutcome } from './initConfig.js';
+import { withLines } from './lineFile.js';
 import { joinPath } from './paths.js';
 
 /**
@@ -84,17 +86,47 @@ export function configPathFor(root: string): string {
 }
 
 /**
+ * Where PAW's ignore file live relative to repo root.
+ *
+ * @param {string} root - Repo root.
+ * @returns {string} `.paw/.gitignore` path.
+ */
+export function ignorePathFor(root: string): string {
+  return joinPath([root, '.paw', '.gitignore']);
+}
+
+/**
+ * First line of a `.paw/.gitignore` that attach creates.
+ */
+const IGNORE_HEADER = '# Written by `paw init`: PAW runtime state and credential files.';
+
+/**
+ * Entries `.paw/.gitignore` must hold, relative to `.paw/`: daemon runtime
+ * state, the violation store, and every environment file `isEnvFile` matches.
+ */
+const IGNORED = [
+  'daemon.token',
+  'daemon.lock',
+  'daemon.log',
+  'paw.sqlite',
+  'console.endpoint.json',
+  '*.env',
+  '.env*',
+] as const;
+
+/**
  * Plan files an attach write into repo root.
  *
  * Config be one file that may already exist (written by another tool),
  * so what happen to it decided by {@link resolveInit} — every surface
  * that can attach repository must reach same verdict. Refusal return as a
- * plan that write no config and carry reason: caller report it and git
- * hook still have plan.
+ * plan that write no config and carry reason: caller report it, and git
+ * hook and ignore file still have plan.
  *
  * @param {string} root - Repo root.
  * @param {string | null} existingConfig - Current `.paw/config.json` contents, or null when absent.
  * @param {InitMode} mode - How operator resolved config conflict.
+ * @param {string} existingIgnore - Current `.paw/.gitignore` contents; empty when absent. Kept; missing entries appended.
  * @returns {InitPlan} Files to write, and any refusal.
  * @throws {Error} When existing config present but unreadable.
  */
@@ -102,16 +134,22 @@ export function planInit(
   root: string,
   existingConfig: string | null = null,
   mode: InitMode = 'create',
+  existingIgnore = '',
 ): InitPlan {
   const outcome = resolveInit(existingConfig, DEFAULT_CONFIG, mode);
   const hookWrite: FileWrite = {
     path: joinPath([root, '.git', 'hooks', 'pre-commit']),
-    content: hook('check --staged'),
+    content: hook('gates --staged'),
     executable: true,
+  };
+  const ignoreWrite: FileWrite = {
+    path: ignorePathFor(root),
+    content: withLines(existingIgnore === '' ? `${IGNORE_HEADER}\n` : existingIgnore, IGNORED),
+    executable: false,
   };
 
   if (outcome.kind === 'refuse') {
-    return { root, writes: [hookWrite], refusal: outcome };
+    return { root, writes: [hookWrite, ignoreWrite], refusal: outcome };
   }
 
   return {
@@ -123,6 +161,7 @@ export function planInit(
         executable: false,
       },
       hookWrite,
+      ignoreWrite,
     ],
   };
 }

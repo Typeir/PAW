@@ -310,8 +310,8 @@ export { withinRoot } from './domain/scope.js';
 export { binDir, pawHome } from './domain/pawHome.js';
 export type { HomeEnv } from './domain/pawHome.js';
 
-export { applyInit } from './application/applyInit.js';
-export { configPathFor, planInit } from './domain/initScaffold.js';
+export { applyInit, readInitPlan } from './application/applyInit.js';
+export { configPathFor, ignorePathFor, planInit } from './domain/initScaffold.js';
 export type { FileWrite, InitPlan } from './domain/initScaffold.js';
 
 export {

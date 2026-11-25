@@ -15,6 +15,7 @@
  * @since 5.0.0
  */
 
+import { withLines } from '../domain/lineFile.js';
 import { MODULES_DIR } from './moduleInstall.js';
 
 /**
@@ -115,13 +116,7 @@ function excludeLine(path: string): string {
  * @returns {string} New file text.
  */
 export function excludeWith(text: string, paths: readonly string[]): string {
-  const lines = new Set(text.split('\n'));
-  const missing = paths.map(excludeLine).filter((line) => !lines.has(line));
-  if (missing.length === 0) {
-    return text;
-  }
-  const base = text === '' || text.endsWith('\n') ? text : `${text}\n`;
-  return `${base}${missing.join('\n')}\n`;
+  return withLines(text, paths.map(excludeLine));
 }
 
 /**
