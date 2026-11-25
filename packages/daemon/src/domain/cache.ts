@@ -131,6 +131,7 @@ export function buildPlanSlice<Args>(
  * @property {RunProgress} run - Run identity and progress.
  * @property {BudgetSummary} budget - What run spend.
  * @property {Violation[]} violations - Open enforcement violations.
+ * @property {boolean} enforcementReachable - False when no enforcement pawd answered.
  * @property {string} socket - Bound address.
  * @property {number} gates - Gate count for the rail.
  * @property {number} keys - Provider key count for the rail.
@@ -146,6 +147,7 @@ export interface SnapshotParts {
   readonly run: RunProgress;
   readonly budget: BudgetSummary;
   readonly violations: readonly Violation[];
+  readonly enforcementReachable: boolean;
   readonly socket: string;
   readonly gates: number;
   readonly keys: number;
@@ -180,6 +182,7 @@ export function composeSnapshot(parts: SnapshotParts): PawSnapshot {
     run: parts.run,
     budget: parts.budget,
     violations: parts.violations,
+    enforcementReachable: parts.enforcementReachable,
     daemon: {
       live: true,
       uptimeLabel: formatUptime(parts.host.uptimeSec),

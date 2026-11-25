@@ -101,6 +101,7 @@ const BASE: PawSnapshot = {
     { id: 1, filePath: 'src/a.ts', rule: 'r1', message: 'direct & <b> "x"', indirectFix: false },
     { id: 2, filePath: 'src/b.ts', rule: 'r2', message: 'indirect', indirectFix: true },
   ],
+  enforcementReachable: true,
   logs: [
     { at: '2026-08-05T15:40:00.000Z', level: 'info', message: 'pawd listening on 127.0.0.1:8971' },
     { at: '2026-08-05T15:40:02.000Z', level: 'warn', message: 'could not record recent route /x' },

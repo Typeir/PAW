@@ -103,6 +103,17 @@ describe('applyLiveEvent', () => {
     expect(applyLiveEvent(DATA, frame('budget', budget)).budget).toBe(budget);
   });
 
+  it('takes violations, reachability, and the gate count from one enforcement frame', () => {
+    const violations = [
+      { id: 9, filePath: 'src/cart.ts', rule: 'no-console', message: 'console', indirectFix: false },
+    ];
+    const next = applyLiveEvent(DATA, frame('enforcement', { reachable: false, violations, gates: 3 }));
+
+    expect(next.violations).toBe(violations);
+    expect(next.enforcementReachable).toBe(false);
+    expect(next.chrome).toEqual({ ...DATA.chrome, gates: 3 });
+  });
+
   it('takes the served repository from a landed scope, and only from one', () => {
     expect(
       applyLiveEvent(DATA, frame('attach', { status: 'idle', path: 'C:\\code\\next' })).root,

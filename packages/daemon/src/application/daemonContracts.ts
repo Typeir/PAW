@@ -23,6 +23,7 @@ import type {
   RecentRoutesPort,
   RunSettings,
   SwarmPlan,
+  Violation,
 } from '@paw/core';
 import type { LiveBus } from '../domain/bus.js';
 import type { ControlPort } from '../domain/control.js';
@@ -216,6 +217,7 @@ export type Dispatcher = (
  * @property {() => readonly unknown[]} [providers] - Key-free provider roster served at `/api/providers` for the Keys view. Omit and the route answers 404.
  * @property {ModuleResolverPort} [moduleResolver] - Locates each module's package for `/api/modules`. Omit and the route answers 404.
  * @property {() => Promise<unknown>} [tasks] - Task graph rows and refusals for `/api/tasks`. Wired by a shell that has the work-model module. Omit and the route answers 404.
+ * @property {() => Promise<readonly Violation[] | null>} [violations] - Open violations of the enforcement pawd for the current scope, read every poll; null when no pawd answers. Omit and the console reports enforcement unreachable.
  */
 export interface DaemonOptions {
   readonly root?: string;
@@ -233,6 +235,7 @@ export interface DaemonOptions {
   readonly providers?: () => readonly unknown[];
   readonly moduleResolver?: ModuleResolverPort;
   readonly tasks?: () => Promise<{ readonly enabled: boolean }>;
+  readonly violations?: () => Promise<readonly Violation[] | null>;
   onAttach?(path: string, mode: InitMode): void;
   onRelease?(settings: RunSettings): void;
   dispatcherFor?(settings: RunSettings): Dispatcher;

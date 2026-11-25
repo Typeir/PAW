@@ -24,10 +24,7 @@ import type {
   QualityGate,
 } from '@paw/core';
 
-/**
- * Gate file names both loaders accept: import-loadable TS/JS modules.
- */
-export const GATE_FILE = /\.gate\.(mts|cts|ts|mjs|cjs|js)$/;
+export { GATE_FILE } from '@paw/core';
 
 /**
  * Build single-file context gate get, scoped to edited paths.

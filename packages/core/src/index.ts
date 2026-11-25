@@ -66,6 +66,7 @@ export type {
   HealthReport,
   QualityGate,
 } from './domain/gate.js';
+export { GATE_FILE, countGateFiles } from './domain/gate.js';
 
 export { validateConfig } from './domain/config.js';
 export type { ConfigDocument, ConfigProblem, PawConfig } from './domain/config.js';
@@ -360,6 +361,7 @@ export type {
 export type {
   AttachState,
   BudgetSummary,
+  EnforcementSlice,
   ClientMessage,
   RunSettings,
   DaemonStatus,

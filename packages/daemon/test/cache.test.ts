@@ -172,6 +172,7 @@ describe('composeSnapshot', () => {
     run: idleRun('15-40-02', '2026-08-06T15:40:02.000Z') as RunProgress,
     budget: idleBudget() as BudgetSummary,
     violations: [],
+    enforcementReachable: true,
     socket: '127.0.0.1:8971',
     gates: 3,
     keys: 2,
@@ -194,6 +195,7 @@ describe('composeSnapshot', () => {
     expect(snapshot.briefs).toHaveLength(2);
     expect(snapshot.doctor).toBe(DOCTOR);
     expect(snapshot.chrome).toEqual({ gates: 3, keys: 2, tasks: true });
+    expect(snapshot.enforcementReachable).toBe(true);
   });
 
   it('derives the daemon status line from the host it was handed', () => {

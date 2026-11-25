@@ -25,6 +25,7 @@
 
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import type { Violation } from '@paw/core';
 import type { ControlPort, ControlResult } from '../domain/control.js';
 import { socketPath, tokenPath } from '../infrastructure/endpoint.js';
 import { rpcCall } from '../infrastructure/rpcClient.js';
@@ -93,5 +94,26 @@ export function enforcementControl(
         return result === null ? UNREACHABLE : { status: 202, body: result };
       },
     },
+  };
+}
+
+/**
+ * Reader of the open violations held by the enforcement pawd for the scope the console holds. Each read is one `violations.list` round trip and resets that pawd's idle timer.
+ *
+ * @param {string | (() => string)} root - Repository console serve, or getter for scope it currently hold.
+ * @param {EnforcementControlSeams} [seams] - Injectable seams.
+ * @returns {() => Promise<readonly Violation[] | null>} Reader; resolves null when no pawd answers.
+ */
+export function enforcementViolations(
+  root: string | (() => string),
+  seams: EnforcementControlSeams = {},
+): () => Promise<readonly Violation[] | null> {
+  const currentRoot = typeof root === 'function' ? root : (): string => root;
+  const rpc = seams.rpc ?? socketRpc;
+  return async () => {
+    const result = (await rpc('violations.list', {}, currentRoot())) as {
+      readonly violations: readonly Violation[];
+    } | null;
+    return result === null ? null : result.violations;
   };
 }

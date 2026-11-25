@@ -21,6 +21,7 @@ import {
   parseEnvelope,
   watchFrame,
   type DispatchEvent,
+  type EnforcementSlice,
   type HostInfo,
   type HostProcess,
   type LogEntry,
@@ -28,6 +29,7 @@ import {
   type RunProgress,
   type RunSettings,
   type SwarmPlan,
+  type Violation,
 } from '@paw/core';
 import { describe, expect, it, vi } from 'vitest';
 import { CA_DAYS, LEAF_DAYS, META_VERSION, addDays } from '../src/domain/identity.js';
@@ -781,6 +783,71 @@ describe('runDaemon', () => {
     // The served snapshot reflects the edited config, so the doctor reports the
     // failure.
     expect((await daemon.snapshot()).doctor.ok).toBe(false);
+  });
+
+  it('reports enforcement unreachable and counts gates when no violations reader is wired', async () => {
+    const rig = makeRig({
+      listFiles: async () => [
+        ...LISTING,
+        { path: '.paw/gates', isFile: false },
+        { path: '.paw/gates/no-console.gate.mjs', isFile: true },
+        { path: '.paw/gates/notes.md', isFile: true },
+      ],
+    });
+    const snapshot = await (await runDaemon({}, rig.runtime)).snapshot();
+
+    expect(snapshot.enforcementReachable).toBe(false);
+    expect(snapshot.violations).toEqual([]);
+    expect(snapshot.chrome.gates).toBe(1);
+  });
+
+  it('counts no gates when the config names no gatesDir', async () => {
+    const { gatesDir: _dropped, ...bare } = JSON.parse(CONFIG) as Record<string, unknown>;
+    const rig = makeRig({
+      readFile: async (path: string) =>
+        path.endsWith('.json') ? JSON.stringify(bare) : `source of ${path}`,
+    });
+    expect((await (await runDaemon({}, rig.runtime)).snapshot()).chrome.gates).toBe(0);
+  });
+
+  it('serves the enforcement pawd violations and publishes only when they change', async () => {
+    const open: Violation = { id: 1, filePath: 'src/cart.ts', rule: 'no-console', message: 'console', indirectFix: false };
+    let held: Violation[] | null = [open];
+    const rig = makeRig();
+    const daemon = await runDaemon({ violations: async () => held }, rig.runtime);
+    const slices: EnforcementSlice[] = [];
+    daemon.bus.subscribe('enforcement', (next) => slices.push(next as EnforcementSlice));
+
+    const booted = await daemon.snapshot();
+    expect(booted.enforcementReachable).toBe(true);
+    expect(booted.violations).toEqual([open]);
+
+    rig.tick();
+    await settle();
+    expect(slices).toHaveLength(0);
+
+    held = null;
+    rig.tick();
+    await settle();
+    expect(slices).toEqual([{ reachable: false, violations: [], gates: 0 }]);
+    expect((await daemon.snapshot()).enforcementReachable).toBe(false);
+  });
+
+  it('reports a failing violations reader and keeps serving', async () => {
+    const rig = makeRig();
+    const daemon = await runDaemon(
+      {
+        violations: async () => {
+          throw new Error('store locked');
+        },
+      },
+      rig.runtime,
+    );
+    rig.tick();
+    await settle();
+
+    expect(rig.warnings.filter((w) => w === 'enforcement source failed: store locked')).toHaveLength(2);
+    expect((await daemon.snapshot()).enforcementReachable).toBe(false);
   });
 
   it('does not go looking for a config the repository does not have', async () => {

@@ -8,6 +8,8 @@
  * between calls confirm console follow current consumer. One case omits the fake
  * `rpc` so a real socket call runs against a dead endpoint and returns 503,
  * covering the default path.
+ * `enforcementViolations` reads `violations.list` for the held scope and
+ * resolves null when pawd does not answer.
  * Cover `enforcementControl.ts` to 100%.
  *
  * @module @paw/daemon/test/enforcementControl
@@ -17,7 +19,10 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { enforcementControl } from '../src/application/enforcementControl.js';
+import {
+  enforcementControl,
+  enforcementViolations,
+} from '../src/application/enforcementControl.js';
 
 const prune = 'DELETE /api/violations';
 const stop = 'POST /api/daemon/stop';
@@ -80,5 +85,28 @@ describe('enforcementControl', () => {
       body: {},
     });
     expect(res.status).toBe(503);
+  });
+});
+
+describe('enforcementViolations', () => {
+  const open = [{ id: 1, filePath: 'src/cart.ts', rule: 'no-console', message: 'console output', indirectFix: false }];
+
+  it('reads the open violations of the held scope, per call', async () => {
+    const rpc = vi.fn(async () => ({ violations: open }));
+    let held = '/consumer-a';
+    const read = enforcementViolations(() => held, { rpc });
+    expect(await read()).toEqual(open);
+    held = '/consumer-b';
+    await read();
+    expect(rpc).toHaveBeenNthCalledWith(1, 'violations.list', {}, '/consumer-a');
+    expect(rpc).toHaveBeenNthCalledWith(2, 'violations.list', {}, '/consumer-b');
+  });
+
+  it('resolves null when pawd does not answer', async () => {
+    expect(await enforcementViolations('/repo', { rpc: async () => null })()).toBeNull();
+  });
+
+  it('resolves null through the real socket when no daemon is running', async () => {
+    expect(await enforcementViolations('/no/such/repo')()).toBeNull();
   });
 });

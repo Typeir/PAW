@@ -172,6 +172,20 @@ export interface RailChrome {
 }
 
 /**
+ * Enforcement state of the served repository.
+ *
+ * @interface EnforcementSlice
+ * @property {boolean} reachable - False when no enforcement pawd answered for the repository; `violations` is then empty and unknown.
+ * @property {Violation[]} violations - Open violations in that pawd's store.
+ * @property {number} gates - Gate files in the repository's `gatesDir`.
+ */
+export interface EnforcementSlice {
+  readonly reachable: boolean;
+  readonly violations: readonly Violation[];
+  readonly gates: number;
+}
+
+/**
  * Full console state. Producer ship it, consumer render it. Every field plain data; swarm plan pre-render to `briefs`/`slugs`.
  *
  * @interface PawSnapshot
@@ -193,6 +207,7 @@ export interface RailChrome {
  * @property {RunProgress} run - Run identity and progress split.
  * @property {BudgetSummary} budget - Spend meter.
  * @property {Violation[]} violations - Open enforcement violations.
+ * @property {boolean} enforcementReachable - False when no enforcement pawd answered; `violations` is then unknown.
  * @property {LogEntry[]} logs - Daemon log ring, oldest first — the backlog a console shows before live frames arrive.
  * @property {DaemonStatus} daemon - Daemon status pill.
  * @property {RailChrome} chrome - Gates/Keys rail counts.
@@ -216,6 +231,7 @@ export interface PawSnapshot {
   readonly run: RunProgress;
   readonly budget: BudgetSummary;
   readonly violations: readonly Violation[];
+  readonly enforcementReachable: boolean;
   readonly logs: readonly LogEntry[];
   readonly daemon: DaemonStatus;
   readonly chrome: RailChrome;
@@ -337,6 +353,7 @@ export interface LiveTopicMap {
   readonly doctor: DoctorReport;
   readonly run: RunProgress;
   readonly budget: BudgetSummary;
+  readonly enforcement: EnforcementSlice;
   readonly tree: readonly TreeNode[];
   readonly log: readonly LogEntry[];
   readonly error: LiveError;

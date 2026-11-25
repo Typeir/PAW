@@ -52,6 +52,7 @@ export const TOPIC_CODES: Readonly<Record<LiveTopic, string>> = {
   doctor: 'dr',
   run: 'rn',
   budget: 'bg',
+  enforcement: 'en',
   tree: 'tr',
   log: 'lg',
   error: 'er',

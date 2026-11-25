@@ -214,6 +214,15 @@ describe('ViolationsView', () => {
     expect(screen.getByText('none open')).toBeInTheDocument();
     expect(screen.getByText('no open violations')).toBeInTheDocument();
   });
+
+  it('says enforcement is not running instead of claiming a clean ledger', () => {
+    renderInConsole(
+      <ViolationsView />,
+      makeSnapshot({ violations: [], enforcementReachable: false }),
+    );
+    expect(screen.getByText('enforcement not running')).toBeInTheDocument();
+    expect(screen.queryByText('no open violations')).toBeNull();
+  });
 });
 
 describe('PendingView', () => {

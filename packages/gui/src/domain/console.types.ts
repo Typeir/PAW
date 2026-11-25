@@ -85,6 +85,7 @@ export interface PlanView {
  * @property {RunProgress} run - Run identity and progress split.
  * @property {BudgetSummary} budget - Spend meter.
  * @property {Violation[]} violations - Open enforcement violations.
+ * @property {boolean} enforcementReachable - False when no enforcement pawd answered; `violations` is then unknown.
  * @property {DaemonStatus} daemon - Daemon status pill.
  * @property {LogEntry[]} logs - Daemon log entries, oldest first, capped at the ring size.
  * @property {RailChrome} chrome - Gates/Keys rail counts.
@@ -102,6 +103,7 @@ export interface ConsoleData {
   readonly run: RunProgress;
   readonly budget: BudgetSummary;
   readonly violations: readonly Violation[];
+  readonly enforcementReachable: boolean;
   readonly logs: readonly LogEntry[];
   readonly daemon: DaemonStatus;
   readonly chrome: RailChrome;

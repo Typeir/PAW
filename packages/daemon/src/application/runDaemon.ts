@@ -25,11 +25,13 @@ import {
   LIVE_TOPICS,
   buildRegistry,
   connectorRoster,
+  countGateFiles,
   resolveModules,
   runDoctor,
   type AttachState,
   type BudgetSummary,
   type DispatchEvent,
+  type EnforcementSlice,
   type HostInfo,
   type HostProcess,
   type LogEntry,
@@ -355,6 +357,40 @@ export async function runDaemon(
   };
 
   /**
+   * Gate files in the configured `gatesDir` of the current listing.
+   *
+   * @returns {number} Gate count; 0 when config names no `gatesDir`.
+   */
+  const gateCount = (): number =>
+    typeof config.gatesDir === 'string'
+      ? countGateFiles(
+          entries.filter((entry) => entry.isFile).map((entry) => entry.path),
+          config.gatesDir,
+        )
+      : 0;
+
+  let enforcement: EnforcementSlice = { reachable: false, violations: [], gates: gateCount() };
+
+  /**
+   * Re-read open violations from the enforcement pawd and recount gates, publish only when either changed.
+   */
+  const readEnforcement = async (): Promise<void> => {
+    const violations = options.violations === undefined ? null : await options.violations();
+    const next: EnforcementSlice = {
+      reachable: violations !== null,
+      violations: violations ?? [],
+      gates: gateCount(),
+    };
+    if (!sameValue(enforcement, next)) {
+      enforcement = next;
+      bus.publish('enforcement', next);
+    }
+  };
+  await readEnforcement().catch((error: unknown) => {
+    report(`enforcement source failed: ${reason(error)}`, 'error');
+  });
+
+  /**
    * Point daemon at another repository and republish everything derived from
    * it.
    *
@@ -385,6 +421,7 @@ export async function runDaemon(
     bus.publish('tree', tree);
     bus.publish('doctor', doctor);
     bus.publish('attach', attachState());
+    await readEnforcement();
     await rememberRoute(root);
   };
 
@@ -435,6 +472,7 @@ export async function runDaemon(
   const stopPolling = runtime.schedule(() => {
     runSource('process', readProcesses);
     runSource('config', readConfig);
+    runSource('enforcement', readEnforcement);
     // Chained, no raced. Plan reader decide what still exist by ask
     // `plansSlice`, so run it beside listing reader would let it judge against
     // last tick answer and re-render a plan that just been deleted. Listing that
@@ -466,9 +504,10 @@ export async function runDaemon(
       doctor,
       run: run ?? idleRun(runId, startedAt),
       budget: budget ?? idleBudget(),
-      violations: [],
+      violations: enforcement.violations,
+      enforcementReachable: enforcement.reachable,
       socket,
-      gates: 0,
+      gates: enforcement.gates,
       keys: modelCount(config),
       tasks: options.tasks === undefined ? false : (await options.tasks()).enabled,
       logs: log.entries(),

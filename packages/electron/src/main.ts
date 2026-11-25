@@ -46,6 +46,7 @@ import {
   createNodeModuleResolver,
   createNodeRecentRoutes,
   enforcementControl,
+  enforcementViolations,
   identityNotice,
   listProviders,
   mergeControl,
@@ -407,6 +408,7 @@ async function start(): Promise<void> {
       providers: () => listProviders(launch.root),
       moduleResolver: createNodeModuleResolver(launch.root),
       tasks: () => readRepoTasks(scope()),
+      violations: enforcementViolations(scope),
     },
     nodeRuntime(GUI_PAGE),
   );

@@ -146,3 +146,23 @@ export interface HealthReport {
   };
   gates: GateResult[];
 }
+
+/**
+ * Gate file names the loaders accept: import-loadable TS/JS modules.
+ */
+export const GATE_FILE = /\.gate\.(mts|cts|ts|mjs|cjs|js)$/;
+
+/**
+ * Count gate files directly inside a gates directory, as the loaders read it (not recursive).
+ *
+ * @param {readonly string[]} paths - Repo-relative file paths, `/`-separated.
+ * @param {string} gatesDir - Repo-relative gates directory; a leading `./` and trailing `/` are ignored.
+ * @returns {number} Paths whose parent is `gatesDir` and whose name matches {@link GATE_FILE}.
+ */
+export function countGateFiles(paths: readonly string[], gatesDir: string): number {
+  const dir = gatesDir.replace(/^\.\//, '').replace(/\/+$/, '');
+  return paths.filter((path) => {
+    const slash = path.lastIndexOf('/');
+    return path.slice(0, Math.max(slash, 0)) === dir && GATE_FILE.test(path.slice(slash + 1));
+  }).length;
+}

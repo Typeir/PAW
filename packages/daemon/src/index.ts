@@ -62,7 +62,7 @@ export type {
   ControlResult,
 } from './domain/control.js';
 
-export { enforcementControl } from './application/enforcementControl.js';
+export { enforcementControl, enforcementViolations } from './application/enforcementControl.js';
 export type { EnforcementControlSeams } from './application/enforcementControl.js';
 export { configControl } from './application/configControl.js';
 export { plansControl } from './application/plansControl.js';

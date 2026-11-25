@@ -1,7 +1,9 @@
 /**
  * Violations View
  *
- * @fileoverview Lists enforcement results from the console store. Severity comes
+ * @fileoverview Lists enforcement results from the console store. With no
+ * enforcement pawd answering for the repository, says so instead of reporting
+ * none open. Severity comes
  * from violation itself: direct violation block in same file reads critical, one
  * with fix in another file (`indirectFix`) reads warning. Component renders store
  * rows in the order the store holds them.
@@ -24,7 +26,19 @@ import { Placeholder } from '../atoms/placeholder.js';
  * @returns {JSX.Element} The view.
  */
 export function ViolationsView() {
-  const { violations } = useConsoleData();
+  const { violations, enforcementReachable } = useConsoleData();
+  if (!enforcementReachable) {
+    return (
+      <>
+        <Crumb title='Violations' sub='enforcement not running' />
+        <Card>
+          <Placeholder>
+            no enforcement daemon answers for this repository · violations show once a hook starts it
+          </Placeholder>
+        </Card>
+      </>
+    );
+  }
   if (violations.length === 0) {
     return (
       <>

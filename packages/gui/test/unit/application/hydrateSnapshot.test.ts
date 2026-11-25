@@ -37,6 +37,7 @@ describe('hydrate', () => {
       run: snapshot.run,
       budget: snapshot.budget,
       violations: snapshot.violations,
+      enforcementReachable: snapshot.enforcementReachable,
       logs: snapshot.logs,
       daemon: snapshot.daemon,
       chrome: snapshot.chrome,

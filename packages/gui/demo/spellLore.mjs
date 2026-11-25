@@ -224,6 +224,7 @@ export function demoSnapshot() {
     },
     budget: { spendUsd: 0.03, tokensIn: 41280, tokensOut: 9130 },
     violations: VIOLATIONS,
+    enforcementReachable: true,
     daemon: {
       live: false,
       uptimeLabel: '—',

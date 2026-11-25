@@ -46,6 +46,7 @@ import {
   findConsoleEndpointByPid,
   dispatcherFor,
   enforcementControl,
+  enforcementViolations,
   identityNotice,
   listProviders,
   mergeControl,
@@ -461,6 +462,7 @@ export async function runUi(
       providers: () => listProviders(scope()),
       moduleResolver: createNodeModuleResolver(root),
       tasks: () => readRepoTasks(scope()),
+      violations: enforcementViolations(scope),
       onAttach: (path, mode) => {
         void approveAttach(path, mode, () => handle);
       },

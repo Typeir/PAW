@@ -27,6 +27,7 @@ import type {
   AttachState,
   BudgetSummary,
   DoctorReport,
+  EnforcementSlice,
   HostInfo,
   HostProcess,
   LiveEnvelope,
@@ -102,6 +103,16 @@ export function applyLiveEvent(data: ConsoleData, event: LiveEnvelope): ConsoleD
 
     case 'budget':
       return { ...data, budget: event.data as BudgetSummary };
+
+    case 'enforcement': {
+      const slice = event.data as EnforcementSlice;
+      return {
+        ...data,
+        violations: slice.violations,
+        enforcementReachable: slice.reachable,
+        chrome: { ...data.chrome, gates: slice.gates },
+      };
+    }
 
     case 'log': {
       const fresh = event.data as readonly LogEntry[];
