@@ -55,16 +55,16 @@ describe('configControl', () => {
 
     it('binds a role, writes the document, and returns the new roles', async () => {
       const doc = fakeDoc(withModel);
-      const res = await run(doc.port, { body: { role: 'review.judge', model: 'fast' } });
+      const res = await run(doc.port, { body: { role: 'review.graze', model: 'fast' } });
       expect(res.status).toBe(200);
       expect(res.body).toEqual({
         ok: true,
-        roles: { 'review.judge': 'fast' },
+        roles: { 'review.graze': 'fast' },
         models: { fast: caps },
         connectors: [],
         modules: [],
       });
-      expect(doc.get().roles).toEqual({ 'review.judge': 'fast' });
+      expect(doc.get().roles).toEqual({ 'review.graze': 'fast' });
     });
 
     it('refuses a non-string role or model with 422', async () => {
@@ -73,7 +73,7 @@ describe('configControl', () => {
     });
 
     it('surfaces an engine refusal, e.g. an undeclared model', async () => {
-      const res = await run(fakeDoc().port, { body: { role: 'review.judge', model: 'ghost' } });
+      const res = await run(fakeDoc().port, { body: { role: 'review.graze', model: 'ghost' } });
       expect(res).toMatchObject({ status: 422, body: { ok: false } });
     });
   });

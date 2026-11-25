@@ -111,8 +111,8 @@ describe('resolveModel', () => {
   });
 
   it('throws when a required role is unbound', () => {
-    const reg = registry([decl('review.judge', false)], []);
-    expect(() => resolveModel(reg, 'review.judge')).toThrow(/unbound/);
+    const reg = registry([decl('gate.fix', false)], []);
+    expect(() => resolveModel(reg, 'gate.fix')).toThrow(/unbound/);
   });
 
   it('returns null when an optional role is unbound', () => {
@@ -142,7 +142,7 @@ describe('doctorRoles', () => {
     const reg = registry(
       [
         decl('edit.apply', false),
-        decl('review.judge', false),
+        decl('gate.fix', false),
         decl('memory.draft', true),
         decl('gate.explain', true, { tools: true }),
       ],
@@ -157,7 +157,7 @@ describe('doctorRoles', () => {
       boundTo: 'ds-flash',
       blocking: false,
     });
-    expect(rows.find((r) => r.role === 'review.judge')).toMatchObject({
+    expect(rows.find((r) => r.role === 'gate.fix')).toMatchObject({
       boundTo: null,
       blocking: true,
     });

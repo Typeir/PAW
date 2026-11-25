@@ -161,7 +161,8 @@ describe('cli doctor (e2e)', () => {
     expect(code).toBe(1);
     expect(stdout).toContain('doctor: NOT READY');
     expect(stdout).toContain('config.connector');
-    expect(stdout).toContain('review.judge');
+    expect(stdout).toContain('config.roles.review.judge');
+    expect(stdout).toContain('paw config unbind review.judge');
   });
 });
 
@@ -291,54 +292,45 @@ describe('cli config show (e2e)', () => {
     vision: false,
     costClass: 'cheap',
   };
-  const ROOMY = { ...CHEAP, maxOutputTokens: 16_384, costClass: 'standard' };
+  const SMALL = { ...CHEAP, maxOutputTokens: 4_096 };
 
   /**
-   * Config binding both cheap roles to `deepseek-chat` and `review.judge` to
+   * Config binding `review.graze` to `deepseek-chat` and `edit.apply` to
    * whichever model the case is about.
    *
-   * @param judge - Model id to bind `review.judge` to.
+   * @param edit - Model id to bind `edit.apply` to.
    * @param models - Declared models.
    */
-  const configFor = (judge: string, models: Record<string, unknown>): unknown => ({
+  const configFor = (edit: string, models: Record<string, unknown>): unknown => ({
     models,
-    roles: {
-      'edit.apply': 'deepseek-chat',
-      'review.graze': 'deepseek-chat',
-      'review.judge': judge,
-    },
+    roles: { 'edit.apply': edit, 'review.graze': 'deepseek-chat' },
   });
 
   it('marks every satisfied binding and exits 0', async () => {
-    const root = repoWithConfig(
-      configFor('deepseek-roomy', { 'deepseek-chat': CHEAP, 'deepseek-roomy': ROOMY }),
-    );
+    const root = repoWithConfig(configFor('deepseek-chat', { 'deepseek-chat': CHEAP }));
     const { stdout, code } = await runCliIn(root, 'config', 'show');
     expect(code).toBe(0);
     expect(stdout).toContain('✓ role edit.apply → deepseek-chat');
-    expect(stdout).toContain('✓ role review.judge → deepseek-roomy');
+    expect(stdout).toContain('✓ role review.graze → deepseek-chat');
+    expect(stdout).not.toContain('review.judge');
     expect(stdout).not.toContain('cannot run');
   });
 
   it('refuses a binding whose model the config does not declare', async () => {
-    const root = repoWithConfig(
-      configFor('deepseek-reasoner', { 'deepseek-chat': CHEAP }),
-    );
+    const root = repoWithConfig(configFor('ghost', { 'deepseek-chat': CHEAP }));
     const { stdout, code } = await runCliIn(root, 'config', 'show');
     expect(code).toBe(1);
-    expect(stdout).toContain(
-      '✗ role review.judge → deepseek-reasoner — model "deepseek-reasoner" is not declared',
-    );
-    expect(stdout).toContain('1 required role(s) cannot run: review.judge');
+    expect(stdout).toContain('✗ role edit.apply → ghost — model "ghost" is not declared');
+    expect(stdout).toContain('1 required role(s) cannot run: edit.apply');
   });
 
   it('refuses a declared model whose output ceiling falls short of the role', async () => {
-    const root = repoWithConfig(configFor('deepseek-chat', { 'deepseek-chat': CHEAP }));
+    const root = repoWithConfig(
+      configFor('small', { 'deepseek-chat': CHEAP, small: SMALL }),
+    );
     const { stdout, code } = await runCliIn(root, 'config', 'show');
     expect(code).toBe(1);
-    expect(stdout).toContain(
-      '✗ role review.judge → deepseek-chat — max output 8192 < required 16384',
-    );
+    expect(stdout).toContain('✗ role edit.apply → small — max output 4096 < required 8192');
   });
 });
 

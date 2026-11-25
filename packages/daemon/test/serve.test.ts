@@ -119,7 +119,6 @@ const CONFIG = JSON.stringify({
   roles: {
     'edit.apply': 'ds-flash',
     'review.graze': 'ds-flash',
-    'review.judge': 'ds-flash',
   },
 });
 
@@ -562,7 +561,7 @@ describe('runDaemon', () => {
     const res = await rig.handler()?.(asConsole('/api/config'));
     expect(JSON.parse(res?.body ?? '{}')).toEqual({
       models: ['ds-flash'],
-      roles: { 'edit.apply': 'ds-flash', 'review.graze': 'ds-flash', 'review.judge': 'ds-flash' },
+      roles: { 'edit.apply': 'ds-flash', 'review.graze': 'ds-flash' },
     });
   });
 

@@ -115,7 +115,7 @@ describe('selectors', () => {
   });
 
   it("fails the plan's role when its binding is blocking", () => {
-    const blocked = hydrate(makeSnapshot({ planRole: 'review.judge' }));
+    const blocked = hydrate(makeSnapshot({ planRole: 'edit.apply' }));
     expect(planRoleOk(blocked)).toBe(false);
   });
 

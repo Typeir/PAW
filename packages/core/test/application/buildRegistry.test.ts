@@ -66,21 +66,31 @@ describe('doctorConfigRoles', () => {
     );
   });
 
+  it('does not block on an unbound review.graze', () => {
+    expect(doctorConfigRoles({}).find((r) => r.role === 'review.graze')?.blocking).toBe(
+      false,
+    );
+  });
+
+  it('declares no review.judge role', () => {
+    expect(doctorConfigRoles({}).map((r) => r.role)).not.toContain('review.judge');
+  });
+
   it('reports a binding to an undeclared model instead of throwing', () => {
-    const rows = doctorConfigRoles({ roles: { 'review.judge': 'deepseek-reasoner' } });
-    const judge = rows.find((r) => r.role === 'review.judge');
-    expect(judge).toMatchObject({ boundTo: 'deepseek-reasoner', blocking: true });
-    expect(judge?.satisfaction?.reasons).toEqual(['model "deepseek-reasoner" is not declared']);
+    const rows = doctorConfigRoles({ roles: { 'edit.apply': 'ghost' } });
+    const edit = rows.find((r) => r.role === 'edit.apply');
+    expect(edit).toMatchObject({ boundTo: 'ghost', blocking: true });
+    expect(edit?.satisfaction?.reasons).toEqual(['model "ghost" is not declared']);
   });
 
   it('refuses a declared model whose output ceiling falls short of the role', () => {
     const rows = doctorConfigRoles({
-      models: { 'deepseek-reasoner': CAP },
-      roles: { 'review.judge': 'deepseek-reasoner' },
+      models: { small: { ...CAP, maxOutputTokens: 4_096 } },
+      roles: { 'edit.apply': 'small' },
     });
-    const judge = rows.find((r) => r.role === 'review.judge');
-    expect(judge?.blocking).toBe(true);
-    expect(judge?.satisfaction?.reasons).toContain('max output 8192 < required 16384');
+    const edit = rows.find((r) => r.role === 'edit.apply');
+    expect(edit?.blocking).toBe(true);
+    expect(edit?.satisfaction?.reasons).toContain('max output 4096 < required 8192');
   });
 
   it('passes a binding that satisfies its role', () => {

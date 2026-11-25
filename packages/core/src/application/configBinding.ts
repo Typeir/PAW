@@ -230,14 +230,15 @@ export function disableConnector(config: ConfigDocument, id: string): ConfigEdit
 }
 
 /**
- * Clear role binding, leave it unbound.
+ * Clear role binding, leave it unbound. A bound role PAW no longer declares can
+ * still be cleared.
  *
  * @param {ConfigDocument} config - Current document.
  * @param {string} roleId - Role to unbind.
- * @returns {ConfigEdit} Next document, or refusal.
+ * @returns {ConfigEdit} Next document, or refusal when the role is neither declared nor bound.
  */
 export function clearBinding(config: ConfigDocument, roleId: string): ConfigEdit {
-  if (!ROLE_IDS.has(roleId)) {
+  if (!ROLE_IDS.has(roleId) && config.roles?.[roleId] === undefined) {
     return { ok: false, reason: `unknown role "${roleId}"` };
   }
   const roles = { ...config.roles };

@@ -2,7 +2,7 @@
  * PAW Doctor Service Tests
  *
  * @fileoverview Test combined verdict. Clean install, config problem, blocking
- * role, both at once. Cover `doctor.ts` to 100%.
+ * role, stray binding, both at once. Cover `doctor.ts` to 100%.
  *
  * @module @paw/core/test/application/doctor
  * @version 0.0.0
@@ -67,7 +67,7 @@ describe('runDoctor', () => {
 
   it('is not ok when a required role is blocking', () => {
     const reg: RoleRegistry = {
-      declarations: new Map([['review.judge', role('review.judge', false)]]),
+      declarations: new Map([['edit.apply', role('edit.apply', false)]]),
       bindings: new Map(),
     };
     const rep = runDoctor(goodConfig, reg, KNOWN);
@@ -75,9 +75,28 @@ describe('runDoctor', () => {
     expect(rep.roles[0].blocking).toBe(true);
   });
 
+  it('is not ok when a binding names a role PAW does not declare', () => {
+    const reg: RoleRegistry = {
+      declarations: boundRegistry.declarations,
+      bindings: new Map([
+        ['edit.apply', { modelId: 'm', capabilities: CAP, port }],
+        ['review.judge', { modelId: 'm', capabilities: CAP, port }],
+      ]),
+    };
+    const rep = runDoctor(goodConfig, reg, KNOWN);
+    expect(rep.ok).toBe(false);
+    expect(rep.config).toEqual([
+      {
+        field: 'roles.review.judge',
+        message:
+          'role "review.judge" is not a PAW role; remove the binding with paw config unbind review.judge',
+      },
+    ]);
+  });
+
   it('reports both a config problem and a role problem together', () => {
     const reg: RoleRegistry = {
-      declarations: new Map([['review.judge', role('review.judge', false)]]),
+      declarations: new Map([['edit.apply', role('edit.apply', false)]]),
       bindings: new Map(),
     };
     const rep = runDoctor({}, reg, KNOWN);

@@ -122,9 +122,8 @@ function brief(spell, member) {
 }
 
 const ROLES = [
-  ['lore.author', 'deepseek-chat'], ['lore.judge', 'deepseek-reasoner'],
+  ['lore.author', 'deepseek-chat'],
   ['edit.apply', 'deepseek-chat'], ['review.graze', 'deepseek-chat'],
-  ['review.judge', 'deepseek-reasoner'],
 ].map(([role, boundTo]) => ({
   role,
   optional: false,

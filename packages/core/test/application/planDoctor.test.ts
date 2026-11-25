@@ -28,6 +28,7 @@ const DEEPSEEK: ModelCapabilities = {
   vision: false,
   costClass: 'cheap',
 };
+const SMALL: ModelCapabilities = { ...DEEPSEEK, maxOutputTokens: 4_096 };
 
 /**
  * One-member plan bound to the named role.
@@ -73,14 +74,12 @@ describe('checkRoleBinding', () => {
   });
 
   it('names the output-ceiling shortfall that used to surface only at dispatch', () => {
-    const finding = checkRoleBinding(plan('review.judge'), {
-      modelId: 'deepseek-chat',
-      capabilities: DEEPSEEK,
+    const finding = checkRoleBinding(plan('edit.apply'), {
+      modelId: 'small',
+      capabilities: SMALL,
     });
     expect(finding.ok).toBe(false);
-    expect(finding.detail).toBe(
-      'review.judge → deepseek-chat: max output 8192 < required 16384',
-    );
+    expect(finding.detail).toBe('edit.apply → small: max output 4096 < required 8192');
   });
 });
 
@@ -92,9 +91,9 @@ describe('doctorPlanWithBinding', () => {
   });
 
   it('refuses when the plan is sound but its role is not servable', () => {
-    const findings = doctorPlanWithBinding(plan('review.judge'), {
-      modelId: 'deepseek-chat',
-      capabilities: DEEPSEEK,
+    const findings = doctorPlanWithBinding(plan('edit.apply'), {
+      modelId: 'small',
+      capabilities: SMALL,
     });
     expect(findings.every((f) => f.ok)).toBe(false);
   });

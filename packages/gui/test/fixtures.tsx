@@ -68,7 +68,7 @@ const BASE: PawSnapshot = {
       },
       { role: 'memory.draft', optional: true, boundTo: null, satisfaction: null, blocking: false },
       {
-        role: 'review.judge',
+        role: 'edit.apply',
         optional: false,
         boundTo: 'weak',
         satisfaction: { ok: false, reasons: ['requires reasoning'] },

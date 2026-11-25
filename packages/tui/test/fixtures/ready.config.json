@@ -15,7 +15,6 @@
   },
   "roles": {
     "edit.apply": "ds-flash",
-    "review.graze": "ds-flash",
-    "review.judge": "ds-flash"
+    "review.graze": "ds-flash"
   }
 }

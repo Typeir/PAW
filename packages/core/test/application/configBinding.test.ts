@@ -80,8 +80,8 @@ describe('declareModel', () => {
 
 describe('setBinding', () => {
   it('binds a role to a declared model', () => {
-    const edit = setBinding(base, 'review.judge', 'fast');
-    expect(edit.ok && edit.config.roles).toEqual({ 'edit.apply': 'fast', 'review.judge': 'fast' });
+    const edit = setBinding(base, 'review.graze', 'fast');
+    expect(edit.ok && edit.config.roles).toEqual({ 'edit.apply': 'fast', 'review.graze': 'fast' });
   });
 
   it('refuses an unknown role', () => {
@@ -89,7 +89,7 @@ describe('setBinding', () => {
   });
 
   it('refuses a model that is not declared', () => {
-    expect(setBinding(base, 'review.judge', 'ghost')).toMatchObject({
+    expect(setBinding(base, 'review.graze', 'ghost')).toMatchObject({
       ok: false,
       reason: 'model "ghost" is not declared',
     });
@@ -98,9 +98,9 @@ describe('setBinding', () => {
 
 describe('clearBinding', () => {
   it('removes a role binding, preserving the others', () => {
-    const two: ConfigDocument = { ...base, roles: { 'edit.apply': 'fast', 'review.judge': 'fast' } };
+    const two: ConfigDocument = { ...base, roles: { 'edit.apply': 'fast', 'review.graze': 'fast' } };
     const edit = clearBinding(two, 'edit.apply');
-    expect(edit.ok && edit.config.roles).toEqual({ 'review.judge': 'fast' });
+    expect(edit.ok && edit.config.roles).toEqual({ 'review.graze': 'fast' });
   });
 
   it('is idempotent when the role was not bound', () => {
@@ -110,5 +110,11 @@ describe('clearBinding', () => {
 
   it('refuses an unknown role', () => {
     expect(clearBinding(base, 'made.up')).toMatchObject({ ok: false });
+  });
+
+  it('clears a binding to a role PAW no longer declares', () => {
+    const stray: ConfigDocument = { ...base, roles: { 'edit.apply': 'fast', 'review.judge': 'fast' } };
+    const edit = clearBinding(stray, 'review.judge');
+    expect(edit.ok && edit.config.roles).toEqual({ 'edit.apply': 'fast' });
   });
 });

@@ -52,10 +52,10 @@ const BROKEN: DoctorReport = {
   config: [{ field: 'root', message: 'root must be a non-empty string' }],
   roles: [
     {
-      role: 'review.judge',
+      role: 'edit.apply',
       boundTo: 'small',
       blocking: true,
-      satisfaction: { ok: false, reasons: ['max output 8192 < required 16384'] },
+      satisfaction: { ok: false, reasons: ['max output 4096 < required 8192'] },
     },
     { role: 'memory.draft', boundTo: null, blocking: false, satisfaction: null },
   ],
@@ -246,7 +246,7 @@ describe('doctorLines', () => {
     const lines = doctorLines(BROKEN);
     expect(lines[0]).toBe('PAW is NOT ready.');
     expect(lines).toContain('✗ config.root — root must be a non-empty string');
-    expect(lines).toContain('✗ review.judge → small (max output 8192 < required 16384)');
+    expect(lines).toContain('✗ edit.apply → small (max output 4096 < required 8192)');
     expect(lines).toContain('✓ memory.draft → (unbound)');
   });
 });

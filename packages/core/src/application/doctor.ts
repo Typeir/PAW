@@ -4,7 +4,8 @@
  * @fileoverview Unified pre-flight check CLI, TUI, GUI render. Combine config
  * validation with role doctor into one report and one `ok` verdict: PAW ready
  * to run only when config resolve and no required role unbound or unsatisfied.
- * Pure over its inputs.
+ * A binding to a role PAW does not declare is a config problem. Pure over its
+ * inputs.
  *
  * @module @paw/core/application/doctor
  * @version 0.0.0
@@ -37,6 +38,21 @@ export interface DoctorReport {
 }
 
 /**
+ * One problem per binding whose role PAW does not declare.
+ *
+ * @param {RoleRegistry} registry - Declarations and bindings.
+ * @returns {ConfigProblem[]} One `roles.<id>` problem per undeclared role, naming the unbind verb.
+ */
+function strayBindings(registry: RoleRegistry): ConfigProblem[] {
+  return [...registry.bindings.keys()]
+    .filter((id) => !registry.declarations.has(id))
+    .map((id) => ({
+      field: `roles.${id}`,
+      message: `role "${id}" is not a PAW role; remove the binding with paw config unbind ${id}`,
+    }));
+}
+
+/**
  * Run unified doctor.
  *
  * @param {unknown} config - Parsed config object to validate.
@@ -49,7 +65,7 @@ export function runDoctor(
   registry: RoleRegistry,
   knownConnectors: readonly string[],
 ): DoctorReport {
-  const configProblems = validateConfig(config, knownConnectors);
+  const configProblems = [...validateConfig(config, knownConnectors), ...strayBindings(registry)];
   const roles = doctorRoles(registry);
   const ok = configProblems.length === 0 && roles.every((r) => !r.blocking);
   return { config: configProblems, roles, ok };

@@ -460,14 +460,14 @@ describe('formatDoctor', () => {
       ok: false,
       config: [{ field: 'connector', message: 'unknown connector "x"' }],
       roles: [
-        { role: 'review.judge', optional: false, boundTo: 'weak', satisfaction: { ok: false, reasons: ['requires tool calls'] }, blocking: true },
+        { role: 'edit.apply', optional: false, boundTo: 'weak', satisfaction: { ok: false, reasons: ['requires tool calls'] }, blocking: true },
         { role: 'memory.draft', optional: true, boundTo: null, satisfaction: null, blocking: false },
       ],
     };
     const out = formatDoctor(report);
     expect(out[0]).toBe('doctor: NOT READY');
     expect(out).toContain('  ✗ config.connector: unknown connector "x"');
-    expect(out).toContain('  ✗ role review.judge → weak — requires tool calls');
+    expect(out).toContain('  ✗ role edit.apply → weak — requires tool calls');
     expect(out).toContain('  ✓ role memory.draft → (unbound) [optional]');
   });
 });
@@ -554,14 +554,14 @@ describe('formatRoleRows', () => {
     expect(
       formatRoleRows([
         {
-          role: 'review.judge',
+          role: 'edit.apply',
           optional: false,
-          boundTo: 'deepseek-chat',
-          satisfaction: { ok: false, reasons: ['max output 8192 < required 16384'] },
+          boundTo: 'small',
+          satisfaction: { ok: false, reasons: ['max output 4096 < required 8192'] },
           blocking: true,
         },
       ]),
-    ).toEqual(['  ✗ role review.judge → deepseek-chat — max output 8192 < required 16384']);
+    ).toEqual(['  ✗ role edit.apply → small — max output 4096 < required 8192']);
   });
 });
 

@@ -245,8 +245,8 @@ describe('createConfigClient', () => {
   describe('unbind', () => {
     it('DELETEs the role, escaping it in the query', async () => {
       const fetchFn = respond({ ok: true });
-      await createConfigClient(fetchFn).unbind('review.judge');
-      expect(fetchFn).toHaveBeenCalledWith(`${CONFIG_ROLES_URL}?role=review.judge`, {
+      await createConfigClient(fetchFn).unbind('review.graze');
+      expect(fetchFn).toHaveBeenCalledWith(`${CONFIG_ROLES_URL}?role=review.graze`, {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
       });
