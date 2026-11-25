@@ -9,7 +9,13 @@
  * @module @paw/daemon/test/run
  */
 
-import type { DispatchEvent, DispatchResult, ModelPort } from '@paw/core';
+import {
+  judgeViolations,
+  proveMember,
+  type DispatchEvent,
+  type DispatchResult,
+  type ModelPort,
+} from '@paw/core';
 import { describe, expect, it } from 'vitest';
 import { meterPort, toRunProgress, trackRun } from '../src/application/run.js';
 
@@ -64,7 +70,7 @@ describe('toRunProgress', () => {
         { member: 2, key: 'c.mdx', state: 'done', content: 'wrote c' },
       ],
     };
-    expect(toRunProgress(result, '15-40-02', '2026-08-05T15:40:02.000Z')).toEqual({
+    expect(toRunProgress(result, '15-40-02', '2026-08-05T15:40:02.000Z', [])).toEqual({
       id: '15-40-02',
       startedAt: '2026-08-05T15:40:02.000Z',
       skipped: 1,
@@ -86,11 +92,59 @@ describe('toRunProgress', () => {
       findings: [{ check: 'count', ok: false }],
       outcomes: [],
     };
-    expect(toRunProgress(refused, 'r', 't')).toMatchObject({
+    expect(toRunProgress(refused, 'r', 't', [])).toMatchObject({
       done: 0,
       skipped: 0,
       confirmed: 0,
       members: [],
+    });
+  });
+
+  it('fails a member whose proof failed, naming why, and confirms only the rest', () => {
+    const result: DispatchResult = {
+      released: true,
+      findings: [],
+      outcomes: [
+        { member: 0, key: 'cart', state: 'done', content: 'ok' },
+        { member: 1, key: 'pay', state: 'done', content: 'ok' },
+        { member: 2, key: 'orders', state: 'done', content: 'ok' },
+      ],
+    };
+    const cart = judgeViolations(
+      [proveMember(0, 'cart', true, [{ path: 'src/cart.ts', state: 'written' }])],
+      [{ id: 1, filePath: 'src/cart.ts', rule: 'no-console', message: 'm', indirectFix: false }],
+    )[0];
+    const proofs = [
+      cart,
+      proveMember(1, 'pay', true, [{ path: 'src/pay.ts', state: 'empty' }]),
+      proveMember(2, 'orders', true, [{ path: 'src/orders.ts', state: 'written' }]),
+    ];
+
+    expect(toRunProgress(result, 'r', 't', proofs)).toEqual({
+      id: 'r',
+      startedAt: 't',
+      skipped: 0,
+      done: 1,
+      running: 0,
+      failed: 2,
+      confirmed: 1,
+      members: [
+        {
+          member: 0,
+          key: 'cart',
+          state: 'failed',
+          level: null,
+          note: 'src/cart.ts holds 1 open violation(s): no-console',
+        },
+        {
+          member: 1,
+          key: 'pay',
+          state: 'failed',
+          level: null,
+          note: 'declared file is empty: src/pay.ts',
+        },
+        { member: 2, key: 'orders', state: 'done', level: null },
+      ],
     });
   });
 });
@@ -203,7 +257,7 @@ describe('trackRun', () => {
     };
 
     // Live view matches the authoritative end-of-run view when the run finishes.
-    expect(tracker.progress()).toEqual(toRunProgress(result, 'r', 't'));
+    expect(tracker.progress()).toEqual(toRunProgress(result, 'r', 't', []));
   });
 
   it('ignores a settled event that carries no outcome', () => {

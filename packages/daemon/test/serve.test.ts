@@ -1315,6 +1315,7 @@ describe('runDaemon', () => {
               outcomes: [{ member: 0, key: 'a.mdx', state: 'done', content: 'out' }],
             },
             usage: { spendUsd: 0, tokensIn: 10, tokensOut: 20 },
+            proofs: [],
           };
         },
       },
@@ -1371,6 +1372,7 @@ describe('runDaemon', () => {
                 outcomes: [{ member: 0, key: 'a.mdx', state: 'done', content: 'out' }],
               },
               usage: { spendUsd: 0, tokensIn: 5, tokensOut: 7 },
+              proofs: [],
             };
           };
         },
@@ -1406,6 +1408,7 @@ describe('runDaemon', () => {
             outcomes: [{ member: 0, key: 'a.mdx', state: 'skipped' }],
           },
           usage: { spendUsd: 0, tokensIn: 1, tokensOut: 2 },
+          proofs: [],
         }),
       },
       rig.runtime,
@@ -1479,6 +1482,7 @@ describe('runDaemon', () => {
             ],
           },
           usage: { spendUsd: 0, tokensIn: 120, tokensOut: 8 },
+          proofs: [],
         }),
       },
       rig.runtime,

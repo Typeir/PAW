@@ -13,13 +13,15 @@
  * @since 5.0.0
  */
 
-import type {
-  BudgetSummary,
-  DispatchEvent,
-  DispatchResult,
-  MemberView,
-  ModelPort,
-  RunProgress,
+import {
+  proofFailures,
+  type BudgetSummary,
+  type DispatchEvent,
+  type DispatchResult,
+  type MemberProof,
+  type MemberView,
+  type ModelPort,
+  type RunProgress,
 } from '@paw/core';
 
 /**
@@ -138,35 +140,42 @@ export function trackRun(id: string, startedAt: string): RunTracker {
 }
 
 /**
- * Map finished dispatch to run progress. `running` and `failed` zero; batch
- * dispatch is done by the time it returns. If any member fails, the whole run
- * throws. `confirmed` counts members with content in the return.
+ * Map finished dispatch and its proofs to run progress. `running` is zero;
+ * batch dispatch is done by the time it returns. A member whose proof failed
+ * (declared file not produced, or holding open violations) is `failed` with
+ * the reasons as its note. `confirmed` counts members with content in the
+ * return that did not fail.
  *
  * @param {DispatchResult} result - Dispatch result.
  * @param {string} id - Run id.
  * @param {string} startedAt - Run start timestamp.
+ * @param {readonly MemberProof[]} proofs - Per-member verdicts.
  * @returns {RunProgress} Run as console show it.
  */
 export function toRunProgress(
   result: DispatchResult,
   id: string,
   startedAt: string,
+  proofs: readonly MemberProof[],
 ): RunProgress {
-  const members: MemberView[] = result.outcomes.map((outcome) => ({
-    member: outcome.member,
-    key: outcome.key,
-    state: outcome.state,
-    level: null,
-  }));
+  const failures = new Map(
+    proofs.map((proof) => [proof.member, proofFailures(proof)] as const).filter(([, why]) => why.length > 0),
+  );
+  const members: MemberView[] = result.outcomes.map((outcome) => {
+    const why = failures.get(outcome.member);
+    return why === undefined
+      ? { member: outcome.member, key: outcome.key, state: outcome.state, level: null }
+      : { member: outcome.member, key: outcome.key, state: 'failed', level: null, note: why.join('; ') };
+  });
   const done = members.filter((m) => m.state === 'done').length;
   return {
     id,
     startedAt,
-    skipped: members.length - done,
+    skipped: members.filter((m) => m.state !== 'done' && m.state !== 'failed').length,
     done,
     running: 0,
-    failed: 0,
-    confirmed: result.outcomes.filter((o) => o.content !== undefined).length,
+    failed: failures.size,
+    confirmed: result.outcomes.filter((o) => o.content !== undefined && !failures.has(o.member)).length,
     members,
   };
 }

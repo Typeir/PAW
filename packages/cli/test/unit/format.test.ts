@@ -571,6 +571,7 @@ describe('formatProof', () => {
     key: 'k0',
     state: 'proved',
     targets: [],
+    violations: [],
     ...over,
   });
 
@@ -615,6 +616,26 @@ describe('formatProof', () => {
       }),
     ]);
     expect(out[1]).toBe('  ✗ member 0 (k0) — declared file is unchanged: src/a.ts');
+  });
+
+  it('counts and names a member whose file holds open violations', () => {
+    const out = formatProof([
+      proof({ targets: [{ path: 'src/orders.ts', state: 'written' }] }),
+      proof({
+        member: 1,
+        key: 'cart',
+        state: 'violating',
+        targets: [{ path: 'src/cart.ts', state: 'written' }],
+        violations: [
+          { id: 1, filePath: 'src/cart.ts', rule: 'no-console', message: 'm', indirectFix: false },
+          { id: 2, filePath: 'src/cart.ts', rule: 'no-console', message: 'm', indirectFix: false },
+        ],
+      }),
+    ]);
+    expect(out).toEqual([
+      'targets: 1 proved · 0 unproved · 1 with open violations',
+      '  ✗ member 1 (cart) — src/cart.ts holds 2 open violation(s): no-console',
+    ]);
   });
 });
 

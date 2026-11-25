@@ -119,7 +119,9 @@ export {
 export type { DoctorFinding, SwarmPlan } from './domain/swarm.js';
 
 export {
+  judgeViolations,
   parentDir,
+  proofFailures,
   proveMember,
   proveTarget,
   unprovedMembers,

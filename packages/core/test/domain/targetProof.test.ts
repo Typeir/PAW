@@ -12,12 +12,15 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  judgeViolations,
   parentDir,
+  proofFailures,
   proveMember,
   proveTarget,
   unprovedMembers,
   type TargetProof,
 } from '../../src/domain/targetProof.js';
+import type { Violation } from '../../src/domain/violation.js';
 
 const written: TargetProof = { path: 'a.md', state: 'written' };
 const empty: TargetProof = { path: 'b.md', state: 'empty' };
@@ -63,6 +66,7 @@ describe('proveMember', () => {
       key: 'k',
       state: 'skipped',
       targets: [],
+      violations: [],
     });
   });
 
@@ -92,5 +96,72 @@ describe('unprovedMembers', () => {
       proveMember(3, 'd', true, []),
     ];
     expect(unprovedMembers(proofs).map((p) => p.key)).toEqual(['b']);
+  });
+});
+
+describe('judgeViolations', () => {
+  const v = (id: number, filePath: string, rule: string): Violation => ({
+    id,
+    filePath,
+    rule,
+    message: rule,
+    indirectFix: false,
+  });
+  const cart = { path: './src/cart.ts', state: 'written' as const };
+
+  it('marks a proved member violating when its declared file holds open violations', () => {
+    const proofs = [proveMember(0, 'cart', true, [cart]), proveMember(1, 'orders', true, [written])];
+    const open = [
+      v(1, 'src/cart.ts', 'no-console'),
+      v(2, 'src\\cart.ts', 'no-console'),
+      v(3, 'x.ts', 'r'),
+    ];
+    const [judged, clean] = judgeViolations(proofs, open);
+
+    expect(judged.state).toBe('violating');
+    expect(judged.violations.map((x) => x.id)).toEqual([1, 2]);
+    expect(clean).toBe(proofs[1]);
+  });
+
+  it('leaves unproved, undeclared, and skipped members as they were', () => {
+    const proofs = [
+      proveMember(0, 'a', true, [empty]),
+      proveMember(1, 'b', true, []),
+      proveMember(2, 'c', false, []),
+    ];
+    expect(judgeViolations(proofs, [v(1, 'b.md', 'r')])).toEqual(proofs);
+  });
+});
+
+describe('proofFailures', () => {
+  it('names each unproduced file with its reason', () => {
+    const proof = proveMember(0, 'k', true, [
+      written,
+      empty,
+      { path: 'c.md', state: 'unchanged' },
+    ]);
+    expect(proofFailures(proof)).toEqual([
+      'declared file is empty: b.md',
+      'declared file is unchanged: c.md',
+    ]);
+  });
+
+  it('counts open violations per file and names their distinct rules', () => {
+    const proof = judgeViolations(
+      [proveMember(0, 'k', true, [{ path: 'src/cart.ts', state: 'written' }])],
+      [
+        { id: 1, filePath: 'src/cart.ts', rule: 'no-console', message: 'm', indirectFix: false },
+        { id: 2, filePath: 'src/cart.ts', rule: 'no-console', message: 'm', indirectFix: false },
+        { id: 3, filePath: 'src/cart.ts', rule: 'no-secrets', message: 'm', indirectFix: false },
+      ],
+    )[0];
+    expect(proofFailures(proof)).toEqual([
+      'src/cart.ts holds 3 open violation(s): no-console, no-secrets',
+    ]);
+  });
+
+  it('reports nothing for a member that did not fail', () => {
+    expect(proofFailures(proveMember(0, 'k', true, [written]))).toEqual([]);
+    expect(proofFailures(proveMember(0, 'k', false, []))).toEqual([]);
   });
 });

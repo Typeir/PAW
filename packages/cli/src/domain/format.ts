@@ -28,7 +28,7 @@ import type {
   SwarmPlan,
   Violation,
 } from '@paw/core';
-import { freshnessText, listRow, renderBrief } from '@paw/core';
+import { freshnessText, listRow, proofFailures, renderBrief } from '@paw/core';
 import { ansiPaint } from '@paw/cosmetics';
 import type { ProviderInfo } from '@paw/daemon';
 
@@ -488,39 +488,25 @@ export function formatHerd(result: DispatchResult): string[] {
 }
 
 /**
- * Why a declared file did not count as produced.
- */
-const UNPROVED_REASON: Readonly<Record<'empty' | 'unchanged', string>> = {
-  empty: 'declared file is empty',
-  unchanged: 'declared file is unchanged',
-};
-
-/**
  * Render the verdict on what a herd actually wrote. Members that ran and
  * declared no `expectFiles` are reported as unenforced rather than counted
- * as passes; every unproved member is named with the file that failed it.
+ * as passes; every failed member is named with each reason `proofFailures` gives.
  *
- * @param {readonly MemberProof[]} proofs - Verdicts from `TargetLedger.prove`.
+ * @param {readonly MemberProof[]} proofs - Verdicts from `TargetLedger.prove`, judged against open violations.
  * @returns {string[]} Terminal lines.
  */
 export function formatProof(proofs: readonly MemberProof[]): string[] {
   const proved = proofs.filter((p) => p.state === 'proved').length;
   const unproved = proofs.filter((p) => p.state === 'unproved').length;
-  if (proved + unproved === 0) {
+  const violating = proofs.filter((p) => p.state === 'violating').length;
+  if (proved + unproved + violating === 0) {
     return ['targets: not enforced — no member that ran declares expectFiles'];
   }
-  const lines = [`targets: ${proved} proved · ${unproved} unproved`];
+  const counts = `targets: ${proved} proved · ${unproved} unproved`;
+  const lines = [violating === 0 ? counts : `${counts} · ${violating} with open violations`];
   for (const proof of proofs) {
-    if (proof.state !== 'unproved') {
-      continue;
-    }
-    for (const target of proof.targets) {
-      if (target.state === 'written') {
-        continue;
-      }
-      lines.push(
-        `  ✗ member ${proof.member} (${proof.key}) — ${UNPROVED_REASON[target.state]}: ${target.path}`,
-      );
+    for (const why of proofFailures(proof)) {
+      lines.push(`  ✗ member ${proof.member} (${proof.key}) — ${why}`);
     }
   }
   return lines;

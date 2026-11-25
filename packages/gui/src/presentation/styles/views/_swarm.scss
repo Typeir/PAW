@@ -78,6 +78,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.herd-why {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--crit);
+  white-space: normal;
+}
+
 .tabs {
   display: flex;
   gap: 2px;

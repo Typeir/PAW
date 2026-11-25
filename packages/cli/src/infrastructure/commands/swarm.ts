@@ -5,7 +5,8 @@
  * or dispatch plan against deterministic fake model (or live provider under
  * `--live`). `run` creates every declared target before a live dispatch — the
  * SDK `edit` tool modifies existing files only — and proves each one landed
- * afterwards. Provide helpers shared with the `ui` command: plan loading,
+ * afterwards; a live run held to gates also fails members whose files hold
+ * open violations in the enforcement pawd's store. Provide helpers shared with the `ui` command: plan loading,
  * `--context` expansion, fake registry.
  *
  * @module @paw/cli/infrastructure/commands/swarm
@@ -22,6 +23,7 @@ import {
   composeBrief,
   dispatchSwarm,
   doctorPlanWithBinding,
+  judgeViolations,
   openTargetLedger,
   type ModelCapabilities,
   type ModelPort,
@@ -32,6 +34,7 @@ import {
 import { createNodeFileReader, createNodeFs } from '@paw/adapters';
 import {
   COPILOT_SLIM_SECTIONS,
+  enforcementViolations,
   liveHerdBinding,
   openLiveHerd,
   postRunReport,
@@ -270,9 +273,14 @@ export async function runSwarm(
       } else {
         print(['live herd: members edited their files in place through the agent tools']);
       }
-      const proofs = await ledger.prove(result.outcomes, writer ? writer.written() : []);
+      const proved = await ledger.prove(result.outcomes, writer ? writer.written() : []);
+      const open = live && gates ? await enforcementViolations(process.cwd())() : [];
+      if (open === null) {
+        print(['open violations not checked: no enforcement daemon answers for this repository']);
+      }
+      const proofs = judgeViolations(proved, open ?? []);
       print(formatProof(proofs));
-      const produced = proofs.every((proof) => proof.state !== 'unproved');
+      const produced = proofs.every((proof) => proof.state !== 'unproved' && proof.state !== 'violating');
       return result.released && produced ? 0 : 1;
     } finally {
       await close();

@@ -6,6 +6,9 @@
  * return dispatcher that open registry (live provider or deterministic fake),
  * meter bound port, attach run context to plan, forward output ceiling and
  * concurrency to dispatch, write each member when it land, close live client.
+ * Every run is proved against the plan's `expectFiles` (live runs pre-create
+ * missing targets); a live run held to gates also judges open violations in
+ * those files.
  *
  * @module @paw/daemon/application/herdDispatcher
  * @version 0.0.0
@@ -13,15 +16,20 @@
  * @since 5.0.0
  */
 
-import type {
-  BudgetSummary,
-  DispatchDeps,
-  DispatchEvent,
-  DispatchResult,
-  FileReaderPort,
-  RoleRegistry,
-  RunSettings,
-  SwarmPlan,
+import {
+  judgeViolations,
+  openTargetLedger,
+  type BudgetSummary,
+  type DispatchDeps,
+  type DispatchEvent,
+  type DispatchResult,
+  type FileReaderPort,
+  type FileSystemPort,
+  type MemberProof,
+  type RoleRegistry,
+  type RunSettings,
+  type SwarmPlan,
+  type Violation,
 } from '@paw/core';
 import { meterPort } from './run.js';
 
@@ -48,6 +56,8 @@ export interface HerdWriterLike {
  * @property {FileReaderPort} files - Read files member attach.
  * @property {(plan: SwarmPlan<unknown>) => HerdWriterLike} makeWriter - Build writer for this plan output.
  * @property {(plan: SwarmPlan<unknown>, deps: DispatchDeps<unknown>) => Promise<DispatchResult>} dispatch - Dispatch use-case.
+ * @property {FileSystemPort} fs - Where declared target files live; read before and after the run.
+ * @property {() => Promise<readonly Violation[] | null>} violations - Open violations of the repository's enforcement pawd; null when none answers.
  */
 export interface HerdDeps {
   openLive: (
@@ -60,16 +70,18 @@ export interface HerdDeps {
   files: FileReaderPort;
   makeWriter: (plan: SwarmPlan<unknown>) => HerdWriterLike;
   dispatch: (plan: SwarmPlan<unknown>, deps: DispatchDeps<unknown>) => Promise<DispatchResult>;
+  fs: FileSystemPort;
+  violations: () => Promise<readonly Violation[] | null>;
 }
 
 /**
- * Run, report live: dispatch result plus metered usage. Structurally daemon
+ * Run, report live: dispatch result, metered usage, and per-member proof. Structurally daemon
  * `Dispatcher`.
  */
 export type HerdDispatcher = (
   plan: SwarmPlan<unknown>,
   onProgress: (event: DispatchEvent) => void | Promise<void>,
-) => Promise<{ result: DispatchResult; usage: BudgetSummary }>;
+) => Promise<{ result: DispatchResult; usage: BudgetSummary; proofs: readonly MemberProof[] }>;
 
 /**
  * Build dispatcher run settings describe.
@@ -92,6 +104,11 @@ export function dispatcherFor(settings: RunSettings, deps: HerdDeps): HerdDispat
       const bindings = new Map(opened.registry.bindings);
       bindings.set(plan.role, { ...binding, port: metered.port });
       const attached = settings.context === undefined ? [] : await deps.resolveContext(settings.context);
+      const ledger = openTargetLedger(plan, deps.fs);
+      await ledger.snapshot();
+      if (settings.live) {
+        await ledger.createPlaceholders();
+      }
       const writer = deps.makeWriter(plan);
       const result = await deps.dispatch(deps.withContext(plan, attached), {
         registry: { declarations: opened.registry.declarations, bindings },
@@ -103,7 +120,13 @@ export function dispatcherFor(settings: RunSettings, deps: HerdDeps): HerdDispat
           await writer.onProgress(event);
         },
       });
-      return { result, usage: metered.usage() };
+      const proofs = await ledger.prove(result.outcomes, writer.written());
+      const policed = settings.live && (settings.gates ?? true);
+      return {
+        result,
+        usage: metered.usage(),
+        proofs: policed ? judgeViolations(proofs, (await deps.violations()) ?? []) : proofs,
+      };
     } finally {
       await opened.close();
     }

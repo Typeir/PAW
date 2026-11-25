@@ -5,13 +5,16 @@
  * member that ran is proved only when every file it declared carries content
  * it did not carry before. Pure: the caller supplies before/after content and
  * the paths PAW wrote itself. States are reported, never thrown; a swarm that
- * produced nothing must say so rather than exit clean.
+ * produced nothing must say so rather than exit clean. A proved member whose
+ * declared files hold open violations is `violating`.
  *
  * @module @paw/core/domain/targetProof
  * @version 0.0.0
  * @author Typeir
  * @since 5.0.0
  */
+
+import type { Violation } from './violation.js';
 
 /**
  * Verdict for one declared file. `written` is the only pass.
@@ -32,9 +35,10 @@ export interface TargetProof {
 
 /**
  * Verdict for one member. `undeclared` mean the plan declare no `expectFiles`
- * for it, so nothing can be enforced; `skipped` mean it never ran.
+ * for it, so nothing can be enforced; `skipped` mean it never ran; `violating`
+ * mean it produced its files and they hold open violations.
  */
-export type MemberProofState = 'proved' | 'unproved' | 'undeclared' | 'skipped';
+export type MemberProofState = 'proved' | 'unproved' | 'violating' | 'undeclared' | 'skipped';
 
 /**
  * One member and what it produced.
@@ -44,12 +48,14 @@ export type MemberProofState = 'proved' | 'unproved' | 'undeclared' | 'skipped';
  * @property {string} key - Member resume key.
  * @property {MemberProofState} state - Whether it produced what it declared.
  * @property {readonly TargetProof[]} targets - One entry per declared file; empty when skipped or undeclared.
+ * @property {readonly Violation[]} violations - Open violations in its declared files; non-empty only when `violating`.
  */
 export interface MemberProof {
   readonly member: number;
   readonly key: string;
   readonly state: MemberProofState;
   readonly targets: readonly TargetProof[];
+  readonly violations: readonly Violation[];
 }
 
 /**
@@ -104,13 +110,13 @@ export function proveMember(
   targets: readonly TargetProof[],
 ): MemberProof {
   if (!ran) {
-    return { member, key, state: 'skipped', targets: [] };
+    return { member, key, state: 'skipped', targets: [], violations: [] };
   }
   if (targets.length === 0) {
-    return { member, key, state: 'undeclared', targets };
+    return { member, key, state: 'undeclared', targets, violations: [] };
   }
   const proved = targets.every((t) => t.state === 'written');
-  return { member, key, state: proved ? 'proved' : 'unproved', targets };
+  return { member, key, state: proved ? 'proved' : 'unproved', targets, violations: [] };
 }
 
 /**
@@ -121,4 +127,68 @@ export function proveMember(
  */
 export function unprovedMembers(proofs: readonly MemberProof[]): MemberProof[] {
   return proofs.filter((p) => p.state === 'unproved');
+}
+
+/**
+ * Repo-relative path in one spelling: `/`-separated, no leading `./`.
+ *
+ * @param {string} path - Path as a plan or the store spells it.
+ * @returns {string} Normalized path.
+ */
+function samePath(path: string): string {
+  return path.split(String.fromCharCode(92)).join('/').replace(/^\.\//, '');
+}
+
+/**
+ * Mark proved members whose declared files hold open violations as `violating`.
+ *
+ * @param {readonly MemberProof[]} proofs - Verdicts from the ledger.
+ * @param {readonly Violation[]} violations - Open violations from the enforcement store.
+ * @returns {MemberProof[]} Same verdicts; a proved member with a violation in a declared file becomes `violating` and carries them.
+ */
+export function judgeViolations(
+  proofs: readonly MemberProof[],
+  violations: readonly Violation[],
+): MemberProof[] {
+  return proofs.map((proof) => {
+    if (proof.state !== 'proved') {
+      return proof;
+    }
+    const declared = new Set(proof.targets.map((t) => samePath(t.path)));
+    const held = violations.filter((v) => declared.has(samePath(v.filePath)));
+    return held.length === 0 ? proof : { ...proof, state: 'violating', violations: held };
+  });
+}
+
+/**
+ * Why an unproved declared file did not count as produced.
+ */
+const UNPROVED_REASON: Readonly<Record<'empty' | 'unchanged', string>> = {
+  empty: 'declared file is empty',
+  unchanged: 'declared file is unchanged',
+};
+
+/**
+ * Why a member failed, one line per failing file.
+ *
+ * @param {MemberProof} proof - One verdict.
+ * @returns {string[]} `<reason>: <path>` per unproduced file, `<path> holds N open violation(s): <rules>` per violating file; empty for any other state.
+ */
+export function proofFailures(proof: MemberProof): string[] {
+  if (proof.state === 'unproved') {
+    return proof.targets.flatMap((t) =>
+      t.state === 'written' ? [] : [`${UNPROVED_REASON[t.state]}: ${t.path}`],
+    );
+  }
+  if (proof.state !== 'violating') {
+    return [];
+  }
+  const byFile = new Map<string, string[]>();
+  for (const v of proof.violations) {
+    byFile.set(v.filePath, [...(byFile.get(v.filePath) ?? []), v.rule]);
+  }
+  return [...byFile].map(
+    ([file, rules]) =>
+      `${file} holds ${rules.length} open violation(s): ${[...new Set(rules)].join(', ')}`,
+  );
 }

@@ -271,6 +271,11 @@ describe('HerdTab', () => {
     expect(screen.getByText('1 done · 1 run · 1 fail')).toBeInTheDocument();
   });
 
+  it('shows why a failed member failed, under its name', () => {
+    renderInConsole(<HerdTab />);
+    expect(screen.getByText('boom')).toHaveClass('herd-why');
+  });
+
   it('groups members with what needs attention first and settled last', () => {
     renderInConsole(<HerdTab />);
     const groups = screen

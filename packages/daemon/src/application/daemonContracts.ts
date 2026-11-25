@@ -17,6 +17,7 @@ import type {
   HostProcess,
   InitMode,
   LogEntry,
+  MemberProof,
   ModelPort,
   ModuleResolverPort,
   PawSnapshot,
@@ -182,10 +183,12 @@ export interface DaemonRuntime {
  * @interface RunReport
  * @property {DispatchResult} result - Core's own dispatch result.
  * @property {BudgetSummary} usage - Tokens run actually spent.
+ * @property {readonly MemberProof[]} proofs - Per-member verdict on declared files and their open violations.
  */
 export interface RunReport {
   readonly result: DispatchResult;
   readonly usage: BudgetSummary;
+  readonly proofs: readonly MemberProof[];
 }
 
 /**

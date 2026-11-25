@@ -541,7 +541,7 @@ export async function runDaemon(
     });
     // Finished result is authoritative. The tracker reports only what it was
     // told, and a dispatcher that reports nothing must still end correctly.
-    run = toRunProgress(report.result, id, at);
+    run = toRunProgress(report.result, id, at, report.proofs);
     budget = report.usage;
     bus.publish('run', run);
     bus.publish('budget', budget);

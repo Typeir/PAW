@@ -4,7 +4,9 @@
  * injected collaborators, return dispatcher that open right registry
  * (live vs fake), meter bound port, forward run's ceiling and concurrency
  * to dispatch, attach context to plan, write each member, always close
- * live client. Prove with fakes — no SDK, no dispatchSwarm internals.
+ * live client. Every run is proved against `expectFiles`; a live run pre-creates
+ * missing targets and, when held to gates, judges open violations in them.
+ * Prove with fakes — no SDK, no dispatchSwarm internals.
  *
  * @module @paw/daemon/test/application/herdDispatcher
  */
@@ -14,11 +16,13 @@ import type {
   DispatchEvent,
   DispatchResult,
   FileReaderPort,
+  FileSystemPort,
   ModelPort,
   ModelRequest,
   RoleRegistry,
   RunSettings,
   SwarmPlan,
+  Violation,
 } from '@paw/core';
 import { describe, expect, it, vi } from 'vitest';
 import { dispatcherFor, type HerdDeps } from '../../src/application/herdDispatcher.js';
@@ -51,6 +55,45 @@ const noWriter = { onProgress: async () => undefined, written: () => [] };
 const files = {} as FileReaderPort;
 
 /**
+ * In-memory file system over a path → content map.
+ *
+ * @param {Map<string, string>} disk - Backing store; absent path reads empty.
+ * @returns {FileSystemPort} The port.
+ */
+function memFs(disk: Map<string, string>): FileSystemPort {
+  return {
+    readText: async (path) => disk.get(path) ?? '',
+    writeText: async (path, content) => {
+      disk.set(path, content);
+    },
+    appendText: async () => undefined,
+    ensureDir: async () => undefined,
+    setExecutable: async () => undefined,
+  };
+}
+
+const TARGETED: SwarmPlan<unknown> = {
+  ...PLAN,
+  expectFiles: (_args, member) => (member === 0 ? 'src/cart.ts' : 'src/pay.ts'),
+};
+
+const OPEN: Violation = {
+  id: 1,
+  filePath: 'src/cart.ts',
+  rule: 'no-console',
+  message: 'console output',
+  indirectFix: false,
+};
+
+const RAN: DispatchResult = {
+  released: true,
+  outcomes: [
+    { member: 0, key: 'cart', state: 'done', content: 'ok' },
+    { member: 1, key: 'pay', state: 'done', content: 'ok' },
+  ],
+} as unknown as DispatchResult;
+
+/**
  * Build deps whose dispatch record what it get handed and drive one member so
  * metered port get exercised.
  *
@@ -70,6 +113,8 @@ function deps(over: Partial<HerdDeps> = {}): {
     resolveContext: async () => ['a.ts'],
     files,
     makeWriter: () => noWriter,
+    fs: memFs(new Map()),
+    violations: async () => [],
     dispatch: async (plan, d) => {
       seen.planName = plan.name;
       seen.d = d;
@@ -157,5 +202,58 @@ describe('dispatcherFor', () => {
     ).rejects.toThrow(/bound to no model/);
     expect(resolveContext).not.toHaveBeenCalled();
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('pre-creates missing targets on a live run and judges open violations in them', async () => {
+    const disk = new Map<string, string>();
+    const { deps: d } = deps({
+      fs: memFs(disk),
+      violations: async () => [OPEN],
+      dispatch: async () => {
+        disk.set('src/cart.ts', 'console.log(1)');
+        return RAN;
+      },
+    });
+    const report = await dispatcherFor({ plan: 'p', live: true }, d)(TARGETED, () => undefined);
+
+    expect(disk.get('src/pay.ts')).toBe('');
+    expect(report.proofs.map((p) => p.state)).toEqual(['violating', 'unproved']);
+    expect(report.proofs[0].violations).toEqual([OPEN]);
+  });
+
+  it('proves without judging violations when gates are off, and when no pawd answers', async () => {
+    const violations = vi.fn(async () => [OPEN]);
+    const written = (disk: Map<string, string>) => async () => {
+      disk.set('src/cart.ts', 'a');
+      disk.set('src/pay.ts', 'b');
+      return RAN;
+    };
+    const off = new Map<string, string>();
+    const gatesOff = await dispatcherFor(
+      { plan: 'p', live: true, gates: false },
+      deps({ fs: memFs(off), violations, dispatch: written(off) }).deps,
+    )(TARGETED, () => undefined);
+    expect(gatesOff.proofs.map((p) => p.state)).toEqual(['proved', 'proved']);
+    expect(violations).not.toHaveBeenCalled();
+
+    const down = new Map<string, string>();
+    const unreachable = await dispatcherFor(
+      { plan: 'p', live: true },
+      deps({ fs: memFs(down), violations: async () => null, dispatch: written(down) }).deps,
+    )(TARGETED, () => undefined);
+    expect(unreachable.proofs.map((p) => p.state)).toEqual(['proved', 'proved']);
+  });
+
+  it('proves a fake run by what the writer wrote, creating no placeholders', async () => {
+    const disk = new Map<string, string>();
+    const { deps: d } = deps({
+      fs: memFs(disk),
+      makeWriter: () => ({ onProgress: async () => undefined, written: () => ['src/cart.ts'] }),
+      dispatch: async () => RAN,
+    });
+    const report = await dispatcherFor({ plan: 'p', live: false }, d)(TARGETED, () => undefined);
+
+    expect(disk.size).toBe(0);
+    expect(report.proofs.map((p) => p.state)).toEqual(['proved', 'unproved']);
   });
 });

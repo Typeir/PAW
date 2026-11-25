@@ -7,7 +7,8 @@
  * One table ordered by member index would sort a running row under done rows —
  * batch dispatch means members do not finish in dispatch order.
  *
- * A group with empty rows does not render.
+ * A group with empty rows does not render. A member's note (why it failed)
+ * renders under its name.
  *
  * Member cell is a real button; selecting it opens Plan tab editor for that
  * member via keyboard or screen reader. Before any release nothing dispatches
@@ -88,6 +89,7 @@ function HerdGroup({
                 onClick={() => onSelect(row.member)}>
                 {row.key}
               </button>
+              {row.note === undefined ? null : <div className='herd-why'>{row.note}</div>}
             </td>
             <td className='r note'>{row.level === null ? '—' : `lvl ${row.level}`}</td>
             <td>

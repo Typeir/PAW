@@ -50,7 +50,6 @@ import {
   identityNotice,
   listProviders,
   mergeControl,
-  meterPort,
   nodeRuntime,
   plansControl,
   tasksControl,
@@ -71,62 +70,6 @@ import { openConsole } from '../../application/electronLauncher.js';
 import { createHerdWriter } from '../../application/herdWriter.js';
 import { concurrencyFrom, maxTokensFrom, parseArgs, withContext } from '../../domain/context.js';
 import { fakeRegistryFor, GATES_OFF_NOTICE, openPolicedHerd, resolveContextArg } from './swarm.js';
-
-/**
- * Build dispatcher for `paw ui --run`. Release the swarm once against the real
- * model — deterministic fake, or live provider under `--live` — through metered
- * port. Console and meter record run outcomes and token count.
- *
- * @param {boolean} live - Dispatch against live provider or not.
- * @param {boolean} full - Live only: keep model stock persona, not slim baseline.
- * @param {readonly string[]} attached - Files attach to every brief.
- * @param {number | undefined} concurrency - Max members in flight.
- * @param {number | undefined} maxOutputTokens - Per-member output cap.
- * @param {boolean} gates - Live only: false runs members with no gates; the secrets rule still applies.
- * @returns {Dispatcher} The dispatcher.
- */
-function uiDispatcher(
-  live: boolean,
-  full: boolean,
-  attached: readonly string[],
-  concurrency: number | undefined,
-  maxOutputTokens: number | undefined,
-  gates: boolean,
-): Dispatcher {
-  return async (plan, onProgress) => {
-    const { registry: base, close } = live
-      ? await openPolicedHerd(plan, gates)
-      : { registry: fakeRegistryFor(plan), close: async () => {} };
-    try {
-      const binding = base.bindings.get(plan.role);
-      if (!binding) {
-        throw new Error(`cannot run "${plan.name}": role "${plan.role}" is bound to no model`);
-      }
-      const metered = meterPort(binding.port);
-      const bindings = new Map(base.bindings);
-      bindings.set(plan.role, { ...binding, port: metered.port });
-      const writer = live ? null : createHerdWriter(plan, createNodeFs(), existsSync);
-      const result = await dispatchSwarm(withContext(plan, attached), {
-        registry: { declarations: base.declarations, bindings },
-        files: createNodeFileReader(process.cwd()),
-        concurrency,
-        maxOutputTokens,
-        systemBaseline: live && !full ? COPILOT_SLIM_SECTIONS : undefined,
-        onProgress: async (event) => {
-          onProgress(event);
-          await writer?.onProgress(event);
-        },
-      });
-      const wrote = writer?.written() ?? [];
-      if (wrote.length > 0) {
-        process.stdout.write(`herd wrote ${wrote.length} file(s)\n`);
-      }
-      return { result, usage: metered.usage() };
-    } finally {
-      await close();
-    }
-  };
-}
 
 /**
  * Launch default browser at console URL — the OS opener per platform, detached
@@ -182,14 +125,16 @@ function spawnShell(bin: string, shellArgs: readonly string[]) {
 }
 
 /**
- * Build dispatcher for approved console release: live registry or fake, slim
- * persona on live, herd writer on fake only (live members edit in place),
- * context globs resolved against the repo the CLI runs in.
+ * Build dispatcher for `paw ui --run` and for an approved console release:
+ * live registry or fake, slim persona on live unless `full`, herd writer on
+ * fake only (live members edit in place), context globs resolved against the
+ * repo the CLI runs in, every member proved against its declared files.
  *
- * @param {RunSettings} settings - What console asked to run.
+ * @param {RunSettings} settings - What to run.
+ * @param {boolean} [full] - Live only: keep the model's stock persona instead of the slim baseline. Default false.
  * @returns {Dispatcher} Dispatcher the daemon run and meter.
  */
-function releaseDispatcher(settings: RunSettings): Dispatcher {
+function releaseDispatcher(settings: RunSettings, full = false): Dispatcher {
   return dispatcherFor(settings, {
     openLive: (plan: SwarmPlan<unknown>, gates: boolean) => openPolicedHerd(plan, gates),
     fakeRegistry: fakeRegistryFor,
@@ -203,8 +148,10 @@ function releaseDispatcher(settings: RunSettings): Dispatcher {
     dispatch: (plan, deps) =>
       dispatchSwarm(plan, {
         ...deps,
-        ...(settings.live ? { systemBaseline: COPILOT_SLIM_SECTIONS } : {}),
+        ...(settings.live && !full ? { systemBaseline: COPILOT_SLIM_SECTIONS } : {}),
       }),
+    fs: createNodeFs(),
+    violations: enforcementViolations(process.cwd()),
   });
 }
 
@@ -469,17 +416,20 @@ export async function runUi(
       onRelease: (settings) => {
         void approveRelease(settings, () => handle);
       },
-      dispatcherFor: releaseDispatcher,
+      dispatcherFor: (settings) => releaseDispatcher(settings),
       ...(control ? { control } : {}),
       ...(shouldRun
         ? {
-            dispatch: uiDispatcher(
-              live,
+            dispatch: releaseDispatcher(
+              {
+                plan: planPath ?? '',
+                live,
+                gates,
+                context: attached,
+                concurrency: concurrencyFrom(args),
+                maxOutputTokens: maxTokensFrom(args),
+              },
               full,
-              attached,
-              concurrencyFrom(args),
-              maxTokensFrom(args),
-              gates,
             ),
           }
         : {}),
