@@ -2,14 +2,13 @@
  * PAW live SDK registry
  *
  * @fileoverview Build {@link RoleRegistry}. Route issue completions
- * through PAW daemon-owned SDK egress — replace vendored raw
- * DeepSeek runtime. Open one shared Copilot client (the injected
- * {@link OpenModel}, `openSdkModel` in production), bind plan role to
- * live model, return client `close` so run can stop the runtime
- * when the run finishes. DeepSeek defaults stored as data
- * (`baseUrl` + model), overridable by env or argument; key
- * read from environment lazily at egress and never held here. Fail loud
- * per CONSTRAINTS.md Constraint 3: run with no key throws at first call.
+ * through PAW daemon-owned SDK egress. Open one shared Copilot client (the
+ * injected {@link OpenModel}, `openSdkModel` in production), bind plan role to
+ * live model, return client `close` so run can stop the runtime when the run
+ * finishes. Wire type, endpoint, model, and key come from the run's
+ * {@link ProviderProfile}; `baseUrl` and `model` arguments override. The key is
+ * handed to egress through the token callback only. A run with no model id
+ * throws before the runtime opens.
  *
  * @module @paw/daemon/model/liveSdkRegistry
  * @version 0.0.0
@@ -26,9 +25,6 @@ import {
 } from '@paw/core';
 import type { ProviderProfile } from './providerEnv.js';
 import type { OpenSdkModelOptions } from './sdkModel.js';
-
-const DEFAULT_BASE = 'https://api.deepseek.com';
-const DEFAULT_MODEL = 'deepseek-chat';
 
 /**
  * Capabilities live model declared to have, so role that require
@@ -58,20 +54,22 @@ export type OpenModel = (
 ) => Promise<{ port: ModelPort; close: () => Promise<void> }>;
 
 /**
- * Model id a live run bind to: explicit override, else the provider profile,
- * else `DEEPSEEK_MODEL`, else `deepseek-chat`. Same precedence
- * {@link liveSdkRegistryFor} apply, reachable without opening the runtime.
+ * Model id a live run bind to: explicit override, else the provider's `MODEL`.
+ * Same precedence {@link liveSdkRegistryFor} apply, reachable without opening the runtime.
  *
- * @param {object} opts - Overrides.
- * @param {ProviderProfile} [opts.provider] - Provider from a `.paw/<name>.provider.env`.
+ * @param {object} opts - Provider and override.
+ * @param {ProviderProfile} opts.provider - Provider from a `.paw/<name>.provider.env`.
  * @param {string} [opts.model] - Model id override.
  * @returns {string} Resolved model id.
+ * @throws {Error} When neither the override nor the provider names a model.
  */
-export function liveModelId(opts: {
-  provider?: ProviderProfile;
-  model?: string;
-}): string {
-  return opts.model ?? opts.provider?.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_MODEL;
+export function liveModelId(opts: { provider: ProviderProfile; model?: string }): string {
+  const id = opts.model ?? opts.provider.model;
+  if (id === undefined) {
+    const name = opts.provider.name;
+    throw new Error(`provider "${name}" names no model: add MODEL to .paw/${name}.provider.env`);
+  }
+  return id;
 }
 
 /**
@@ -96,10 +94,11 @@ export interface LiveSdkRegistry {
  * @param {string} opts.workingDirectory - Absolute root members built-in tools operate within; served repository.
  * @param {boolean} opts.safemode - When true, members denied shell — option-A surface.
  * @param {unknown} opts.hooks - SDK session hooks every member session carries; the herd passes pawd's.
- * @param {ProviderProfile} [opts.provider] - Provider from a `.paw/<name>.provider.env`; sets wire type, endpoint, default model, and key. Absent, the legacy `DEEPSEEK_*` environment drives all four.
- * @param {string} [opts.baseUrl] - Base URL override; else the provider's, else `DEEPSEEK_BASE_URL`, else the public DeepSeek endpoint.
- * @param {string} [opts.model] - Model id override; else the provider's, else `DEEPSEEK_MODEL`, else `deepseek-chat`.
+ * @param {ProviderProfile} opts.provider - Provider from a `.paw/<name>.provider.env`; sets wire type, endpoint, default model, and key.
+ * @param {string} [opts.baseUrl] - Base URL override; else the provider's.
+ * @param {string} [opts.model] - Model id override; else the provider's.
  * @returns {Promise<LiveSdkRegistry>} Registry and its close hook.
+ * @throws {Error} When no model id is resolved; the runtime is not opened.
  */
 export async function liveSdkRegistryFor(
   plan: SwarmPlan<unknown>,
@@ -109,26 +108,16 @@ export async function liveSdkRegistryFor(
     workingDirectory: string;
     safemode: boolean;
     hooks: unknown;
-    provider?: ProviderProfile;
+    provider: ProviderProfile;
     baseUrl?: string;
     model?: string;
   },
 ): Promise<LiveSdkRegistry> {
   const profile = opts.provider;
-  const baseUrl =
-    opts.baseUrl ?? profile?.baseUrl ?? process.env.DEEPSEEK_BASE_URL ?? DEFAULT_BASE;
   const modelId = liveModelId(opts);
   const { port, close } = await openModel({
-    provider: { type: profile?.type ?? 'openai', baseUrl },
-    authToken: () => {
-      const key = profile?.key ?? process.env.DEEPSEEK_KEY;
-      if (key === undefined || key === '') {
-        throw new Error(
-          'no provider key: add .paw/<name>.provider.env with KEY and BASE_URL, or set DEEPSEEK_KEY',
-        );
-      }
-      return key;
-    },
+    provider: { type: profile.type, baseUrl: opts.baseUrl ?? profile.baseUrl },
+    authToken: () => profile.key,
     baseDirectory: opts.baseDirectory,
     workingDirectory: opts.workingDirectory,
     safemode: opts.safemode,

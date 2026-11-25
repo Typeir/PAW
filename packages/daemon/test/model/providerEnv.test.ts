@@ -1,7 +1,7 @@
 /**
  * @fileoverview Cover the provider-env module: filename → provider name, file
  * parse with required KEY/BASE_URL and wire-type check, and provider choice —
- * requested name, single-provider default, deepseek preference, and the loud
+ * requested name, single-provider default, no preference by name, and the loud
  * refusals with the configured roster named.
  *
  * @module @paw/daemon/test/model/providerEnv
@@ -88,24 +88,23 @@ describe('chooseProvider', () => {
     );
   });
 
-  it('prefers deepseek among several when nothing is requested', () => {
+  it('prefers no provider by name: several configured and none requested throws, listing them', () => {
     const providers = new Map([
       ['gemini', profile({ name: 'gemini' })],
       ['deepseek', profile()],
     ]);
-    expect(chooseProvider(providers, undefined).name).toBe('deepseek');
+    expect(() => chooseProvider(providers, undefined)).toThrow(
+      'set PAW_PROVIDER to pick one of: gemini, deepseek',
+    );
   });
 
-  it('throws when several are configured, none requested, none deepseek', () => {
-    const providers = new Map([
-      ['gemini', profile({ name: 'gemini' })],
-      ['azure', profile({ name: 'azure' })],
-    ]);
-    expect(() => chooseProvider(providers, undefined)).toThrow('set PAW_PROVIDER');
+  it('throws naming an empty roster for a requested name', () => {
+    expect(() => chooseProvider(new Map(), 'gemini')).toThrow('configured: (none)');
   });
 
-  it('throws naming an empty roster', () => {
-    expect(() => chooseProvider(new Map(), 'gemini')).toThrow('(none)');
-    expect(() => chooseProvider(new Map(), undefined)).toThrow('(none configured)');
+  it('throws naming the file to add when no provider is configured', () => {
+    expect(() => chooseProvider(new Map(), undefined)).toThrow(
+      'no model provider: add .paw/<name>.provider.env with KEY, BASE_URL, and MODEL',
+    );
   });
 });

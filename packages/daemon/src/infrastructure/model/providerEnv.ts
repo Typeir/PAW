@@ -91,12 +91,13 @@ export function parseProviderEnv(name: string, text: string): ProviderProfile {
 
 /**
  * Pick the provider a run uses. A requested name must exist; with no request,
- * a single configured provider wins, then one named `deepseek`. Anything else
- * throws, listing what is configured.
+ * a single configured provider wins. No configured provider, or several with
+ * none requested, throws.
  *
  * @param {ReadonlyMap<string, ProviderProfile>} providers - Configured providers, by name.
  * @param {string | undefined} requested - `PAW_PROVIDER`, when set.
  * @returns {ProviderProfile} The chosen provider.
+ * @throws {Error} When the requested provider is not configured, none is configured, or several are and none is requested.
  */
 export function chooseProvider(
   providers: ReadonlyMap<string, ProviderProfile>,
@@ -113,14 +114,11 @@ export function chooseProvider(
     }
     return hit;
   }
+  if (providers.size === 0) {
+    throw new Error('no model provider: add .paw/<name>.provider.env with KEY, BASE_URL, and MODEL');
+  }
   if (providers.size === 1) {
     return [...providers.values()][0];
   }
-  const deepseek = providers.get('deepseek');
-  if (deepseek !== undefined) {
-    return deepseek;
-  }
-  throw new Error(
-    `set PAW_PROVIDER to pick one of: ${[...providers.keys()].join(', ') || '(none configured)'}`,
-  );
+  throw new Error(`set PAW_PROVIDER to pick one of: ${[...providers.keys()].join(', ')}`);
 }

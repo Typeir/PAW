@@ -1,16 +1,16 @@
 /**
  * PAW Live Herd Opener
  *
- * @fileoverview Entry point that runs a live herd through the SDK. Loads
- * `DEEPSEEK_*` from nearest `.env.local`, creates a temporary runtime home, and
- * builds a live SDK-backed {@link RoleRegistry} for the plan. Returns the
+ * @fileoverview Entry point that runs a live herd through the SDK. Resolves the
+ * provider from `.paw/*.provider.env` and `PAW_PROVIDER`, creates a temporary
+ * runtime home, and builds a live SDK-backed {@link RoleRegistry} for the plan. Returns the
  * registry with a `close` that stops the shared client and removes the home.
  * Single-call CLI entry. Lifecycle (start once, dispatch a concurrent pool,
  * stop once) is handled here.
  * Excluded from unit coverage in `vitest.config.ts`: reads environment, walks
  * the filesystem, and spawns the 159 MB Copilot runtime via
  * {@link openSdkModel}.
- * Collaborators — {@link parseDeepseekEnv}, {@link liveSdkRegistryFor}, and
+ * Collaborators — {@link parseProviderEnv}, {@link chooseProvider}, {@link liveSdkRegistryFor}, and
  * egress cores — unit-covered to 100%. Live run verifies integration.
  *
  * @module @paw/daemon/model/openLiveHerd
@@ -22,12 +22,11 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { PlanBinding, SwarmPlan } from '@paw/core';
 import { createHerdHooks, type HerdHooks } from '../../application/herdHooks.js';
 import { socketPath, tokenPath } from '../endpoint.js';
 import { rpcCall } from '../rpcClient.js';
-import { parseDeepseekEnv } from './envLocal.js';
 import {
   chooseProvider,
   parseProviderEnv,
@@ -41,34 +40,6 @@ import {
   type LiveSdkRegistry,
 } from './liveSdkRegistry.js';
 import { openSdkModel } from './sdkModel.js';
-
-/**
- * Loads `DEEPSEEK_*` from nearest `.env.local` into process environment, searching
- * upward from starting directory. Never overwrites an existing value. Logs
- * nothing — the value lives only in `process.env`, read at egress.
- *
- * @param {string} startDir - Directory where upward search begin.
- * @returns {Promise<void>} Resolve once find and apply file, or reach root.
- */
-async function loadEnvLocal(startDir: string): Promise<void> {
-  let dir = startDir;
-  for (;;) {
-    const candidate = join(dir, '.env.local');
-    if (existsSync(candidate)) {
-      for (const [name, value] of parseDeepseekEnv(await readFile(candidate, 'utf8'))) {
-        if (process.env[name] === undefined) {
-          process.env[name] = value;
-        }
-      }
-      return;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) {
-      return;
-    }
-    dir = parent;
-  }
-}
 
 /**
  * Providers configured in `<root>/.paw/*.provider.env`, parsed, by name. An
@@ -93,19 +64,16 @@ async function loadProviders(root: string): Promise<Map<string, ProviderProfile>
 }
 
 /**
- * Provider a live run in `cwd` would use: `.env.local`, then
- * `.paw/*.provider.env`, then `PAW_PROVIDER`. Shared by the run path and the
- * doctor path, which differ only in whether they open the runtime.
+ * Provider a live run in `cwd` would use: one of `.paw/*.provider.env`, picked
+ * by `PAW_PROVIDER` when several exist. Shared by the run path and the doctor
+ * path, which differ only in whether they open the runtime.
  *
  * @param {string} cwd - Repository root.
- * @returns {Promise<ProviderProfile | undefined>} Chosen provider, or undefined when none is configured.
+ * @returns {Promise<ProviderProfile>} Chosen provider.
+ * @throws {Error} When none is configured, or several are and `PAW_PROVIDER` names none of them.
  */
-async function resolveProvider(cwd: string): Promise<ProviderProfile | undefined> {
-  await loadEnvLocal(cwd);
-  const providers = await loadProviders(cwd);
-  return providers.size === 0
-    ? undefined
-    : chooseProvider(providers, process.env.PAW_PROVIDER);
+async function resolveProvider(cwd: string): Promise<ProviderProfile> {
+  return chooseProvider(await loadProviders(cwd), process.env.PAW_PROVIDER);
 }
 
 /**
@@ -119,10 +87,7 @@ async function resolveProvider(cwd: string): Promise<ProviderProfile | undefined
  */
 export async function liveHerdBinding(cwd: string = process.cwd()): Promise<PlanBinding> {
   const provider = await resolveProvider(cwd);
-  return {
-    modelId: liveModelId(provider === undefined ? {} : { provider }),
-    capabilities: LIVE_CAPS,
-  };
+  return { modelId: liveModelId({ provider }), capabilities: LIVE_CAPS };
 }
 
 /**
@@ -172,7 +137,7 @@ export async function openLiveHerd(
     workingDirectory: cwd,
     safemode: opts.safemode ?? false,
     hooks: pawdHooks(cwd, opts.gates ?? true),
-    ...(provider === undefined ? {} : { provider }),
+    provider,
   });
   return {
     registry,

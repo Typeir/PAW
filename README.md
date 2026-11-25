@@ -92,7 +92,7 @@ and token counts are real. The SDK is imported in exactly one file.
  Copilot SDK runtime — tools · hooks · permissions · sub-agents
 ```
 
-Credentials live in `.paw/<name>.provider.env` (`KEY`, `BASE_URL`, `TYPE`, optional `MODEL`), are
+Credentials live in `.paw/<name>.provider.env` (`KEY`, `BASE_URL`, `MODEL`, optional `TYPE`), are
 gitignored, and are read at egress. `PAW_PROVIDER` picks between several.
 
 > **Do not build a new MCP, tool registry, or permission system.** The SDK is that, and consuming it is
