@@ -93,7 +93,9 @@ and token counts are real. The SDK is imported in exactly one file.
 ```
 
 Credentials live in `.paw/<name>.provider.env` (`KEY`, `BASE_URL`, `MODEL`, optional `TYPE`), are
-gitignored, and are read at egress. `PAW_PROVIDER` picks between several.
+gitignored, and are read at egress. `PAW_PROVIDER` picks between several. The provider's `MODEL` must be
+declared in `.paw/config.json` (`paw config model <id> --context N --max-output N --cost <tier>`); that
+declaration is the capability set the doctor judges and the output ceiling egress stamps.
 
 > **Do not build a new MCP, tool registry, or permission system.** The SDK is that, and consuming it is
 > the reason to sit on the runtime.
@@ -220,8 +222,9 @@ roster (key-free), the connector catalogue, and linter connectors reporting defe
 **Planned:**
 - **Gates view** — needs a control-gated endpoint that runs `GateRunner.runForFiles` daemon-side.
 - **Swarm run-log tab** — per-run member stream in the console.
-- **Live registry ↔ config bindings** — a live herd binds the plan role to one resolved provider/model;
-  `.paw/config.json` role→model bindings are honoured by doctor and TUI only.
+- **Live role bindings** — a live herd binds the plan role to the provider's `MODEL`, with the
+  capabilities `.paw/config.json` declares for it; config role→model bindings are honoured by doctor and
+  TUI only.
 - **tsc baseline diff** — whole-project findings outside the touched files are dropped today.
 - **Installer**: WiX MSI, code-signing, release CI, and folding `path`/`init` into one `paw` binary.
 

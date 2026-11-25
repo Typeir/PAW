@@ -2,8 +2,9 @@
  * PAW Live Herd Opener
  *
  * @fileoverview Entry point that runs a live herd through the SDK. Resolves the
- * provider from `.paw/*.provider.env` and `PAW_PROVIDER`, creates a temporary
- * runtime home, and builds a live SDK-backed {@link RoleRegistry} for the plan. Returns the
+ * provider from `.paw/*.provider.env` and `PAW_PROVIDER` and the model's
+ * capabilities from `.paw/config.json`, creates a temporary runtime home, and
+ * builds a live SDK-backed {@link RoleRegistry} for the plan. Returns the
  * registry with a `close` that stops the shared client and removes the home.
  * Single-call CLI entry. Lifecycle (start once, dispatch a concurrent pool,
  * stop once) is handled here.
@@ -23,6 +24,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
+import { createNodeConfigDocument } from '@paw/adapters';
 import type { PlanBinding, SwarmPlan } from '@paw/core';
 import { createHerdHooks, type HerdHooks } from '../../application/herdHooks.js';
 import { socketPath, tokenPath } from '../endpoint.js';
@@ -34,8 +36,7 @@ import {
   type ProviderProfile,
 } from './providerEnv.js';
 import {
-  LIVE_CAPS,
-  liveModelId,
+  liveBinding,
   liveSdkRegistryFor,
   type LiveSdkRegistry,
 } from './liveSdkRegistry.js';
@@ -77,17 +78,28 @@ async function resolveProvider(cwd: string): Promise<ProviderProfile> {
 }
 
 /**
- * Model a live run would bind to and the capabilities it declares, resolved
- * without opening the 159 MB runtime. Lets `paw swarm doctor --live` judge the
- * plan's role against the model that would serve it, instead of that shortfall
- * surfacing at dispatch.
+ * Models `<root>/.paw/config.json` declares, by id.
+ *
+ * @param {string} root - Consumer repo root.
+ * @returns {Promise<Readonly<Record<string, unknown>> | undefined>} Declared models; undefined when the config declares none or does not exist.
+ * @throws {Error} When the config exists but is not JSON.
+ */
+async function loadModels(root: string): Promise<Readonly<Record<string, unknown>> | undefined> {
+  return (await createNodeConfigDocument(root).read()).models;
+}
+
+/**
+ * Model a live run would bind to and the capabilities `.paw/config.json`
+ * declares for it, resolved without opening the 159 MB runtime. Lets
+ * `paw swarm doctor --live` judge the plan's role against the model that would
+ * serve it, instead of that shortfall surfacing at dispatch.
  *
  * @param {string} [cwd] - Repository root; default to process cwd.
  * @returns {Promise<PlanBinding>} Model id and its declared capabilities.
+ * @throws {Error} When no provider resolves, or {@link liveBinding} refuses.
  */
 export async function liveHerdBinding(cwd: string = process.cwd()): Promise<PlanBinding> {
-  const provider = await resolveProvider(cwd);
-  return { modelId: liveModelId({ provider }), capabilities: LIVE_CAPS };
+  return liveBinding({ provider: await resolveProvider(cwd), models: await loadModels(cwd) });
 }
 
 /**
@@ -138,6 +150,7 @@ export async function openLiveHerd(
     safemode: opts.safemode ?? false,
     hooks: pawdHooks(cwd, opts.gates ?? true),
     provider,
+    models: await loadModels(cwd),
   });
   return {
     registry,

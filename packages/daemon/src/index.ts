@@ -160,7 +160,7 @@ export type { MeteredPort, RunTracker } from './application/run.js';
 export { liveHerdBinding, openLiveHerd } from './infrastructure/model/openLiveHerd.js';
 export { COPILOT_SLIM_SECTIONS, slimSectionsOf } from './infrastructure/model/copilotSystemSections.js';
 export type { SystemSectionEntry } from './infrastructure/model/copilotSystemSections.js';
-export { LIVE_CAPS, liveModelId } from './infrastructure/model/liveSdkRegistry.js';
+export { liveBinding } from './infrastructure/model/liveSdkRegistry.js';
 export type { LiveSdkRegistry } from './infrastructure/model/liveSdkRegistry.js';
 
 export { createSessionRegistry } from './application/sessionRegistry.js';

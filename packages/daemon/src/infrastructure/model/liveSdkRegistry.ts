@@ -6,9 +6,10 @@
  * injected {@link OpenModel}, `openSdkModel` in production), bind plan role to
  * live model, return client `close` so run can stop the runtime when the run
  * finishes. Wire type, endpoint, model, and key come from the run's
- * {@link ProviderProfile}; `baseUrl` and `model` arguments override. The key is
- * handed to egress through the token callback only. A run with no model id
- * throws before the runtime opens.
+ * {@link ProviderProfile}; `baseUrl` and `model` arguments override. The
+ * model's capabilities come from its `.paw/config.json` declaration. The key is
+ * handed to egress through the token callback only. A run with no model id, or
+ * whose model the config does not declare validly, throws before the runtime opens.
  *
  * @module @paw/daemon/model/liveSdkRegistry
  * @version 0.0.0
@@ -18,29 +19,14 @@
 
 import {
   buildRegistry,
-  type ModelCapabilities,
+  parseCapabilities,
   type ModelPort,
+  type PlanBinding,
   type RoleRegistry,
   type SwarmPlan,
 } from '@paw/core';
 import type { ProviderProfile } from './providerEnv.js';
 import type { OpenSdkModelOptions } from './sdkModel.js';
-
-/**
- * Capabilities live model declared to have, so role that require
- * tools, structured output, or large window satisfied by binding.
- * `maxOutputTokens` is the ceiling the provider actually serves; a role
- * requiring more than this is refused by the plan doctor before dispatch.
- */
-export const LIVE_CAPS: ModelCapabilities = {
-  contextTokens: 128_000,
-  maxOutputTokens: 8_192,
-  tools: true,
-  structuredOutput: true,
-  reasoning: true,
-  vision: false,
-  costClass: 'cheap',
-};
 
 /**
  * Open shared SDK-backed model. `openSdkModel` in production; fake in tests.
@@ -54,22 +40,40 @@ export type OpenModel = (
 ) => Promise<{ port: ModelPort; close: () => Promise<void> }>;
 
 /**
- * Model id a live run bind to: explicit override, else the provider's `MODEL`.
- * Same precedence {@link liveSdkRegistryFor} apply, reachable without opening the runtime.
+ * Model a live run bind to and its declared capabilities. The id is the
+ * explicit override, else the provider's `MODEL`; the capabilities are that
+ * id's entry in the config's `models`. Same resolution
+ * {@link liveSdkRegistryFor} apply, reachable without opening the runtime.
  *
- * @param {object} opts - Provider and override.
+ * @param {object} opts - Provider, override, and declared models.
  * @param {ProviderProfile} opts.provider - Provider from a `.paw/<name>.provider.env`.
  * @param {string} [opts.model] - Model id override.
- * @returns {string} Resolved model id.
- * @throws {Error} When neither the override nor the provider names a model.
+ * @param {Readonly<Record<string, unknown>> | undefined} opts.models - `models` from `.paw/config.json`; undefined when it declares none.
+ * @returns {PlanBinding} Model id and its capabilities.
+ * @throws {Error} When no model id is resolved, the config does not declare it, or its declaration is malformed.
  */
-export function liveModelId(opts: { provider: ProviderProfile; model?: string }): string {
-  const id = opts.model ?? opts.provider.model;
-  if (id === undefined) {
+export function liveBinding(opts: {
+  provider: ProviderProfile;
+  model?: string;
+  models: Readonly<Record<string, unknown>> | undefined;
+}): PlanBinding {
+  const modelId = opts.model ?? opts.provider.model;
+  if (modelId === undefined) {
     const name = opts.provider.name;
     throw new Error(`provider "${name}" names no model: add MODEL to .paw/${name}.provider.env`);
   }
-  return id;
+  const declared = opts.models?.[modelId];
+  if (declared === undefined) {
+    throw new Error(
+      `model "${modelId}" is not declared in .paw/config.json; declare it with ` +
+        `paw config model ${modelId} --context N --max-output N --cost <tier>`,
+    );
+  }
+  const parsed = parseCapabilities(declared);
+  if (!parsed.ok) {
+    throw new Error(`model "${modelId}" in .paw/config.json: ${parsed.reason}`);
+  }
+  return { modelId, capabilities: parsed.capabilities };
 }
 
 /**
@@ -95,10 +99,11 @@ export interface LiveSdkRegistry {
  * @param {boolean} opts.safemode - When true, members denied shell — option-A surface.
  * @param {unknown} opts.hooks - SDK session hooks every member session carries; the herd passes pawd's.
  * @param {ProviderProfile} opts.provider - Provider from a `.paw/<name>.provider.env`; sets wire type, endpoint, default model, and key.
+ * @param {Readonly<Record<string, unknown>> | undefined} opts.models - `models` from `.paw/config.json`; supplies the bound model's capabilities.
  * @param {string} [opts.baseUrl] - Base URL override; else the provider's.
  * @param {string} [opts.model] - Model id override; else the provider's.
  * @returns {Promise<LiveSdkRegistry>} Registry and its close hook.
- * @throws {Error} When no model id is resolved; the runtime is not opened.
+ * @throws {Error} When {@link liveBinding} refuses; the runtime is not opened.
  */
 export async function liveSdkRegistryFor(
   plan: SwarmPlan<unknown>,
@@ -109,12 +114,13 @@ export async function liveSdkRegistryFor(
     safemode: boolean;
     hooks: unknown;
     provider: ProviderProfile;
+    models: Readonly<Record<string, unknown>> | undefined;
     baseUrl?: string;
     model?: string;
   },
 ): Promise<LiveSdkRegistry> {
   const profile = opts.provider;
-  const modelId = liveModelId(opts);
+  const { modelId, capabilities } = liveBinding(opts);
   const { port, close } = await openModel({
     provider: { type: profile.type, baseUrl: opts.baseUrl ?? profile.baseUrl },
     authToken: () => profile.key,
@@ -124,7 +130,7 @@ export async function liveSdkRegistryFor(
     hooks: opts.hooks,
   });
   const registry = buildRegistry(
-    { models: { [modelId]: LIVE_CAPS }, roles: { [plan.role]: modelId } },
+    { models: { [modelId]: capabilities }, roles: { [plan.role]: modelId } },
     (): ModelPort => port,
   );
   return { registry, close };
