@@ -1,7 +1,7 @@
 /**
  * PAW Installer Shim Planner
  *
- * @fileoverview Decide launcher shims `paw-setup path` put into bin dir, as values — apply step write them through filesystem port. Without shims PATH edit activate empty directory, no shell find `paw`. npm convention: on Windows write three flavors per launcher — extensionless `#!/bin/sh` for Git Bash (bash resolve bare name to no-extension file, never `.cmd`), `.cmd` for cmd, `.ps1` for PowerShell. POSIX need only sh one. Each shim exec `node <entry>` forwarding arguments; entry path backslashed inside `.cmd`/`.ps1`, forward-slashed in sh.
+ * @fileoverview Decide launcher shims `paw-setup path` put into bin dir, as values — apply step write them through filesystem port. Without shims PATH edit activate empty directory, no shell find `paw`. npm convention: on Windows write three flavors per launcher — extensionless `#!/bin/sh` for Git Bash (bash resolve bare name to no-extension file, never `.cmd`), `.cmd` for cmd, `.ps1` for PowerShell. POSIX need only sh one. Each shim exec `node <entry>` forwarding arguments; the `.ps1` one also forwards piped input to node's stdin. Entry path backslashed inside `.cmd`/`.ps1`, forward-slashed in sh.
  *
  * @module @paw/installer/shims
  * @version 0.0.0
@@ -65,7 +65,9 @@ export function planShims(
       });
       writes.push({
         path: `${binDir}/${name}.ps1`,
-        content: `& node "${back}" @args\nexit $LASTEXITCODE\n`,
+        content:
+          `if ($MyInvocation.ExpectingInput) {\n  $input | & node "${back}" @args\n} else {\n` +
+          `  & node "${back}" @args\n}\nexit $LASTEXITCODE\n`,
         executable: false,
       });
     }

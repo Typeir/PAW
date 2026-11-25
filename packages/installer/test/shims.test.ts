@@ -42,7 +42,14 @@ describe('planShims', () => {
     expect(writes[0].executable).toBe(true);
     expect(writes[1].content).toContain('node "C:\\repo\\bin\\paw.mjs" %*');
     expect(writes[1].executable).toBe(false);
-    expect(writes[2].content).toContain('& node "C:\\repo\\bin\\paw.mjs" @args');
+    expect(writes[2].content).toBe(
+      'if ($MyInvocation.ExpectingInput) {\n' +
+        '  $input | & node "C:\\repo\\bin\\paw.mjs" @args\n' +
+        '} else {\n' +
+        '  & node "C:\\repo\\bin\\paw.mjs" @args\n' +
+        '}\n' +
+        'exit $LASTEXITCODE\n',
+    );
     expect(writes[2].executable).toBe(false);
   });
 
