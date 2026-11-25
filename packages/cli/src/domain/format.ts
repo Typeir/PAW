@@ -30,6 +30,7 @@ import type {
 } from '@paw/core';
 import { freshnessText, listRow, renderBrief } from '@paw/core';
 import { ansiPaint } from '@paw/cosmetics';
+import type { ProviderInfo } from '@paw/daemon';
 
 const GATE_FINDING_CAP = 25;
 const VIOLATION_CAP = 40;
@@ -99,7 +100,13 @@ export function formatHelp(color = false): string[] {
     '                                 and a git pre-commit hook that runs paw gates --staged',
     '  sync                           re-run init, keeping existing config',
     '  violations [list|prune [file]] list recorded violations, or clear them',
-    '  config <get|set> …             read or edit model and role bindings in .paw/config.json',
+    '  config [show|bind|unbind|model] …  show role bindings, bind or unbind a role, or declare a',
+    '                                 model: config model <id> --context N --max-output N --cost <tier>',
+    '  providers [list]               list model providers (no keys) and the steps a live run lacks',
+    '  providers add <name> --base-url <url> --model <id> [--type openai|azure|anthropic]',
+    '                                 add or replace a provider; the key is read from stdin or a',
+    '                                 hidden prompt, never from the command line',
+    '  providers remove <name>        delete a provider',
     '  connectors [enable|disable <id>]  list the connector catalogue, or turn one on or off',
     '  modules [enable|disable|install|uninstall <id>]  list the module catalogue, turn one on or',
     '                                 off, clone one into .paw/modules (--from overrides the',
@@ -213,6 +220,35 @@ export function formatConnectors(roster: readonly ConnectorRosterRow[]): string[
           row.requires.length === 0 ? '' : ` · needs ${row.requires.join(', ')}`
         }`,
     ),
+  ];
+}
+
+/**
+ * One provider line: name, wire type, endpoint, model, and key length; or name and parse failure.
+ *
+ * @param {ProviderInfo} row - Key-free roster row.
+ * @returns {string} Terminal line.
+ */
+function providerLine(row: ProviderInfo): string {
+  if (row.error !== undefined) {
+    return `  ${row.name} · does not parse: ${row.error}`;
+  }
+  const model = row.model === undefined ? 'no model' : `model ${row.model}`;
+  return `  ${row.name} · ${row.type} · ${row.baseUrl} · ${model} · key ${row.keyChars} chars`;
+}
+
+/**
+ * Render the provider roster, key-free, then one line per hint.
+ *
+ * @param {readonly ProviderInfo[]} roster - Rows from `listProviders`.
+ * @param {readonly string[]} hints - Steps a live run lacks, from `providerHints`.
+ * @returns {string[]} Terminal lines.
+ */
+export function formatProviders(roster: readonly ProviderInfo[], hints: readonly string[]): string[] {
+  return [
+    roster.length === 0 ? 'providers: none configured' : `providers: ${roster.length} configured`,
+    ...roster.map(providerLine),
+    ...hints.map((hint) => `  hint: ${hint}`),
   ];
 }
 

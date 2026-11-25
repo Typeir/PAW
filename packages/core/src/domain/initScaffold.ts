@@ -115,6 +115,16 @@ const IGNORED = [
 ] as const;
 
 /**
+ * `.paw/.gitignore` text holding every PAW runtime and credential entry once.
+ *
+ * @param {string} existing - Current file text; empty when the file does not exist.
+ * @returns {string} New file text: a new file gets a header line; an existing one is kept with missing entries appended.
+ */
+export function pawIgnoreText(existing: string): string {
+  return withLines(existing === '' ? `${IGNORE_HEADER}\n` : existing, IGNORED);
+}
+
+/**
  * Plan files an attach write into repo root.
  *
  * Config be one file that may already exist (written by another tool),
@@ -144,7 +154,7 @@ export function planInit(
   };
   const ignoreWrite: FileWrite = {
     path: ignorePathFor(root),
-    content: withLines(existingIgnore === '' ? `${IGNORE_HEADER}\n` : existingIgnore, IGNORED),
+    content: pawIgnoreText(existingIgnore),
     executable: false,
   };
 

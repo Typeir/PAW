@@ -99,12 +99,14 @@ describe('chooseProvider', () => {
   });
 
   it('throws naming an empty roster for a requested name', () => {
-    expect(() => chooseProvider(new Map(), 'gemini')).toThrow('configured: (none)');
+    expect(() => chooseProvider(new Map(), 'gemini')).toThrow(
+      'PAW_PROVIDER="gemini" names no configured provider; configured: (none)',
+    );
   });
 
-  it('throws naming the file to add when no provider is configured', () => {
+  it('throws naming the verb that adds one when no provider is configured', () => {
     expect(() => chooseProvider(new Map(), undefined)).toThrow(
-      'no model provider: add .paw/<name>.provider.env with KEY, BASE_URL, and MODEL',
+      'no model provider: paw providers add <name> --base-url <url> --model <id>   (key on stdin)',
     );
   });
 });

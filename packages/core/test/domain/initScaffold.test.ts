@@ -11,7 +11,22 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ignorePathFor, planInit } from '../../src/domain/initScaffold.js';
+import { ignorePathFor, pawIgnoreText, planInit } from '../../src/domain/initScaffold.js';
+
+describe('pawIgnoreText', () => {
+  it('writes the header and every entry into a new file', () => {
+    expect(pawIgnoreText('')).toBe(
+      '# Written by `paw init`: PAW runtime state and credential files.\n' +
+        'daemon.token\ndaemon.lock\ndaemon.log\npaw.sqlite\nconsole.endpoint.json\n*.env\n.env*\n',
+    );
+  });
+
+  it('keeps an existing file and appends only its missing entries', () => {
+    expect(pawIgnoreText('mine\n*.env\n')).toBe(
+      'mine\n*.env\ndaemon.token\ndaemon.lock\ndaemon.log\npaw.sqlite\nconsole.endpoint.json\n.env*\n',
+    );
+  });
+});
 
 describe('planInit', () => {
   const plan = planInit('/work/repo');

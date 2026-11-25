@@ -92,8 +92,8 @@ and token counts are real. The SDK is imported in exactly one file.
  Copilot SDK runtime — tools · hooks · permissions · sub-agents
 ```
 
-Credentials live in `.paw/<name>.provider.env` (`KEY`, `BASE_URL`, `MODEL`, optional `TYPE`), are
-gitignored, and are read at egress. `PAW_PROVIDER` picks between several. The provider's `MODEL` must be
+Credentials live in `.paw/<name>.provider.env` (`KEY`, `BASE_URL`, `MODEL`, optional `TYPE`), written by
+`paw providers add`, gitignored, and read at egress. `PAW_PROVIDER` picks between several. The provider's `MODEL` must be
 declared in `.paw/config.json` (`paw config model <id> --context N --max-output N --cost <tier>`); that
 declaration is the capability set the doctor judges and the output ceiling egress stamps.
 
@@ -133,7 +133,13 @@ paw doctor <config.json>               # validate config + role/capability bindi
 paw gates [--staged] [files…]          # run the quality gates
 paw violations [list|prune [file]]     # list or clear recorded violations
 paw connectors [enable|disable <id>]   # the connector catalogue and its state
-paw config <get|set> …                 # model and role bindings
+paw config [show|bind|unbind|model] …  # role bindings; declare a model's capabilities
+
+# Model providers — no file editing; the key comes from stdin or a hidden prompt
+paw providers                          # roster (no keys) + the steps a live run still lacks
+echo "$KEY" | paw providers add deepseek --base-url https://api.deepseek.com --model deepseek-chat
+paw config model deepseek-chat --context 128000 --max-output 8192 --cost cheap --tools --structured
+paw providers remove deepseek
 
 # Swarm
 paw swarm doctor|show|run <plan.swarm.mjs>       # validate · preview a brief · dispatch

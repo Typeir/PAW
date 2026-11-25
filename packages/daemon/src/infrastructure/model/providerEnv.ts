@@ -38,6 +38,26 @@ const ENV_LINE = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/;
 const WIRE_TYPES = ['openai', 'azure', 'anthropic'] as const;
 
 /**
+ * Command that adds or replaces a provider; the key is read from stdin.
+ *
+ * @param {string} [name] - Provider name; a `<name>` placeholder when omitted.
+ * @returns {string} The `paw providers add` command line.
+ */
+export function addProviderCommand(name = '<name>'): string {
+  return `paw providers add ${name} --base-url <url> --model <id>`;
+}
+
+/**
+ * Command that declares a model's capabilities in `.paw/config.json`.
+ *
+ * @param {string} id - Model id.
+ * @returns {string} The `paw config model` command line.
+ */
+export function declareModelCommand(id: string): string {
+  return `paw config model ${id} --context N --max-output N --cost <tier>`;
+}
+
+/**
  * The provider name a `<name>.provider.env` filename carries, or null for any
  * other filename.
  *
@@ -107,7 +127,7 @@ export function chooseProvider(
     const hit = providers.get(requested);
     if (hit === undefined) {
       throw new Error(
-        `provider "${requested}" has no .paw/${requested}.provider.env; configured: ${
+        `PAW_PROVIDER="${requested}" names no configured provider; configured: ${
           [...providers.keys()].join(', ') || '(none)'
         }`,
       );
@@ -115,7 +135,7 @@ export function chooseProvider(
     return hit;
   }
   if (providers.size === 0) {
-    throw new Error('no model provider: add .paw/<name>.provider.env with KEY, BASE_URL, and MODEL');
+    throw new Error(`no model provider: ${addProviderCommand()}   (key on stdin)`);
   }
   if (providers.size === 1) {
     return [...providers.values()][0];

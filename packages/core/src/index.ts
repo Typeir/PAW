@@ -311,7 +311,7 @@ export { binDir, pawHome } from './domain/pawHome.js';
 export type { HomeEnv } from './domain/pawHome.js';
 
 export { applyInit, readInitPlan } from './application/applyInit.js';
-export { configPathFor, ignorePathFor, planInit } from './domain/initScaffold.js';
+export { configPathFor, ignorePathFor, pawIgnoreText, planInit } from './domain/initScaffold.js';
 export type { FileWrite, InitPlan } from './domain/initScaffold.js';
 
 export {

@@ -44,6 +44,28 @@ function runCliIn(
 }
 
 /**
+ * Run CLI as child process in `cwd`, writing `input` to its stdin and closing
+ * it; resolve with stdout, stderr, exit code.
+ *
+ * @param cwd - Directory to run in.
+ * @param input - Text written to stdin.
+ * @param args - The argv after the script path.
+ */
+function runCliWithInput(
+  cwd: string,
+  input: string,
+  ...args: string[]
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  return new Promise((resolve) => {
+    const child = execFile(process.execPath, [TSX, MAIN, ...args], { cwd }, (err, stdout, stderr) => {
+      const code = err && typeof err.code === 'number' ? err.code : 0;
+      resolve({ stdout, stderr, code });
+    });
+    child.stdin?.end(input);
+  });
+}
+
+/**
  * Run CLI as child process with given argv, resolve with stdout, stderr, exit
  * code.
  *
@@ -501,4 +523,55 @@ describe('cli violations (e2e)', () => {
     expect(listed.stdout).toContain('violations: no daemon is running for this repository');
     expect(listed.code).toBe(1);
   }, 60000);
+});
+
+describe('cli providers (e2e)', () => {
+  it('adds a provider from a piped key, hints each missing step, and removes it', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'paw-providers-'));
+    git(root, 'init', '-q');
+
+    const empty = await runCliIn(root, 'providers');
+    expect(empty.code).toBe(0);
+    expect(empty.stdout).toContain('providers: none configured');
+    expect(empty.stdout).toContain('hint: add a provider: paw providers add <name> --base-url <url> --model <id>');
+
+    const add = ['providers', 'add', 'acme', '--base-url', 'http://llm.acme.test/v1', '--model', 'acme-large'];
+    const keyless = await runCliWithInput(root, '', ...add);
+    expect(keyless.code).toBe(1);
+    expect(keyless.stdout).toContain('providers: provider "acme": no key given');
+
+    const added = await runCliWithInput(root, 'sk-acme-secret\n', ...add);
+    expect(added.code).toBe(0);
+    expect(added.stdout).toContain('providers: wrote .paw/acme.provider.env · key 14 chars');
+    expect(added.stdout).toContain('  acme · openai · http://llm.acme.test/v1 · model acme-large · key 14 chars');
+    expect(added.stdout).toContain(
+      'hint: declare model "acme-large": paw config model acme-large --context N --max-output N --cost <tier>',
+    );
+    expect(`${added.stdout}${added.stderr}`).not.toContain('sk-acme-secret');
+    expect(readFileSync(join(root, '.paw', 'acme.provider.env'), 'utf8')).toBe(
+      'TYPE=openai\nBASE_URL=http://llm.acme.test/v1\nMODEL=acme-large\nKEY=sk-acme-secret\n',
+    );
+    git(root, 'add', '-A');
+    const staged = git(root, 'diff', '--cached', '--name-only');
+    expect(staged).toContain('.paw/.gitignore');
+    expect(staged).not.toContain('acme.provider.env');
+
+    const declared = await runCliIn(
+      root, 'config', 'model', 'acme-large', '--context', '64000', '--max-output', '8192', '--cost', 'cheap', '--tools',
+    );
+    expect(declared.code).toBe(0);
+    const ready = await runCliIn(root, 'providers');
+    expect(ready.stdout).not.toContain('hint:');
+    writeFileSync(join(root, 'plan.swarm.mjs'), readFileSync(join(FIX, 'demo.swarm.mjs'), 'utf8'), 'utf8');
+    const doctor = await runCliIn(root, 'swarm', 'doctor', 'plan.swarm.mjs', '--live');
+    expect(doctor.stdout).toContain('✓ role-binding — edit.apply → acme-large');
+
+    const removed = await runCliIn(root, 'providers', 'remove', 'acme');
+    expect(removed.code).toBe(0);
+    expect(removed.stdout).toContain('providers: removed .paw/acme.provider.env');
+    expect(existsSync(join(root, '.paw', 'acme.provider.env'))).toBe(false);
+    const again = await runCliIn(root, 'providers', 'remove', 'acme');
+    expect(again.code).toBe(1);
+    expect(again.stdout).toContain('provider "acme" is not configured; list them with paw providers');
+  }, 120000);
 });

@@ -90,6 +90,8 @@ export {
 } from './infrastructure/linterRunner.js';
 export type { LintExec, LinterRunnerOptions } from './infrastructure/linterRunner.js';
 export { listProviders } from './infrastructure/model/providerRoster.js';
+export { planProviderAdd, providerHints } from './infrastructure/model/providerSetup.js';
+export type { ProviderAddPlan, ProviderInput, ProviderRow, ProviderWrite } from './infrastructure/model/providerSetup.js';
 export type { ProviderInfo, RosterSeams } from './infrastructure/model/providerRoster.js';
 
 export { IGNORED_DIRS, buildFileTree, findSubtree } from './domain/tree.js';

@@ -30,6 +30,7 @@ import {
   formatHerd,
   formatPlanDoctor,
   formatProof,
+  formatProviders,
   formatPruned,
   formatRoleRows,
   formatSyncReports,
@@ -58,6 +59,7 @@ describe('formatHelp', () => {
       'ui',
       'tui',
       'trust',
+      'providers',
     ]) {
       expect(lines.some((line) => line.trimStart().startsWith(verb))).toBe(true);
     }
@@ -613,5 +615,32 @@ describe('formatProof', () => {
       }),
     ]);
     expect(out[1]).toBe('  ✗ member 0 (k0) — declared file is unchanged: src/a.ts');
+  });
+});
+
+describe('formatProviders', () => {
+  it('says none is configured, then the hints', () => {
+    expect(formatProviders([], ['add a provider: x'])).toEqual([
+      'providers: none configured',
+      '  hint: add a provider: x',
+    ]);
+  });
+
+  it('lists each provider key-free, a broken file with its reason, and a modelless one', () => {
+    expect(
+      formatProviders(
+        [
+          { name: 'acme', type: 'openai', baseUrl: 'https://llm.acme.test/v1', model: 'acme-large', keyChars: 7 },
+          { name: 'bad', error: 'bad.provider.env needs KEY and BASE_URL' },
+          { name: 'bare', type: 'anthropic', baseUrl: 'u', keyChars: 3 },
+        ],
+        [],
+      ),
+    ).toEqual([
+      'providers: 3 configured',
+      '  acme · openai · https://llm.acme.test/v1 · model acme-large · key 7 chars',
+      '  bad · does not parse: bad.provider.env needs KEY and BASE_URL',
+      '  bare · anthropic · u · no model · key 3 chars',
+    ]);
   });
 });

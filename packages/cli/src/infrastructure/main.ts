@@ -32,6 +32,7 @@ import { formatDoctor, formatHelp } from '../domain/format.js';
 import { runCheck } from './commands/check.js';
 import { runConfig } from './commands/config.js';
 import { runConnectors } from './commands/connectors.js';
+import { runProviders } from './commands/providers.js';
 import { runModules } from './commands/modules.js';
 import { runTasks } from './commands/tasks.js';
 import { runDaemonCommand } from './commands/daemonCommand.js';
@@ -107,6 +108,9 @@ async function main(): Promise<number> {
   }
   if (command === 'config') {
     return runConfig(rest, print);
+  }
+  if (command === 'providers') {
+    return runProviders(rest, print);
   }
   if (command === 'connectors') {
     return runConnectors(rest, print);

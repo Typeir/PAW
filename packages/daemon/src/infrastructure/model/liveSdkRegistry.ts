@@ -25,7 +25,7 @@ import {
   type RoleRegistry,
   type SwarmPlan,
 } from '@paw/core';
-import type { ProviderProfile } from './providerEnv.js';
+import { addProviderCommand, declareModelCommand, type ProviderProfile } from './providerEnv.js';
 import type { OpenSdkModelOptions } from './sdkModel.js';
 
 /**
@@ -60,13 +60,12 @@ export function liveBinding(opts: {
   const modelId = opts.model ?? opts.provider.model;
   if (modelId === undefined) {
     const name = opts.provider.name;
-    throw new Error(`provider "${name}" names no model: add MODEL to .paw/${name}.provider.env`);
+    throw new Error(`provider "${name}" names no model: ${addProviderCommand(name)}`);
   }
   const declared = opts.models?.[modelId];
   if (declared === undefined) {
     throw new Error(
-      `model "${modelId}" is not declared in .paw/config.json; declare it with ` +
-        `paw config model ${modelId} --context N --max-output N --cost <tier>`,
+      `model "${modelId}" is not declared in .paw/config.json; declare it with ${declareModelCommand(modelId)}`,
     );
   }
   const parsed = parseCapabilities(declared);

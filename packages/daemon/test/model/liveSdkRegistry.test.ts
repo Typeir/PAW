@@ -92,7 +92,7 @@ describe('liveSdkRegistryFor', () => {
   it('refuses to open the runtime when no model id is resolved', async () => {
     await expect(
       liveSdkRegistryFor(PLAN, openModel, { ...BASE, provider: MODELLESS, models: MODELS }),
-    ).rejects.toThrow('add MODEL to .paw/gemini.provider.env');
+    ).rejects.toThrow('paw providers add gemini --base-url <url> --model <id>');
     expect(captured).toBeNull();
   });
 
@@ -121,7 +121,7 @@ describe('liveBinding', () => {
 
   it('throws, naming the provider file, when neither names a model', () => {
     expect(() => liveBinding({ provider: MODELLESS, models: MODELS })).toThrow(
-      'provider "gemini" names no model: add MODEL to .paw/gemini.provider.env',
+      'provider "gemini" names no model: paw providers add gemini --base-url <url> --model <id>',
     );
   });
 
