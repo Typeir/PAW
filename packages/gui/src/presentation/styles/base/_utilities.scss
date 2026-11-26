@@ -1,5 +1,5 @@
 ////
-/// Single-purpose helpers: push right, gap left, visually hidden.
+/// Single-purpose helpers: push right, gap left, visually hidden, a view's refusal line.
 ////
 
 .push {
@@ -20,4 +20,11 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+p.ok.crit {
+  margin: 0 0 8px;
+  color: var(--crit);
+  font-family: var(--mono);
+  font-size: 11.5px;
 }
