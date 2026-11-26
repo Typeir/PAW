@@ -13,10 +13,15 @@
  */
 
 import {
+  clearBinding,
   freshnessText,
   memberCount,
   planKey,
+  removeModel,
   renderBrief,
+  setBinding,
+  type ConfigDocument,
+  type ConfigEdit,
   type DispatchResult,
   type SwarmPlan,
   type Violation,
@@ -168,7 +173,7 @@ export const MENU: readonly MenuEntry[] = [
   {
     id: 'config',
     label: 'config',
-    hint: 'role → model bindings in .paw/config.json',
+    hint: 'role → model bindings and declared models in .paw/config.json',
     cli: 'paw config',
   },
   {
@@ -470,4 +475,36 @@ export function configLines(config: ConfigSnapshot): string[] {
     lines.push(`  ${binding.role} → ${binding.bound ?? '(unbound)'}`);
   }
   return lines;
+}
+
+/**
+ * One edit the config picker chose.
+ */
+export type ConfigPick =
+  | { readonly kind: 'bind'; readonly role: string; readonly model: string }
+  | { readonly kind: 'unbind'; readonly role: string }
+  | { readonly kind: 'remove'; readonly model: string };
+
+/**
+ * Run the core edit a config pick names.
+ *
+ * @param {ConfigDocument} config - Current document.
+ * @param {ConfigPick} pick - The chosen edit.
+ * @returns {ConfigEdit} Next document, or the engine's refusal.
+ */
+export function configEditFor(config: ConfigDocument, pick: ConfigPick): ConfigEdit {
+  if (pick.kind === 'bind') {
+    return setBinding(config, pick.role, pick.model);
+  }
+  return pick.kind === 'unbind' ? clearBinding(config, pick.role) : removeModel(config, pick.model);
+}
+
+/**
+ * Line reporting a refused edit.
+ *
+ * @param {ConfigEdit} edit - Edit outcome.
+ * @returns {string[]} `✗ <reason>` when refused; empty when it applied.
+ */
+export function refusalLines(edit: ConfigEdit): string[] {
+  return edit.ok ? [] : [`✗ ${edit.reason}`];
 }

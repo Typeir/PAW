@@ -10,6 +10,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import {
+  CONFIG_MODELS_URL,
   CONFIG_ROLES_URL,
   CONFIG_URL,
   CONNECTORS_URL,
@@ -238,6 +239,32 @@ describe('createConfigClient', () => {
       await expect(createConfigClient(busy).syncTasks(false)).resolves.toEqual({
         ok: false,
         reason: 'a sync is already running; wait for it to finish',
+      });
+    });
+  });
+
+  describe('removeModel', () => {
+    it('DELETEs the model, escaping it in the query, and returns the models written', async () => {
+      const fetchFn = respond({ ok: true, json: async () => ({ ok: true, models: { fast: {}, slow: {} } }) });
+      await expect(createConfigClient(fetchFn).removeModel('acme/large')).resolves.toEqual({
+        ok: true,
+        models: ['fast', 'slow'],
+      });
+      expect(fetchFn).toHaveBeenCalledWith(`${CONFIG_MODELS_URL}?id=acme%2Flarge`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    it('returns the daemon refusal', async () => {
+      const fetchFn = respond({
+        ok: false,
+        status: 422,
+        json: async () => ({ ok: false, reason: 'model "fast" is bound to edit.apply' }),
+      });
+      await expect(createConfigClient(fetchFn).removeModel('fast')).resolves.toEqual({
+        ok: false,
+        reason: 'model "fast" is bound to edit.apply',
       });
     });
   });

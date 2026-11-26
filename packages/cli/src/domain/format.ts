@@ -102,6 +102,7 @@ export function formatHelp(color = false): string[] {
     '  violations [list|prune [file]] list recorded violations, or clear them',
     '  config [show|bind|unbind|model] …  show role bindings, bind or unbind a role, or declare a',
     '                                 model: config model <id> --context N --max-output N --cost <tier>',
+    '  config model remove <id>       remove a declared model no role is bound to',
     '  providers [list]               list model providers (no keys) and the steps a live run lacks',
     '  providers add <name> --base-url <url> --model <id> [--type openai|azure|anthropic]',
     '                                 add or replace a provider; the key is read from stdin or a',

@@ -26,14 +26,12 @@ import { intro, isCancel, log, note, outro, select, spinner } from '@clack/promp
 import {
   BUILTIN_ROLES,
   buildRegistry,
-  clearBinding,
   connectorRoster,
   dispatchSwarm,
   memberCount,
   planKey,
   resolveModules,
   runDoctor,
-  setBinding,
   type ConfigDocumentPort,
   type HealthReport,
   type ModelCapabilities,
@@ -55,6 +53,7 @@ import {
 import { rpcCall, socketPath, tokenPath } from '@paw/daemon';
 import {
   menuFor,
+  configEditFor,
   configLines,
   connectorLines,
   daemonLines,
@@ -63,9 +62,11 @@ import {
   herdLines,
   moduleLines,
   planLines,
+  refusalLines,
   syncLines,
   taskLines,
   type ActionId,
+  type ConfigPick,
   type ConfigSnapshot,
   type DaemonSnapshot,
   type DaemonStatus,
@@ -249,7 +250,7 @@ function cliLine(entry: MenuEntry, colored: boolean): string | null {
 
 /**
  * Run one action to its printed lines. Interactive mode may prompt (member
- * pick, daemon verb, binding edit); batch keeps the defaults: member 0, daemon
+ * pick, daemon verb, config edit); batch keeps the defaults: member 0, daemon
  * status, config read-only.
  *
  * @param {ActionId} id - The action.
@@ -362,45 +363,81 @@ async function runAction(
     }
     return syncLines(await syncRepoBackends(root, full, fetch, () => new Date().toISOString()));
   }
-  // config
-  const doc = createNodeConfigDocument(root);
-  if (interactive) {
-    const snapshot = await readConfigSnapshot(doc);
-    const picked = await select({
-      message: 'bindings — edit one?',
-      options: [
-        { value: '(view)', label: 'just show them', hint: 'cli: paw config' },
-        ...snapshot.bindings.map((binding) => ({
-          value: binding.role,
-          label: `${binding.role} → ${binding.bound ?? '(unbound)'}`,
-          hint: 'rebind or unbind',
-        })),
-      ],
-    });
-    if (isCancel(picked)) {
-      return [];
-    }
-    if (picked !== '(view)') {
-      const target = await select({
-        message: `bind ${picked} to`,
-        options: [
-          ...snapshot.models.map((model) => ({ value: model, label: model })),
-          { value: '(unbind)', label: '(unbind)', hint: 'cli: paw config unbind' },
-        ],
-      });
-      if (!isCancel(target)) {
-        const current = await doc.read();
-        const edit =
-          target === '(unbind)'
-            ? clearBinding(current, picked)
-            : setBinding(current, picked, target);
-        if (edit.ok) {
-          await doc.write(edit.config);
-        }
-      }
-    }
+  return configAction(createNodeConfigDocument(root), interactive);
+}
+
+/**
+ * Value the config picker gives the remove-a-model entry.
+ */
+const REMOVE_MODEL = '(remove model)';
+
+/**
+ * Prompt for one config edit: rebind or unbind a role, or remove a declared
+ * model. Null when the operator cancels or only views.
+ *
+ * @param {ConfigSnapshot} snapshot - Models and bindings to offer.
+ * @returns {Promise<ConfigPick | null>} The chosen edit, or null.
+ */
+async function promptConfigPick(snapshot: ConfigSnapshot): Promise<ConfigPick | null> {
+  const picked = await select({
+    message: 'bindings — edit one?',
+    options: [
+      { value: '(view)', label: 'just show them', hint: 'cli: paw config' },
+      ...snapshot.bindings.map((binding) => ({
+        value: binding.role,
+        label: `${binding.role} → ${binding.bound ?? '(unbound)'}`,
+        hint: 'rebind or unbind',
+      })),
+      ...(snapshot.models.length === 0
+        ? []
+        : [{ value: REMOVE_MODEL, label: 'remove a model', hint: 'cli: paw config model remove <id>' }]),
+    ],
+  });
+  if (isCancel(picked) || picked === '(view)') {
+    return null;
   }
-  return configLines(await readConfigSnapshot(doc));
+  if (picked === REMOVE_MODEL) {
+    const model = await select({
+      message: 'remove which model?',
+      options: snapshot.models.map((id) => ({ value: id, label: id })),
+    });
+    return isCancel(model) ? null : { kind: 'remove', model };
+  }
+  const target = await select({
+    message: `bind ${picked} to`,
+    options: [
+      ...snapshot.models.map((model) => ({ value: model, label: model })),
+      { value: '(unbind)', label: '(unbind)', hint: 'cli: paw config unbind' },
+    ],
+  });
+  if (isCancel(target)) {
+    return null;
+  }
+  return target === '(unbind)'
+    ? { kind: 'unbind', role: picked }
+    : { kind: 'bind', role: picked, model: target };
+}
+
+/**
+ * Config action: in interactive mode apply one picked edit, then print the
+ * bindings, preceded by the refusal when the engine refused it. Batch mode only
+ * prints.
+ *
+ * @param {ConfigDocumentPort} doc - Config document.
+ * @param {boolean} interactive - Whether prompts may open.
+ * @returns {Promise<string[]>} Lines to print.
+ */
+async function configAction(doc: ConfigDocumentPort, interactive: boolean): Promise<string[]> {
+  const pick = interactive ? await promptConfigPick(await readConfigSnapshot(doc)) : null;
+  let refused: string[] = [];
+  if (pick !== null) {
+    const edit = configEditFor(await doc.read(), pick);
+    if (edit.ok) {
+      await doc.write(edit.config);
+    }
+    refused = refusalLines(edit);
+  }
+  return [...refused, ...configLines(await readConfigSnapshot(doc))];
 }
 
 /**

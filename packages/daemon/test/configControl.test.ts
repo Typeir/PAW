@@ -2,7 +2,8 @@
  * PAW Config Control Port Tests
  *
  * @fileoverview Test each config verb against fake document. Bind write doc and
- * return new roles. Declare write new models. Clear take role from body or query.
+ * return new roles. Declare write new models; remove refuse a bound one. Clear
+ * take role from body or query.
  * Refusals cover non-string param, missing one, engine rejection, malformed caps.
  *
  * @module @paw/daemon/test/configControl
@@ -119,6 +120,36 @@ describe('configControl', () => {
     it('refuses malformed capabilities', async () => {
       const res = await run(fakeDoc().port, { body: { id: 'slow', capabilities: { tools: 'yes' } } });
       expect(res.status).toBe(422);
+    });
+  });
+
+  describe('DELETE /api/config/models', () => {
+    const run = (doc: ConfigDocumentPort, over: Partial<ControlRequest>) =>
+      configControl(doc).handlers['DELETE /api/config/models'](req(over));
+
+    it('removes a model named in the body', async () => {
+      const doc = fakeDoc(withModel);
+      const res = await run(doc.port, { body: { id: 'fast' } });
+      expect(res).toMatchObject({ status: 200, body: { ok: true, models: {} } });
+      expect(doc.get().models).toEqual({});
+    });
+
+    it('removes a model named in the query', async () => {
+      const doc = fakeDoc(withModel);
+      const res = await run(doc.port, { query: new URLSearchParams('id=fast') });
+      expect(res.status).toBe(200);
+      expect(doc.get().models).toEqual({});
+    });
+
+    it('refuses a model a role is bound to, leaving the document unwritten', async () => {
+      const doc = fakeDoc({ ...withModel, roles: { 'edit.apply': 'fast' } });
+      const res = await run(doc.port, { body: { id: 'fast' } });
+      expect(res).toMatchObject({ status: 422, body: { ok: false } });
+      expect(doc.get().models).toEqual({ fast: caps });
+    });
+
+    it('refuses when no id is given', async () => {
+      expect((await run(fakeDoc().port, {})).status).toBe(422);
     });
   });
 

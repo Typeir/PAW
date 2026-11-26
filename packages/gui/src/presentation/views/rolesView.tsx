@@ -5,6 +5,8 @@
  * role binds to, and whether the binding meets the role's requirements. A
  * required role that is unbound, or bound to a model lacking the role's
  * capability, blocks the view. Optional role left unbound renders optional.
+ * With a daemon behind it, a Models card lists declared models, each removable;
+ * the daemon refuses a model a role is bound to.
  *
  * @module @paw/gui/presentation/views/rolesView
  * @version 0.0.0
@@ -18,6 +20,7 @@ import { useConsoleData } from '../../application/hooks/useConsole.js';
 import { useConfigClient } from '../../application/context/consoleContext.js';
 import { useBindingEditor } from '../../application/hooks/useBindingEditor.js';
 import { Card } from '../atoms/card.js';
+import { CloseLight } from '../atoms/closeLight.js';
 import { Crumb } from '../atoms/crumb.js';
 import { Select } from '../atoms/select.js';
 
@@ -96,6 +99,25 @@ export function RolesView() {
           </ul>
         </div>
       </Card>
+      {editor.editable && (
+        <Card title='Models' meta={`${editor.models.length} declared`}>
+          <div className='pad'>
+            <ul>
+              {editor.models.map((model) => (
+                <li className='model-row' key={model}>
+                  <span className='mid'>{model}</span>
+                  <CloseLight
+                    small
+                    className='model-remove'
+                    label={`Remove model ${model}`}
+                    onClick={() => editor.removeModel(model)}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Card>
+      )}
     </>
   );
 }

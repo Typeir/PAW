@@ -1,7 +1,7 @@
 /**
  * Binding Editor Hook Tests
  *
- * @fileoverview Roles view edit state through small probe. No client, not editable, does nothing. Client load models, report read failure. Write clear prior error. Refusal show reason, or default when none.
+ * @fileoverview Roles view edit state through small probe. No client, not editable, does nothing. Client load models, report read failure. Write clear prior error. Refusal show reason, or default when none. Removal take the models the daemon wrote.
  *
  * @module @paw/gui/test/unit/application/useBindingEditor
  */
@@ -28,6 +28,7 @@ function Probe({ client }: { readonly client: ConfigClient | null }) {
       <span data-testid='editable'>{String(editor.editable)}</span>
       <button onClick={() => editor.bind('edit.apply', 'fast')}>bind</button>
       <button onClick={() => editor.unbind('edit.apply')}>unbind</button>
+      <button onClick={() => editor.removeModel('slow')}>remove</button>
     </div>
   );
 }
@@ -44,6 +45,7 @@ const client = (over: Partial<ConfigClient> = {}): ConfigClient => ({
   syncTasks: async () => ({ ok: true, reports: [] }),
   bind: async () => ({ ok: true }),
   unbind: async () => ({ ok: true }),
+  removeModel: async () => ({ ok: true, models: ['fast'] }),
   ...over,
 });
 
@@ -54,6 +56,7 @@ describe('useBindingEditor', () => {
     expect(screen.getByTestId('models')).toHaveTextContent('');
     await userEvent.click(screen.getByText('bind'));
     await userEvent.click(screen.getByText('unbind'));
+    await userEvent.click(screen.getByText('remove'));
     expect(screen.getByTestId('error')).toHaveTextContent('');
   });
 
@@ -91,6 +94,26 @@ describe('useBindingEditor', () => {
     );
     await userEvent.click(screen.getByText('bind'));
     expect(await screen.findByText('model "ghost" is not declared')).toBeInTheDocument();
+  });
+
+  it('removes a model and shows the models the daemon wrote, not a stale re-read', async () => {
+    const removeModel = vi.fn(async () => ({ ok: true as const, models: ['fast'] }));
+    const models = vi.fn(async () => ['fast', 'slow']);
+    render(<Probe client={client({ models, removeModel })} />);
+    expect(await screen.findByText('fast,slow')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('remove'));
+    expect(removeModel).toHaveBeenCalledWith('slow');
+    await waitFor(() => expect(screen.getByTestId('models')).toHaveTextContent(/^fast$/));
+    expect(models).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the models and shows why a removal was refused', async () => {
+    const reason = 'model "slow" is bound to edit.apply; unbind with paw config unbind edit.apply';
+    render(<Probe client={client({ removeModel: async () => ({ ok: false as const, reason }) })} />);
+    expect(await screen.findByText('fast,slow')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('remove'));
+    expect(await screen.findByText(reason)).toBeInTheDocument();
+    expect(screen.getByTestId('models')).toHaveTextContent('fast,slow');
   });
 
   it('falls back to a default reason when a refusal gives none', async () => {

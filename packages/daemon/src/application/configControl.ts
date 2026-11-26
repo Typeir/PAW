@@ -22,6 +22,7 @@ import {
   enabledConnectorIds,
   enabledModuleIds,
   parseCapabilities,
+  removeModel,
   setBinding,
   type ConfigDocumentPort,
   type ConfigEdit,
@@ -49,8 +50,8 @@ function asString(value: unknown): string | null {
 }
 
 /**
- * Build control port. Port edit repo config document: bind role, declare model,
- * clear binding.
+ * Build control port. Port edit repo config document: bind role, declare or
+ * remove model, clear binding, toggle connector or module.
  *
  * @param {ConfigDocumentPort} configDoc - Document to read and write.
  * @returns {ControlPort} Registered writes.
@@ -127,6 +128,13 @@ export function configControl(configDoc: ConfigDocumentPort): ControlPort {
           return refuse(parsed.reason);
         }
         return commit(declareModel(await configDoc.read(), id, parsed.capabilities));
+      },
+      'DELETE /api/config/models': async ({ query, body }) => {
+        const id = asString(body.id) ?? query?.get('id') ?? null;
+        if (id === null) {
+          return refuse('id is required');
+        }
+        return commit(removeModel(await configDoc.read(), id));
       },
     },
   };

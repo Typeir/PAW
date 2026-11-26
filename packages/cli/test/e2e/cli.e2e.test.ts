@@ -334,6 +334,47 @@ describe('cli config show (e2e)', () => {
   });
 });
 
+describe('cli config model remove (e2e)', () => {
+  const CAPS = {
+    contextTokens: 128_000,
+    maxOutputTokens: 8_192,
+    tools: true,
+    structuredOutput: true,
+    reasoning: false,
+    vision: false,
+    costClass: 'cheap',
+  };
+
+  it('refuses a bound model, then removes it once unbound', async () => {
+    const root = repoWithConfig({
+      models: { 'deepseek-chat': CAPS, spare: CAPS },
+      roles: { 'edit.apply': 'deepseek-chat' },
+    });
+    const bound = await runCliIn(root, 'config', 'model', 'remove', 'deepseek-chat');
+    expect(bound.code).toBe(1);
+    expect(bound.stdout).toContain(
+      'model "deepseek-chat" is bound to edit.apply; unbind with paw config unbind edit.apply',
+    );
+
+    const spare = await runCliIn(root, 'config', 'model', 'remove', 'spare');
+    expect(spare.code).toBe(0);
+    expect(spare.stdout).toContain('removed model spare');
+    const shown = await runCliIn(root, 'config', 'show');
+    expect(shown.stdout).toContain('models: deepseek-chat');
+
+    const ghost = await runCliIn(root, 'config', 'model', 'remove', 'spare');
+    expect(ghost.code).toBe(1);
+    expect(ghost.stdout).toContain('model "spare" is not declared');
+  });
+
+  it('fails loud without a model id', async () => {
+    const root = repoWithConfig({ models: { spare: CAPS } });
+    const { code, stderr } = await runCliIn(root, 'config', 'model', 'remove');
+    expect(code).toBe(1);
+    expect(stderr).toContain('usage: paw config model remove <id>');
+  });
+});
+
 describe('cli modules install (e2e)', () => {
   /** Local git repo standing in for the paw-agile remote, shipping one skill on `main`. */
   const moduleSource = (): string => {

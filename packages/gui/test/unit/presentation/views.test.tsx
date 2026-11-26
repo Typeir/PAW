@@ -90,6 +90,7 @@ const configClient = (over: Partial<ConfigClient> = {}): ConfigClient => ({
   syncTasks: async () => ({ ok: true, reports: [] }),
   bind: async () => ({ ok: true }),
   unbind: async () => ({ ok: true }),
+  removeModel: async () => ({ ok: true, models: [] }),
   ...over,
 });
 
@@ -186,6 +187,18 @@ describe('RolesView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Model for lore.author' }));
     await userEvent.click(await screen.findByRole('option', { name: '(unbound)' }));
     expect(unbind).toHaveBeenCalledWith('lore.author');
+  });
+
+  it('lists the declared models only when a daemon backs the view', async () => {
+    renderInConsole(<RolesView />);
+    expect(screen.queryByRole('heading', { name: 'Models' })).toBeNull();
+  });
+
+  it('removes a declared model over the client', async () => {
+    const removeModel = vi.fn(async () => ({ ok: true as const, models: ['slow'] }));
+    renderEditable(configClient({ removeModel }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove model fast' }));
+    expect(removeModel).toHaveBeenCalledWith('fast');
   });
 
   it('surfaces why the declared models could not be read', async () => {

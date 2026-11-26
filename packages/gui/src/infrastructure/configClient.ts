@@ -48,6 +48,11 @@ export const TASKS_SYNC_URL = '/api/tasks/sync';
 export const CONFIG_ROLES_URL = '/api/config/roles';
 
 /**
+ * Model declaration control endpoint.
+ */
+export const CONFIG_MODELS_URL = '/api/config/models';
+
+/**
  * Outcome of write.
  *
  * @interface ConfigWrite
@@ -58,6 +63,13 @@ export interface ConfigWrite {
   readonly ok: boolean;
   readonly reason?: string;
 }
+
+/**
+ * Outcome of a model removal: the declared models the daemon wrote, or the refusal.
+ */
+export type ModelsWrite =
+  | { readonly ok: true; readonly models: readonly string[] }
+  | { readonly ok: false; readonly reason: string };
 
 /**
  * Declared models and role bindings, as `/api/config` serves them.
@@ -165,6 +177,7 @@ export type TaskSyncResult =
  * @property {(full: boolean) => Promise<TaskSyncResult>} syncTasks - Sync every enabled backend; `full` forces a full sweep.
  * @property {(role: string, model: string) => Promise<ConfigWrite>} bind - Bind role to model.
  * @property {(role: string) => Promise<ConfigWrite>} unbind - Clear role binding.
+ * @property {(id: string) => Promise<ModelsWrite>} removeModel - Remove a declared model; refused while a role is bound to it.
  * @property {(id: string, on: boolean) => Promise<ConfigWrite>} setConnector - Enable or disable a connector.
  * @property {(id: string, on: boolean) => Promise<ConfigWrite>} setModule - Enable or disable a module.
  */
@@ -178,6 +191,7 @@ export interface ConfigClient {
   syncTasks(full: boolean): Promise<TaskSyncResult>;
   bind(role: string, model: string): Promise<ConfigWrite>;
   unbind(role: string): Promise<ConfigWrite>;
+  removeModel(id: string): Promise<ModelsWrite>;
   setConnector(id: string, on: boolean): Promise<ConfigWrite>;
   setModule(id: string, on: boolean): Promise<ConfigWrite>;
 }
@@ -305,6 +319,17 @@ export function createConfigClient(fetchFn: FetchLike): ConfigClient {
           headers: JSON_HEADERS,
         }),
       );
+    },
+    async removeModel(id: string): Promise<ModelsWrite> {
+      const response = await fetchFn(`${CONFIG_MODELS_URL}?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: JSON_HEADERS,
+      });
+      if (!response.ok) {
+        return refusalOf(response);
+      }
+      const written = (await response.json()) as { readonly models: Readonly<Record<string, unknown>> };
+      return { ok: true, models: Object.keys(written.models) };
     },
   };
 }

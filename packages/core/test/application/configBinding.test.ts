@@ -18,6 +18,7 @@ import {
   clearBinding,
   declareModel,
   parseCapabilities,
+  removeModel,
   setBinding,
 } from '../../src/application/configBinding.js';
 
@@ -93,6 +94,34 @@ describe('setBinding', () => {
       ok: false,
       reason: 'model "ghost" is not declared',
     });
+  });
+});
+
+describe('removeModel', () => {
+  it('removes an unbound model, preserving the rest of the document', () => {
+    const two: ConfigDocument = { ...base, models: { fast: caps, slow: caps } };
+    expect(removeModel(two, 'slow')).toEqual({
+      ok: true,
+      config: { root: '.paw', models: { fast: caps }, roles: { 'edit.apply': 'fast' } },
+    });
+  });
+
+  it('refuses a model that is not declared', () => {
+    expect(removeModel(base, 'ghost')).toEqual({ ok: false, reason: 'model "ghost" is not declared' });
+  });
+
+  it('refuses a model a role is bound to, naming each role and the unbind verb', () => {
+    const both: ConfigDocument = { ...base, roles: { 'edit.apply': 'fast', 'review.graze': 'fast' } };
+    expect(removeModel(both, 'fast')).toEqual({
+      ok: false,
+      reason:
+        'model "fast" is bound to edit.apply, review.graze; unbind with paw config unbind edit.apply && paw config unbind review.graze',
+    });
+  });
+
+  it('removes a model from a document with no role bindings', () => {
+    const edit = removeModel({ root: '.paw', models: { fast: caps } }, 'fast');
+    expect(edit).toEqual({ ok: true, config: { root: '.paw', models: {} } });
   });
 });
 

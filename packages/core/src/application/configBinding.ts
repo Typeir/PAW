@@ -1,7 +1,7 @@
 /**
  * PAW Config Binding Edits
  *
- * @fileoverview Pure transform over repo config document. Add model, bind role to one, or clear binding. Each return new document or reason refuse; no I/O; file owner apply result. Validation match {@link buildRegistry}: role must be one PAW declare, and binding model must already declare.
+ * @fileoverview Pure transform over repo config document. Add or remove model, bind role to one, or clear binding. Each return new document or reason refuse; no I/O; file owner apply result. Validation match {@link buildRegistry}: role must be one PAW declare, and binding model must already declare.
  *
  * @module @paw/core/application/configBinding
  * @version 0.0.0
@@ -227,6 +227,31 @@ export function disableConnector(config: ConfigDocument, id: string): ConfigEdit
     return { ok: true, config: rest };
   }
   return { ok: true, config: next };
+}
+
+/**
+ * Remove a declared model. Refused while any role is bound to it.
+ *
+ * @param {ConfigDocument} config - Current document.
+ * @param {string} id - Model to remove.
+ * @returns {ConfigEdit} Next document, or refusal when the model is not declared or still bound.
+ */
+export function removeModel(config: ConfigDocument, id: string): ConfigEdit {
+  if (config.models?.[id] === undefined) {
+    return { ok: false, reason: `model "${id}" is not declared` };
+  }
+  const bound = Object.entries(config.roles ?? {})
+    .filter(([, modelId]) => modelId === id)
+    .map(([roleId]) => roleId);
+  if (bound.length > 0) {
+    return {
+      ok: false,
+      reason: `model "${id}" is bound to ${bound.join(', ')}; unbind with ${bound.map((r) => `paw config unbind ${r}`).join(' && ')}`,
+    };
+  }
+  const models = { ...config.models };
+  delete models[id];
+  return { ok: true, config: { ...config, models } };
 }
 
 /**

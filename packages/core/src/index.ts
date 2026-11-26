@@ -214,6 +214,7 @@ export {
   enableConnector,
   enableModule,
   parseCapabilities,
+  removeModel,
   setBinding,
 } from './application/configBinding.js';
 export type { ConfigEdit } from './application/configBinding.js';

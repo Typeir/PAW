@@ -5,7 +5,9 @@
  * models pick from, write maybe in flight, reason last one refused. Write go
  * to daemon, new binding come on next live snapshot, so hook hold no
  * optimistic copy of bindings — only models (snapshot not carry them) and
- * write status. Page with no daemon behind it get null client, not editable.
+ * write status. A removal takes the models from the daemon's write response,
+ * since `/api/config` lags the file by one poll. Page with no daemon behind it
+ * get null client, not editable.
  *
  * @module @paw/gui/application/hooks/useBindingEditor
  * @version 0.0.0
@@ -26,6 +28,7 @@ import type { ConfigClient, ConfigWrite } from '../../infrastructure/configClien
  * @property {boolean} editable - Daemon there to write to.
  * @property {(role: string, model: string) => void} bind - Bind role to model.
  * @property {(role: string) => void} unbind - Clear role binding.
+ * @property {(model: string) => void} removeModel - Remove a declared model; models become the ones the daemon wrote.
  */
 export interface BindingEditor {
   readonly models: readonly string[];
@@ -34,6 +37,7 @@ export interface BindingEditor {
   readonly editable: boolean;
   bind(role: string, model: string): void;
   unbind(role: string): void;
+  removeModel(model: string): void;
 }
 
 /**
@@ -82,5 +86,23 @@ export function useBindingEditor(client: ConfigClient | null): BindingEditor {
     [client, run],
   );
 
-  return { models, pending, error, editable: client !== null, bind, unbind };
+  const removeModel = useCallback(
+    (model: string): void => {
+      if (client !== null) {
+        setPending(true);
+        setError(null);
+        void client.removeModel(model).then((result) => {
+          setPending(false);
+          if (result.ok) {
+            setModels(result.models);
+          } else {
+            setError(result.reason);
+          }
+        });
+      }
+    },
+    [client],
+  );
+
+  return { models, pending, error, editable: client !== null, bind, unbind, removeModel };
 }

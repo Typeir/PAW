@@ -1,7 +1,7 @@
 /**
  * PAW CLI — config command
  *
- * @fileoverview `paw config` edit repo model bindings on disk: show roles and bindings judged against what each role requires, bind role to declared model, unbind, or declare model. CLI hold filesystem authority; write `.paw/config.json` through core edit engine, same engine console reach over control API.
+ * @fileoverview `paw config` edit repo model bindings on disk: show roles and bindings judged against what each role requires, bind role to declared model, unbind, declare model, or remove one no role is bound to. CLI hold filesystem authority; write `.paw/config.json` through core edit engine, same engine console reach over control API.
  *
  * @module @paw/cli/infrastructure/commands/config
  * @version 0.0.0
@@ -14,6 +14,7 @@ import {
   declareModel,
   doctorConfigRoles,
   parseCapabilities,
+  removeModel,
   setBinding,
   type ConfigDocument,
   type ConfigEdit,
@@ -105,12 +106,19 @@ export async function runConfig(
     }
     return commit(clearBinding(config, role), doc, print, `unbound ${role}`);
   }
+  if (sub === 'model' && rest[1] === 'remove') {
+    const id = rest[2];
+    if (id === undefined) {
+      throw new Error('usage: paw config model remove <id>');
+    }
+    return commit(removeModel(config, id), doc, print, `removed model ${id}`);
+  }
   if (sub === 'model') {
     const args = parseArgs(rest.slice(1), ['context', 'max-output', 'cost']);
     const id = args.positional[0];
     if (id === undefined) {
       throw new Error(
-        'usage: paw config model <id> --context N --max-output N --cost <tier> [--tools --structured --reasoning --vision]',
+        'usage: paw config model <id> --context N --max-output N --cost <tier> [--tools --structured --reasoning --vision] · paw config model remove <id>',
       );
     }
     const parsed = parseCapabilities({

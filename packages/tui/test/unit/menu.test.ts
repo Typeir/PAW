@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import type { DispatchResult, DoctorReport, HealthReport, SwarmPlan, Violation } from '@paw/core';
 import {
   MENU,
+  configEditFor,
   configLines,
   connectorLines,
   daemonLines,
@@ -26,6 +27,7 @@ import {
   menuFor,
   moduleLines,
   planLines,
+  refusalLines,
   syncLines,
   taskLines,
 } from '../../src/domain/menu.js';
@@ -402,5 +404,46 @@ describe('configLines', () => {
 
   it('says when no models are declared', () => {
     expect(configLines({ models: [], bindings: [] })[0]).toBe('models: (none declared)');
+  });
+});
+
+describe('configEditFor', () => {
+  const caps = {
+    contextTokens: 128_000,
+    maxOutputTokens: 8_192,
+    tools: true,
+    structuredOutput: true,
+    reasoning: false,
+    vision: false,
+    costClass: 'cheap' as const,
+  };
+  const doc = { models: { ds: caps, spare: caps }, roles: { 'edit.apply': 'ds' } };
+
+  it('binds a role', () => {
+    const edit = configEditFor(doc, { kind: 'bind', role: 'review.graze', model: 'ds' });
+    expect(edit.ok && edit.config.roles).toEqual({ 'edit.apply': 'ds', 'review.graze': 'ds' });
+  });
+
+  it('unbinds a role', () => {
+    const edit = configEditFor(doc, { kind: 'unbind', role: 'edit.apply' });
+    expect(edit.ok && edit.config.roles).toEqual({});
+  });
+
+  it('removes an unbound model', () => {
+    const edit = configEditFor(doc, { kind: 'remove', model: 'spare' });
+    expect(edit.ok && Object.keys(edit.config.models ?? {})).toEqual(['ds']);
+  });
+
+  it('carries the refusal for a bound model', () => {
+    expect(configEditFor(doc, { kind: 'remove', model: 'ds' })).toMatchObject({ ok: false });
+  });
+});
+
+describe('refusalLines', () => {
+  it('prints the reason for a refused edit and nothing for an applied one', () => {
+    expect(refusalLines({ ok: false, reason: 'model "x" is not declared' })).toEqual([
+      '✗ model "x" is not declared',
+    ]);
+    expect(refusalLines({ ok: true, config: {} })).toEqual([]);
   });
 });
